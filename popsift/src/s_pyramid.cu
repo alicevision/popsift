@@ -94,7 +94,7 @@ void Pyramid::debug_out_floats( float* data, uint32_t pitch, uint32_t height )
           height,
           0 );
 
-    test_last_error( __LINE__ );
+    test_last_error( __LINE__, _stream );
 }
 
 void Pyramid::debug_out_floats_t( float* data, uint32_t pitch, uint32_t height )
@@ -106,7 +106,7 @@ void Pyramid::debug_out_floats_t( float* data, uint32_t pitch, uint32_t height )
           height,
           0 );
 
-    test_last_error( __LINE__ );
+    test_last_error( __LINE__, _stream );
 }
 
 /*************************************************************
@@ -141,7 +141,6 @@ Pyramid::Layer::Layer( )
 
 void Pyramid::Layer::allocExtrema( uint32_t layer_max_extrema )
 {
-    cudaError_t        err;
     ExtremaMgmt*       mgmt;
 
     _d_extrema = new ExtremumCandidate*[ _levels ];
@@ -160,12 +159,12 @@ void Pyramid::Layer::allocExtrema( uint32_t layer_max_extrema )
         _h_extrema_mgmt[i].init( layer_max_extrema );
     }
 
-    CUDA_MEMCPY_ASYNC( _d_extrema_mgmt,
-                       _h_extrema_mgmt,
-                       _levels * sizeof(ExtremaMgmt),
-                       cudaMemcpyHostToDevice,
-                       _stream,
-                       true );
+    POP_CUDA_MEMCPY_ASYNC( _d_extrema_mgmt,
+                           _h_extrema_mgmt,
+                           _levels * sizeof(ExtremaMgmt),
+                           cudaMemcpyHostToDevice,
+                           _stream,
+                           true );
 
     _d_extrema[0] = 0;
     _d_extrema[_levels-1] = 0;
@@ -190,7 +189,7 @@ void Pyramid::Layer::freeExtrema( )
     delete [] _h_desc;
 }
 
-void Pyramid::Layer::alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema, cudaStream_t stream=0 )
+void Pyramid::Layer::alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema, cudaStream_t stream )
 {
     _pitch   = _width  = width;
     _t_pitch = _height = height;
@@ -259,7 +258,7 @@ void Pyramid::Layer::free( )
     cudaStreamDestroy( _stream );
 }
 
-void Pyramid::Layer::resetExtremaCount( )
+void Pyramid::Layer::resetExtremaCount( cudaStream_t stream )
 {
     for( uint32_t i=1; i<_levels-1; i++ ) {
         _h_extrema_mgmt[i].counter = 0;
@@ -267,15 +266,15 @@ void Pyramid::Layer::resetExtremaCount( )
     POP_CUDA_MEMCPY_ASYNC( _d_extrema_mgmt,
                            _h_extrema_mgmt,
                            _levels * sizeof(ExtremaMgmt),
-                           cudaMemcpyHostToDevice, _stream, true );
+                           cudaMemcpyHostToDevice, stream, true );
 }
 
-void Pyramid::Layer::readExtremaCount( )
+void Pyramid::Layer::readExtremaCount( cudaStream_t stream )
 {
     POP_CUDA_MEMCPY_ASYNC( _h_extrema_mgmt,
                            _d_extrema_mgmt,
                            _levels * sizeof(ExtremaMgmt),
-                           cudaMemcpyDeviceToHost, _stream, true );
+                           cudaMemcpyDeviceToHost, stream, true );
 }
 
 uint32_t Pyramid::Layer::getExtremaCount( ) const

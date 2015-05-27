@@ -169,7 +169,7 @@ class Pyramid
          * alloc() - allocates all GPU memories for one octave
          * @param width in floats, not bytes!!!
          */
-        void alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema );
+        void alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema, cudaStream_t stream=0 );
         void free();
 
         /**
@@ -216,7 +216,7 @@ private:
 
     void descriptors_v1( );
 
-    void test_last_error( int line );
+    void test_last_error( int line, cudaStream_t stream );
     void debug_out_floats  ( float* data, uint32_t pitch, uint32_t height );
     void debug_out_floats_t( float* data, uint32_t pitch, uint32_t height );
 
