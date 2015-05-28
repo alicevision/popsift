@@ -103,6 +103,7 @@ void PopSift::execute( imgStream inp )
         globalKeepTime.waitFor( stream_2 );
     }
 
+#if 1
     cerr << "stopping global timer" << endl;
     globalKeepTime.stop( );
     cerr << "stopped global timer" << endl;
@@ -114,6 +115,7 @@ void PopSift::execute( imgStream inp )
     _pyramid1->report_times();
     if( secondImage )
         _pyramid2->report_times();
+#endif
 
     if( log_to_file ) {
         _base1->download_and_save_array( "upscaled-input-image.pgm" );
