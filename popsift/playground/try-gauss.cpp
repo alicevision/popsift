@@ -116,7 +116,7 @@ void printit( double* image, int width )
 {
     for( int h=0; h<width; h++ ) {
         for( int w=0; w<width; w++ ) {
-            cout << setprecision(3) << image[h*width+w] << " ";
+            cout << setw(4) << setprecision(3) << image[h*width+w] << " ";
         }
         cout << endl;
     }
@@ -124,15 +124,16 @@ void printit( double* image, int width )
 
 int main( )
 {
-    const double sigma=2.0;
-    const int width=7;    // width should be ceil(6*sigma)^2
+    const double sigma=1.0;
+    const int width=9;    // width should be ceil(6*sigma)^2
 
     int     w1D_1 = ceil(sigma)*6+1;
     double* k = new double[width*width];
     cout << sigma << " -> " << w1D_1 << endl;
     make_kernel2D( sigma, k, width );
-    // printit( k, width );
-    // cout << "Sum: " << sum << endl;
+
+                    // printit( k, width );
+                    // cout << "Sum: " << sum << endl;
     double* k1D = new double[width];
     make_kernel1D( sigma, k1D, width );
 
@@ -154,6 +155,12 @@ int main( )
     double* k1D_4 = new double[w1D_4];
     make_kernel1D( sigma4, k1D_4, w1D_4 );
 
+    double  sigma6 = sqrt(6.0) * sigma;
+    int     w1D_6 = ceil(sigma6)*6+1;
+    cout << sigma6 << " -> " << w1D_6 << endl;
+    double* k1D_6 = new double[w1D_6];
+    make_kernel1D( sigma6, k1D_6, w1D_6 );
+
     cout << endl
          << "Applying kernel to a dummy image of 1s" << endl;
     const int imagewidth = 3 * width;
@@ -169,6 +176,8 @@ int main( )
     double* out_i2D_2 = new double[imagewidth*imagewidth];
     double* out_i2D_3 = new double[imagewidth*imagewidth];
     double* out_i2D_4 = new double[imagewidth*imagewidth];
+    double* out_i2D_5 = new double[imagewidth*imagewidth];
+    double* out_i2D_6 = new double[imagewidth*imagewidth];
 
     double* out_i1D_1 = new double[imagewidth*imagewidth];
     double* out_i1D_2 = new double[imagewidth*imagewidth];
@@ -182,8 +191,11 @@ int main( )
     apply2D( k, width, out_i2D_1, image, imagewidth );
     apply2D( k, width, out_i2D_2, out_i2D_1, imagewidth );
     apply2D( k, width, out_i2D_3, out_i2D_2, imagewidth );
-    // apply2D( k, width, out_i2D_4, out_i2D_3, imagewidth );
-    printit( out_i2D_3, imagewidth );
+    apply2D( k, width, out_i2D_4, out_i2D_3, imagewidth );
+    apply2D( k, width, out_i2D_5, out_i2D_4, imagewidth );
+    apply2D( k, width, out_i2D_6, out_i2D_5, imagewidth );
+    cout << "Applying 2D kernel with sigma " << sigma << " 6 times (kernel size " << width << "x" << width << ")" << endl;
+    printit( out_i2D_6, imagewidth );
 
     // apply1D_row( k1D, width, out_i1D_1, image, imagewidth );
     // apply1D_row( k1D, width, out_i1D_2, out_i1D_1, imagewidth );
@@ -198,8 +210,14 @@ int main( )
     // apply1D_col( k1D, width, out_i1D_6, out_i1D_5, imagewidth );
     // printit( out_i1D_6, imagewidth );
 
-    apply1D_row( k1D_3, w1D_3, out_i1D_7, image, imagewidth );
-    apply1D_col( k1D_3, w1D_3, out_i1D_8, out_i1D_7, imagewidth );
+    // apply1D_row( k1D_3, w1D_3, out_i1D_7, image, imagewidth );
+    // apply1D_col( k1D_3, w1D_3, out_i1D_8, out_i1D_7, imagewidth );
+    // cout << "Applying 1D kernel with sigma " << sigma3 << " once horiz, once vert (kernel size " << w1D_3 << ")" << endl;
+    // printit( out_i1D_8, imagewidth );
+
+    apply1D_row( k1D_6, w1D_6, out_i1D_7, image, imagewidth );
+    apply1D_col( k1D_6, w1D_6, out_i1D_8, out_i1D_7, imagewidth );
+    cout << "Applying 1D kernel with sigma " << sigma3 << " once horiz, once vert (kernel size " << w1D_3 << ")" << endl;
     printit( out_i1D_8, imagewidth );
 #if 0
     apply2D( k, width, out_image2, out_image, imagewidth );
