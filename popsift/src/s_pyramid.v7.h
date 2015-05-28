@@ -247,7 +247,7 @@ void Pyramid::build_v7( Image* base )
                 } else {
                     filter_gauss_horiz_v7_by_2
                         <<<grid_t,block,0,_stream>>>
-                        ( _layers[octave-1].getData( V7_LEVELS-1 ),
+                        ( _layers[octave-1].getData( V7_LEVELS-3 ),
                           _layers[octave].getData2(),
                           _layers[octave].getWidth(),
                           _layers[octave].getPitch(),
