@@ -1,3 +1,9 @@
+#include "s_pyramid.h"
+
+#include "gauss_filter.h"
+#include "clamp.hpp"
+#include "debug_macros.hpp"
+
 /*************************************************************
  * V7: device side
  *************************************************************/
@@ -7,6 +13,8 @@
 #define V7_FILTERSIZE   ( V7_RANGE + 1        + V7_RANGE )
 #define V7_READ_RANGE   ( V7_RANGE + V7_WIDTH + V7_RANGE )
 #define V7_LEVELS       _levels
+
+namespace popart {
 
 __device__ uint32_t non_null_dog = 0;
 
@@ -27,7 +35,7 @@ void filter_gauss_horiz_v7( float* src_data,
     float out = 0;
 
     for( int offset = V7_RANGE; offset>0; offset-- ) {
-        g  = d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
+        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
 
         idx = clamp( block_x + threadIdx.x - offset, width );
         val = src_data[ block_y * pitch + idx ];
@@ -38,7 +46,7 @@ void filter_gauss_horiz_v7( float* src_data,
         out += ( val * g );
     }
 
-    g  = d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
+    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
     idx = clamp( block_x + threadIdx.x, width );
     val = src_data[ block_y * pitch + idx ];
     out += ( val * g );
@@ -69,7 +77,7 @@ void filter_gauss_vert_v7_sub( float*   src_data,
     float out = 0;
 
     for( int offset = V7_RANGE; offset>0; offset-- ) {
-        g  = d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
+        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
 
         idy = clamp( block_y - offset, height );
         val = src_data[ idy * pitch + idx ];
@@ -80,7 +88,7 @@ void filter_gauss_vert_v7_sub( float*   src_data,
         out += ( val * g );
     }
 
-    g  = d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
+    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
     idy = clamp( block_y, height );
     val = src_data[ idy * pitch + idx ];
     out += ( val * g );
@@ -150,7 +158,7 @@ void filter_gauss_horiz_v7_by_2( float*   src_data,
     float out = 0;
 
     for( int offset = V7_RANGE; offset>0; offset-- ) {
-        g  = d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
+        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
 
         idx = clamp( 2 * ( block_x + threadIdx.x - offset ), src_pitch );
         val = src_data[ 2 * block_y * src_pitch + idx ];
@@ -161,7 +169,7 @@ void filter_gauss_horiz_v7_by_2( float*   src_data,
         out += ( val * g );
     }
 
-    g  = d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
+    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
     idx = clamp( 2 * ( block_x + threadIdx.x ), src_pitch );
     val = src_data[ 2 * block_y * src_pitch + idx ];
     out += ( val * g );
@@ -196,12 +204,6 @@ void Pyramid::build_v7( Image* base )
     uint32_t value = 0;
     cudaMemcpyToSymbol( non_null_dog, &value, sizeof(uint32_t), 0, cudaMemcpyHostToDevice );
     cudaDeviceSynchronize();
-
-#if 0
-        cudaDeviceSynchronize();
-        cudaError_t err = cudaGetLastError();
-        POP_CUDA_FATAL_TEST( err, "entering Pyramid::build_v7: " );
-#endif
 
     _keep_time_pyramid_v7.start();
 
@@ -299,10 +301,5 @@ void Pyramid::build_v7( Image* base )
     cerr << "The total of dog symbols written is " << value << endl;
 }
 
-// #undef V7_WIDTH
-#undef V7_RANGE
-#undef V7_GAUSS_BASE
-#undef V7_FILTERSIZE
-#undef V7_READ_RANGE
-#undef V7_LEVELS
+} // namespace popart
 

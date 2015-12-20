@@ -11,11 +11,12 @@
 
 #include <npp.h>
 
-#include "s_pyramid.hpp"
+#include "s_pyramid.h"
 #include "keep_time.hpp"
 #include "debug_macros.hpp"
 #include "align_macro.hpp"
 #include "clamp.hpp"
+#include "gauss_filter.h"
 
 #define PYRAMID_PRINT_DEBUG 0
 
@@ -29,29 +30,15 @@ using namespace std;
 
 namespace popart {
 
-__device__ __constant__ float d_gauss_filter[32];
-
 #include "s_pyramid.v6.h"
-#include "s_pyramid.v7.h"
 
 #include "s_ori.v1.h"
 #include "s_ori.v2.h"
 #include "s_extrema.v4.h"
 
-// #include "s_desc.v1.h"
-
 /*************************************************************
  * CUDA device functions for printing debug information
  *************************************************************/
-__global__
-void print_gauss_filter_symbol( uint32_t columns )
-{
-    printf("Entering print_gauss_filter_symbol\n");
-    for( uint32_t x=0; x<columns; x++ ) {
-        printf("%0.3f ", d_gauss_filter[x] );
-    }
-    printf("\n");
-}
 
 __global__
 void py_print_corner_float( float* img, uint32_t pitch, uint32_t height, uint32_t level )
@@ -562,68 +549,6 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, cudaStream_t s
 Pyramid::~Pyramid( )
 {
     delete [] _layers;
-}
-
-/*************************************************************
- * Initialize the Gauss filter table in constant memory
- *************************************************************/
-
-void Pyramid::init_filter( float sigma0, uint32_t levels, cudaStream_t stream )
-{
-    cerr << "Entering " << __FUNCTION__ << endl;
-    if( sigma0 > 2.0 )
-    {
-        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
-             << " Sigma > 2.0 is not supported. Re-size __constant__ array and recompile."
-             << endl;
-        exit( -__LINE__ );
-    }
-    if( levels > 12 )
-    {
-        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
-             << " More than 12 levels not supported. Re-size __constant__ array and recompile."
-             << endl;
-        exit( -__LINE__ );
-    }
-
-    float local_filter[32];
-    // const int W = GAUSS_SPAN; // no filter wider than 25; 32 is just for alignment
-    // assert( W % 2 == 1 ); // filters should be symmetric, i.e. odd-sized
-    // const double mean = GAUSS_ONE_SIDE_RANGE; // is always (GAUSS_SPAN-1)/2
-
-    float sigma = sigma0;
-    double sum = 0.0;
-    for (int x = 0; x < GAUSS_SPAN; ++x) {
-            /* Should be:
-             * kernel[x] = exp( -0.5 * (pow((x-mean)/sigma, 2.0) ) )
-             *           / sqrt(2 * M_PI * sigma * sigma);
-             _w /= 2;
-             _h /= 2;
-             * but the denominator is constant and we divide by sum anyway
-             */
-        local_filter[x] = exp( -0.5 * (pow( double(x-GAUSS_ONE_SIDE_RANGE)/sigma, 2.0) ) );
-        sum += local_filter[x];
-    }
-
-    for (int x = 0; x < GAUSS_SPAN; ++x) 
-        local_filter[x] /= sum;
-
-    cudaError_t err;
-    err = cudaMemcpyToSymbolAsync( d_gauss_filter,
-                                   local_filter,
-                                   32*sizeof(float),
-                                   0,
-                                   cudaMemcpyHostToDevice,
-                                   stream );
-    POP_CUDA_FATAL_TEST( err, "cudaMemcpyToSymbol failed for Gauss kernel initialization: " );
-
-    if( false ) {
-        print_gauss_filter_symbol
-            <<<1,1,0,stream>>>
-            ( GAUSS_SPAN );
-        err = cudaGetLastError();
-        POP_CUDA_FATAL_TEST( err, "print_gauss_filter_symbol failed: " );
-    }
 }
 
 /*************************************************************

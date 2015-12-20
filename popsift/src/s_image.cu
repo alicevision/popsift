@@ -4,6 +4,7 @@
 #include <fstream>
 #include "debug_macros.hpp"
 #include "align_macro.hpp"
+#include "assist.h"
 #include <stdio.h>
 #include <assert.h>
 
@@ -169,7 +170,7 @@ void Image::upscale_v1( Image& src )
           src.a_height );
     _keep_time_image_v2.stop();
 
-    test_last_error( __LINE__ );
+    test_last_error( __FILE__,  __LINE__ );
 }
 
 __host__
@@ -193,7 +194,7 @@ void Image::upscale_v2( Image& src )
           src.u_height );
     _keep_time_image_v3.stop();
 
-    test_last_error( __LINE__ );
+    test_last_error( __FILE__,  __LINE__ );
 }
 
 __host__
@@ -217,7 +218,7 @@ void Image::upscale_v3( Image& src )
           src.u_height );
     _keep_time_image_v3.stop();
 
-    test_last_error( __LINE__ );
+    test_last_error( __FILE__,  __LINE__ );
 }
 
 __host__
@@ -248,14 +249,14 @@ void Image::upscale_v4( Image& src )
           this->a_height );
     _keep_time_image_v4.stop();
 
-    test_last_error( __LINE__ );
+    test_last_error( __FILE__,  __LINE__ );
 }
 
 __host__
 void Image::upscale_v5( Image& src )
 {
     printf("Merged even-odd method\n");
-    dim3 grid( this->a_width/128/sizeof(float), this->a_height/2 );
+    dim3 grid( grid_divide( this->a_width, 128*sizeof(float) ), grid_divide( this->a_height, 2 ) );
     dim3 block( 128 );
 
     float* dest   = (float*)(this->array);
@@ -272,7 +273,7 @@ void Image::upscale_v5( Image& src )
           src.u_height );
     _keep_time_image_v5.stop();
 
-    test_last_error( __LINE__ );
+    test_last_error( __FILE__,  __LINE__ );
 }
 
 __host__
@@ -302,13 +303,12 @@ void Image::report_times( )
     if( true  ) _keep_time_image_v5.report( "    V5, Time for image upscale: " );
 }
 
-void Image::test_last_error( int line )
+void Image::test_last_error( const char* file, int line )
 {
     cudaError_t err;
-    // cudaStreamSynchronize( stream );
     err = cudaGetLastError();
     if( err != cudaSuccess ) {
-        printf("A problem in line %d, %s\n", line, cudaGetErrorString(err) );
+        printf("Error in %s:%d\n     CUDA failed: %s\n", file, line, cudaGetErrorString(err) );
         exit( -__LINE__ );
     }
 }

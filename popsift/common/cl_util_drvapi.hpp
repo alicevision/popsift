@@ -1,3 +1,4 @@
+#if 0
 #ifndef __CL_UTIL_DRVAPI_HPP__
 #define __CL_UTIL_DRVAPI_HPP__
 
@@ -337,3 +338,4 @@ inline cl_program create_program(cl_context context, cl_device_id device, const 
 
 #endif
 // end - __CL_UTIL_DRVAPI_HPP__
+#endif

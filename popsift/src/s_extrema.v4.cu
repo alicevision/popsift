@@ -411,6 +411,8 @@ bool find_extrema_in_dog_v4_bemap( float*             dog[3], // level-1, level,
         // atomicAdd( &debug_r.thresh_exceeded, 1 );
         return false;
     }
+
+    /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
     if( edgeval > (edge_limit+1.0f)*(edge_limit+1.0f)/edge_limit ) {
         // atomicAdd( &debug_r.edge_exceeded, 1 );
         return false;

@@ -1,4 +1,4 @@
-#include "s_pyramid.hpp"
+#include "s_pyramid.h"
 #include "s_gradiant.h"
 
 #define DESCR_BINS_V1        8

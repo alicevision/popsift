@@ -34,7 +34,7 @@ struct Image
     void upscale( Image& src, size_t scalefactor );
 
     void debug_out( );
-    void test_last_error( int line );
+    void test_last_error( const char* file, int line );
 
     void download_and_save_array( const char* filename );
 

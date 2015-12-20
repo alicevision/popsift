@@ -1,3 +1,4 @@
+#if 0
 #ifndef __CL_UTIL_HPP__
 #define __CL_UTIL_HPP__
 
@@ -113,3 +114,4 @@ inline const char *error_string(cl_int error)
 }
 
 #endif                          /* __CL_UTIL_HPP__ */
+#endif

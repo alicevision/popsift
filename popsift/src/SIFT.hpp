@@ -28,7 +28,7 @@
 #include "c_util_stopwatch.hpp"
 #include "debug_macros.hpp"
 #include "s_image.hpp"
-#include "s_pyramid.hpp"
+#include "s_pyramid.h"
 
 /* user parameters */
 extern int verbose;

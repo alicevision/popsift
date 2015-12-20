@@ -1,6 +1,7 @@
 /*************************************************************
  * V6: device side
  *************************************************************/
+
 #define V6_WIDTH    128
 #define V6_RANGE    4 // RANGES from 1 to 12 are possible
 #define V6_GAUSS_BASE   ( GAUSS_ONE_SIDE_RANGE - V6_RANGE )
@@ -27,7 +28,7 @@ void filter_gauss_horiz_v6( float* src_data, uint32_t src_w, uint32_t src_h,
     float out = 0;
     #pragma unroll
     for( int i=0; i<V6_FILTERSIZE; i++ ) {
-        out += px[threadIdx.x+i] * d_gauss_filter[V6_GAUSS_BASE+i];
+        out += px[threadIdx.x+i] * popart::d_gauss_filter[V6_GAUSS_BASE+i];
     }
 
     int dst_row   = block_x + threadIdx.x;
@@ -59,7 +60,7 @@ void filter_gauss_horiz_v6_and_dog( float* src_data, uint32_t src_w, uint32_t sr
     float out = 0;
     #pragma unroll
     for( int i=0; i<V6_FILTERSIZE; i++ ) {
-        out += px[threadIdx.x+i] * d_gauss_filter[V6_GAUSS_BASE+i];
+        out += px[threadIdx.x+i] * popart::d_gauss_filter[V6_GAUSS_BASE+i];
     }
 
     int dst_row   = block_x + threadIdx.x;
@@ -98,7 +99,7 @@ void filter_gauss_horiz_v6_by_2( float* src_data, uint32_t src_w, uint32_t src_h
     float out = 0;
     #pragma unroll
     for( int i=0; i<V6_FILTERSIZE; i++ ) {
-        out += px[threadIdx.x+i] * d_gauss_filter[V6_GAUSS_BASE+i];
+        out += px[threadIdx.x+i] * popart::d_gauss_filter[V6_GAUSS_BASE+i];
     }
 
     int dst_row   = block_x + threadIdx.x;
