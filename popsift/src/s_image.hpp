@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 #include "c_util_img.hpp"
-#include "keep_time.hpp"
 #include "plane_2d.h"
 
 namespace popart {
@@ -40,21 +39,18 @@ struct Image
      *  this image must have type_size float
      *  scalefactor is right now 2
      */
-    void upscale( Image& src, size_t scalefactor );
+    void upscale( Image_uint8& src, size_t scalefactor );
 
     void debug_out( );
     void test_last_error( const char* file, int line );
 
     void download_and_save_array( const char* filename );
 
-    void report_times( );
-
 private:
-    void upscale_v1( Image& src );
-    void upscale_v2( Image& src );
-    void upscale_v3( Image& src );
-    void upscale_v4( Image& src );
-    void upscale_v5( Image& src );
+    void upscale_v1( Image_uint8& src );
+    void upscale_v2( Image_uint8& src );
+    void upscale_v3( Image_uint8& src );
+    void upscale_v4( Image_uint8& src );
 };
 
 } // namespace popart

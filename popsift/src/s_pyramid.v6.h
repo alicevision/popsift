@@ -164,9 +164,9 @@ void Pyramid::build_v6( Image* base )
                 if( octave == 0 ) {
                     filter_gauss_horiz_v6
                         <<<grid_t,block,0,_stream>>>
-                        ( (float*)base->array,
-                          base->pitch / sizeof(float),
-                          base->a_height,
+                        ( base->array.data,
+                          base->array.step / sizeof(float),
+                          base->array.getRows(),
                           _layers[octave].getTransposedData(),
                           _layers[octave].getTransposedPitch(),
                           _layers[octave].getTransposedHeight() );

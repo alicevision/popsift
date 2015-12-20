@@ -254,11 +254,11 @@ public:
     template <typename U>
     __host__ __device__
     explicit Plane2D( const Plane2D<U>& orig )
-        : PitchPlane2D<T>( orig.data, orig.step )
-        , _rows( orig.rows )
+        : PitchPlane2D<T>( (T*)orig.data, orig.step )
+        , _rows( orig.getRows() )
     {
         // careful computation: cols is a short
-        int width = orig.cols * orig.elemSize();
+        int width = orig.getCols() * orig.elemSize();
         width /= this->elemSize();
         _cols = width;
     }
@@ -444,11 +444,15 @@ inline void Plane2D<T>::memcpyToHost( PitchPlane2D<T>& hostPlane, cudaStream_t s
  * Typedefs for various template instances
  *************************************************************/
 
-typedef PitchPlane2D<unsigned char> PitchPlane2D_uint8;
-typedef PitchPlane2D<float>         PitchPlane2D_float;
+typedef PitchPlane2D<uint8_t> PitchPlane2D_uint8;
+typedef PitchPlane2D<float>   PitchPlane2D_float;
+typedef PitchPlane2D<uchar2>  PitchPlane2D_uchar_2;
+typedef PitchPlane2D<float4>  PitchPlane2D_float_4;
 
-typedef Plane2D<unsigned char>      Plane2D_uint8;
-typedef Plane2D<float>              Plane2D_float;
+typedef Plane2D<uint8_t>      Plane2D_uint8;
+typedef Plane2D<float>        Plane2D_float;
+typedef Plane2D<uchar2>       Plane2D_uchar_2;
+typedef Plane2D<float4>       Plane2D_float_4;
 
 } // namespace popart
 

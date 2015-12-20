@@ -240,11 +240,11 @@ void Pyramid::build_v7( Image* base )
                 if( octave == 0 ) {
                     filter_gauss_horiz_v7
                         <<<grid_t,block,0,_stream>>>
-                        ( (float*)base->array,
+                        ( base->array.data,
                           _layers[octave].getData2(),
-                          base->u_width,
+                          base->array.getCols(),
                           _layers[octave].getPitch(),
-                          base->u_height,
+                          base->array.getRows(),
                           _layers[octave].getTransposedPitch() );
                 } else {
                     filter_gauss_horiz_v7_by_2
