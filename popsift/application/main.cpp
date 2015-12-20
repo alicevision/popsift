@@ -17,6 +17,7 @@
  */
 
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <cmath>
 #include <iomanip>
@@ -164,9 +165,9 @@ void option(int ac, char **av)
             help(av[0]);
             break;
 
-            /* number of octaves */
         case 'O':
 			{
+                /* number of octaves */
 				std::istringstream iss(optarg);
 				int a = -1;
 				iss >> a; octaves = a;
@@ -175,9 +176,9 @@ void option(int ac, char **av)
 			}
 			break;
 
-			/* number of levels */
         case 'S':
 			{
+			    /* number of levels */
 				std::istringstream iss(optarg);
 				int a = -1;
 				iss >> a; levels = a; 
@@ -186,9 +187,9 @@ void option(int ac, char **av)
 			}
 			break;
 
-			/* number of upsamplings */
         case 'u':
 			{
+			    /* number of upsamplings */
 				std::istringstream iss(optarg);
 				int a = -1;
 				iss >> a; upsampling = a;
@@ -197,9 +198,9 @@ void option(int ac, char **av)
 			}
 			break;
 
-			/* threshold */
         case 't':
 			{
+			    /* threshold */
 				std::istringstream iss(optarg);
 				float a = -1;
 				iss >> a; threshold = a;
@@ -207,9 +208,9 @@ void option(int ac, char **av)
 			}
 			break;
 
-			/* edge-threshold */
         case 'e':
 			{
+			    /* edge-threshold */
 				std::istringstream iss(optarg);
 				float a = -1;
 				iss >> a; edgeLimit = a;

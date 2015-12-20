@@ -25,7 +25,6 @@
 
 /* include utilities */
 #include "c_util_img.hpp"
-#include "c_util_stopwatch.hpp"
 #include "debug_macros.hpp"
 #include "s_image.hpp"
 #include "s_pyramid.h"

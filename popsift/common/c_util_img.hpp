@@ -1,45 +1,15 @@
 #pragma once
 
-// #include <fstream>
 #include <string>
 #include <iostream>
 
-#include "c_util.hpp"
+#include "c_util.h"
 
 /* type definitions */
 typedef unsigned char    pixel_uc;
 typedef float            pixel_f;
 typedef unsigned char    uchar;
 typedef unsigned int     uint;
-
-/*************************************/
-/* @namespace Comment                */
-/* @brief Comment crusher            */
-/*        Erase the upcoming comment */
-/*************************************/
-
-/** 
- * @brief Comment crusher
- *        Erase the upcoming comments
- * 
- * @param is 
- * @param manip 
- * 
- * @return 
- */
-namespace Comment {
-    static class _comment {
-    } cmnt;
-    inline std::istream& operator>>(std::istream& is, _comment & manip) {
-        char c;
-        char b[1024];
-        is >> c;
-        if (c != '#')
-            return is.putback(c);
-        is.getline(b, 1024);
-        return is;
-    }
-}
 
 struct imgStream {
     int width;

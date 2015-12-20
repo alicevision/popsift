@@ -8,6 +8,24 @@
 #define G_RATE (uint32_t)(0.586611F * 0x1000000)
 #define B_RATE (uint32_t)(0.114478F * 0x1000000)
 
+/*************************************/
+/* @namespace Comment                */
+/* @brief Comment crusher            */
+/*************************************/
+namespace Comment {
+    static class _comment {
+    } cmnt;
+    inline std::istream& operator>>(std::istream& is, _comment & manip) {
+        char c;
+        char b[1024];
+        is >> c;
+        if (c != '#')
+            return is.putback(c);
+        is.getline(b, 1024);
+        return is;
+    }
+}
+
 /** 
  * BEMAP Utility for finding an input file
  * Finding process iterates on the given folder:
