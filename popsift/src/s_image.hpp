@@ -3,27 +3,36 @@
 #include <stdint.h>
 #include "c_util_img.hpp"
 #include "keep_time.hpp"
+#include "plane_2d.h"
 
 namespace popart {
 
+struct Image_uint8
+{
+    Plane2D_uint8 array;    // 2D plane allocated on device
+
+    /** Allocate device-side buffer.
+     */
+    Image_uint8( short width, short height );
+
+    /** Upload the grayscale image to the device.
+     */
+    void upload( imgStream& gray, cudaStream_t stream );
+
+    /** Deallocate device-side buffer.
+     */
+    ~Image_uint8( );
+};
+
 struct Image
 {
-    cudaStream_t stream;
-    uchar*       array;     // pointer to array in device memory
-    size_t       a_width;   // width  aligned to 128 byte
-    size_t       a_height;  // height aligned to 128 byte
-    size_t       pitch;     // perhaps CUDA has stricter align needs than 128
-    size_t       u_width;   // unaligned width
-    size_t       u_height;  // unaligned height
-    size_t       type_size; // uchar or float
+    cudaStream_t  stream;
+    Plane2D_float array;    // 2D plane allocated on device
+    size_t        u_width;   // unaligned width
+    size_t        u_height;  // unaligned height
 
     /** Create a device-sided buffer of the given dimensions */
-    Image( size_t w, size_t h, size_t type_size, cudaStream_t s );
-
-    /** Create a device-sided buffer that can hold the given
-     *  image and copy image to device.
-     */
-    Image( imgStream& gray, cudaStream_t s );
+    Image( size_t w, size_t h, cudaStream_t s );
 
     ~Image( );
 
@@ -46,12 +55,6 @@ private:
     void upscale_v3( Image& src );
     void upscale_v4( Image& src );
     void upscale_v5( Image& src );
-
-    KeepTime _keep_time_image_v1;
-    KeepTime _keep_time_image_v2;
-    KeepTime _keep_time_image_v3;
-    KeepTime _keep_time_image_v4;
-    KeepTime _keep_time_image_v5;
 };
 
 } // namespace popart

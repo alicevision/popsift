@@ -316,14 +316,12 @@ void Image::test_last_error( const char* file, int line )
 void Image::download_and_save_array( const char* filename )
 {
     cerr << "Downloading image from GPU to CPU and writing to file " << filename << endl;
-    int width = a_width / sizeof(float);
-    float* f = new float[ width * a_height ];
-    POP_CUDA_MEMCPY_ASYNC( f,
-                           this->array,
-                           a_width * a_height,
-                           cudaMemcpyDeviceToHost,
-                           0,
-                           false );
+
+    Plane2D_float f;
+    f.allocHost( a_width, a_height, PageAligned );
+
+    f.memcpyFromDevice( array );
+
     unsigned char* c = new unsigned char[ width * a_height ];
     for( int i=0; i<width * a_height; i++ ) {
         c[i] = (unsigned char)(f[i]);
@@ -334,61 +332,47 @@ void Image::download_and_save_array( const char* filename )
        << "255" << endl;
     of.write( (char*)c, width * a_height );
     delete [] c;
-    delete [] f;
+
+    f.freeHost( );
 }
 
-Image::Image( size_t w, size_t h, size_t t, cudaStream_t s )
+Image::Image( size_t w, size_t h, cudaStream_t s )
     : stream( s )
-    , a_width ( w*t )
+    , a_width ( w )
     , a_height( h )
-    , u_width ( w*t )
+    , u_width ( w )
     , u_height( h )
-    , type_size( t )
-    , _keep_time_image_v1( s )
-    , _keep_time_image_v2( s )
-    , _keep_time_image_v3( s )
-    , _keep_time_image_v4( s )
-    , _keep_time_image_v5( s )
 {
     align( a_width,  128 ); // 0x80
     align( a_height, 128 ); // 0x80
-    cudaError_t err;
-    err = cudaMallocPitch( &array, &pitch, a_width, a_height );
-    POP_CUDA_FATAL_TEST( err, "cudaMallocPitch failed for array: " );
-}
 
-Image::Image( imgStream& gray, cudaStream_t s )
-    : stream( s )
-    , a_width ( gray.width )
-    , a_height( gray.height )
-    , u_width ( gray.width )
-    , u_height( gray.height )
-    , type_size( sizeof(uchar) )
-    , _keep_time_image_v1( s )
-    , _keep_time_image_v2( s )
-    , _keep_time_image_v3( s )
-    , _keep_time_image_v4( s )
-    , _keep_time_image_v5( s )
-{
-    align( a_width,  128 ); // 0x80
-    align( a_height, 128 ); // 0x80
-    cudaError_t err;
-    err = cudaMallocPitch( &array, &pitch, a_width, a_height );
-    POP_CUDA_FATAL_TEST( err, "cudaMallocPitch failed for array: " );
-
-    err = cudaMemcpy2DAsync( array,       pitch,
-                             gray.data_r, gray.width,
-                             gray.width,
-                             gray.height,
-                             cudaMemcpyHostToDevice,
-                             stream );
-    POP_CUDA_FATAL_TEST( err, "cudaMemcpy2D failed for image upload: " );
-
+    array.allocDev( a_width, a_height );
 }
 
 Image::~Image( )
 {
-    cudaFree( array );
+    array.freeDev( );
+}
+
+Image_uint8::Image_uint8( short width, short height )
+{
+    array.allocDev( width, height );
+}
+
+void Image_uint8::upload( imgStream& gray, cudaStream_t stream )
+{
+    Plane2D_uint8 hostPlane( gray.width,
+                             gray.height,
+    cudaFree( array )dd:;
+                             gray.data_r,
+                             gray.width );
+
+    hostPlane.memcpyToDevice( array, stream );
+}
+
+Image_uint8::~Image_uint8( )
+{
+    array.freeDev( );
 }
 
 } // namespace popart
