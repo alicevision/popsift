@@ -483,23 +483,23 @@ void Pyramid::Layer::download_and_save_array( const char* basename, uint32_t oct
     if( level < _levels-1 ) {
         uint32_t       sz = getFloatSizeDogData();
         float*         f = new float        [ sz ];
+        uint16_t       max_c = 0;
         uint16_t*      c = new uint16_t[ sz ];
-        POP_CUDA_MEMCPY_ASYNC( f,
-                               getDogData( level ),
-                               getByteSizeDogData(),
-                               cudaMemcpyDeviceToHost,
-                               0,
-                               true );
+        POP_CUDA_MEMCPY( f,
+                         getDogData( level ),
+                         getByteSizeDogData(),
+                         cudaMemcpyDeviceToHost );
         for( uint32_t i=0; i<sz; i++ ) {
             float fm = f[i] * 256.0;
             c[i] = htons( (uint16_t)fm );
+            max_c = max( max_c, c[i] );
         }
         ostringstream ostr;
-        ostr << "dir-dog/" << "d-" << basename << "-o-" << octave << "-l-" << level << ".pgm";
+        ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << level << ".pgm";
         ofstream of( ostr.str().c_str() );
         of << "P5" << endl
            << _pitch << " " << _height << endl
-           << "65535" << endl;
+           << max_c << endl;
         of.write( (char*)c, 2*sz );
         delete [] c;
         delete [] f;
@@ -526,8 +526,8 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, cudaStream_t s
 
     _layers = new Layer[octaves];
 
-    uint32_t w = uint32_t(base->u_width / sizeof(float));
-    uint32_t h = uint32_t(base->u_height);
+    uint32_t w = uint32_t(base->array.getCols());
+    uint32_t h = uint32_t(base->array.getRows());
     for( uint32_t o=0; o<_octaves; o++ ) {
 #if (PYRAMID_PRINT_DEBUG==1)
         printf("Allocating octave %u with width %u and height %u (%u levels)\n", o, w, h, _levels );

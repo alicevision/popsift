@@ -109,11 +109,7 @@ class Pyramid
             ret += ( level * getByteSizeData() );
             return (float*)ret;
         }
-        inline float* getData2( uint32_t level ) {
-            uchar* ret = _data_2;
-            ret += ( level * getByteSizeData() );
-            return (float*)ret;
-        }
+        inline float* getData2( uint32_t level ) { uchar* ret = _data_2; ret += ( level * getByteSizeData() ); return (float*)ret; }
         inline float* getDogData( uint32_t level ) {
             uchar* ret = _dog_data;
             ret += ( level * getByteSizeDogData() );

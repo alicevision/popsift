@@ -26,8 +26,6 @@ struct Image_uint8
 struct Image
 {
     Plane2D_float array;    // 2D plane allocated on device
-    size_t        u_width;   // unaligned width
-    size_t        u_height;  // unaligned height
 
     /** Create a device-sided buffer of the given dimensions */
     Image( size_t w, size_t h );

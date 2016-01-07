@@ -62,12 +62,7 @@ void Image::download_and_save_array( const char* filename )
 }
 
 Image::Image( size_t w, size_t h )
-    : u_width ( w )
-    , u_height( h )
 {
-    align( w, 128 ); // 0x80
-    align( h, 128 ); // 0x80
-
     array.allocDev( w, h );
 }
 
