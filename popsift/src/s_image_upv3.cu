@@ -47,7 +47,7 @@ void p_upscale_3_odd( Plane2D_float dst )
 }
 
 __host__
-void Image::upscale_v3( Image_uint8& src )
+void Image::upscale_v3( Image_uint8& src, cudaStream_t stream )
 {
     cerr << "Separated even-odd method" << endl;
 

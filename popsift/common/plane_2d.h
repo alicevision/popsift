@@ -42,16 +42,16 @@ struct PlaneBase
     void freeHost2D( void* data );
 
     __host__
-    void memcpyToDevice( void* dst, int dst_pitch, void* src, int src_pitch, short cols, short rows );
+    void memcpyToDevice( void* dst, int dst_pitch, void* src, int src_pitch, short cols, short rows, int elemSize );
 
     __host__
-    void memcpyToDevice( void* dst, int dst_pitch, void* src, int src_pitch, short cols, short rows, cudaStream_t stream );
+    void memcpyToDevice( void* dst, int dst_pitch, void* src, int src_pitch, short cols, short rows, int elemSize, cudaStream_t stream );
 
     __host__
-    void memcpyToHost( void* dst, int dst_pitch, void* src, int src_pitch, short cols, short rows );
+    void memcpyToHost( void* dst, int dst_pitch, void* src, int src_pitch, short cols, short rows, int elemSize );
 
     __host__
-    void memcpyToHost( void* dst, int dst_pitch, void* src, int src_pitch, short cols, short rows, cudaStream_t stream );
+    void memcpyToHost( void* dst, int dst_pitch, void* src, int src_pitch, short cols, short rows, int elemSize, cudaStream_t stream );
 
 #ifdef PLANE2D_CUDA_OP_DEBUG
     __host__
@@ -166,7 +166,8 @@ inline void PitchPlane2D<T>::memcpyToDevice( PitchPlane2D<T>& devPlane, short co
 {
     PlaneBase::memcpyToDevice( devPlane.data, devPlane.step,
                                this->data, this->step,
-                               cols, rows );
+                               cols, rows,
+                               sizeof(T) );
 }
 
 template <typename T>
@@ -176,6 +177,7 @@ inline void PitchPlane2D<T>::memcpyToDevice( PitchPlane2D<T>& devPlane, short co
     PlaneBase::memcpyToDevice( devPlane.data, devPlane.step,
                                this->data, this->step,
                                cols, rows,
+                               sizeof(T),
                                stream );
 }
 
@@ -199,7 +201,8 @@ inline void PitchPlane2D<T>::memcpyFromDevice( PitchPlane2D<T>& devPlane, short 
 {
     PlaneBase::memcpyToHost( this->data, this->step,
                              devPlane.data, devPlane.step,
-                             cols, rows );
+                             cols, rows,
+                             sizeof(T) );
 }
 
 template <typename T>
@@ -209,6 +212,7 @@ inline void PitchPlane2D<T>::memcpyFromDevice( PitchPlane2D<T>& devPlane, short 
     PlaneBase::memcpyToHost( this->data, this->step,
                              devPlane.data, devPlane.step,
                              cols, rows,
+                             sizeof(T),
                              stream );
 }
 
@@ -339,8 +343,16 @@ template <typename T>
 __host__
 inline void Plane2D<T>::memcpyToDevice( Plane2D<T>& devPlane, cudaStream_t stream )
 {
-    assert( devPlane._cols == this->_cols );
-    assert( devPlane._rows == this->_rows );
+    if( devPlane._cols != this->_cols ) {
+        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
+                  << "    Error: source columns (" << this->_cols << ") and dest columns (" << devPlane._cols << ") must be identical" << std::endl;
+        exit( -1 );
+    }
+    if( devPlane._rows != this->_rows ) {
+        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
+                  << "    Error: source rows (" << this->_rows << ") and dest rows (" << devPlane._rows << ") must be identical" << std::endl;
+        exit( -1 );
+    }
     PitchPlane2D<T>::memcpyToDevice( devPlane, this->_cols, this->_rows, stream );
 }
 

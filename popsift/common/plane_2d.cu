@@ -84,7 +84,8 @@ void PlaneBase::freeHost2D( void* data )
 __host__
 void PlaneBase::memcpyToDevice( void* dst, int dst_pitch,
                                 void* src, int src_pitch,
-                                short cols, short rows )
+                                short cols, short rows,
+                                int elemSize )
 {
     assert( dst != 0 );
     assert( dst_pitch != 0 );
@@ -95,7 +96,7 @@ void PlaneBase::memcpyToDevice( void* dst, int dst_pitch,
     cudaError_t err;
     err = cudaMemcpy2D( dst, dst_pitch,
                         src, src_pitch,
-                        cols, rows,
+                        cols*elemSize, rows,
                         cudaMemcpyHostToDevice );
     if( err != cudaSuccess ) {
         cerr << __FILE__ << ":" << __LINE__ << endl
@@ -109,6 +110,7 @@ __host__
 void PlaneBase::memcpyToDevice( void* dst, int dst_pitch,
                                 void* src, int src_pitch,
                                 short cols, short rows,
+                                int elemSize,
                                 cudaStream_t stream )
 {
     assert( dst != 0 );
@@ -120,7 +122,7 @@ void PlaneBase::memcpyToDevice( void* dst, int dst_pitch,
     cudaError_t err;
     err = cudaMemcpy2DAsync( dst, dst_pitch,
                              src, src_pitch,
-                             cols, rows,
+                             cols*elemSize, rows,
                              cudaMemcpyHostToDevice,
                              stream );
     if( err != cudaSuccess ) {
@@ -134,7 +136,8 @@ void PlaneBase::memcpyToDevice( void* dst, int dst_pitch,
 __host__
 void PlaneBase::memcpyToHost( void* dst, int dst_pitch,
                               void* src, int src_pitch,
-                              short cols, short rows )
+                              short cols, short rows,
+                              int elemSize )
 {
     assert( dst != 0 );
     assert( dst_pitch != 0 );
@@ -145,7 +148,7 @@ void PlaneBase::memcpyToHost( void* dst, int dst_pitch,
     cudaError_t err;
     err = cudaMemcpy2D( dst, dst_pitch,
                         src, src_pitch,
-                        cols, rows,
+                        cols*elemSize, rows,
                         cudaMemcpyDeviceToHost );
     if( err != cudaSuccess ) {
         cerr << __FILE__ << ":" << __LINE__ << endl
@@ -159,6 +162,7 @@ __host__
 void PlaneBase::memcpyToHost( void* dst, int dst_pitch,
                               void* src, int src_pitch,
                               short cols, short rows,
+                              int elemSize,
                               cudaStream_t stream )
 {
     assert( dst != 0 );
@@ -170,7 +174,7 @@ void PlaneBase::memcpyToHost( void* dst, int dst_pitch,
     cudaError_t err;
     err = cudaMemcpy2DAsync( dst, dst_pitch,
                              src, src_pitch,
-                             cols, rows,
+                             cols*elemSize, rows,
                              cudaMemcpyDeviceToHost,
                              stream );
     if( err != cudaSuccess ) {

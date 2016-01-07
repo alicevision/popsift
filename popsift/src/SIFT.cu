@@ -37,6 +37,9 @@ void PopSift::execute( imgStream inp )
 {
     _inp = inp;
 
+    assert( inp.data_g == 0 );
+    assert( inp.data_b == 0 );
+
     if (_octaves < 0)
         _octaves = max(int (floor( logf( (float)min(_inp.width, _inp.height) )
                                    / logf( 2.0f ) ) - 3 + up), 1);
@@ -66,10 +69,15 @@ void PopSift::execute( imgStream inp )
 
     err = cudaEventCreate( &event_0 );
 
-    popart::Image  input1( _inp, stream_1 );
-    popart::Image* input2;
+    popart::Image_uint8* input1;
+    popart::Image_uint8* input2;
+    input1 = new popart::Image_uint8( _inp.width, _inp.height );
     if( secondImage ) {
-        input2 = new popart::Image( _inp, stream_2 );
+        input2 = new popart::Image_uint8( _inp.width, _inp.height );
+    }
+    input1->upload( _inp, stream_1 );
+    if( secondImage ) {
+        input2->upload( _inp, stream_2 );
     }
 
     popart::KeepTime globalKeepTime( stream_1 );
@@ -77,14 +85,14 @@ void PopSift::execute( imgStream inp )
 
     float sigma = 1.0;
 
-    _base1 = new popart::Image( _upscaled_width, _upscaled_height, sizeof(float), stream_1 );
+    _base1 = new popart::Image( _upscaled_width, _upscaled_height );
     _pyramid1 = new popart::Pyramid( _base1, _octaves, _scales, stream_1 );
-    _base1->upscale( input1, 1<<up );
+    _base1->upscale( *input1, 1<<up, stream_1 );
 
     if( secondImage ) {
-        _base2 = new popart::Image( _upscaled_width, _upscaled_height, sizeof(float), stream_2 );
+        _base2 = new popart::Image( _upscaled_width, _upscaled_height );
         _pyramid2 = new popart::Pyramid( _base2, _octaves, _scales, stream_2 );
-        _base2->upscale( *input2, 1<<up );
+        _base2->upscale( *input2, 1<<up, stream_2 );
     }
 
     popart::Pyramid::init_filter( sigma, _scales, stream_0 );
@@ -108,13 +116,6 @@ void PopSift::execute( imgStream inp )
     globalKeepTime.stop( );
     cerr << "stopped global timer" << endl;
     globalKeepTime.report( "Combined overall time: " );
-
-    _base1->report_times();
-    if( secondImage )
-        _base2->report_times();
-    _pyramid1->report_times();
-    if( secondImage )
-        _pyramid2->report_times();
 #endif
 
     if( log_to_file ) {

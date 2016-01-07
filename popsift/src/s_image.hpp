@@ -25,13 +25,12 @@ struct Image_uint8
 
 struct Image
 {
-    cudaStream_t  stream;
     Plane2D_float array;    // 2D plane allocated on device
     size_t        u_width;   // unaligned width
     size_t        u_height;  // unaligned height
 
     /** Create a device-sided buffer of the given dimensions */
-    Image( size_t w, size_t h, cudaStream_t s );
+    Image( size_t w, size_t h );
 
     ~Image( );
 
@@ -39,7 +38,7 @@ struct Image
      *  this image must have type_size float
      *  scalefactor is right now 2
      */
-    void upscale( Image_uint8& src, size_t scalefactor );
+    void upscale( Image_uint8& src, size_t scalefactor, cudaStream_t s );
 
     void debug_out( );
     void test_last_error( const char* file, int line );
@@ -47,10 +46,10 @@ struct Image
     void download_and_save_array( const char* filename );
 
 private:
-    void upscale_v1( Image_uint8& src );
-    void upscale_v2( Image_uint8& src );
-    void upscale_v3( Image_uint8& src );
-    void upscale_v4( Image_uint8& src );
+    void upscale_v1( Image_uint8& src, cudaStream_t stream );
+    void upscale_v2( Image_uint8& src, cudaStream_t stream );
+    void upscale_v3( Image_uint8& src, cudaStream_t stream );
+    void upscale_v4( Image_uint8& src, cudaStream_t stream );
 };
 
 } // namespace popart

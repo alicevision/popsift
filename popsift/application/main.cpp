@@ -283,11 +283,11 @@ int main(int argc, char **argv)
     deviceInfo.print( );
 
     PopSift PopSift( octaves,
-                   levels,
-                   upsampling,
-                   threshold,
-                   edgeLimit,
-                   sigma );
+                     levels,
+                     upsampling,
+                     threshold,
+                     edgeLimit,
+                     sigma );
 
     PopSift.execute(inp);
     return 0;

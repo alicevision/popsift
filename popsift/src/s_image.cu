@@ -12,7 +12,7 @@ using namespace std;
 namespace popart {
 
 __host__
-void Image::upscale( Image_uint8& src, size_t scalefactor )
+void Image::upscale( Image_uint8& src, size_t scalefactor, cudaStream_t stream )
 {
     if( scalefactor != 2 ) {
         cerr << "Scale factor is " << scalefactor << endl;
@@ -20,10 +20,10 @@ void Image::upscale( Image_uint8& src, size_t scalefactor )
         exit( -__LINE__ );
     }
 
-    if( false ) upscale_v1( src );
-    if( false ) upscale_v2( src );
-    if( false ) upscale_v3( src );
-    if( true  ) upscale_v4( src );
+    if( false ) upscale_v1( src, stream );
+    if( false ) upscale_v2( src, stream );
+    if( false ) upscale_v3( src, stream );
+    if( true  ) upscale_v4( src, stream );
 }
 
 void Image::test_last_error( const char* file, int line )
@@ -61,11 +61,8 @@ void Image::download_and_save_array( const char* filename )
     f.freeHost( );
 }
 
-Image::Image( size_t w, size_t h, cudaStream_t s )
-    : stream( s )
-    // , a_width ( w )
-    // , a_height( h )
-    , u_width ( w )
+Image::Image( size_t w, size_t h )
+    : u_width ( w )
     , u_height( h )
 {
     align( w, 128 ); // 0x80
@@ -81,11 +78,22 @@ Image::~Image( )
 
 Image_uint8::Image_uint8( short width, short height )
 {
+    cerr << "Enter " << __FUNCTION__ << " with width=" << width << " and height=" << height << endl;
     array.allocDev( width, height );
+    cerr << "   array width=" << array.getWidth() << " height=" << array.getHeight() << endl;
+    cerr << "Leave " << __FUNCTION__ << endl;
 }
 
 void Image_uint8::upload( imgStream& gray, cudaStream_t stream )
 {
+#ifndef NDEBUG
+    ofstream of( "original-gray-image.pgm" );
+    of << "P5" << endl
+       << gray.width << " " << gray.height << endl
+       << "255" << endl;
+    of.write( (char*)gray.data_r, gray.width * gray.height );
+#endif // NDEBUG
+
     Plane2D_uint8 hostPlane( gray.width,
                              gray.height,
                              gray.data_r,

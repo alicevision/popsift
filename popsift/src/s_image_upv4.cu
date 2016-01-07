@@ -28,6 +28,10 @@ void p_upscale_4( Plane2D_float dst, Plane2D_uint8 src )
     const int src_xpos_1 = clamp(  dst_xko    >> 1, src.getCols() );
     const int src_xpos_2 = clamp( (dst_xko+1) >> 1, src.getCols() );
 
+    // dst.ptr(dst_ypos_1)[dst_xko] = 0x80;
+    // dst.ptr(dst_ypos_2)[dst_xko] = 0x80;
+    // if( dst_ypos_1 >= dst.getRows() ) return;
+
     const int v00  = src.ptr(src_ypos_1)[src_xpos_1];
     const int v01  = src.ptr(src_ypos_1)[src_xpos_2];
     const int v10  = src.ptr(src_ypos_2)[src_xpos_1];
@@ -41,12 +45,13 @@ void p_upscale_4( Plane2D_float dst, Plane2D_uint8 src )
 }
 
 __host__
-void Image::upscale_v4( Image_uint8& src )
+void Image::upscale_v4( Image_uint8& src, cudaStream_t stream )
 {
     cerr << "Merged even-odd method" << endl;
 
-    dim3 grid( grid_divide( this->array.getCols(), 128 ),
-               grid_divide( this->array.getRows(), 2 ) );
+    int gridx = grid_divide( this->array.getCols(), 128 );
+    int gridy = grid_divide( this->array.getRows(), 2 );
+    dim3 grid( gridx, gridy );
     dim3 block( 128 );
 
     p_upscale_4

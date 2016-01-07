@@ -1,12 +1,18 @@
 #include "c_util_img.hpp"
 
 #include <fstream>
+#include <iostream>
 #include <stdint.h>
 
 /* GRAYSCALE */
-#define R_RATE (uint32_t)(0.298912F * 0x1000000)
-#define G_RATE (uint32_t)(0.586611F * 0x1000000)
-#define B_RATE (uint32_t)(0.114478F * 0x1000000)
+// #define R_RATE (uint32_t)(0.298912F * 0x1000000)
+// #define G_RATE (uint32_t)(0.586611F * 0x1000000)
+// #define B_RATE (uint32_t)(0.114478F * 0x1000000)
+#define R_RATE 0.298912f
+#define G_RATE 0.586611f
+#define B_RATE 0.114478f
+
+using namespace std;
 
 /*************************************/
 /* @namespace Comment                */
@@ -225,6 +231,9 @@ void read_pgpm(std::string & filename, imgStream & buffer, int &isPGM)
 
 void read_gray(std::string & filename, imgStream & buffer)
 {
+    cerr << "Entering " << __FUNCTION__ << endl;
+    cerr << "   filename " << filename << endl;
+
     bool isPGM;
 
     if (!find_file(filename)) {
@@ -254,6 +263,7 @@ void read_gray(std::string & filename, imgStream & buffer)
         isPGM = true;
         break;
     case '6':
+        cerr << "    File is in PPM format" << endl;
         isPGM = false;
         break;
     default:
@@ -314,26 +324,28 @@ void read_gray(std::string & filename, imgStream & buffer)
             *start++ = (pixel_uc) (*buffer++);
       }
     } else {
+      cerr << "    NOT PGM case" << endl;
       if( not isAscii ) {    // PPM P6 image
         ptr_r = new pixel_uc[width * height];
-        pixel_uc *start_r = ptr_r;
-        pixel_uc *end = start_r + width * height;
 
         std::streampos beg = in.tellg();
         char *buffer = new char[width * height * 3];
         in.read(buffer, width * height * 3);
         if (!in.good()) {
-            std::cerr << "ERROR:" << "PGM parsing error: " << filename << std::endl
-                      << "at pixel: " << start_r - ptr_r << std::endl;
+            std::cerr << "ERROR:" << "PGM parsing error: " << filename << std::endl;
             exit(1);
         }
 
         pixel_uc *src = reinterpret_cast < pixel_uc * >(buffer);
-        while (start_r != end) {
-            uint32_t r = (*src) << 24; src++;
-            uint32_t g = (*src) << 24; src++;
-            uint32_t b = (*src) << 24; src++;
-            *start_r++ = ( R_RATE*r+G_RATE*g+B_RATE*b ) >> 24;
+        for( int i=0; i<width * height; i++ ) {
+            float r = *src; src++;
+            float g = *src; src++;
+            float b = *src; src++;
+            ptr_r[i] = (unsigned char)( R_RATE*r+G_RATE*g+B_RATE*b );
+            // uint32_t r = (*src) << 24; src++;
+            // uint32_t g = (*src) << 24; src++;
+            // uint32_t b = (*src) << 24; src++;
+            // ptr_r[i] = ( R_RATE*r+G_RATE*g+B_RATE*b ) >> 24;
         }
       } else {
         std::cerr << "ERROR: Unknown parsing mode\n" << std::endl;
@@ -346,6 +358,8 @@ void read_gray(std::string & filename, imgStream & buffer)
     buffer.data_r = ptr_r;
     buffer.data_g = 0;
     buffer.data_b = 0;
+
+    cerr << "Leaving " << __FUNCTION__ << endl;
 }
 
 /** 
