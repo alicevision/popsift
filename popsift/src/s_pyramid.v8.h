@@ -68,12 +68,12 @@ void Pyramid::build_v8( Image* base )
     Npp32s    dstStep;
     NppiSize  dstSize;
 
-    for( int octave=0; octave<_octaves; octave++ ) {
+    for( int octave=0; octave<_num_octaves; octave++ ) {
         for( int level=0; level<V8_LEVELS; level++ ) {
             if( level == 0 ) {
                 if( octave == 0 ) {
                     cerr << __LINE__ << " call nppiFilterGaussBorder_32f_C1R" << endl;
-                    dstStep       = _layers[octave].getByteSizePitch( );
+                    dstStep       = _octaves[octave].getByteSizePitch( );
                     dstSize.width = base->pitch / sizeof(float);
                     dstSize.height = base->a_height;
 
@@ -85,7 +85,7 @@ void Pyramid::build_v8( Image* base )
                                 (Npp32s)base->pitch,
                                 mksz( base->u_width/sizeof(float), base->u_height/sizeof(float) ),
                                 mkpt( 0, 0 ),
-                                (Npp32f*)_layers[octave].getData( level ),
+                                (Npp32f*)_octaves[octave].getData( level ),
                                 dstStep,
                                 dstSize,
                                 mns,
@@ -95,27 +95,27 @@ void Pyramid::build_v8( Image* base )
                     NppiSize srcSize;
                     NppiRect srcROI;
                     NppiRect dstROI;
-                    srcSize.width  = _layers[octave-1].getWidth();
-                    srcSize.height = _layers[octave-1].getHeight();
+                    srcSize.width  = _octaves[octave-1].getWidth();
+                    srcSize.height = _octaves[octave-1].getHeight();
                     srcROI.x       = 0;
                     srcROI.y       = 0;
                     srcROI.width   = srcSize.width;
                     srcROI.height  = srcSize.height;
-                    srcStep        = _layers[octave-1].getByteSizePitch();
+                    srcStep        = _octaves[octave-1].getByteSizePitch();
                     dstROI.x       = 0;
                     dstROI.y       = 0;
-                    dstROI.width   = _layers[octave].getWidth();
-                    dstROI.height  = _layers[octave].getHeight();
-                    dstSize.width  = _layers[octave].getWidth();
-                    dstSize.height = _layers[octave].getHeight();
-                    dstStep        = _layers[octave].getByteSizePitch();
+                    dstROI.width   = _octaves[octave].getWidth();
+                    dstROI.height  = _octaves[octave].getHeight();
+                    dstSize.width  = _octaves[octave].getWidth();
+                    dstSize.height = _octaves[octave].getHeight();
+                    dstStep        = _octaves[octave].getByteSizePitch();
                     cerr << __LINE__ << " call nppiResizeSqrPixel_32f_C1R" << endl;
                     status = nppiResizeSqrPixel_32f_C1R(
-                                (const Npp32f*)_layers[octave-1].getData( V8_LEVELS-1 ),
+                                (const Npp32f*)_octaves[octave-1].getData( V8_LEVELS-1 ),
                                 srcSize,
                                 srcStep,
                                 srcROI,
-                                (Npp32f*)_layers[octave].getData2(),
+                                (Npp32f*)_octaves[octave].getData2(),
                                 dstStep,
                                 dstROI,
                                 0.5, 0.5,
@@ -127,33 +127,33 @@ void Pyramid::build_v8( Image* base )
                     // NppiMaskSize mns = NPP_MASK_SIZE_3_X_3;
                     cerr << __LINE__ << " call nppiFilterGaussBorder_32f_C1R" << endl;
                     status = nppiFilterGaussBorder_32f_C1R(
-                                (const Npp32f*)_layers[octave].getData2(),
-                                (Npp32s)_layers[octave].getByteSizePitch(),
-                                mksz( _layers[octave].getWidth(),
-                                      _layers[octave].getHeight() ),
+                                (const Npp32f*)_octaves[octave].getData2(),
+                                (Npp32s)_octaves[octave].getByteSizePitch(),
+                                mksz( _octaves[octave].getWidth(),
+                                      _octaves[octave].getHeight() ),
                                 mkpt( 0, 0 ),
-                                (Npp32f*)_layers[octave].getData(),
-                                (Npp32s)_layers[octave].getByteSizePitch(),
+                                (Npp32f*)_octaves[octave].getData(),
+                                (Npp32s)_octaves[octave].getByteSizePitch(),
                                 dstSize,
                                 mns,
                                 NPP_BORDER_REPLICATE );
                     V8_CHECKERR( status );
                 }
             } else {
-                dstSize.width  = _layers[octave].getWidth();
-                dstSize.height = _layers[octave].getHeight();
-                dstStep        = _layers[octave].getByteSizePitch();
+                dstSize.width  = _octaves[octave].getWidth();
+                dstSize.height = _octaves[octave].getHeight();
+                dstStep        = _octaves[octave].getByteSizePitch();
 
                 NppiMaskSize mns = NPP_MASK_SIZE_9_X_9;
                 // NppiMaskSize mns = NPP_MASK_SIZE_3_X_3;
                 cerr << __LINE__ << " call nppiFilterGaussBorder_32f_C1R" << endl;
                 status = nppiFilterGaussBorder_32f_C1R(
-                            (const Npp32f*)_layers[octave].getData( level - 1 ),
-                            (Npp32s)_layers[octave].getByteSizePitch(),
-                            mksz( _layers[octave].getWidth(),
-                                  _layers[octave].getHeight() ),
+                            (const Npp32f*)_octaves[octave].getData( level - 1 ),
+                            (Npp32s)_octaves[octave].getByteSizePitch(),
+                            mksz( _octaves[octave].getWidth(),
+                                  _octaves[octave].getHeight() ),
                             mkpt( 0, 0 ),
-                            (Npp32f*)_layers[octave].getData( level ),
+                            (Npp32f*)_octaves[octave].getData( level ),
                             dstStep,
                             dstSize,
                             mns,
@@ -162,15 +162,15 @@ void Pyramid::build_v8( Image* base )
             }
 
             if( level > 0 ) {
-                dstSize.width  = _layers[octave].getWidth();
-                dstSize.height = _layers[octave].getHeight();
-                dstStep        = _layers[octave].getByteSizePitch();
+                dstSize.width  = _octaves[octave].getWidth();
+                dstSize.height = _octaves[octave].getHeight();
+                dstStep        = _octaves[octave].getByteSizePitch();
                 cerr << __LINE__ << " call nppiAbsDiff_32f_C1R" << endl;
-                status = nppiAbsDiff_32f_C1R( (const Npp32f*)_layers[octave].getData( level ),
+                status = nppiAbsDiff_32f_C1R( (const Npp32f*)_octaves[octave].getData( level ),
                                               dstStep,
-                                              (const Npp32f*)_layers[octave].getData( level-1 ),
+                                              (const Npp32f*)_octaves[octave].getData( level-1 ),
                                               dstStep,
-                                              (Npp32f*)_layers[octave].getDogData( level-1 ),
+                                              (Npp32f*)_octaves[octave].getDogData( level-1 ),
                                               dstStep,
                                               dstSize );
                 V8_CHECKERR( status );

@@ -184,24 +184,24 @@ __host__
 void Pyramid::descriptors_v1( )
 {
     _keep_time_descr_v1.start();
-    for( int octave=0; octave<_octaves; octave++ ) {
+    for( int octave=0; octave<_num_octaves; octave++ ) {
         // async copy of extrema from device to host
-        _layers[octave].readExtremaCount( _stream );
+        _octaves[octave].readExtremaCount( _stream );
     }
 
     // wait until that is finished, so we can alloc space for descriptor
     cudaStreamSynchronize( _stream );
 
-    for( int octave=0; octave<_octaves; octave++ ) {
+    for( int octave=0; octave<_num_octaves; octave++ ) {
         // allocate the descriptor array for this octave, all levels
-        _layers[octave].allocDescriptors( );
+        _octaves[octave].allocDescriptors( );
     }
 
-    for( int octave=0; octave<_octaves; octave++ ) {
+    for( int octave=0; octave<_num_octaves; octave++ ) {
         for( int level=1; level<_levels-1; level++ ) {
             dim3 block;
             dim3 grid;
-            grid.x  = _layers[octave].getExtremaMgmtH(level)->counter;
+            grid.x  = _octaves[octave].getExtremaMgmtH(level)->counter;
 
             if( grid.x != 0 ) {
                 block.x = DESCR_V1_NUM_THREADS;
@@ -210,12 +210,12 @@ void Pyramid::descriptors_v1( )
 
                 keypoint_descriptors
                     <<<grid,block,0,_stream>>>
-                    ( _layers[octave].getExtrema( level ),
-                      _layers[octave].getDescriptors( level ),
-                      _layers[octave].getData( level ),
-                      _layers[octave].getWidth(),
-                      _layers[octave].getPitch(),
-                      _layers[octave].getHeight() );
+                    ( _octaves[octave].getExtrema( level ),
+                      _octaves[octave].getDescriptors( level ),
+                      _octaves[octave].getData( level ),
+                      _octaves[octave].getWidth(),
+                      _octaves[octave].getPitch(),
+                      _octaves[octave].getHeight() );
 
                 block.x = DESCR_V1_NUM_THREADS;
                 block.y = 1;
@@ -223,7 +223,7 @@ void Pyramid::descriptors_v1( )
 
                 normalize_histogram
                     <<<grid,block,0,_stream>>>
-                    ( _layers[octave].getDescriptors( level ) );
+                    ( _octaves[octave].getDescriptors( level ) );
             }
         }
     }

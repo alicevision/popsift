@@ -227,14 +227,14 @@ __host__
 void Pyramid::orientation_v2( )
 {
     _keep_time_orient_v2.start();
-    for( int octave=0; octave<_octaves; octave++ ) {
-        _layers[octave].readExtremaCount( _stream );
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        _octaves[octave].readExtremaCount( _stream );
         cudaStreamSynchronize( _stream );
         for( int level=1; level<_levels-1; level++ ) {
             dim3 block;
             dim3 grid;
-            // grid.x  = _layers[octave].getExtremaMgmtH(level)->max1;
-            grid.x  = _layers[octave].getExtremaMgmtH(level)->counter;
+            // grid.x  = _octaves[octave].getExtremaMgmtH(level)->max1;
+            grid.x  = _octaves[octave].getExtremaMgmtH(level)->counter;
             block.x = ORI_V2_NUM_THREADS;
             if( grid.x != 0 ) {
 #if 0
@@ -247,12 +247,12 @@ void Pyramid::orientation_v2( )
 
                 compute_keypoint_orientations_v2
                     <<<grid,block,0,_stream>>>
-                    ( _layers[octave].getExtrema( level ),
-                      _layers[octave].getExtremaMgmtD( ),
+                    ( _octaves[octave].getExtrema( level ),
+                      _octaves[octave].getExtremaMgmtD( ),
                       level,
-                      _layers[octave].getData( level ),
-                      _layers[octave].getPitch(),
-                      _layers[octave].getHeight() );
+                      _octaves[octave].getData( level ),
+                      _octaves[octave].getPitch(),
+                      _octaves[octave].getHeight() );
             }
         }
     }

@@ -210,24 +210,24 @@ void Pyramid::build_v7( Image* base )
     dim3 block;
     block.x = V7_WIDTH;
 
-    for( int octave=0; octave<_octaves; octave++ ) {
+    for( int octave=0; octave<_num_octaves; octave++ ) {
         dim3 grid_t;
-        grid_t.x  = _layers[octave].getPitch()  / V7_WIDTH;
-        grid_t.y  = _layers[octave].getTransposedPitch();
+        grid_t.x  = _octaves[octave].getPitch()  / V7_WIDTH;
+        grid_t.y  = _octaves[octave].getTransposedPitch();
         // dim3 grid;
-        // grid.x    = _layers[octave].getTransposedPitch() / V7_WIDTH;
-        // grid.y    = _layers[octave].getTransposedHeight();
+        // grid.x    = _octaves[octave].getTransposedPitch() / V7_WIDTH;
+        // grid.y    = _octaves[octave].getTransposedHeight();
 
 #if 0
         cerr << "Configuration for octave " << octave << endl
              << "  Normal-to-transposed: layer size: "
-             << _layers[octave].getWidth() << "x" << _layers[octave].getHeight() << endl
+             << _octaves[octave].getWidth() << "x" << _octaves[octave].getHeight() << endl
              << "                        grid: "
              << "(" << grid_t.x << "," << grid_t.y << "," << grid_t.z << ")"
              << " block: "
              << "(" << block.x << "," << block.y << "," << block.z << ")" << endl
              << "  Transposed-to-normal: layer size: "
-             << _layers[octave].getTransposedPitch() << "x" << _layers[octave].getTransposedHeight() << endl
+             << _octaves[octave].getTransposedPitch() << "x" << _octaves[octave].getTransposedHeight() << endl
              << "                        grid: "
              << "(" << grid.x << "," << grid.y << "," << grid.z << ")"
              << " block: "
@@ -241,30 +241,30 @@ void Pyramid::build_v7( Image* base )
                     filter_gauss_horiz_v7
                         <<<grid_t,block,0,_stream>>>
                         ( base->array.data,
-                          _layers[octave].getData2( level ),
+                          _octaves[octave].getData2( level ),
                           base->array.getCols(),
-                          _layers[octave].getPitch(),
+                          _octaves[octave].getPitch(),
                           base->array.getRows(),
-                          _layers[octave].getTransposedPitch() );
+                          _octaves[octave].getTransposedPitch() );
                 } else {
                     filter_gauss_horiz_v7_by_2
                         <<<grid_t,block,0,_stream>>>
-                        ( _layers[octave-1].getData( V7_LEVELS-3 ),
-                          _layers[octave].getData2( level ),
-                          _layers[octave].getWidth(),
-                          _layers[octave].getPitch(),
-                          _layers[octave].getHeight(),
-                          _layers[octave-1].getPitch() );
+                        ( _octaves[octave-1].getData( V7_LEVELS-3 ),
+                          _octaves[octave].getData2( level ),
+                          _octaves[octave].getWidth(),
+                          _octaves[octave].getPitch(),
+                          _octaves[octave].getHeight(),
+                          _octaves[octave-1].getPitch() );
                 }
             } else {
                 filter_gauss_horiz_v7
                     <<<grid_t,block,0,_stream>>>
-                    ( _layers[octave].getData( level-1 ),
-                      _layers[octave].getData2( level ),
-                      _layers[octave].getWidth(),
-                      _layers[octave].getPitch(),
-                      _layers[octave].getHeight(),
-                      _layers[octave].getTransposedPitch() );
+                    ( _octaves[octave].getData( level-1 ),
+                      _octaves[octave].getData2( level ),
+                      _octaves[octave].getWidth(),
+                      _octaves[octave].getPitch(),
+                      _octaves[octave].getHeight(),
+                      _octaves[octave].getTransposedPitch() );
             }
             cudaError_t err = cudaGetLastError();
             POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v7 failed: " );
@@ -272,22 +272,22 @@ void Pyramid::build_v7( Image* base )
             if( level == 0 ) {
                 filter_gauss_vert_v7
                     <<<grid_t,block,0,_stream>>>
-                    ( _layers[octave].getData2( level ),
-                      _layers[octave].getData( level ),
-                      _layers[octave].getWidth(),
-                      _layers[octave].getPitch(),
-                      _layers[octave].getHeight() );
+                    ( _octaves[octave].getData2( level ),
+                      _octaves[octave].getData( level ),
+                      _octaves[octave].getWidth(),
+                      _octaves[octave].getPitch(),
+                      _octaves[octave].getHeight() );
             } else {
-                assert( _layers[octave].getDogData() );
+                assert( _octaves[octave].getDogData() );
                 filter_gauss_vert_v7_and_dog
                     <<<grid_t,block,0,_stream>>>
-                    ( _layers[octave].getData2( level ),
-                      _layers[octave].getData( level ),
-                      _layers[octave].getWidth(),
-                      _layers[octave].getPitch(),
-                      _layers[octave].getHeight(),
-                      _layers[octave].getData( level-1 ),
-                      _layers[octave].getDogData( level-1 ) );
+                    ( _octaves[octave].getData2( level ),
+                      _octaves[octave].getData( level ),
+                      _octaves[octave].getWidth(),
+                      _octaves[octave].getPitch(),
+                      _octaves[octave].getHeight(),
+                      _octaves[octave].getData( level-1 ),
+                      _octaves[octave].getDogData( level-1 ) );
             }
             err = cudaGetLastError();
             POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v7 failed: " );

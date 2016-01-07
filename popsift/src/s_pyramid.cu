@@ -112,10 +112,10 @@ void Pyramid::test_last_error( int line, cudaStream_t stream )
 }
 
 /*************************************************************
- * Pyramid::Layer
+ * Pyramid::Octave
  *************************************************************/
 
-Pyramid::Layer::Layer( )
+Pyramid::Octave::Octave( )
     : _data(0)
     , _data_2(0)
     , _t_data(0)
@@ -126,7 +126,7 @@ Pyramid::Layer::Layer( )
     , _d_desc(0)
 { }
 
-void Pyramid::Layer::allocExtrema( uint32_t layer_max_extrema )
+void Pyramid::Octave::allocExtrema( uint32_t layer_max_extrema )
 {
     ExtremaMgmt*       mgmt;
 
@@ -162,7 +162,7 @@ void Pyramid::Layer::allocExtrema( uint32_t layer_max_extrema )
     }
 }
 
-void Pyramid::Layer::freeExtrema( )
+void Pyramid::Octave::freeExtrema( )
 {
     for( uint32_t i=0; i<_levels; i++ ) {
         if( _h_desc    && _h_desc[i] )    cudaFreeHost( _h_desc[i] );
@@ -176,7 +176,7 @@ void Pyramid::Layer::freeExtrema( )
     delete [] _h_desc;
 }
 
-void Pyramid::Layer::alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema, cudaStream_t stream )
+void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema, cudaStream_t stream )
 {
     _pitch   = _width  = width;
     _t_pitch = _height = height;
@@ -235,7 +235,7 @@ void Pyramid::Layer::alloc( uint32_t width, uint32_t height, uint32_t levels, ui
     allocExtrema( layer_max_extrema );
 }
 
-void Pyramid::Layer::free( )
+void Pyramid::Octave::free( )
 {
     freeExtrema( );
     cudaFree( _t_data );
@@ -245,7 +245,7 @@ void Pyramid::Layer::free( )
     cudaStreamDestroy( _stream );
 }
 
-void Pyramid::Layer::resetExtremaCount( cudaStream_t stream )
+void Pyramid::Octave::resetExtremaCount( cudaStream_t stream )
 {
     for( uint32_t i=1; i<_levels-1; i++ ) {
         _h_extrema_mgmt[i].counter = 0;
@@ -256,7 +256,7 @@ void Pyramid::Layer::resetExtremaCount( cudaStream_t stream )
                            cudaMemcpyHostToDevice, stream, true );
 }
 
-void Pyramid::Layer::readExtremaCount( cudaStream_t stream )
+void Pyramid::Octave::readExtremaCount( cudaStream_t stream )
 {
     POP_CUDA_MEMCPY_ASYNC( _h_extrema_mgmt,
                            _d_extrema_mgmt,
@@ -264,7 +264,7 @@ void Pyramid::Layer::readExtremaCount( cudaStream_t stream )
                            cudaMemcpyDeviceToHost, stream, true );
 }
 
-uint32_t Pyramid::Layer::getExtremaCount( ) const
+uint32_t Pyramid::Octave::getExtremaCount( ) const
 {
     uint32_t ct = 0;
     for( uint32_t i=1; i<_levels-1; i++ ) {
@@ -273,14 +273,14 @@ uint32_t Pyramid::Layer::getExtremaCount( ) const
     return ct;
 }
 
-uint32_t Pyramid::Layer::getExtremaCount( uint32_t level ) const
+uint32_t Pyramid::Octave::getExtremaCount( uint32_t level ) const
 {
     if( level < 1 )         return 0;
     if( level > _levels-2 ) return 0;
     return _h_extrema_mgmt[level].counter;
 }
 
-void Pyramid::Layer::allocDescriptors( )
+void Pyramid::Octave::allocDescriptors( )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
         uint32_t sz = _h_extrema_mgmt[l].counter;
@@ -294,7 +294,7 @@ void Pyramid::Layer::allocDescriptors( )
     }
 }
 
-void Pyramid::Layer::downloadDescriptor( cudaStream_t stream )
+void Pyramid::Octave::downloadDescriptor( cudaStream_t stream )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
         uint32_t sz = _h_extrema_mgmt[l].counter;
@@ -311,7 +311,7 @@ void Pyramid::Layer::downloadDescriptor( cudaStream_t stream )
     cudaStreamSynchronize( stream );
 }
 
-void Pyramid::Layer::writeDescriptor( ostream& ostr )
+void Pyramid::Octave::writeDescriptor( ostream& ostr )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
         Descriptor* desc = _h_desc[l];
@@ -327,7 +327,7 @@ void Pyramid::Layer::writeDescriptor( ostream& ostr )
     }
 }
 
-Descriptor* Pyramid::Layer::getDescriptors( uint32_t level )
+Descriptor* Pyramid::Octave::getDescriptors( uint32_t level )
 {
     return _d_desc[level];
 }
@@ -338,8 +338,8 @@ Descriptor* Pyramid::Layer::getDescriptors( uint32_t level )
 
 void Pyramid::download_and_save_array( const char* basename, uint32_t octave, uint32_t level )
 {
-    if( octave < _octaves ) {
-        _layers[octave].download_and_save_array( basename, octave, level );
+    if( octave < _num_octaves ) {
+        _octaves[octave].download_and_save_array( basename, octave, level );
     } else {
         cerr << "Octave " << octave << " does not exist" << endl;
         return;
@@ -348,7 +348,7 @@ void Pyramid::download_and_save_array( const char* basename, uint32_t octave, ui
 
 void Pyramid::download_and_save_descriptors( const char* basename, uint32_t octave )
 {
-    _layers[octave].downloadDescriptor( 0 );
+    _octaves[octave].downloadDescriptor( 0 );
 
     struct stat st = {0};
     if (stat("dir-desc", &st) == -1) {
@@ -357,10 +357,10 @@ void Pyramid::download_and_save_descriptors( const char* basename, uint32_t octa
     ostringstream ostr;
     ostr << "dir-desc/desc-" << basename << "-o-" << octave << ".txt";
     ofstream of( ostr.str().c_str() );
-    _layers[octave].writeDescriptor( of );
+    _octaves[octave].writeDescriptor( of );
 }
 
-void Pyramid::Layer::download_and_save_array( const char* basename, uint32_t octave, uint32_t level )
+void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t octave, uint32_t level )
 {
     if( level >= _levels ) {
         cerr << "Level " << level << " does not exist in Octave " << octave << endl;
@@ -512,7 +512,7 @@ void Pyramid::Layer::download_and_save_array( const char* basename, uint32_t oct
  *************************************************************/
 
 Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, cudaStream_t stream )
-    : _octaves( octaves )
+    : _num_octaves( octaves )
     , _levels( levels + 3 )
     , _stream( stream )
     , _keep_time_pyramid_v6( stream )
@@ -524,18 +524,18 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, cudaStream_t s
 {
     cerr << "Entering " << __FUNCTION__ << endl;
 
-    _layers = new Layer[octaves];
+    _octaves = new Octave[_num_octaves];
 
     uint32_t w = uint32_t(base->array.getCols());
     uint32_t h = uint32_t(base->array.getRows());
-    for( uint32_t o=0; o<_octaves; o++ ) {
+    for( uint32_t o=0; o<_num_octaves; o++ ) {
 #if (PYRAMID_PRINT_DEBUG==1)
         printf("Allocating octave %u with width %u and height %u (%u levels)\n", o, w, h, _levels );
 #endif // (PYRAMID_PRINT_DEBUG==1)
         if( o==0 ) {
-            _layers[o].alloc( w, h, _levels, 10000, _stream );
+            _octaves[o].alloc( w, h, _levels, 10000, _stream );
         } else {
-            _layers[o].alloc( w, h, _levels, 10000 );
+            _octaves[o].alloc( w, h, _levels, 10000 );
         }
         w = ceilf( w / 2.0f );
         h = ceilf( h / 2.0f );
@@ -548,7 +548,7 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, cudaStream_t s
 
 Pyramid::~Pyramid( )
 {
-    delete [] _layers;
+    delete [] _octaves;
 }
 
 /*************************************************************
@@ -592,19 +592,19 @@ void Pyramid::report_times( )
     if( ORIENTA_V2_ON ) _keep_time_orient_v2. report("    V2, time for finding orientation: " );
     _keep_time_descr_v1.report("    V1, time for computing descriptors: " );
 
-    for( int o=0; o<_octaves; o++ ) {
+    for( int o=0; o<_num_octaves; o++ ) {
         cout << "Extrema for Octave " << o << ": ";
         for( int l=1; l<_levels-1; l++ ) {
-            cout << setw(3) << _layers[o].getExtremaCount( l ) << " ";
+            cout << setw(3) << _octaves[o].getExtremaCount( l ) << " ";
         }
-        cout << "-> " << setw(4) << _layers[o].getExtremaCount( ) << endl;
+        cout << "-> " << setw(4) << _octaves[o].getExtremaCount( ) << endl;
     }
 }
 
 void Pyramid::reset_extremum_counter( )
 {
-    for( int o=0; o<_octaves; o++ ) {
-        _layers[o].resetExtremaCount( _stream );
+    for( int o=0; o<_num_octaves; o++ ) {
+        _octaves[o].resetExtremaCount( _stream );
     }
 }
 
@@ -616,8 +616,8 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
     // find_extrema_v3( 2 );
     find_extrema_v4( 2, edgeLimit, threshold );
 
-    for( int o=0; o<_octaves; o++ ) {
-        _layers[o].readExtremaCount( _stream );
+    for( int o=0; o<_num_octaves; o++ ) {
+        _octaves[o].readExtremaCount( _stream );
     }
 
     if( ORIENTA_V1_ON ) { orientation_v1( ); }

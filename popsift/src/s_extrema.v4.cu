@@ -520,44 +520,44 @@ void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold
 
     _keep_time_extrema_v4.start();
 
-    for( int octave=0; octave<_octaves; octave++ ) {
+    for( int octave=0; octave<_num_octaves; octave++ ) {
         for( int level=1; level<_levels-1; level++ ) {
             dim3 block;
             dim3 grid;
-            grid.x  = _layers[octave].getPitch()  / 32;
-            grid.y  = _layers[octave].getHeight() / height;
+            grid.x  = _octaves[octave].getPitch()  / 32;
+            grid.y  = _octaves[octave].getHeight() / height;
             block.x = 32;
             block.y = height;
 
             find_extrema_in_dog_v4
                 <<<grid,block,0,_stream>>>
-                ( _layers[octave].getDogData( level-1 ),
-                  _layers[octave].getDogData( level ),
-                  _layers[octave].getDogData( level+1 ),
+                ( _octaves[octave].getDogData( level-1 ),
+                  _octaves[octave].getDogData( level ),
+                  _octaves[octave].getDogData( level+1 ),
                   edgeLimit,
                   threshold,
-                  _layers[octave].getWidth( ),
-                  _layers[octave].getPitch( ),
-                  _layers[octave].getHeight( ),
+                  _octaves[octave].getWidth( ),
+                  _octaves[octave].getPitch( ),
+                  _octaves[octave].getHeight( ),
                   level,
                   _levels,
-                  _layers[octave].getExtremaMgmtD( ),
-                  _layers[octave].getExtrema( level ) );
+                  _octaves[octave].getExtremaMgmtD( ),
+                  _octaves[octave].getExtrema( level ) );
 #if 1
             fix_extrema_count_v4
                 <<<1,1,0,_stream>>>
-                ( _layers[octave].getExtremaMgmtD( ),
+                ( _octaves[octave].getExtremaMgmtD( ),
                   level );
 #else
     // this does not work yet: I have no idea how to link with CUDA
     // and still achieve dynamic parallelism
             start_orientation_v4
                 <<<1,1,0,_stream>>>
-                ( _layers[octave].getExtrema( level ),
-                  _layers[octave].getExtremaMgmtD( level ),
-                  _layers[octave].getDogData( level ),
-                  _layers[octave].getPitch( ),
-                  _layers[octave].getHeight( ) );
+                ( _octaves[octave].getExtrema( level ),
+                  _octaves[octave].getExtremaMgmtD( level ),
+                  _octaves[octave].getDogData( level ),
+                  _octaves[octave].getPitch( ),
+                  _octaves[octave].getHeight( ) );
 #endif
         }
     }

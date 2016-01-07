@@ -60,7 +60,7 @@ struct Descriptor
 
 class Pyramid
 {
-    class Layer
+    class Octave
     {
         cudaStream_t _stream;
 
@@ -88,8 +88,8 @@ class Pyramid
         Descriptor**        _h_desc;
 
     public:
-        Layer( );
-        ~Layer( ) { this->free(); }
+        Octave( );
+        ~Octave( ) { this->free(); }
 
         inline int getLevels() const { return _levels; }
         inline int getWidth() const  { return _width; }
@@ -179,9 +179,9 @@ class Pyramid
         void freeExtrema( );
     };
 
-    uint32_t     _octaves;
+    uint32_t     _num_octaves;
     uint32_t     _levels;
-    Layer*       _layers;
+    Octave*      _octaves;
     cudaStream_t _stream;
 
 public:
