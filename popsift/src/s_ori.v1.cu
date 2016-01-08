@@ -17,12 +17,10 @@ __global__
 void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
                                        ExtremaMgmt*       mgmt_array,
                                        uint32_t           mgmt_level,
-                                       const float*       layer,
-                                       int                layer_pitch,
-                                       int                layer_height )
+                                       Plane2D_float      layer )
 {
-    uint32_t w   = layer_pitch;
-    uint32_t h   = layer_height;
+    uint32_t w   = layer.getWidth();
+    uint32_t h   = layer.getHeight();
 
     ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
 
@@ -64,9 +62,7 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
                       theta,
                       xx,
                       yy,
-                      layer,
-                      layer_pitch,
-                      layer_height );
+                      layer );
 
         float dx = xx - x;
         float dy = yy - y;
@@ -179,9 +175,7 @@ void Pyramid::orientation_v1( )
                     ( _octaves[octave].getExtrema( level ),
                       _octaves[octave].getExtremaMgmtD( ),
                       level,
-                      _octaves[octave].getData( level ),
-                      _octaves[octave].getPitch(),
-                      _octaves[octave].getHeight() );
+                      _octaves[octave].getData( level ) );
             }
         }
     }

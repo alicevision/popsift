@@ -30,8 +30,6 @@ using namespace std;
 
 namespace popart {
 
-#include "s_pyramid.v6.h"
-
 #include "s_ori.v1.h"
 #include "s_ori.v2.h"
 #include "s_extrema.v4.h"
@@ -117,7 +115,7 @@ void Pyramid::test_last_error( int line, cudaStream_t stream )
 
 Pyramid::Octave::Octave( )
     : _data(0)
-    , _data_2(0)
+    , _data2(0)
     , _t_data(0)
     , _dog_data(0)
     , _h_extrema_mgmt(0)
@@ -178,8 +176,6 @@ void Pyramid::Octave::freeExtrema( )
 
 void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema, cudaStream_t stream )
 {
-    _pitch   = _width  = width;
-    _t_pitch = _height = height;
     _levels            = levels;
     if( stream != 0 ) {
         _stream = stream;
@@ -192,45 +188,23 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
     memset( _d_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
     memset( _h_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
 
-    align( _pitch,   128 ); // aligning both width
-    align( _t_pitch, 128 ); // and height because we allocate transposed data
-                           // Note: 128 may be excessive
 #if (PYRAMID_PRINT_DEBUG==1)
     printf("    correcting to width %u, height %u\n", _width, _height );
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
-    cudaError_t err;
-    size_t p;
+    _data     = new Plane2D_float[_levels];
+    _t_data   = new Plane2D_float[_levels];
+    _data2    = new Plane2D_float[_levels];
+    _dog_data = new Plane2D_float[_levels-1];
 
-    err = cudaMallocPitch( &_data,   &p,   _pitch*sizeof(float), _levels * _t_pitch );
-    POP_CUDA_FATAL_TEST( err, "cudaMallocPitch failed for array: " );
-    _pitch = uint32_t(p/sizeof(float));
-    assert( _pitch * sizeof(float) == p );
-#if (PYRAMID_PRINT_DEBUG==1)
-    printf("    data size in bytes is   %u (%u floats) * %u = %u\n",
-           uint32_t(p), _pitch,
-           _levels * _t_pitch,
-           uint32_t(_levels * getByteSizeData() ) );
-#endif // (PYRAMID_PRINT_DEBUG==1)
-
-    err = cudaMallocPitch( &_data_2,   &p,   _pitch*sizeof(float), _levels * _t_pitch );
-    POP_CUDA_FATAL_TEST( err, "cudaMallocPitch failed for array: " );
-    assert( _pitch * sizeof(float) == p );
-
-    err = cudaMallocPitch( &_dog_data, &p, _pitch*sizeof(float), (_levels-1) * _t_pitch );
-    POP_CUDA_FATAL_TEST( err, "cudaMallocPitch failed for array: " );
-    assert( _pitch * sizeof(float) == p );
-
-    err = cudaMallocPitch( &_t_data, &p, _t_pitch*sizeof(float), _levels * _pitch );
-    POP_CUDA_FATAL_TEST( err, "cudaMallocPitch failed for array: " );
-    _t_pitch = uint32_t(p/sizeof(float));
-    assert( _t_pitch * sizeof(float) == p );
-#if (PYRAMID_PRINT_DEBUG==1)
-    printf("    t-data size in bytes is %u (%u floats) * %u = %u\n",
-           uint32_t(p), _t_pitch,
-           _levels * _pitch,
-           uint32_t(_levels * getByteSizeTransposedData() ) );
-#endif // (PYRAMID_PRINT_DEBUG==1)
+    for( int i=0; i<_levels; i++ ) {
+        _data[i]  .allocDev( width, height );
+        _data2[i] .allocDev( width, height );
+        _t_data[i].allocDev( height, width );
+    }
+    for( int i=0; i<_levels-1; i++ ) {
+        _dog_data[i].allocDev( width, height );
+    }
 
     allocExtrema( layer_max_extrema );
 }
@@ -238,10 +212,16 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
 void Pyramid::Octave::free( )
 {
     freeExtrema( );
-    cudaFree( _t_data );
-    cudaFree( _dog_data );
-    cudaFree( _data_2 );
-    cudaFree( _data );
+
+    for( int i=0; i<_levels; i++ ) {
+        _data[i]  .freeDev( );
+        _data2[i] .freeDev( );
+        _t_data[i].freeDev( );
+    }
+    for( int i=0; i<_levels-1; i++ ) {
+        _dog_data[i].freeDev( );
+    }
+
     cudaStreamDestroy( _stream );
 }
 
@@ -375,31 +355,34 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
             mkdir("dir-octave", 0700);
         }
 
-        uint32_t       sz = getFloatSizeData();
-        float*         f = new float        [ sz ];
-        unsigned char* c = new unsigned char[ sz ];
-        POP_CUDA_MEMCPY_ASYNC( f,
-                               getData( level ),
-                               getByteSizeData(),
-                               cudaMemcpyDeviceToHost,
-                               0,
-                               true );
-        for( uint32_t i=0; i<sz; i++ ) {
-            c[i] = (unsigned char)(f[i]);
-        }
+        Plane2D_float& devPlane( getData(level) );
+
+        int width  = devPlane.getWidth();
+        int height = devPlane.getHeight();
+
+        Plane2D_float  hostPlane;
+        Plane2D_uint8  hostPlane_c;
+        hostPlane.allocHost( width, height, popart::Unaligned );
+        hostPlane.memcpyFromDevice( devPlane );
+        hostPlane_c.allocHost( width, height, popart::Unaligned );
+
+        for( int y=0; y<height; y++ )
+            for( int x=0; x<width; x++ )
+                hostPlane_c.ptr(y)[x] = (unsigned char)( hostPlane.ptr(y)[x] );
+
         ostringstream ostr;
         ostr << "dir-octave/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
         ofstream of( ostr.str().c_str() );
         of << "P5" << endl
-           << _pitch << " " << _height << endl
+           << width << " " << height << endl
            << "255" << endl;
-        of.write( (char*)c, sz );
+        of.write( (char*)hostPlane_c.data, hostPlane_c.getByteSize() );
         of.close();
 
         if( level == 0 ) {
             uint32_t total_ct = 0;
 
-            cerr << "calling from octave " << octave << endl;
+            cerr << "calling " << __FUNCTION__ << " from octave " << octave << endl;
             readExtremaCount( 0 );
             cudaDeviceSynchronize( );
             for( uint32_t l=0; l<_levels; l++ ) {
@@ -417,8 +400,8 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
                         int32_t x = roundf( cand[i].xpos );
                         int32_t y = roundf( cand[i].ypos );
                         for( int32_t j=-4; j<=4; j++ ) {
-                            c[ clamp(y+j,_height)*_pitch + clamp(x,  _width) ] = 255;
-                            c[ clamp(y,  _height)*_pitch + clamp(x+j,_width) ] = 255;
+                            hostPlane_c.ptr( clamp(y+j,height) )[ clamp(x,  width) ] = 255;
+                            hostPlane_c.ptr( clamp(y,  height) )[ clamp(x+j,width) ] = 255;
                         }
                     }
 
@@ -435,15 +418,15 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
                 ostr << "dir-feat/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
                 ofstream of( ostr.str().c_str() );
                 of << "P5" << endl
-                   << _pitch << " " << _height << endl
+                   << width << " " << height << endl
                    << "255" << endl;
-                of.write( (char*)c, sz );
+                of.write( (char*)hostPlane_c.data, hostPlane_c.getByteSize() );
                 of.close();
             }
         }
 
-        delete [] c;
-        delete [] f;
+        hostPlane_c.freeHost();
+        hostPlane  .freeHost();
     }
 #endif
 #if 0
@@ -481,28 +464,30 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
     }
 
     if( level < _levels-1 ) {
-        uint32_t       sz = getFloatSizeDogData();
-        float*         f = new float        [ sz ];
-        uint16_t       max_c = 0;
-        uint16_t*      c = new uint16_t[ sz ];
-        POP_CUDA_MEMCPY( f,
-                         getDogData( level ),
-                         getByteSizeDogData(),
-                         cudaMemcpyDeviceToHost );
-        for( uint32_t i=0; i<sz; i++ ) {
-            float fm = f[i] * 256.0;
-            c[i] = htons( (uint16_t)fm );
-            max_c = max( max_c, c[i] );
+        Plane2D_float& devPlane( getDogData(level) );
+        int width  = devPlane.getWidth();
+        int height = devPlane.getHeight();
+
+        Plane2D_float  f;
+        Plane2D_uint16 c;
+        f.allocHost( width, height, popart::Unaligned );
+        c.allocHost( width, height, popart::Unaligned );
+        devPlane.memcpyToHost( f );
+        for( int y=0; y<height; y++ ) {
+            for( int x=0; x<width; x++ ) {
+                float fm = f.ptr(y)[x] * 256.0;
+                c.ptr(y)[x] = htons( (uint16_t)fm );
+            }
         }
         ostringstream ostr;
         ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << level << ".pgm";
         ofstream of( ostr.str().c_str() );
         of << "P5" << endl
-           << _pitch << " " << _height << endl
-           << max_c << endl;
-        of.write( (char*)c, 2*sz );
-        delete [] c;
-        delete [] f;
+           << width << " " << height << endl
+           << 65536 << endl;
+        of.write( (char*)c.data, 2*f.getByteSize() );
+        c.freeHost();
+        f.freeHost();
     }
 #endif
 }
@@ -570,15 +555,6 @@ void Pyramid::build( Image* base, uint32_t idx )
         #endif // (PYRAMID_PRINT_DEBUG==1)
         build_v7( base );
     }
-
-#if 0
-    if( true  ) {
-        #if (PYRAMID_PRINT_DEBUG==1)
-        printf("V9: Grouping %dx1x1 read float4s, one octaves, one levels\n", V9_WIDTH);
-        #endif // (PYRAMID_PRINT_DEBUG==1)
-        build_v9( base );
-    }
-#endif
 }
 
 void Pyramid::report_times( )

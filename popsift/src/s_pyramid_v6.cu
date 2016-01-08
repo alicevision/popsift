@@ -1,3 +1,9 @@
+#include "s_pyramid.h"
+
+#include "gauss_filter.h"
+#include "clamp.hpp"
+#include "debug_macros.hpp"
+
 /*************************************************************
  * V6: device side
  *************************************************************/
@@ -9,18 +15,25 @@
 #define V6_READ_RANGE   ( V6_RANGE + V6_WIDTH + V6_RANGE )
 #define V6_LEVELS       _levels
 
+namespace popart {
+
 __global__
-void filter_gauss_horiz_v6( float* src_data, uint32_t src_w, uint32_t src_h,
-                            float* dst_data, uint32_t dst_w, uint32_t dst_h )
+void filter_gauss_horiz_v6( Plane2D_float src_data,
+                            Plane2D_float dst_data )
 {
     int32_t block_x = blockIdx.x * V6_WIDTH; // blockDim.x; <- wrong, it's 136
     int32_t block_y = blockIdx.y;            // blockDim.y; <- it's 1, trivial
 
     __shared__ float px[V6_READ_RANGE];
 
+    const int src_w = src_data.getWidth();
+    const int src_h = src_data.getHeight();
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+
     int32_t idx     = threadIdx.x - V6_RANGE;
     int32_t src_idx = clamp( block_x + idx, src_w );
-    px[threadIdx.x] = src_data[ block_y * src_w + src_idx ];
+    px[threadIdx.x] = src_data.ptr(block_y)[src_idx];
     __syncthreads();
 
     if( threadIdx.x >= V6_WIDTH ) return;
@@ -36,23 +49,28 @@ void filter_gauss_horiz_v6( float* src_data, uint32_t src_w, uint32_t src_h,
     if( dst_col < 0 || dst_col >= dst_w ) return;
     if( dst_row < 0 || dst_row >= dst_h ) return;
 
-    dst_data[dst_row * dst_w + dst_col ] = out;
+    dst_data.ptr(dst_row)[dst_col] = out;
 }
 
 __global__
-void filter_gauss_horiz_v6_and_dog( float* src_data, uint32_t src_w, uint32_t src_h,
-                                    float* dst_data, uint32_t dst_w, uint32_t dst_h,
-                                    float* higher_level_data,
-                                    float* dog_data )
+void filter_gauss_horiz_v6_and_dog( Plane2D_float src_data,
+                                    Plane2D_float dst_data,
+                                    Plane2D_float higher_level_data,
+                                    Plane2D_float dog_data )
 {
     int32_t block_x = blockIdx.x * V6_WIDTH;
     int32_t block_y = blockIdx.y;
 
     __shared__ float px[V6_READ_RANGE];
 
+    const int src_w = src_data.getWidth();
+    const int src_h = src_data.getHeight();
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+
     int32_t idx     = threadIdx.x - V6_RANGE;
     int32_t src_idx = clamp( block_x + idx, src_w );
-    px[threadIdx.x] = src_data[ block_y * src_w + src_idx ];
+    px[threadIdx.x] = src_data.ptr(block_y)[src_idx];
     __syncthreads();
 
     if( threadIdx.x >= V6_WIDTH ) return;
@@ -68,18 +86,18 @@ void filter_gauss_horiz_v6_and_dog( float* src_data, uint32_t src_w, uint32_t sr
     if( dst_col < 0 || dst_col >= dst_w ) return;
     if( dst_row < 0 || dst_row >= dst_h ) return;
 
-    dst_data[dst_row * dst_w + dst_col] = out;
+    dst_data.ptr(dst_row)[dst_col] = out;
 
     float cmp;
-    cmp = higher_level_data[dst_row * dst_w + dst_col];
+    cmp = higher_level_data.ptr(dst_row)[dst_col];
     out -= cmp;
     out = fabs(out);
-    dog_data[dst_row * dst_w + dst_col] = out;
+    dog_data.ptr(dst_row)[dst_col] = out;
 }
 
 __global__
-void filter_gauss_horiz_v6_by_2( float* src_data, uint32_t src_w, uint32_t src_h,
-                                 float* dst_data, uint32_t dst_w, uint32_t dst_h )
+void filter_gauss_horiz_v6_by_2( Plane2D_float src_data,
+                                 Plane2D_float dst_data )
 {
     if( threadIdx.x >= V6_READ_RANGE ) return;
     int32_t block_x = blockIdx.x * V6_WIDTH;
@@ -87,10 +105,15 @@ void filter_gauss_horiz_v6_by_2( float* src_data, uint32_t src_w, uint32_t src_h
 
     __shared__ float px[V6_READ_RANGE];
 
+    const int src_w = src_data.getWidth();
+    const int src_h = src_data.getHeight();
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+
     int32_t idx     = threadIdx.x - V6_RANGE;
     int32_t src_idx = clamp( 2*(block_x + idx), src_w );
     int32_t src_y   = clamp( 2*block_y, src_h );
-    float value     = src_data[ src_y * src_w + src_idx ];
+    float value     = src_data.ptr(src_y)[src_idx];
     px[threadIdx.x] = value;
     __syncthreads();
 
@@ -107,7 +130,7 @@ void filter_gauss_horiz_v6_by_2( float* src_data, uint32_t src_w, uint32_t src_h
     if( dst_col < 0 || dst_col >= dst_w ) return;
     if( dst_row < 0 || dst_row >= dst_h ) return;
 
-    dst_data[dst_row * dst_w + dst_col ] = out;
+    dst_data.ptr(dst_row)[dst_col] = out;
 }
 
 /*************************************************************
@@ -135,12 +158,14 @@ void Pyramid::build_v6( Image* base )
     block.x = V6_READ_RANGE;
 
     for( int octave=0; octave<_num_octaves; octave++ ) {
+        Plane2D_float s_data( _octaves[octave].getData(0) );
+        Plane2D_float t_data( _octaves[octave].getTransposedData(0) );
         dim3 grid_t;
         dim3 grid;
-        grid_t.x  = _octaves[octave].getPitch() / V6_WIDTH;
-        grid_t.y  = _octaves[octave].getHeight();
-        grid.x    = _octaves[octave].getTransposedPitch() / V6_WIDTH;
-        grid.y    = _octaves[octave].getTransposedHeight();
+        grid_t.x  = s_data.getWidth() / V6_WIDTH;
+        grid_t.y  = s_data.getHeight();
+        grid.x    = t_data.getWidth() / V6_WIDTH;
+        grid.y    = t_data.getHeight();
 
 #if 0
         cerr << "Configuration for octave " << octave << endl
@@ -164,31 +189,19 @@ void Pyramid::build_v6( Image* base )
                 if( octave == 0 ) {
                     filter_gauss_horiz_v6
                         <<<grid_t,block,0,_stream>>>
-                        ( base->array.data,
-                          base->array.step / sizeof(float),
-                          base->array.getRows(),
-                          _octaves[octave].getTransposedData(),
-                          _octaves[octave].getTransposedPitch(),
-                          _octaves[octave].getTransposedHeight() );
+                        ( base->array,
+                          _octaves[octave].getTransposedData( level ) );
                 } else {
                     filter_gauss_horiz_v6_by_2
                         <<<grid_t,block,0,_stream>>>
                         ( _octaves[octave-1].getData( V6_LEVELS-1 ),
-                          _octaves[octave-1].getPitch(),
-                          _octaves[octave-1].getHeight(),
-                          _octaves[octave].getTransposedData(),
-                          _octaves[octave].getTransposedPitch(),
-                          _octaves[octave].getTransposedHeight() );
+                          _octaves[octave].getTransposedData( level ) );
                 }
             } else {
                 filter_gauss_horiz_v6
                     <<<grid_t,block,0,_stream>>>
                     ( _octaves[octave].getData( level-1 ),
-                      _octaves[octave].getPitch(),
-                      _octaves[octave].getHeight(),
-                      _octaves[octave].getTransposedData( level ),
-                      _octaves[octave].getTransposedPitch(),
-                      _octaves[octave].getTransposedHeight() );
+                      _octaves[octave].getTransposedData( level ) );
             }
             cudaError_t err = cudaGetLastError();
             POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v6 failed: " );
@@ -197,21 +210,12 @@ void Pyramid::build_v6( Image* base )
                 filter_gauss_horiz_v6
                     <<<grid,block,0,_stream>>>
                     ( _octaves[octave].getTransposedData( level ),
-                      _octaves[octave].getTransposedPitch(),
-                      _octaves[octave].getTransposedHeight(),
-                      _octaves[octave].getData( level ),
-                      _octaves[octave].getPitch(),
-                      _octaves[octave].getHeight() );
+                      _octaves[octave].getData( level ) );
             } else {
-                assert( _octaves[octave].getDogData() );
                 filter_gauss_horiz_v6_and_dog
                     <<<grid,block,0,_stream>>>
                     ( _octaves[octave].getTransposedData( level ),
-                      _octaves[octave].getTransposedPitch(),
-                      _octaves[octave].getTransposedHeight(),
                       _octaves[octave].getData( level ),
-                      _octaves[octave].getPitch(),
-                      _octaves[octave].getHeight(),
                       _octaves[octave].getData( level-1 ),
                       _octaves[octave].getDogData( level-1 ) );
             }
@@ -222,10 +226,5 @@ void Pyramid::build_v6( Image* base )
     _keep_time_pyramid_v6.stop();
 }
 
-// #undef V6_WIDTH
-#undef V6_RANGE
-#undef V6_GAUSS_BASE
-#undef V6_FILTERSIZE
-#undef V6_READ_RANGE
-#undef V6_LEVELS
+} // namespace popart
 

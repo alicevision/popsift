@@ -64,15 +64,12 @@ class Pyramid
     {
         cudaStream_t _stream;
 
-        uchar*    _data;   // main frame
-        uchar*    _data_2; // alternative to transposed data, surface Mem
-        uchar*    _t_data; // transsposed data, used without surface
-        uchar*    _dog_data; // difference of Gaussian
         uint32_t  _levels;
-        uint32_t  _width; // width in number of floats, not bytes
-        uint32_t  _height;
-        uint32_t  _pitch; // pitch in number of floats, not bytes !!!
-        uint32_t  _t_pitch;
+
+        Plane2D_float* _data;
+        Plane2D_float* _data2;
+        Plane2D_float* _dog_data;
+        Plane2D_float* _t_data;
 
         /* It seems strange strange to collect extrema globally only.
          * Because of the global cut-off, features from the later
@@ -92,51 +89,47 @@ class Pyramid
         ~Octave( ) { this->free(); }
 
         inline int getLevels() const { return _levels; }
-        inline int getWidth() const  { return _width; }
-        inline int getHeight() const { return _height; }
-        inline int getPitch() const  { return _pitch; }
-        inline int getTransposedWidth() const  { return _height; }
-        inline int getTransposedHeight() const { return _width; }
-        inline int getTransposedPitch() const  { return _t_pitch; }
+        inline int getWidth() const  { return _data[0].getWidth(); }
+        inline int getHeight() const { return _data[0].getHeight(); }
+        inline int getTransposedWidth() const  { return _t_data[0].getWidth(); }
+        inline int getTransposedHeight() const { return _t_data[0].getHeight(); }
 
-        inline float* getData()           { return (float*)_data; }
-        inline float* getData2()          { return (float*)_data_2; }
-        inline float* getDogData()        { return (float*)_dog_data; }
-        inline float* getTransposedData() { return (float*)_t_data; }
-
-        inline float* getData( uint32_t level ) {
-            uchar* ret = _data;
-            ret += ( level * getByteSizeData() );
-            return (float*)ret;
+        inline Plane2D_float& getData( uint32_t level ) {
+            return _data[level];
         }
-        inline float* getData2( uint32_t level ) { uchar* ret = _data_2; ret += ( level * getByteSizeData() ); return (float*)ret; }
-        inline float* getDogData( uint32_t level ) {
-            uchar* ret = _dog_data;
-            ret += ( level * getByteSizeDogData() );
-            return (float*)ret;
+        inline Plane2D_float& getData2( uint32_t level ) {
+            return _data2[level];
         }
-        inline float* getTransposedData( uint32_t level ) {
-            uchar* ret = _t_data;
-            ret += ( level * getByteSizeTransposedData() );
-            return (float*)ret;
+        inline Plane2D_float& getDogData( uint32_t level ) {
+            return _dog_data[level];
+        }
+        inline Plane2D_float& getTransposedData( uint32_t level ) {
+            return _t_data[level];
         }
 
-        inline uint32_t getFloatSizeData() const           { return _pitch * _height; }
-        inline uint32_t getFloatSizeDogData() const        { return getFloatSizeData(); }
-        inline uint32_t getFloatSizeTransposedData() const { return _t_pitch * _width; }
-
+        inline uint32_t getFloatSizeData() const {
+            return _data[0].getByteSize() / sizeof(float);
+        }
+        inline uint32_t getFloatSizeDogData() const        {
+            return _dog_data[0].getByteSize() / sizeof(float);
+        }
+        inline uint32_t getFloatSizeTransposedData() const {
+            return _t_data[0].getByteSize() / sizeof(float);
+        }
         inline uint32_t getByteSizeData() const {
-            return sizeof(float) * getFloatSizeData();
+            return _data[0].getByteSize();
         }
-        inline uint32_t getByteSizeDogData() const { return getByteSizeData(); }
+        inline uint32_t getByteSizeDogData() const {
+            return _dog_data[0].getByteSize();
+        }
         inline uint32_t getByteSizeTransposedData() const {
-            return sizeof(float) * getFloatSizeTransposedData();
+            return _t_data[0].getByteSize();
         }
         inline uint32_t getByteSizePitch() const {
-            return sizeof(float) * getPitch();
+            return _data[0].getPitch();
         }
         inline uint32_t getByteSizeTransposedPitch() const {
-            return sizeof(float) * getTransposedPitch();
+            return _t_data[0].getPitch();
         }
 
         inline ExtremaMgmt* getExtremaMgmtH( uint32_t level ) {

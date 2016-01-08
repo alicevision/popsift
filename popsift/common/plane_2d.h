@@ -152,6 +152,8 @@ template <typename T> struct PitchPlane2D : public PlaneT<T>
     __host__ inline void freeHost( ) {
         PlaneBase::freeHost2D( this->data );
     }
+    __host__ __device__
+    inline short getPitch( ) const { return step; }
 };
 
 /*************************************************************
@@ -303,6 +305,8 @@ public:
     inline short getRows( ) const { return _rows; }
     __host__ __device__
     inline short getHeight( ) const { return _rows; }
+    __host__ __device__
+    inline short getByteSize( ) const { return this->step*_rows; }
 
     __host__ inline void allocDev( int w, int h ) {
         _cols = w;
@@ -456,12 +460,14 @@ inline void Plane2D<T>::memcpyToHost( PitchPlane2D<T>& hostPlane, cudaStream_t s
  * Typedefs for various template instances
  *************************************************************/
 
-typedef PitchPlane2D<uint8_t> PitchPlane2D_uint8;
-typedef PitchPlane2D<float>   PitchPlane2D_float;
-typedef PitchPlane2D<uchar2>  PitchPlane2D_uchar_2;
-typedef PitchPlane2D<float4>  PitchPlane2D_float_4;
+typedef PitchPlane2D<uint8_t>  PitchPlane2D_uint8;
+typedef PitchPlane2D<uint16_t> PitchPlane2D_uint16;
+typedef PitchPlane2D<float>    PitchPlane2D_float;
+typedef PitchPlane2D<uchar2>   PitchPlane2D_uchar_2;
+typedef PitchPlane2D<float4>   PitchPlane2D_float_4;
 
 typedef Plane2D<uint8_t>      Plane2D_uint8;
+typedef Plane2D<uint16_t>     Plane2D_uint16;
 typedef Plane2D<float>        Plane2D_float;
 typedef Plane2D<uchar2>       Plane2D_uchar_2;
 typedef Plane2D<float4>       Plane2D_float_4;

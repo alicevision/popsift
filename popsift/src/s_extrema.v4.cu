@@ -1,5 +1,7 @@
 #include "s_extrema.v4.h"
 #include "debug_macros.hpp"
+#include "assist.h"
+#include "clamp.hpp"
 
 #define DEBUG_MODE 1
 
@@ -44,7 +46,7 @@ inline uint32_t extrema_count_v4( uint32_t indicator, ExtremaMgmt* mgmt )
 }
 
 __device__
-inline bool is_extremum_v4( float* dog[3],
+inline bool is_extremum_v4( Plane2D_float& dog0, Plane2D_float& dog1, Plane2D_float& dog2,
                             uint32_t y0, uint32_t y1, uint32_t y2,
                             uint32_t x0, uint32_t x1, uint32_t x2 )
 {
@@ -55,9 +57,19 @@ inline bool is_extremum_v4( float* dog[3],
     uint32_t gt = 0;
     uint32_t lt = 0;
 
-    float val0 = dog[1][y1+x0];
-    float val2 = dog[1][y1+x2];
-    float val  = dog[1][y1+x1];
+    float* dog0y0 = dog0.ptr(y0);
+    float* dog0y1 = dog0.ptr(y1);
+    float* dog0y2 = dog0.ptr(y2);
+    float* dog1y0 = dog1.ptr(y0);
+    float* dog1y1 = dog1.ptr(y1);
+    float* dog1y2 = dog1.ptr(y2);
+    float* dog2y0 = dog2.ptr(y0);
+    float* dog2y1 = dog2.ptr(y1);
+    float* dog2y2 = dog2.ptr(y2);
+
+    float val0 = dog1y1[x0];
+    float val2 = dog1y1[x2];
+    float val  = dog1y1[x1];
 
     // bit indeces for neighbours:
     //     7 0 1    0x80 0x01 0x02
@@ -71,42 +83,42 @@ inline bool is_extremum_v4( float* dog[3],
     if( ( gt != 0x00440000 ) && ( lt != 0x00440000 ) ) return false;
 
     // 2nd group: requires a total of 8 128-byte reads
-    extremum_cmp_v4( val, dog[1][y0+x0], gt, lt, 0x00800000 ); // ( 0x01<<7 ) << 16
-    extremum_cmp_v4( val, dog[1][y2+x0], gt, lt, 0x00200000 ); // ( 0x01<<5 ) << 16
-    extremum_cmp_v4( val, dog[0][y0+x0], gt, lt, 0x80000000 ); // ( 0x01<<6 ) << 24
-    extremum_cmp_v4( val, dog[0][y2+x0], gt, lt, 0x40000000 ); // ( 0x01<<6 ) << 24
-    extremum_cmp_v4( val, dog[0][y1+x0], gt, lt, 0x20000000 ); // ( 0x01<<6 ) << 24
-    extremum_cmp_v4( val, dog[2][y0+x0], gt, lt, 0x00008000 ); // ( 0x01<<6 ) <<  8
-    extremum_cmp_v4( val, dog[2][y1+x0], gt, lt, 0x00004000 ); // ( 0x01<<6 ) <<  8
-    extremum_cmp_v4( val, dog[2][y2+x0], gt, lt, 0x00002000 ); // ( 0x01<<6 ) <<  8
+    extremum_cmp_v4( val, dog1y0[x0], gt, lt, 0x00800000 ); // ( 0x01<<7 ) << 16
+    extremum_cmp_v4( val, dog1y2[x0], gt, lt, 0x00200000 ); // ( 0x01<<5 ) << 16
+    extremum_cmp_v4( val, dog0y0[x0], gt, lt, 0x80000000 ); // ( 0x01<<6 ) << 24
+    extremum_cmp_v4( val, dog0y2[x0], gt, lt, 0x40000000 ); // ( 0x01<<6 ) << 24
+    extremum_cmp_v4( val, dog0y1[x0], gt, lt, 0x20000000 ); // ( 0x01<<6 ) << 24
+    extremum_cmp_v4( val, dog2y0[x0], gt, lt, 0x00008000 ); // ( 0x01<<6 ) <<  8
+    extremum_cmp_v4( val, dog2y1[x0], gt, lt, 0x00004000 ); // ( 0x01<<6 ) <<  8
+    extremum_cmp_v4( val, dog2y2[x0], gt, lt, 0x00002000 ); // ( 0x01<<6 ) <<  8
 
     if( ( gt != 0xe0e4e000 ) && ( lt != 0xe0e4e000 ) ) return false;
 
     // 3rd group: remaining 2 cache misses in own layer
-    extremum_cmp_v4( val, dog[1][y0+x1], gt, lt, 0x00010000 ); // ( 0x01<<0 ) << 16
-    extremum_cmp_v4( val, dog[1][y0+x2], gt, lt, 0x00020000 ); // ( 0x01<<1 ) << 16
-    extremum_cmp_v4( val, dog[1][y2+x1], gt, lt, 0x00100000 ); // ( 0x01<<4 ) << 16
-    extremum_cmp_v4( val, dog[1][y2+x2], gt, lt, 0x00080000 ); // ( 0x01<<3 ) << 16
+    extremum_cmp_v4( val, dog1y0[x1], gt, lt, 0x00010000 ); // ( 0x01<<0 ) << 16
+    extremum_cmp_v4( val, dog1y0[x2], gt, lt, 0x00020000 ); // ( 0x01<<1 ) << 16
+    extremum_cmp_v4( val, dog1y2[x1], gt, lt, 0x00100000 ); // ( 0x01<<4 ) << 16
+    extremum_cmp_v4( val, dog1y2[x2], gt, lt, 0x00080000 ); // ( 0x01<<3 ) << 16
 
     if( ( gt != 0xe0ffe000 ) && ( lt != 0xe0ffe000 ) ) return false;
 
     // 4th group: 3 cache misses higher layer
-    extremum_cmp_v4( val, dog[0][y0+x1], gt, lt, 0x01000000 ); // ( 0x01<<0 ) << 24
-    extremum_cmp_v4( val, dog[0][y0+x2], gt, lt, 0x02000000 ); // ( 0x01<<1 ) << 24
-    extremum_cmp_v4( val, dog[0][y1+x1], gt, lt, 0x00000004 ); // ( 0x01<<2 )
-    extremum_cmp_v4( val, dog[0][y1+x2], gt, lt, 0x04000000 ); // ( 0x01<<2 ) << 24
-    extremum_cmp_v4( val, dog[0][y2+x1], gt, lt, 0x10000000 ); // ( 0x01<<4 ) << 24
-    extremum_cmp_v4( val, dog[0][y2+x2], gt, lt, 0x08000000 ); // ( 0x01<<3 ) << 24
+    extremum_cmp_v4( val, dog0y0[x1], gt, lt, 0x01000000 ); // ( 0x01<<0 ) << 24
+    extremum_cmp_v4( val, dog0y0[x2], gt, lt, 0x02000000 ); // ( 0x01<<1 ) << 24
+    extremum_cmp_v4( val, dog0y1[x1], gt, lt, 0x00000004 ); // ( 0x01<<2 )
+    extremum_cmp_v4( val, dog0y1[x2], gt, lt, 0x04000000 ); // ( 0x01<<2 ) << 24
+    extremum_cmp_v4( val, dog0y2[x1], gt, lt, 0x10000000 ); // ( 0x01<<4 ) << 24
+    extremum_cmp_v4( val, dog0y2[x2], gt, lt, 0x08000000 ); // ( 0x01<<3 ) << 24
 
     if( ( gt != 0xffffe004 ) && ( lt != 0xffffe004 ) ) return false;
 
-    // 5th group: 3 cache misses lower layer
-    extremum_cmp_v4( val, dog[2][y0+x1], gt, lt, 0x00000100 ); // ( 0x01<<0 ) <<  8
-    extremum_cmp_v4( val, dog[2][y0+x2], gt, lt, 0x00000200 ); // ( 0x01<<1 ) <<  8
-    extremum_cmp_v4( val, dog[2][y1+x1], gt, lt, 0x00000001 ); // ( 0x01<<0 )
-    extremum_cmp_v4( val, dog[2][y1+x2], gt, lt, 0x00000400 ); // ( 0x01<<2 ) <<  8
-    extremum_cmp_v4( val, dog[2][y2+x1], gt, lt, 0x00001000 ); // ( 0x01<<4 ) <<  8
-    extremum_cmp_v4( val, dog[2][y2+x2], gt, lt, 0x00000800 ); // ( 0x01<<3 ) <<  8
+    // 5th group: 3 cache misss lower layer
+    extremum_cmp_v4( val, dog2y0[x1], gt, lt, 0x00000100 ); // ( 0x01<<0 ) <<  8
+    extremum_cmp_v4( val, dog2y0[x2], gt, lt, 0x00000200 ); // ( 0x01<<1 ) <<  8
+    extremum_cmp_v4( val, dog2y1[x1], gt, lt, 0x00000001 ); // ( 0x01<<0 )
+    extremum_cmp_v4( val, dog2y1[x2], gt, lt, 0x00000400 ); // ( 0x01<<2 ) <<  8
+    extremum_cmp_v4( val, dog2y2[x1], gt, lt, 0x00001000 ); // ( 0x01<<4 ) <<  8
+    extremum_cmp_v4( val, dog2y2[x2], gt, lt, 0x00000800 ); // ( 0x01<<3 ) <<  8
 
     if( ( gt != 0xffffff05 ) && ( lt != 0xffffff05 ) ) return false;
     
@@ -171,7 +183,8 @@ __device__ bool solve( float A[3][3], float b[3] )
     return true;
 }
 
-__device__ bool solve2( float i[3][3], float b[3] )
+__device__
+inline bool solve2( float i[3][3], float b[3] )
 {
     float det0b = - i[1][2] * i[1][2];
     float det0a =   i[1][1] * i[2][2];
@@ -202,6 +215,11 @@ __device__ bool solve2( float i[3][3], float b[3] )
     det += ( i[0][1] * det1 );
     det += ( i[0][2] * det2 );
 
+    if( det == 0 ) {
+        printf("ZERO determinant\n");
+        return false;
+    }
+
     // float rsd = 1.0 / det;
     float rsd = __frcp_rn( det );
 
@@ -230,12 +248,11 @@ __device__ bool solve2( float i[3][3], float b[3] )
 }
 
 __device__
-bool find_extrema_in_dog_v4_bemap( float*             dog[3], // level-1, level, level+1
+bool find_extrema_in_dog_v4_bemap( Plane2D_float&     dog0,
+                                   Plane2D_float&     dog1,
+                                   Plane2D_float&     dog2,
                                    float              edge_limit,
                                    float              threshold,
-                                   const uint32_t     width,
-                                   const uint32_t     pitch,
-                                   const uint32_t     height,
                                    const uint32_t     level,
                                    const uint32_t     maxlevel,
                                    ExtremaMgmt*       d_extrema_mgmt,
@@ -259,6 +276,9 @@ bool find_extrema_in_dog_v4_bemap( float*             dog[3], // level-1, level,
     int32_t x       = block_x + threadIdx.x;
     // int32_t z       = 0;
 
+    int width  = dog0.getWidth();
+    int height = dog0.getHeight();
+
     if ( x+2 >= width ) {
         // atomicAdd( &debug_r.too_wide, 1 );
         return false;
@@ -268,21 +288,24 @@ bool find_extrema_in_dog_v4_bemap( float*             dog[3], // level-1, level,
         return false;
     }
 
-    int32_t x0      = x;
-    int32_t x1      = x+1;
-    int32_t x2      = x+2;
-    int32_t y0w     = y * pitch;
-    int32_t y1w     = (y+1) * pitch;
-    int32_t y2w     = (y+2) * pitch;
+    int32_t x0 = clamp( x,   width );
+    int32_t x1 = clamp( x+1, width );
+    int32_t x2 = clamp( x+2, width );
+    int32_t y0 = clamp( y,   height );
+    int32_t y1 = clamp( y+1, height );
+    int32_t y2 = clamp( y+2, height );
+    // int32_t y0w     = y * pitch;
+    // int32_t y1w     = (y+1) * pitch;
+    // int32_t y2w     = (y+2) * pitch;
 
-    float val = dog[1][y1w+x1];
+    float val = dog1.ptr(y1)[x1];
 
     if( fabs( val ) < threshold ) {
         // atomicAdd( &debug_r.under_threshold, 1 );
         return false;
     }
 
-    if( not is_extremum_v4( dog, y0w, y1w, y2w, x0, x1, x2 ) ) {
+    if( not is_extremum_v4( dog0, dog1, dog2, y0, y1, y2, x0, x1, x2 ) ) {
         // atomicAdd( &debug_r.not_extremum, 1 );
         return false;
     }
@@ -316,21 +339,21 @@ bool find_extrema_in_dog_v4_bemap( float*             dog[3], // level-1, level,
     /* must be execute at least once */
     for ( iter = 0; iter < 5; iter++) {
         /* compute gradient */
-        Dx = 0.5 * ( dog[1][y1w+x2] - dog[1][y1w+x0] );
-        Dy = 0.5 * ( dog[1][y2w+x1] - dog[1][y2w+x1] );
-        Ds = 0.5 * ( dog[2][y1w+x1] - dog[0][y1w+x1] );
+        Dx = 0.5 * ( dog1.ptr(y1)[x2] - dog1.ptr(y1)[x0] );
+        Dy = 0.5 * ( dog1.ptr(y2)[x1] - dog1.ptr(y2)[x1] );
+        Ds = 0.5 * ( dog2.ptr(y1)[x1] - dog0.ptr(y1)[x1] );
 
         /* compute Hessian */
-        Dxx = dog[1][y1w+x2] + dog[1][y1w+x0] - 2.0 * dog[1][y1w+x1];
-        Dyy = dog[1][y2w+x1] + dog[1][y0w+x1] - 2.0 * dog[1][y1w+x1];
-        Dss = dog[2][y1w+x1] + dog[0][y1w+x1] - 2.0 * dog[1][y1w+x1];
+        Dxx = dog1.ptr(y1)[x2] + dog1.ptr(y1)[x0] - 2.0 * dog1.ptr(y1)[x1];
+        Dyy = dog1.ptr(y2)[x1] + dog1.ptr(y0)[x1] - 2.0 * dog1.ptr(y1)[x1];
+        Dss = dog2.ptr(y1)[x1] + dog0.ptr(y1)[x1] - 2.0 * dog1.ptr(y1)[x1];
 
-        Dxy = 0.25f * ( dog[1][y2w+x2] + dog[1][y0w+x0]
-                      - dog[1][y2w+x0] - dog[1][y0w+x2] );
-        Dxs = 0.25f * ( dog[2][y1w+x2] + dog[0][y1w+x0]
-                      - dog[2][y1w+x0] - dog[0][y1w+x2] );
-        Dys = 0.25f * ( dog[2][y2w+x1] + dog[0][y0w+x1]
-                      - dog[0][y2w+x1] - dog[2][y0w+x1] );
+        Dxy = 0.25f * ( dog1.ptr(y2)[x2] + dog1.ptr(y0)[x0]
+                      - dog1.ptr(y2)[x0] - dog1.ptr(y0)[x2] );
+        Dxs = 0.25f * ( dog2.ptr(y1)[x2] + dog0.ptr(y1)[x0]
+                      - dog2.ptr(y1)[x0] - dog0.ptr(y1)[x2] );
+        Dys = 0.25f * ( dog2.ptr(y2)[x1] + dog0.ptr(y0)[x1]
+                      - dog0.ptr(y2)[x1] - dog2.ptr(y0)[x1] );
 
         float b[3];
         float A[3][3];
@@ -442,27 +465,19 @@ bool find_extrema_in_dog_v4_bemap( float*             dog[3], // level-1, level,
 }
 
 __global__
-void find_extrema_in_dog_v4( float*             dog_upper,
-                             float*             dog_here,
-                             float*             dog_lower,
+void find_extrema_in_dog_v4( Plane2D_float      dog_upper,
+                             Plane2D_float      dog_here,
+                             Plane2D_float      dog_lower,
                              float              edge_limit,
                              float              threshold,
-                             const uint32_t     width,
-                             const uint32_t     pitch,
-                             const uint32_t     height,
                              const uint32_t     level,
                              const uint32_t     maxlevel,
                              ExtremaMgmt*       mgmt_array,
                              ExtremumCandidate* d_extrema )
 {
-    float* dog_array[3];
-    dog_array[0] = dog_upper;
-    dog_array[1] = dog_here;
-    dog_array[2] = dog_lower;
-
     ExtremaMgmt* mgmt = &mgmt_array[level];
 
-    uint32_t indicator = find_extrema_in_dog_v4_bemap( dog_array, edge_limit, threshold, width, pitch, height, level, maxlevel, mgmt, d_extrema );
+    uint32_t indicator = find_extrema_in_dog_v4_bemap( dog_upper, dog_here, dog_lower, edge_limit, threshold, level, maxlevel, mgmt, d_extrema );
 }
 
 __global__
@@ -521,28 +536,41 @@ void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold
     _keep_time_extrema_v4.start();
 
     for( int octave=0; octave<_num_octaves; octave++ ) {
-        for( int level=1; level<_levels-1; level++ ) {
+        for( int level=1; level<_levels-2; level++ ) {
             dim3 block;
             dim3 grid;
-            grid.x  = _octaves[octave].getPitch()  / 32;
-            grid.y  = _octaves[octave].getHeight() / height;
+            grid.x  = grid_divide( _octaves[octave].getData(level).getWidth(), 32 );
+            grid.y  = grid_divide( _octaves[octave].getData(level).getHeight(), height );
             block.x = 32;
             block.y = height;
 
+#if 0
+        cerr << "In " << __FUNCTION__ << endl
+             << "    Configuration for octave " << octave << " and level " << level << endl
+             << "      Horiz: layer size: "
+             << _octaves[octave].getData(level).getWidth() << "x" << _octaves[octave].getData(level).getHeight() << endl
+             << "      Vert: layer size: "
+             << _octaves[octave].getData2(level).getWidth() << "x" << _octaves[octave].getData2(level).getHeight() << endl
+             << "      grid: "
+             << "(" << grid.x << "," << grid.y << "," << grid.z << ")"
+             << " block: "
+             << "(" << block.x << "," << block.y << "," << block.z << ")" << endl;
+#endif
+
+            Plane2D_float& d0( _octaves[octave].getDogData( level-1 ) );
+            Plane2D_float& d1( _octaves[octave].getDogData( level   ) );
+            Plane2D_float& d2( _octaves[octave].getDogData( level+1 ) );
+
             find_extrema_in_dog_v4
                 <<<grid,block,0,_stream>>>
-                ( _octaves[octave].getDogData( level-1 ),
-                  _octaves[octave].getDogData( level ),
-                  _octaves[octave].getDogData( level+1 ),
+                ( d0, d1, d2,
                   edgeLimit,
                   threshold,
-                  _octaves[octave].getWidth( ),
-                  _octaves[octave].getPitch( ),
-                  _octaves[octave].getHeight( ),
                   level,
                   _levels,
                   _octaves[octave].getExtremaMgmtD( ),
                   _octaves[octave].getExtrema( level ) );
+
 #if 1
             fix_extrema_count_v4
                 <<<1,1,0,_stream>>>
@@ -555,12 +583,13 @@ void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold
                 <<<1,1,0,_stream>>>
                 ( _octaves[octave].getExtrema( level ),
                   _octaves[octave].getExtremaMgmtD( level ),
-                  _octaves[octave].getDogData( level ),
+                  d1,
                   _octaves[octave].getPitch( ),
                   _octaves[octave].getHeight( ) );
 #endif
         }
     }
+    cudaStreamSynchronize( _stream );
     cudaError_t err = cudaGetLastError();
     POP_CUDA_FATAL_TEST( err, "find_extrema_in_dog_v4 failed: " );
 

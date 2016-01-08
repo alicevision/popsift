@@ -16,11 +16,11 @@ using namespace popart;
 __global__
 void keypoint_descriptors( ExtremumCandidate* cand,
                            Descriptor*        descs,
-                           const float*       layer,
-                           uint32_t           width,
-                           uint32_t           pitch,
-                           uint32_t           height )
+                           Plane2D_float      layer )
 {
+    uint32_t width  = layer.getWidth();
+    uint32_t height = layer.getHeight();
+
     // int bidx = blockIdx.x & 0xf; // lower 4 bits of block ID
     int ix   = threadIdx.y; // bidx & 0x3;       // lower 2 bits of block ID
     int iy   = threadIdx.z; // bidx >> 2;        // next lowest 2 bits of block ID
@@ -85,7 +85,7 @@ void keypoint_descriptors( ExtremumCandidate* cand,
             float th;
             get_gradiant( mod, th,
                           ii, jj,
-                          layer, pitch, height );
+                          layer );
 #else
             float mod = at(grad,  ii, jj);
             float th  = at(theta, ii, jj);
@@ -212,10 +212,7 @@ void Pyramid::descriptors_v1( )
                     <<<grid,block,0,_stream>>>
                     ( _octaves[octave].getExtrema( level ),
                       _octaves[octave].getDescriptors( level ),
-                      _octaves[octave].getData( level ),
-                      _octaves[octave].getWidth(),
-                      _octaves[octave].getPitch(),
-                      _octaves[octave].getHeight() );
+                      _octaves[octave].getData( level ) );
 
                 block.x = DESCR_V1_NUM_THREADS;
                 block.y = 1;

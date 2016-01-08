@@ -1,6 +1,7 @@
 #pragma once
 
 #include <inttypes.h>
+#include "plane_2d.h"
 
 /*
  * The Bemap code has a massive overhead by computing grad and
@@ -12,19 +13,17 @@
  * paper.
  */
 __device__
-inline void get_gradiant( float&       grad,
-                          float&       theta,
-                          uint32_t     x,
-                          uint32_t     y,
-                          const float* layer,
-                          uint32_t     pitch,
-                          uint32_t     height )
+inline void get_gradiant( float&         grad,
+                          float&         theta,
+                          uint32_t       x,
+                          uint32_t       y,
+                          popart::Plane2D_float& layer )
 {
     grad  = 0.0f;
     theta = 0.0f;
-    if( x > 0 && x < pitch-1 && y > 0 && y < height -1 ) {
-        float dx = layer[y*pitch+(x+1)] - layer[y*pitch+(x-1)];
-        float dy = layer[(y-1)*pitch+x] - layer[(y+1)*pitch+x];
+    if( x > 0 && x < layer.getCols()-1 && y > 0 && y < layer.getRows()-1 ) {
+        float dx = layer.ptr(y)[x+1] - layer.ptr(y)[x-1];
+        float dy = layer.ptr(y-1)[x] - layer.ptr(y+1)[x];
         grad     = __fsqrt_rz(dx*dx + dy*dy);
         theta    = atan2f(dy, dx);
     }
