@@ -7,146 +7,118 @@
 
 #include "SIFT.h"
 #include "debug_macros.h"
-#include "keep_time.h"
 
 using namespace std;
 
-PopSift::PopSift(int O_,
-               int S_,
-               int up_,
-               float threshold,
-               float edgeThreshold,
-               float sigma )
-    : _octaves( O_ )
+PopSift::PopSift( int num_octaves,
+                  int S_,
+                  int upscale_factor,
+                  float threshold,
+                  float edgeThreshold,
+                  float sigma )
+    : _octaves( num_octaves )
     , _scales( max(2,S_) ) // min is 2, GPU restriction */
-    , up( up_ )
+    , up( upscale_factor )
     , _sigma( sigma )
+    , _threshold( threshold ) // SIFT parameter
+    , _edgeLimit( edgeThreshold ) // SIFT parameter
 {
-    /* SIFT parameters */
-    _threshold = threshold;
-    _edgeLimit = edgeThreshold;
 }
 
 PopSift::~PopSift()
 {
+    _hst_input_image.freeHost( popart::CudaAllocated );
+    _dev_input_image.freeDev( );
 }
 
 #define TRY_IMAGE_TWICE 0
 
-void PopSift::execute( imgStream inp )
+void PopSift::init( int w, int h )
 {
-    _inp = inp;
-
-    assert( inp.data_g == 0 );
-    assert( inp.data_b == 0 );
-
-    if (_octaves < 0)
-        _octaves = max(int (floor( logf( (float)min(_inp.width, _inp.height) )
+    if (_octaves < 0) {
+        _octaves = max(int (floor( logf( (float)min( w, h ) )
                                    / logf( 2.0f ) ) - 3 + up), 1);
-
-    cudaError_t err;
-
-    /* setup CUDA device */
-    err = cudaSetDevice( choose );
-    POP_CUDA_FATAL_TEST( err, "Failed to set CUDA device" );
-
-#if (TRY_IMAGE_TWICE==1)
-    const bool secondImage = true;
-#else
-    const bool secondImage = false;
-#endif // (TRY_IMAGE_TWICE==1)
-
-    _upscaled_width  = _inp.width  << up;
-    _upscaled_height = _inp.height << up;
-
-    cudaEvent_t  event_0;
-    cudaStream_t stream_0;
-    cudaStream_t stream_1;
-    cudaStream_t stream_2;
-    POP_CUDA_STREAM_CREATE( &stream_0 );
-    POP_CUDA_STREAM_CREATE( &stream_1 );
-    POP_CUDA_STREAM_CREATE( &stream_2 );
-
-    err = cudaEventCreate( &event_0 );
-
-    popart::Image_uint8* input1;
-    popart::Image_uint8* input2;
-    input1 = new popart::Image_uint8( _inp.width, _inp.height );
-    if( secondImage ) {
-        input2 = new popart::Image_uint8( _inp.width, _inp.height );
-    }
-    input1->upload( _inp, stream_1 );
-    if( secondImage ) {
-        input2->upload( _inp, stream_2 );
     }
 
-    popart::KeepTime globalKeepTime( stream_1 );
-    globalKeepTime.start();
+    _upscaled_width  = w << up;
+    _upscaled_height = h << up;
+
+    _hst_input_image.allocHost( w, h, popart::CudaAllocated );
+    _dev_input_image.allocDev( w, h );
+
+    POP_CUDA_STREAM_CREATE( &_stream );
+
+    _initTime    = new popart::KeepTime( _stream );
+    _uploadTime  = new popart::KeepTime( _stream );
+    _pyramidTime = new popart::KeepTime( _stream );
+    _extremaTime = new popart::KeepTime( _stream );
 
     float sigma = 1.0;
 
-    _base1 = new popart::Image( _upscaled_width, _upscaled_height );
-    _pyramid1 = new popart::Pyramid( _base1, _octaves, _scales, stream_1 );
-    _base1->upscale( *input1, 1<<up, stream_1 );
+    _initTime->start();
 
-    if( secondImage ) {
-        _base2 = new popart::Image( _upscaled_width, _upscaled_height );
-        _pyramid2 = new popart::Pyramid( _base2, _octaves, _scales, stream_2 );
-        _base2->upscale( *input2, 1<<up, stream_2 );
-    }
+    popart::Pyramid::init_filter( sigma, _scales, _stream );
+    popart::Pyramid::init_sigma(  sigma, _scales, _stream );
 
-    popart::Pyramid::init_filter( sigma, _scales, stream_0 );
-    popart::Pyramid::init_sigma(  sigma, _scales, stream_0 );
-    cudaEventRecord( event_0, stream_0 );
+    _initTime->stop();
 
-    cudaStreamWaitEvent( stream_1, event_0, 0 );
-    _pyramid1->build( _base1, 0 );
+    _baseImg = new popart::Image( _upscaled_width, _upscaled_height );
+    _pyramid = new popart::Pyramid( _baseImg, _octaves, _scales, _stream );
+}
 
-    _pyramid1->find_extrema( _edgeLimit, _threshold );
+void PopSift::uninit( )
+{
+    cudaStreamSynchronize( _stream );
 
-    if( secondImage ) {
-        cudaStreamWaitEvent( stream_2, event_0, 0 );
-        _pyramid2->build( _base2, 0 );
-        _pyramid2->find_extrema( _edgeLimit, _threshold );
-        globalKeepTime.waitFor( stream_2 );
-    }
+    _hst_input_image.freeHost( popart::CudaAllocated );
+    _dev_input_image.freeDev( );
 
-#if 1
-    cerr << "stopping global timer" << endl;
-    globalKeepTime.stop( );
-    cerr << "stopped global timer" << endl;
-    globalKeepTime.report( "Combined overall time: " );
-#endif
+    cudaStreamDestroy( _stream );
+
+    _initTime   ->report( "Time to initialize:    " );
+    _uploadTime ->report( "Time to upload:        " );
+    _pyramidTime->report( "Time to build pyramid: " );
+    _extremaTime->report( "Time to find extrema:  " );
+
+    delete _initTime;
+    delete _uploadTime;
+    delete _pyramidTime;
+    delete _extremaTime;
+
+    delete _baseImg;
+    delete _pyramid;
+}
+
+void PopSift::execute( imgStream inp )
+{
+    assert( inp.data_g == 0 );
+    assert( inp.data_b == 0 );
+
+    _uploadTime->start();
+    memcpy( _hst_input_image.data, inp.data_r, inp.width * inp.height );
+    _hst_input_image.memcpyToDevice( _dev_input_image, _stream );
+    _baseImg->upscale( _dev_input_image, 1<<up, _stream );
+    _uploadTime->stop();
+
+    _pyramidTime->start();
+    _pyramid->build( _baseImg );
+    _pyramidTime->stop();
+
+    _extremaTime->start();
+    _pyramid->find_extrema( _edgeLimit, _threshold );
+    _extremaTime->stop();
 
     if( log_to_file ) {
-        _base1->download_and_save_array( "upscaled-input-image.pgm" );
-        if( secondImage ) {
-            _base2->download_and_save_array( "upscaled-input-image2.pgm" );
-        }
+        _baseImg->download_and_save_array( "upscaled-input-image.pgm" );
 
         for( int o=0; o<_octaves; o++ ) {
             for( int s=0; s<_scales+3; s++ ) {
-                _pyramid1->download_and_save_array( "pyramid", o, s );
-                if( secondImage ) {
-                    _pyramid2->download_and_save_array( "pyramid2", o, s );
-                }
+                _pyramid->download_and_save_array( "pyramid", o, s );
             }
         }
         for( int o=0; o<_octaves; o++ ) {
-            _pyramid1->download_and_save_descriptors( "pyramid", o );
-            if( secondImage ) {
-                _pyramid2->download_and_save_descriptors( "pyramid2", o );
-            }
+            _pyramid->download_and_save_descriptors( "pyramid", o );
         }
     }
-
-    cudaEventDestroy( event_0 );
-    cudaStreamDestroy( stream_0 );
-    cudaStreamDestroy( stream_1 );
-    if( secondImage ) {
-        cudaStreamDestroy( stream_2 );
-    }
-
-printf("Everything OK until here, quitting\n");
 }
 

@@ -183,7 +183,7 @@ public:
 
     static void init_filter( float sigma, uint32_t level, cudaStream_t stream );
     static void init_sigma(  float sigma, uint32_t level, cudaStream_t stream );
-    void build( Image* base, uint32_t idx );
+    void build( Image* base );
 
     void find_extrema( float edgeLimit, float threshold );
 

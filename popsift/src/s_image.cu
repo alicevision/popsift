@@ -12,7 +12,7 @@ using namespace std;
 namespace popart {
 
 __host__
-void Image::upscale( Image_uint8& src, size_t scalefactor, cudaStream_t stream )
+void Image::upscale( Plane2D_uint8 & src, size_t scalefactor, cudaStream_t stream )
 {
     if( scalefactor != 2 ) {
         cerr << "Scale factor is " << scalefactor << endl;
@@ -58,7 +58,7 @@ void Image::download_and_save_array( const char* filename )
     of.write( (char*)c, f.getCols() * f.getRows() );
     delete [] c;
 
-    f.freeHost( );
+    f.freeHost( PageAligned );
 }
 
 Image::Image( size_t w, size_t h )
@@ -67,37 +67,6 @@ Image::Image( size_t w, size_t h )
 }
 
 Image::~Image( )
-{
-    array.freeDev( );
-}
-
-Image_uint8::Image_uint8( short width, short height )
-{
-    cerr << "Enter " << __FUNCTION__ << " with width=" << width << " and height=" << height << endl;
-    array.allocDev( width, height );
-    cerr << "   array width=" << array.getWidth() << " height=" << array.getHeight() << endl;
-    cerr << "Leave " << __FUNCTION__ << endl;
-}
-
-void Image_uint8::upload( imgStream& gray, cudaStream_t stream )
-{
-#ifndef NDEBUG
-    ofstream of( "original-gray-image.pgm" );
-    of << "P5" << endl
-       << gray.width << " " << gray.height << endl
-       << "255" << endl;
-    of.write( (char*)gray.data_r, gray.width * gray.height );
-#endif // NDEBUG
-
-    Plane2D_uint8 hostPlane( gray.width,
-                             gray.height,
-                             gray.data_r,
-                             gray.width );
-
-    hostPlane.memcpyToDevice( array, stream );
-}
-
-Image_uint8::~Image_uint8( )
 {
     array.freeDev( );
 }

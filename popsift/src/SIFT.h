@@ -20,36 +20,31 @@
 
 #include <vector>
 #include <iostream>
-#include <cuda_runtime.h>
 #include <assert.h>
 
+#include <cuda_runtime.h>
+
 /* include utilities */
+#include "keep_time.h"
 #include "c_util_img.h"
+#include "plane_2d.h"
 #include "debug_macros.h"
 #include "s_image.h"
 #include "s_pyramid.h"
 
 /* user parameters */
 extern int verbose;
-extern int choose;
 extern int log_to_file;
 
-class PopSift {
-private:
-    size_t           _upscaled_width;  // popart in use
-    size_t           _upscaled_height; // popart in use
-    popart::Image*   _base1;           // popart in use
-    popart::Image*   _base2;           // popart in use
-    popart::Pyramid* _pyramid1;        // popart in use
-    popart::Pyramid* _pyramid2;        // popart in use
-
+class PopSift
+{
 public:
     PopSift( int   octaves,
-            int   levels,
-            int   upscale,
-            float threshold,
-            float edgeThreshold,
-            float sigma );
+             int   levels,
+             int   upscale,
+             float threshold,
+             float edgeThreshold,
+             float sigma );
 
     ~PopSift();
 
@@ -57,18 +52,32 @@ public:
 	/* @brief SIFT executions */
 	/**************************/
 public:
+    void init( int w, int h );
+
     void execute( imgStream _inp );
 
-private:
-    int       _octaves;         /* number of octaves */
-    const int _scales;          /* number of levels */
-    const int up;               /* upsampling times */
-    const float _sigma;         /* initial sigma */
-    float _threshold;           /* DoG threshold */
-    float _edgeLimit;           /* edge threshold */
+    void uninit( );
 
-    /* the input image */
-    imgStream _inp;
+private:
+    size_t           _upscaled_width;  // popart in use
+    size_t           _upscaled_height; // popart in use
+    popart::Image*   _baseImg;         // popart in use
+    popart::Pyramid* _pyramid;         // popart in use
+
+    int              _octaves;         /* number of octaves */
+    const int        _scales;          /* number of levels */
+    const int        up;               /* upsampling times */
+    const float      _sigma;           /* initial sigma */
+    const float      _threshold;       /* DoG threshold */
+    const float      _edgeLimit;       /* edge threshold */
+
+    popart::Plane2D_uint8 _hst_input_image;
+    popart::Plane2D_uint8 _dev_input_image;
+    cudaStream_t          _stream;
+    popart::KeepTime*     _initTime;
+    popart::KeepTime*     _uploadTime;
+    popart::KeepTime*     _pyramidTime;
+    popart::KeepTime*     _extremaTime;
 };
 
 /**

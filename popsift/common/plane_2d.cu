@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <cuda_runtime.h>
+
 #include "plane_2d.h"
 
 using namespace std;
@@ -68,6 +70,19 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
              << "    Trying to allocate unaligned instead." << endl;
 
         return allocHost2D( w, h, elemSize, Unaligned );
+    } else if( m == CudaAllocated ) {
+        void* ptr;
+        cudaError_t err;
+        err = cudaMallocHost( &ptr, sz );
+
+        if( err == cudaSuccess ) return ptr;
+
+        cerr << __FILE__ << ":" << __LINE__ << endl
+             << "    Failed to allocate " << sz << " bytes of aligned and pinned host memory." << endl
+             << "    Cause: " << cudaGetErrorString(err) << endl
+             << "    Trying to allocate unaligned instead." << endl;
+
+        return allocHost2D( w, h, elemSize, Unaligned );
     } else {
         cerr << __FILE__ << ":" << __LINE__ << endl
              << "    Alignment not correctly specified in host plane allocation" << endl;
@@ -76,9 +91,16 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
 }
 
 __host__
-void PlaneBase::freeHost2D( void* data )
+void PlaneBase::freeHost2D( void* data, PlaneMapMode m )
 {
-    if( data != 0 ) free( data );
+    if( data != 0 ) {
+        if( m != CudaAllocated ) {
+            free( data );
+        } else {
+            cudaFreeHost( data );
+        }
+        data = 0;
+    }
 }
 
 __host__

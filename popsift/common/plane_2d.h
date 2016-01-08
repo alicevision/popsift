@@ -17,8 +17,10 @@ namespace popart {
 enum PlaneMapMode
 {
     AlignmentUndefined = 0,
-    Unaligned          = 1,
-    PageAligned        = 2
+    OnDevice           = 1,
+    Unaligned          = 2,
+    PageAligned        = 3,
+    CudaAllocated      = 4
 };
 
 /*************************************************************
@@ -39,7 +41,7 @@ struct PlaneBase
     void* allocHost2D( int w, int h, int elemSize, PlaneMapMode m );
 
     __host__
-    void freeHost2D( void* data );
+    void freeHost2D( void* data, PlaneMapMode m );
 
     __host__
     void memcpyToDevice( void* dst, int dst_pitch, void* src, int src_pitch, short cols, short rows, int elemSize );
@@ -149,8 +151,8 @@ template <typename T> struct PitchPlane2D : public PlaneT<T>
         this->step = w * this->elemSize();
     }
 
-    __host__ inline void freeHost( ) {
-        PlaneBase::freeHost2D( this->data );
+    __host__ inline void freeHost( PlaneMapMode mode ) {
+        PlaneBase::freeHost2D( this->data, mode );
     }
     __host__ __device__
     inline short getPitch( ) const { return step; }

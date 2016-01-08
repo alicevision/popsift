@@ -32,9 +32,6 @@ using namespace std;
 
 /* User parameters */
 int    verbose         = false;
-int    showPrepTime    = false;
-int    showDevInfo     = false;
-int    choose          = false;
 
 string keyFilename     = "";
 string inputFilename   = "";
@@ -56,13 +53,11 @@ float threshold = 10.0 / 256.0;
 //                   from Bemap -> 1.69 (makes no sense)
 
 
-int    infp            = false;
 int    saveGauss       = false;
 int    saveDOG         = false;
 int    saveMag         = false;
 int    saveOri         = false;
 int    display         = false;
-int    fastComp        = false;
 int    log_to_file     = false;
 
 static struct option longopts[] = {
@@ -78,13 +73,6 @@ static struct option longopts[] = {
     { "save-dog",        no_argument,            &saveDOG,          true},
     { "save-mag",        no_argument,            &saveMag,          true},
     { "save-ori",        no_argument,            &saveOri,          true},
-    { "floating-point",  no_argument,            &infp,             true},
-    { "fast-comp",       no_argument,            &fastComp,         true},
-    // { "use-gpu",         no_argument,            NULL,              'g' },
-    { "choose-dev",      no_argument,            NULL,              'd' },
-    // { "choose-plat",     required_argument,      NULL,              'p' },
-    { "dev-info",        no_argument,            &showDevInfo,      true},
-    { "prep-time",       no_argument,            &showPrepTime,     true},
 
     { NULL,              0,                      NULL,               0  }
 };
@@ -104,8 +92,6 @@ void help(const string& filename)
         // << "     [--threshold|-t FLOAT] [--edge-threshold|-e FLOAT] [--floating-point]" << endl
         << "     [--threshold|-t FLOAT] [--log]" << endl
         // << "     [--save-gauss] [--save-dog] [--save-mag] [--save-ori] [--fast-comp]" << endl
-        // << "     [--use-gpu|-g] [--choose-dev|-d] [--choose-plat|-p DEV]" << endl
-        // << "     [--dev-info] [--prep-time]" << endl    
         << "     FILENAME"
         << endl << endl
         << "* Options *" << endl
@@ -121,11 +107,6 @@ void help(const string& filename)
         // << " --save-dog                 Save Difference of Gaussian pyramid"<<endl
         // << " --save-mag                 Save Magnitudes pyramid"<<endl
         // << " --save-ori                 Save Orientations pyramid"<<endl
-        // << " --floating-point           Save descriptor values in floating point"<<endl
-        // << " --fast-comp                Faster descriptor computation (may decrease matching quality)"<<endl
-        // << " --choose-dev               Choose which OpenCL device to use"<<endl
-        // << " --dev-info                 Show Device Info"<<endl
-        // << " --prep-time                Show initialization, memory preparation, step execution, and copyback time"<<endl
         // << endl
         // << " The keypoints will be written to [filename].key" << endl
         // << endl
@@ -218,14 +199,6 @@ void option(int ac, char **av)
 			}
 			break;
 
-            /* Choose which OpenCL device to use */
-        case 'd' :
-			{
-				choose = true;
-				showDevInfo = true;
-			}
-			break;
-
         case 0:
             break;
 
@@ -263,22 +236,6 @@ int main(int argc, char **argv)
     read_gray(inputFilename, inp);
     cerr << "Real name of input file is " << realName << endl;
 
-#if 0
-    verbose && cerr << "SIFT, OpenCL Implementation"
-                    << endl << endl
-                    << "Filename                = " << realName+prefix << endl
-                    << "Image width             = " << inp.width << endl
-                    << "Image height            = " << inp.height << endl
-                    << "DoG Threshold           = " << threshold << endl
-                    << "Edge Threshold          = " << edgeLimit << endl
-                    << "Gaussian Sigma          = " << sigma << endl
-                    << "Show prep time          = " << ((showPrepTime)?("True"):("False")) << endl
-                    << "Save in floating point  = " << ((infp)?("True"):("False")) << endl
-                    << "Faster computation      = " << ((fastComp)?("True"):("False")) << endl
-                    << "Show prep time          = " << ((showPrepTime)?("True"):("False")) << endl
-                    << "Show device info        = " << ((showDevInfo)?("True"):("False")) << endl;
-#endif
-
     device_prop_t deviceInfo;
     deviceInfo.print( );
 
@@ -289,7 +246,9 @@ int main(int argc, char **argv)
                      edgeLimit,
                      sigma );
 
+    PopSift.init( inp.width, inp.height );
     PopSift.execute(inp);
+    PopSift.uninit( );
     return 0;
 }
 

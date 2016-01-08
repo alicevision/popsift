@@ -425,8 +425,8 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
             }
         }
 
-        hostPlane_c.freeHost();
-        hostPlane  .freeHost();
+        hostPlane_c.freeHost( popart::Unaligned );
+        hostPlane  .freeHost( popart::Unaligned );
     }
 #endif
 #if 0
@@ -486,8 +486,8 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
            << width << " " << height << endl
            << 65536 << endl;
         of.write( (char*)c.data, 2*f.getByteSize() );
-        c.freeHost();
-        f.freeHost();
+        c.freeHost( popart::Unaligned );
+        f.freeHost( popart::Unaligned );
     }
 #endif
 }
@@ -540,7 +540,7 @@ Pyramid::~Pyramid( )
  * Build the pyramid in all levels, one octave
  *************************************************************/
 
-void Pyramid::build( Image* base, uint32_t idx )
+void Pyramid::build( Image* base )
 {
     if( PYRAMID_V6_ON ) {
         #if (PYRAMID_PRINT_DEBUG==1)
