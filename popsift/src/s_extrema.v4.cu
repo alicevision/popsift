@@ -1,7 +1,7 @@
 #include "s_extrema.v4.h"
-#include "debug_macros.hpp"
+#include "debug_macros.h"
 #include "assist.h"
-#include "clamp.hpp"
+#include "clamp.h"
 
 #define DEBUG_MODE 1
 

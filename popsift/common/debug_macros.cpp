@@ -1,4 +1,4 @@
-#include "debug_macros.hpp"
+#include "debug_macros.h"
 
 #include <assert.h>
 

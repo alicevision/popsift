@@ -23,8 +23,8 @@
 #include <iomanip>
 #include "getopt.h"
 
-#include "SIFT.hpp"
-#include "device_prop.hpp"
+#include "SIFT.h"
+#include "device_prop.h"
 
 #define N_ITER 1
 

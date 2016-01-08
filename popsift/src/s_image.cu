@@ -1,8 +1,8 @@
-#include "s_image.hpp"
+#include "s_image.h"
 #include <iostream>
 #include <fstream>
-#include "debug_macros.hpp"
-#include "align_macro.hpp"
+#include "debug_macros.h"
+#include "align_macro.h"
 #include "assist.h"
 #include <stdio.h>
 #include <assert.h>

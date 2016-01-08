@@ -12,10 +12,10 @@
 #include <npp.h>
 
 #include "s_pyramid.h"
-#include "keep_time.hpp"
-#include "debug_macros.hpp"
-#include "align_macro.hpp"
-#include "clamp.hpp"
+#include "keep_time.h"
+#include "debug_macros.h"
+#include "align_macro.h"
+#include "clamp.h"
 #include "gauss_filter.h"
 
 #define PYRAMID_PRINT_DEBUG 0

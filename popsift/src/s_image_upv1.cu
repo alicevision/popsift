@@ -1,5 +1,5 @@
-#include "s_image.hpp"
-#include "clamp.hpp"
+#include "s_image.h"
+#include "clamp.h"
 #include "assist.h"
 
 #include <iostream>

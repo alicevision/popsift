@@ -1,7 +1,7 @@
 #pragma once
 
-#include "s_image.hpp"
-#include "keep_time.hpp"
+#include "s_image.h"
+#include "keep_time.h"
 
 #ifndef INF
 #define INF               (1<<29)

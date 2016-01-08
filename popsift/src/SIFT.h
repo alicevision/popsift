@@ -24,9 +24,9 @@
 #include <assert.h>
 
 /* include utilities */
-#include "c_util_img.hpp"
-#include "debug_macros.hpp"
-#include "s_image.hpp"
+#include "c_util_img.h"
+#include "debug_macros.h"
+#include "s_image.h"
 #include "s_pyramid.h"
 
 /* user parameters */

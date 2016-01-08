@@ -1,8 +1,8 @@
 #include "s_pyramid.h"
 
 #include "gauss_filter.h"
-#include "clamp.hpp"
-#include "debug_macros.hpp"
+#include "clamp.h"
+#include "debug_macros.h"
 #include "assist.h"
 
 /*************************************************************

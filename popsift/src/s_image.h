@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdint.h>
-#include "c_util_img.hpp"
+#include "c_util_img.h"
 #include "plane_2d.h"
 
 namespace popart {

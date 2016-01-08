@@ -5,9 +5,9 @@
 #include <cmath>
 #include <assert.h>
 
-#include "SIFT.hpp"
-#include "debug_macros.hpp"
-#include "keep_time.hpp"
+#include "SIFT.h"
+#include "debug_macros.h"
+#include "keep_time.h"
 
 using namespace std;
 

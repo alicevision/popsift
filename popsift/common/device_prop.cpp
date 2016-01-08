@@ -1,8 +1,7 @@
 #include <iostream>
-// #include <assert.h>
 
-#include "device_prop.hpp"
-#include "debug_macros.hpp"
+#include "device_prop.h"
+#include "debug_macros.h"
 
 using namespace std;
 

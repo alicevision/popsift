@@ -1,5 +1,5 @@
 #include "s_pyramid.h"
-#include "debug_macros.hpp"
+#include "debug_macros.h"
 
 #undef PRINT_GAUSS_FILTER_SYMBOL
 

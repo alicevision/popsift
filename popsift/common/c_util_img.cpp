@@ -1,4 +1,4 @@
-#include "c_util_img.hpp"
+#include "c_util_img.h"
 
 #include <fstream>
 #include <iostream>

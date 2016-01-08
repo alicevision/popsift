@@ -1,8 +1,6 @@
-#include "keep_time.hpp"
+#include "keep_time.h"
 #include <stdio.h>
-#include "debug_macros.hpp"
-
-// #include <assert.h>
+#include "debug_macros.h"
 
 using namespace std;
 
