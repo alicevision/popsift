@@ -12,7 +12,7 @@ using namespace std;
 namespace popart {
 
 __host__
-void Image::upscale( Plane2D_uint8 & src, size_t scalefactor, cudaStream_t stream )
+void Image::upscale( Plane2D_uint8 & src, cudaTextureObject_t & tex, size_t scalefactor, cudaStream_t stream )
 {
     if( scalefactor != 2 ) {
         cerr << "Scale factor is " << scalefactor << endl;
@@ -23,7 +23,8 @@ void Image::upscale( Plane2D_uint8 & src, size_t scalefactor, cudaStream_t strea
     if( false ) upscale_v1( src, stream );
     if( false ) upscale_v2( src, stream );
     if( false ) upscale_v3( src, stream );
-    if( true  ) upscale_v4( src, stream );
+    if( false ) upscale_v4( src, stream );
+    if( true  ) upscale_v5( tex, stream );
 }
 
 void Image::test_last_error( const char* file, int line )

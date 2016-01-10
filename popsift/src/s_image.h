@@ -19,7 +19,10 @@ struct Image
      *  this image must have type_size float
      *  scalefactor is right now 2
      */
-    void upscale( Plane2D_uint8 & src, size_t scalefactor, cudaStream_t s );
+    void upscale( Plane2D_uint8 &       src,
+                  cudaTextureObject_t & tex,
+                  size_t                scalefactor,
+                  cudaStream_t          s );
 
     void debug_out( );
     void test_last_error( const char* file, int line );
@@ -31,6 +34,7 @@ private:
     void upscale_v2( Plane2D_uint8 & src, cudaStream_t stream );
     void upscale_v3( Plane2D_uint8 & src, cudaStream_t stream );
     void upscale_v4( Plane2D_uint8 & src, cudaStream_t stream );
+    void upscale_v5( cudaTextureObject_t & tex, cudaStream_t stream );
 };
 
 } // namespace popart

@@ -64,11 +64,43 @@ void PopSift::init( int w, int h )
 
     _baseImg = new popart::Image( _upscaled_width, _upscaled_height );
     _pyramid = new popart::Pyramid( _baseImg, _octaves, _scales, _stream );
+
+    /* initializing texture for upscale V5
+     */
+
+    memset( &_texDesc, 0, sizeof(cudaTextureDesc) );
+    _texDesc.normalizedCoords = 1; // address 0..1 instead of 0..width/height
+    _texDesc.addressMode[0]   = cudaAddressModeClamp;
+    _texDesc.addressMode[1]   = cudaAddressModeClamp;
+    _texDesc.addressMode[2]   = cudaAddressModeClamp;
+    _texDesc.readMode         = cudaReadModeNormalizedFloat; // automatic conversion from uchar to float
+    _texDesc.filterMode       = cudaFilterModeLinear; // bilinear interpolation
+
+    memset( &_resDesc, 0, sizeof(cudaResourceDesc) );
+    _resDesc.resType                  = cudaResourceTypePitch2D;
+    _resDesc.res.pitch2D.devPtr       = _dev_input_image.data;
+    _resDesc.res.pitch2D.desc.f       = cudaChannelFormatKindUnsigned;
+    _resDesc.res.pitch2D.desc.x       = 8;
+    _resDesc.res.pitch2D.desc.y       = 0;
+    _resDesc.res.pitch2D.desc.z       = 0;
+    _resDesc.res.pitch2D.desc.w       = 0;
+    assert( _dev_input_image.elemSize() == 1 );
+    _resDesc.res.pitch2D.pitchInBytes = _dev_input_image.step;
+    _resDesc.res.pitch2D.width        = _dev_input_image.getCols();
+    _resDesc.res.pitch2D.height       = _dev_input_image.getRows();
+
+    cudaError_t err;
+    err = cudaCreateTextureObject( &_texture, &_resDesc, &_texDesc, 0 );
+    POP_CUDA_FATAL_TEST( err, "Could not create texture object: " );
 }
 
 void PopSift::uninit( )
 {
     cudaStreamSynchronize( _stream );
+
+    cudaError_t err;
+    err = cudaDestroyTextureObject( _texture );
+    POP_CUDA_FATAL_TEST( err, "Could not destroy texture object: " );
 
     _hst_input_image.freeHost( popart::CudaAllocated );
     _dev_input_image.freeDev( );
@@ -97,7 +129,7 @@ void PopSift::execute( imgStream inp )
     _uploadTime->start();
     memcpy( _hst_input_image.data, inp.data_r, inp.width * inp.height );
     _hst_input_image.memcpyToDevice( _dev_input_image, _stream );
-    _baseImg->upscale( _dev_input_image, 1<<up, _stream );
+    _baseImg->upscale( _dev_input_image, _texture, 1<<up, _stream );
     _uploadTime->stop();
 
     _pyramidTime->start();

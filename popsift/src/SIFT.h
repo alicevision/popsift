@@ -64,6 +64,10 @@ private:
     popart::Image*   _baseImg;         // popart in use
     popart::Pyramid* _pyramid;         // popart in use
 
+    cudaTextureObject_t _texture; // for upscale v5
+    cudaTextureDesc     _texDesc; // for upscale v5
+    cudaResourceDesc    _resDesc; // for upscale v5
+
     int              _octaves;         /* number of octaves */
     const int        _scales;          /* number of levels */
     const int        up;               /* upsampling times */
