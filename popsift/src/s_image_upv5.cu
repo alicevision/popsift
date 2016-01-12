@@ -3,6 +3,8 @@
 #include "assist.h"
 
 #include <iostream>
+#include <sstream>
+#include <map>
 
 using namespace std;
 
@@ -21,7 +23,7 @@ void p_upscale_5( Plane2D_float dst, cudaTextureObject_t src )
     dst.ptr(idy)[idx] = d * 255.0f;
 }
 
-#undef FIND_BLOCK_SIZE
+#define FIND_BLOCK_SIZE
 
 #ifdef FIND_BLOCK_SIZE
 int condition[][2] = {
@@ -39,6 +41,8 @@ int condition[][2] = {
 __host__
 void Image::upscale_v5( cudaTextureObject_t & tex, cudaStream_t stream )
 {
+    std::map<float,string> logtimes;
+
     cudaEvent_t start;
     cudaEvent_t stop;
     cudaEventCreate( &start );
@@ -46,8 +50,6 @@ void Image::upscale_v5( cudaTextureObject_t & tex, cudaStream_t stream )
     for( int cond=0; condition[cond][0]!=0; cond++ ) {
         int blockx = condition[cond][0];
         int blocky = condition[cond][1];
-
-        cerr << "Trying " << blockx << ", " << blocky << endl;
 
         int loops  = 100;
 
@@ -65,7 +67,21 @@ void Image::upscale_v5( cudaTextureObject_t & tex, cudaStream_t stream )
         float diff;
         cudaEventElapsedTime( &diff, start, stop );
 
-        cerr << "Average upscale time for (" << blockx << "," << blocky << "): " << diff/loops << "ms" << endl;
+        std::pair<float,string> datum;
+        ostringstream ostr;
+        ostr << "(" << blockx << ", " << blocky << ")";
+        datum.first  = diff/loops;
+        datum.second = ostr.str();
+        logtimes.insert( datum );
+    }
+
+    std::map<float,string>::const_iterator it  = logtimes.begin();
+    std::map<float,string>::const_iterator end = logtimes.end();
+    for( ; it != end; it++ ) {
+        const std::pair<float,string>& g = *it;
+        cerr << "avg times: " << g.first
+             << ": " << g.second
+             << endl;
     }
     cudaEventDestroy( start );
     cudaEventDestroy( stop );
