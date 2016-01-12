@@ -201,6 +201,7 @@ private:
     void build_v6  ( Image* base );
     void build_v7  ( Image* base );
     void build_v8  ( Image* base );
+    void build_v11 ( Image* base );
     void build_v12 ( Image* base );
 
     void reset_extremum_counter( );
