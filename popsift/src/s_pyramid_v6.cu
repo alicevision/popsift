@@ -1,5 +1,6 @@
 #include "s_pyramid.h"
 
+#include "assist.h"
 #include "gauss_filter.h"
 #include "clamp.h"
 #include "debug_macros.h"
@@ -152,8 +153,6 @@ void Pyramid::build_v6( Image* base )
     cerr << "Entering " << __FUNCTION__ << " with base image "  << endl;
 #endif
 
-    _keep_time_pyramid_v6.start();
-
     dim3 block;
     block.x = V6_READ_RANGE;
 
@@ -162,21 +161,21 @@ void Pyramid::build_v6( Image* base )
         Plane2D_float t_data( _octaves[octave].getTransposedData(0) );
         dim3 grid_t;
         dim3 grid;
-        grid_t.x  = s_data.getWidth() / V6_WIDTH;
+        grid_t.x  = grid_divide( s_data.getWidth(), V6_WIDTH );
         grid_t.y  = s_data.getHeight();
-        grid.x    = t_data.getWidth() / V6_WIDTH;
+        grid.x    = grid_divide( t_data.getWidth(), V6_WIDTH );
         grid.y    = t_data.getHeight();
 
 #if 0
         cerr << "Configuration for octave " << octave << endl
              << "  Normal-to-transposed: layer size: "
-             << _octaves[octave].getWidth() << "x" << _octaves[octave].getHeight() << endl
+             << _octaves[octave].getData(0).getWidth() << "x" << _octaves[octave].getData(0).getHeight() << endl
              << "                        grid: "
              << "(" << grid_t.x << "," << grid_t.y << "," << grid_t.z << ")"
              << " block: "
              << "(" << block.x << "," << block.y << "," << block.z << ")" << endl
              << "  Transposed-to-normal: layer size: "
-             << _octaves[octave].getTransposedPitch() << "x" << _octaves[octave].getTransposedHeight() << endl
+             << _octaves[octave].getTransposedData(0).getWidth() << "x" << _octaves[octave].getTransposedData(0).getHeight() << endl
              << "                        grid: "
              << "(" << grid.x << "," << grid.y << "," << grid.z << ")"
              << " block: "
@@ -203,6 +202,7 @@ void Pyramid::build_v6( Image* base )
                     ( _octaves[octave].getData( level-1 ),
                       _octaves[octave].getTransposedData( level ) );
             }
+            cudaStreamSynchronize(_stream);
             cudaError_t err = cudaGetLastError();
             POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v6 failed: " );
 
@@ -219,11 +219,11 @@ void Pyramid::build_v6( Image* base )
                       _octaves[octave].getData( level-1 ),
                       _octaves[octave].getDogData( level-1 ) );
             }
+            cudaStreamSynchronize(_stream);
             err = cudaGetLastError();
             POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v6 failed: " );
         }
     }
-    _keep_time_pyramid_v6.stop();
 }
 
 } // namespace popart

@@ -67,9 +67,13 @@ class Pyramid
         uint32_t  _levels;
 
         Plane2D_float* _data;
-        Plane2D_float* _data2;
+        Plane2D_float  _intermediate_data;
         Plane2D_float* _dog_data;
         Plane2D_float* _t_data;
+
+        cudaTextureObject_t* _data_tex;
+        cudaTextureDesc      _data_tex_desc;
+        cudaResourceDesc     _data_res_desc;
 
         /* It seems strange strange to collect extrema globally only.
          * Because of the global cut-off, features from the later
@@ -97,8 +101,8 @@ class Pyramid
         inline Plane2D_float& getData( uint32_t level ) {
             return _data[level];
         }
-        inline Plane2D_float& getData2( uint32_t level ) {
-            return _data2[level];
+        inline Plane2D_float& getIntermediateData( ) {
+            return _intermediate_data;
         }
         inline Plane2D_float& getDogData( uint32_t level ) {
             return _dog_data[level];
@@ -196,6 +200,7 @@ public:
 private:
     void build_v6  ( Image* base );
     void build_v7  ( Image* base );
+    void build_v8  ( Image* base );
 
     void reset_extremum_counter( );
     void find_extrema_v4( uint32_t height, float edgeLimit, float threshold );
@@ -208,9 +213,6 @@ private:
     void test_last_error( int line, cudaStream_t stream );
     void debug_out_floats  ( float* data, uint32_t pitch, uint32_t height );
     void debug_out_floats_t( float* data, uint32_t pitch, uint32_t height );
-
-    KeepTime _keep_time_pyramid_v6;
-    KeepTime _keep_time_pyramid_v7;
 
     KeepTime _keep_time_extrema_v4;
 

@@ -6,114 +6,143 @@
 #include "assist.h"
 
 /*************************************************************
- * V7: device side
+ * V8: device side
  *************************************************************/
 
-#define V7_WIDTH    32
-#define V7_RANGE    4 // RANGES from 1 to 12 are possible
-#define V7_GAUSS_BASE   ( GAUSS_ONE_SIDE_RANGE - V7_RANGE )
-#define V7_FILTERSIZE   ( V7_RANGE + 1        + V7_RANGE )
-#define V7_READ_RANGE   ( V7_RANGE + V7_WIDTH + V7_RANGE )
-#define V7_LEVELS       _levels
+#define V8_EDGE_LEN    32
+#define V8_RANGE    4 // RANGES from 1 to 12 are possible
+#define V8_GAUSS_BASE   ( GAUSS_ONE_SIDE_RANGE - V8_RANGE )
+#define V8_FILTERSIZE   ( V8_RANGE + 1        + V8_RANGE )
+#define V8_LEVELS       _levels
 
 namespace popart {
 
-__device__ uint32_t non_null_dog = 0;
-
 __global__
-void filter_gauss_horiz_v7( Plane2D_float src_data,
+void filter_gauss_horiz_v8( Plane2D_float src_data,
                             Plane2D_float dst_data )
 {
-    int block_x = blockIdx.x * V7_WIDTH;
-    int block_y = blockIdx.y;
-    int idx;
+    __shared__ float loaddata[V8_EDGE_LEN][V8_RANGE + V8_EDGE_LEN + V8_RANGE];
+
+    const int src_w = src_data.getWidth();
+    const int src_h = src_data.getHeight();
+
+    int block_x = blockIdx.x * V8_EDGE_LEN;
+    int block_y = blockIdx.y * V8_EDGE_LEN;
+    int idx     = threadIdx.x;
+    int idy     = threadIdx.y;
+    for( ; idx < V8_EDGE_LEN+2*V8_RANGE; idx += V8_EDGE_LEN) {
+        int read_x = clamp( block_x + idx - V8_RANGE, src_w );
+        int read_y = clamp( block_y + idy,            src_h );
+        WORKS ? loaddata[idy][idx] = src_data.ptr(read_y)[read_x];
+    }
+    __syncthreads();
 
     float g;
     float val;
     float out = 0;
 
-    const int width  = src_data.getWidth();
-    const int height = src_data.getHeight();
-
-    for( int offset = V7_RANGE; offset>0; offset-- ) {
+    for( int offset = V8_RANGE; offset>0; offset-- ) {
         g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
 
-        idx = clamp( block_x + threadIdx.x - offset, width );
-        val = src_data.ptr(block_y)[idx];
+        idx = threadIdx.x - offset;
+        val = loaddata[threadIdx.y][idx+V8_RANGE];
         out += ( val * g );
 
-        idx = clamp( block_x + threadIdx.x + offset, width );
-        val = src_data.ptr(block_y)[idx];
+        idx = threadIdx.x + offset;
+        val = loaddata[threadIdx.y][idx+V8_RANGE];
         out += ( val * g );
     }
 
     g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
-    idx = clamp( block_x + threadIdx.x, width );
-    val = src_data.ptr(block_y)[idx];
+    idx = threadIdx.x;
+    val = loaddata[threadIdx.y][idx+V8_RANGE];
     out += ( val * g );
 
-    if( block_y >= height ) return;
-    if( idx     >= width  ) return;
+    idx = block_x+threadIdx.x;
+    idy = block_y+threadIdx.y;
+    if( idx >= src_w ) return;
+    if( idy >= src_h ) return;
 
-    dst_data.ptr(block_y)[idx] = out;
+    dst_data.ptr(idy)[idx] = out;
 }
 
 __device__
-void filter_gauss_vert_v7_sub( Plane2D_float&  src_data,
+void filter_gauss_vert_v8_sub( Plane2D_float&  src_data,
                                Plane2D_float&  dst_data )
 {
-    const int block_x = blockIdx.x * V7_WIDTH;
-    const int block_y = blockIdx.y;
-    const int idx     = block_x + threadIdx.x;
-    int idy;
+    // does not work on Mac !
+    // assert( blockDim.x == blockDim.y );
+    const int edgeLen = blockDim.x;
+    const int src_w   = src_data.getWidth();
+    const int src_h   = src_data.getHeight();
 
-    const int width  = src_data.getWidth();
-    const int height = src_data.getHeight();
+    int block_x = blockIdx.x * V8_EDGE_LEN;
+    int block_y = blockIdx.y * V8_EDGE_LEN;
+    int idx     = threadIdx.x;
+    int idy     = threadIdx.y;
+    for( ; idy < V8_EDGE_LEN+2*V8_RANGE; idy += V8_EDGE_LEN) {
+        int read_x = clamp( block_y + idy,            src_h );
+        int read_y = clamp( block_x + idx - V8_RANGE, src_w );
+        WORKS ? loaddata[idy][idx] = src_data.ptr(read_y)[read_x];
+    }
+    __syncthreads();
 
-    if( idx >= width ) return;
+    /* loaddata is transposed with respect to the src plane */
+    __shared__ float loaddata[V8_EDGE_LEN][V8_RANGE + V8_EDGE_LEN + V8_RANGE];
+
+    const int base =  blockIdx.y    * edgeLen - V8_RANGE;
+    for( idy = threadIdx.y ; idy < edgeLen+2*V8_RANGE; idy += edgeLen ) {
+        int read_x = clamp( idx, src_w );
+        int read_y = clamp( base + idy, src_h );
+        loaddata[threadIdx.x][idy] = src_data.ptr(read_y)[read_x];
+    }
+    __syncthreads();
+
 
     float g;
     float val;
     float out = 0;
 
-    for( int offset = V7_RANGE; offset>0; offset-- ) {
+    for( int offset = V8_RANGE; offset>0; offset-- ) {
         g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
 
-        idy = clamp( block_y - offset, height );
-        val = src_data.ptr(idy)[idx];
+        idy = threadIdx.x - offset;
+        val = loaddata[threadIdx.y][idy+V8_RANGE];
         out += ( val * g );
 
-        idy = clamp( block_y + offset, height );
-        val = src_data.ptr(idy)[idx];
+        idy = threadIdx.x + offset;
+        val = loaddata[threadIdx.y][idy+V8_RANGE];
         out += ( val * g );
     }
 
     g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
-    idy = clamp( block_y, height );
-    val = src_data.ptr(idy)[idx];
+    idy = threadIdx.x;
+    val = loaddata[threadIdx.y][idy+V8_RANGE];
     out += ( val * g );
 
-    if( idy >= height ) return;
+    idy = block_y+threadIdx.y;
+    if( idx >= src_w ) return;
+    if( idy >= src_h ) return;
 
     dst_data.ptr(idy)[idx] = out;
 }
 
 __global__
-void filter_gauss_vert_v7( Plane2D_float   src_data,
+void filter_gauss_vert_v8( Plane2D_float   src_data,
                            Plane2D_float   dst_data )
 {
-    filter_gauss_vert_v7_sub( src_data, dst_data );
+    filter_gauss_vert_v8_sub( src_data, dst_data );
 }
 
 __global__
-void filter_gauss_vert_v7_and_dog( Plane2D_float   src_data,
+void filter_gauss_vert_v8_and_dog( Plane2D_float   src_data,
                                    Plane2D_float   dst_data,
                                    Plane2D_float   higher_level_data,
                                    Plane2D_float   dog_data )
 {
-    filter_gauss_vert_v7_sub( src_data, dst_data );
+    filter_gauss_vert_v8_sub( src_data, dst_data );
 
-    const int idx = blockIdx.x * V7_WIDTH + threadIdx.x;
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int idy = blockIdx.y;
 
     const int width  = src_data.getWidth();
@@ -127,17 +156,13 @@ void filter_gauss_vert_v7_and_dog( Plane2D_float   src_data,
     b = higher_level_data.ptr(idy)[idx];
     a = fabs( a - b );
     dog_data.ptr(idy)[idx] = a;
-
-    if( a > 0 ) {
-        atomicAdd( &non_null_dog, 1 );
-    }
 }
 
 __global__
-void filter_gauss_horiz_v7_by_2( Plane2D_float   src_data,
+void filter_gauss_horiz_v8_by_2( Plane2D_float   src_data,
                                  Plane2D_float   dst_data )
 {
-    int block_x = blockIdx.x * V7_WIDTH;
+    int block_x = blockIdx.x * blockDim.x;
     int block_y = blockIdx.y;
 
     const int src_w   = src_data.getWidth();
@@ -156,7 +181,7 @@ void filter_gauss_horiz_v7_by_2( Plane2D_float   src_data,
     float val;
     float out = 0;
 
-    for( int offset = V7_RANGE; offset>0; offset-- ) {
+    for( int offset = V8_RANGE; offset>0; offset-- ) {
         g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
 
         src_idx = clamp( 2 * ( dst_idx - offset ), src_w );
@@ -177,10 +202,10 @@ void filter_gauss_horiz_v7_by_2( Plane2D_float   src_data,
 }
 
 /*************************************************************
- * V7: host side
+ * V8: host side
  *************************************************************/
 __host__
-void Pyramid::build_v7( Image* base )
+void Pyramid::build_v8( Image* base )
 {
 #if (PYRAMID_PRINT_DEBUG==1)
     cerr << "Entering " << __FUNCTION__ << " with base image "  << endl
@@ -194,26 +219,24 @@ void Pyramid::build_v7( Image* base )
     cerr << "Entering " << __FUNCTION__ << " with base image "  << endl;
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
-    cudaDeviceSynchronize();
-    uint32_t value = 0;
-    cudaMemcpyToSymbol( non_null_dog, &value, sizeof(uint32_t), 0, cudaMemcpyHostToDevice );
-    cudaDeviceSynchronize();
-
-    dim3 block;
-    block.x = V7_WIDTH;
-
     for( int octave=0; octave<_num_octaves; octave++ ) {
+        dim3 block;
+        block.x = V8_EDGE_LEN;
+        block.y = V8_EDGE_LEN;
 
-        for( int level=0; level<V7_LEVELS; level++ ) {
-            dim3 grid;
-            grid.x  = grid_divide(_octaves[octave].getData(level).getWidth(), V7_WIDTH);
-            grid.y  = _octaves[octave].getData(level).getHeight();
+        dim3 grid;
+        const int width  = _octaves[octave].getData(0).getWidth();
+        const int height = _octaves[octave].getData(0).getHeight();
+        grid.x = grid_divide( width,  V8_EDGE_LEN );
+        grid.y = grid_divide( height, V8_EDGE_LEN );
+
+        for( int level=0; level<V8_LEVELS; level++ ) {
 #if 0
         cerr << "Configuration for octave " << octave << endl
              << "  Horiz: layer size: "
              << _octaves[octave].getData(level).getWidth() << "x" << _octaves[octave].getData(level).getHeight() << endl
              << "  Vert: layer size: "
-             << _octaves[octave].getData2(level).getWidth() << "x" << _octaves[octave].getData2(level).getHeight() << endl
+             << _octaves[octave].getIntermediateData().getWidth() << "x" << _octaves[octave].getIntermediateData().getHeight() << endl
              << "  grid: "
              << "(" << grid.x << "," << grid.y << "," << grid.z << ")"
              << " block: "
@@ -223,48 +246,47 @@ void Pyramid::build_v7( Image* base )
 
             if( level == 0 ) {
                 if( octave == 0 ) {
-                    filter_gauss_horiz_v7
+                    filter_gauss_horiz_v8
                         <<<grid,block,0,_stream>>>
                         ( base->array,
                           _octaves[octave].getIntermediateData( ) );
                 } else {
-                    filter_gauss_horiz_v7_by_2
+                    filter_gauss_horiz_v8_by_2
                         <<<grid,block,0,_stream>>>
-                        ( _octaves[octave-1].getData( V7_LEVELS-3 ),
-                          _octaves[octave].getIntermediateData() );
+                        ( _octaves[octave-1].getData( V8_LEVELS-3 ),
+                          _octaves[octave].getIntermediateData( ) );
                 }
             } else {
-                filter_gauss_horiz_v7
+                filter_gauss_horiz_v8
                     <<<grid,block,0,_stream>>>
                     ( _octaves[octave].getData( level-1 ),
-                      _octaves[octave].getIntermediateData() );
+                      _octaves[octave].getIntermediateData( ) );
             }
-            cudaStreamSynchronize( _stream );
-            cudaError_t err = cudaGetLastError();
-            POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v7 failed: " );
+            // cudaStreamSynchronize( _stream );
+            // cudaError_t err = cudaGetLastError();
+            // POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v8 failed: " );
 
             if( level == 0 ) {
-                filter_gauss_vert_v7
+                filter_gauss_vert_v8
                     <<<grid,block,0,_stream>>>
-                    ( _octaves[octave].getIntermediateData(),
+                    ( _octaves[octave].getIntermediateData( ),
                       _octaves[octave].getData( level ) );
             } else {
-                filter_gauss_vert_v7_and_dog
+                filter_gauss_vert_v8_and_dog
                     <<<grid,block,0,_stream>>>
-                    ( _octaves[octave].getIntermediateData(),
+                    ( _octaves[octave].getIntermediateData( ),
                       _octaves[octave].getData( level ),
                       _octaves[octave].getData( level-1 ),
                       _octaves[octave].getDogData( level-1 ) );
             }
-            cudaStreamSynchronize( _stream );
-            err = cudaGetLastError();
-            POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v7 failed: " );
+            // cudaStreamSynchronize( _stream );
+            // err = cudaGetLastError();
+            // POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v8 failed: " );
         }
     }
-
-    cudaDeviceSynchronize();
-    cudaMemcpyFromSymbol( &value, non_null_dog, sizeof(uint32_t), 0, cudaMemcpyDeviceToHost );
-    cerr << "The total of dog symbols written is " << value << endl;
+    cudaStreamSynchronize( _stream );
+    cudaError_t err = cudaGetLastError();
+    POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v8 failed: " );
 }
 
 } // namespace popart

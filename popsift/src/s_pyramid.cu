@@ -20,8 +20,10 @@
 
 #define PYRAMID_PRINT_DEBUG 0
 
-#define PYRAMID_V6_ON false
+#define PYRAMID_V6_ON true
 #define PYRAMID_V7_ON true
+#define PYRAMID_V8_ON true
+
 #define EXTREMA_V4_ON true
 #define ORIENTA_V1_ON false
 #define ORIENTA_V2_ON true
@@ -115,7 +117,6 @@ void Pyramid::test_last_error( int line, cudaStream_t stream )
 
 Pyramid::Octave::Octave( )
     : _data(0)
-    , _data2(0)
     , _t_data(0)
     , _dog_data(0)
     , _h_extrema_mgmt(0)
@@ -194,16 +195,47 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
 
     _data     = new Plane2D_float[_levels];
     _t_data   = new Plane2D_float[_levels];
-    _data2    = new Plane2D_float[_levels];
     _dog_data = new Plane2D_float[_levels-1];
 
     for( int i=0; i<_levels; i++ ) {
         _data[i]  .allocDev( width, height );
-        _data2[i] .allocDev( width, height );
         _t_data[i].allocDev( height, width );
     }
+    _intermediate_data.allocDev( width, height );
     for( int i=0; i<_levels-1; i++ ) {
         _dog_data[i].allocDev( width, height );
+    }
+
+    _data_tex = new cudaTextureObject_t[_levels];
+
+    memset( &_data_tex_desc, 0, sizeof(cudaTextureDesc) );
+    _data_tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
+    _data_tex_desc.addressMode[0]   = cudaAddressModeClamp;
+    _data_tex_desc.addressMode[1]   = cudaAddressModeClamp;
+    _data_tex_desc.addressMode[2]   = cudaAddressModeClamp;
+    _data_tex_desc.readMode         = cudaReadModeElementType; // read as float
+    _data_tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
+
+
+    memset( &_data_res_desc, 0, sizeof(cudaResourceDesc) );
+    _data_res_desc.resType                  = cudaResourceTypePitch2D;
+    _data_res_desc.res.pitch2D.desc.f       = cudaChannelFormatKindFloat;
+    _data_res_desc.res.pitch2D.desc.x       = 32;
+    _data_res_desc.res.pitch2D.desc.y       = 0;
+    _data_res_desc.res.pitch2D.desc.z       = 0;
+    _data_res_desc.res.pitch2D.desc.w       = 0;
+    for( int i=0; i<_levels; i++ ) {
+        assert( _data[i].elemSize() == 4 );
+        _data_res_desc.res.pitch2D.devPtr       = _data[i].data;
+        _data_res_desc.res.pitch2D.pitchInBytes = _data[i].step;
+        _data_res_desc.res.pitch2D.width        = _data[i].getCols();
+        _data_res_desc.res.pitch2D.height       = _data[i].getRows();
+
+        cudaError_t err;
+        err = cudaCreateTextureObject( &_data_tex[i],
+                                       &_data_res_desc,
+                                       &_data_tex_desc, 0 );
+        POP_CUDA_FATAL_TEST( err, "Could not create texture object: " );
     }
 
     allocExtrema( layer_max_extrema );
@@ -214,8 +246,16 @@ void Pyramid::Octave::free( )
     freeExtrema( );
 
     for( int i=0; i<_levels; i++ ) {
+        cudaError_t err;
+        err = cudaDestroyTextureObject( _data_tex[i] );
+        POP_CUDA_FATAL_TEST( err, "Could not destroy texture object: " );
+    }
+
+    delete [] _data_tex;
+
+    _intermediate_data.freeDev( );
+    for( int i=0; i<_levels; i++ ) {
         _data[i]  .freeDev( );
-        _data2[i] .freeDev( );
         _t_data[i].freeDev( );
     }
     for( int i=0; i<_levels-1; i++ ) {
@@ -500,8 +540,6 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, cudaStream_t s
     : _num_octaves( octaves )
     , _levels( levels + 3 )
     , _stream( stream )
-    , _keep_time_pyramid_v6( stream )
-    , _keep_time_pyramid_v7( stream )
     , _keep_time_extrema_v4( stream )
     , _keep_time_orient_v1(  stream )
     , _keep_time_orient_v2(  stream )
@@ -542,27 +580,15 @@ Pyramid::~Pyramid( )
 
 void Pyramid::build( Image* base )
 {
-    if( PYRAMID_V6_ON ) {
-        #if (PYRAMID_PRINT_DEBUG==1)
-        printf("V6: Grouping %dx1x1 read to shared, one octaves, one levels\n", V6_WIDTH);
-        #endif // (PYRAMID_PRINT_DEBUG==1)
-        build_v6( base );
-    }
-
-    if( PYRAMID_V7_ON ) {
-        #if (PYRAMID_PRINT_DEBUG==1)
-        printf("V7: Grouping %dx1x1 read directly, one octaves, one levels\n", V7_WIDTH);
-        #endif // (PYRAMID_PRINT_DEBUG==1)
-        build_v7( base );
-    }
+    if( PYRAMID_V8_ON ) build_v8( base );
+    if( PYRAMID_V7_ON ) build_v7( base );
+    if( PYRAMID_V6_ON ) build_v6( base );
 }
 
 void Pyramid::report_times( )
 {
     cudaDeviceSynchronize();
-    if( PYRAMID_V6_ON ) _keep_time_pyramid_v6.report("    V6, time for building pyramid: " );
-    if( PYRAMID_V7_ON ) _keep_time_pyramid_v7.report("    V7, time for building pyramid: " );
-    // _keep_time_extrema_v3.report("    V3, time for finding extrema: " );
+
     _keep_time_extrema_v4.report("    V4, time for finding extrema: " );
     if( ORIENTA_V1_ON ) _keep_time_orient_v1. report("    V1, time for finding orientation: " );
     if( ORIENTA_V2_ON ) _keep_time_orient_v2. report("    V2, time for finding orientation: " );
