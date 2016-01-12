@@ -102,7 +102,7 @@ void PopSift::uninit( )
     _hst_input_image.freeHost( popart::CudaAllocated );
     _dev_input_image.freeDev( );
 
-    cudaStreamDestroy( _stream );
+    POP_CUDA_STREAM_DESTROY( _stream );
 
     _initTime   ->report( "Time to initialize:    " );
     _uploadTime ->report( "Time to upload:        " );

@@ -111,3 +111,9 @@ void pop_cuda_memset( void*        ptr,
         POP_CUDA_FATAL_TEST( err, "cudaStreamCreate failed: " ); \
     }
 
+#define POP_CUDA_STREAM_DESTROY( ptr ) { \
+        cudaError_t err; \
+        err = cudaStreamDestroy( ptr ); \
+        POP_CUDA_FATAL_TEST( err, "cudaStreamDestroy failed: " ); \
+    }
+

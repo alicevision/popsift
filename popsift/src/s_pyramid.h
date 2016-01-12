@@ -62,6 +62,7 @@ class Pyramid
 {
     class Octave
     {
+        bool         _stream_created;
         cudaStream_t _stream;
 
         uint32_t  _levels;

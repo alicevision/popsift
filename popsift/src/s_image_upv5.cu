@@ -6,6 +6,8 @@
 #include <sstream>
 #include <map>
 
+#undef FIND_BLOCK_SIZE
+
 using namespace std;
 
 namespace popart {
@@ -22,8 +24,6 @@ void p_upscale_5( Plane2D_float dst, cudaTextureObject_t src )
     float d = tex2D<float>( src, src_x, src_y );
     dst.ptr(idy)[idx] = d * 255.0f;
 }
-
-#define FIND_BLOCK_SIZE
 
 #ifdef FIND_BLOCK_SIZE
 int condition[][2] = {
@@ -95,7 +95,7 @@ void Image::upscale_v5( cudaTextureObject_t & tex, cudaStream_t stream )
     int gridx = grid_divide( this->array.getCols(), 128 );
     int gridy = grid_divide( this->array.getRows(), 1 );
     dim3 grid( gridx, gridy );
-    dim3 block( 128, 1 );
+    dim3 block( 64, 2 );
 
     p_upscale_5
         <<<grid,block,0,stream>>>

@@ -20,9 +20,9 @@
 
 #define PYRAMID_PRINT_DEBUG 0
 
-#define PYRAMID_V6_ON true
+#define PYRAMID_V6_ON false
 #define PYRAMID_V7_ON true
-#define PYRAMID_V8_ON true
+#define PYRAMID_V8_ON false
 
 #define EXTREMA_V4_ON true
 #define ORIENTA_V1_ON false
@@ -116,7 +116,8 @@ void Pyramid::test_last_error( int line, cudaStream_t stream )
  *************************************************************/
 
 Pyramid::Octave::Octave( )
-    : _data(0)
+    : _stream_created( false )
+    , _data(0)
     , _t_data(0)
     , _dog_data(0)
     , _h_extrema_mgmt(0)
@@ -179,8 +180,10 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
 {
     _levels            = levels;
     if( stream != 0 ) {
+        _stream_created = false;
         _stream = stream;
     } else {
+        _stream_created = true;
         POP_CUDA_STREAM_CREATE( &_stream );
     }
 
@@ -266,7 +269,9 @@ void Pyramid::Octave::free( )
     delete [] _t_data;
     delete [] _dog_data;
 
-    cudaStreamDestroy( _stream );
+    if( _stream_created ) {
+        POP_CUDA_STREAM_DESTROY( _stream );
+    }
 }
 
 void Pyramid::Octave::resetExtremaCount( cudaStream_t stream )
@@ -426,7 +431,6 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
         if( level == 0 ) {
             uint32_t total_ct = 0;
 
-            cerr << "calling " << __FUNCTION__ << " from octave " << octave << endl;
             readExtremaCount( 0 );
             cudaDeviceSynchronize( );
             for( uint32_t l=0; l<_levels; l++ ) {
@@ -584,9 +588,53 @@ Pyramid::~Pyramid( )
 
 void Pyramid::build( Image* base )
 {
-    if( PYRAMID_V8_ON ) build_v8( base );
-    if( PYRAMID_V7_ON ) build_v7( base );
-    if( PYRAMID_V6_ON ) build_v6( base );
+    cudaEvent_t start;
+    cudaEvent_t stop;
+    cudaEventCreate( &start );
+    cudaEventCreate( &stop );
+
+    if( PYRAMID_V8_ON ) {
+        float duration = 0.0f;
+        for( int i=0; i<10; i++ ) {
+            cudaEventRecord( start, _stream );
+            build_v8( base );
+            cudaEventRecord( stop, _stream );
+            cudaStreamSynchronize( _stream );
+            float diff;
+            cudaEventElapsedTime( &diff, start, stop );
+            duration += diff;
+        }
+        duration /= 10.0f;
+        cerr << "Pyramid V8 avg duration: " << duration << " ms" << endl;
+    }
+    if( PYRAMID_V7_ON ) {
+        float duration = 0.0f;
+        for( int i=0; i<10; i++ ) {
+            cudaEventRecord( start, _stream );
+            build_v7( base );
+            cudaEventRecord( stop, _stream );
+            cudaStreamSynchronize( _stream );
+            float diff;
+            cudaEventElapsedTime( &diff, start, stop );
+            duration += diff;
+        }
+        duration /= 10.0f;
+        cerr << "Pyramid V7 avg duration: " << duration << " ms" << endl;
+    }
+    if( PYRAMID_V6_ON ) {
+        float duration = 0.0f;
+        for( int i=0; i<10; i++ ) {
+            cudaEventRecord( start, _stream );
+            build_v6( base );
+            cudaEventRecord( stop, _stream );
+            cudaStreamSynchronize( _stream );
+            float diff;
+            cudaEventElapsedTime( &diff, start, stop );
+            duration += diff;
+        }
+        duration /= 10.0f;
+        cerr << "Pyramid V6 avg duration: " << duration << " ms" << endl;
+    }
 }
 
 void Pyramid::report_times( )
