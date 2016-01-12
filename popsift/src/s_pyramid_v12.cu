@@ -130,7 +130,7 @@ void filter_gauss_vert_v12( cudaTextureObject_t src_data,
     for( ; idy < V12_EDGE_LEN+2*V12_RANGE; idy += V12_EDGE_LEN) {
         int read_x = block_x + idx;
         int read_y = block_y + idy - V12_RANGE;
-        loaddata[idy][idx] = tex2D<float>( src_data, read_x, read_y );
+        loaddata[idx][idy] = tex2D<float>( src_data, read_x, read_y );
     }
     __syncthreads();
 
