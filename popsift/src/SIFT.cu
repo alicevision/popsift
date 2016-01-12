@@ -26,10 +26,7 @@ PopSift::PopSift( int num_octaves,
 }
 
 PopSift::~PopSift()
-{
-    _hst_input_image.freeHost( popart::CudaAllocated );
-    _dev_input_image.freeDev( );
-}
+{ }
 
 #define TRY_IMAGE_TWICE 0
 

@@ -1,6 +1,9 @@
 #pragma once
 
 #include <assert.h>
+#include <inttypes.h>
+#include <errno.h>
+#include <stdlib.h>
 #include <cuda_runtime.h>
 
 #define PLANE2D_CUDA_OP_DEBUG

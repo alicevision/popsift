@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdint.h>
+#include <stdlib.h>
 
 /* GRAYSCALE */
 // #define R_RATE (uint32_t)(0.298912F * 0x1000000)

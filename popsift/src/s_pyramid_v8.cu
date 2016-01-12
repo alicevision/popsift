@@ -33,7 +33,7 @@ void filter_gauss_horiz_v8( Plane2D_float src_data,
     for( ; idx < V8_EDGE_LEN+2*V8_RANGE; idx += V8_EDGE_LEN) {
         int read_x = clamp( block_x + idx - V8_RANGE, src_w );
         int read_y = clamp( block_y + idy,            src_h );
-        WORKS ? loaddata[idy][idx] = src_data.ptr(read_y)[read_x];
+        loaddata[idy][idx] = src_data.ptr(read_y)[read_x];
     }
     __syncthreads();
 
@@ -72,32 +72,22 @@ void filter_gauss_vert_v8_sub( Plane2D_float&  src_data,
 {
     // does not work on Mac !
     // assert( blockDim.x == blockDim.y );
-    const int edgeLen = blockDim.x;
     const int src_w   = src_data.getWidth();
     const int src_h   = src_data.getHeight();
+
+    /* loaddata is transposed with respect to the src plane */
+    __shared__ float loaddata[V8_EDGE_LEN][V8_RANGE + V8_EDGE_LEN + V8_RANGE];
 
     int block_x = blockIdx.x * V8_EDGE_LEN;
     int block_y = blockIdx.y * V8_EDGE_LEN;
     int idx     = threadIdx.x;
     int idy     = threadIdx.y;
     for( ; idy < V8_EDGE_LEN+2*V8_RANGE; idy += V8_EDGE_LEN) {
-        int read_x = clamp( block_y + idy,            src_h );
-        int read_y = clamp( block_x + idx - V8_RANGE, src_w );
-        WORKS ? loaddata[idy][idx] = src_data.ptr(read_y)[read_x];
+        int read_x = clamp( block_x + idx,            src_w );
+        int read_y = clamp( block_y + idy - V8_RANGE, src_h );
+        loaddata[idx][idy] = src_data.ptr(read_y)[read_x];
     }
     __syncthreads();
-
-    /* loaddata is transposed with respect to the src plane */
-    __shared__ float loaddata[V8_EDGE_LEN][V8_RANGE + V8_EDGE_LEN + V8_RANGE];
-
-    const int base =  blockIdx.y    * edgeLen - V8_RANGE;
-    for( idy = threadIdx.y ; idy < edgeLen+2*V8_RANGE; idy += edgeLen ) {
-        int read_x = clamp( idx, src_w );
-        int read_y = clamp( base + idy, src_h );
-        loaddata[threadIdx.x][idy] = src_data.ptr(read_y)[read_x];
-    }
-    __syncthreads();
-
 
     float g;
     float val;
@@ -106,20 +96,21 @@ void filter_gauss_vert_v8_sub( Plane2D_float&  src_data,
     for( int offset = V8_RANGE; offset>0; offset-- ) {
         g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
 
-        idy = threadIdx.x - offset;
-        val = loaddata[threadIdx.y][idy+V8_RANGE];
+        idx = threadIdx.x - offset;
+        val = loaddata[threadIdx.y][idx+V8_RANGE];
         out += ( val * g );
 
-        idy = threadIdx.x + offset;
-        val = loaddata[threadIdx.y][idy+V8_RANGE];
+        idx = threadIdx.x + offset;
+        val = loaddata[threadIdx.y][idx+V8_RANGE];
         out += ( val * g );
     }
 
     g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
-    idy = threadIdx.x;
-    val = loaddata[threadIdx.y][idy+V8_RANGE];
+    idx = threadIdx.x;
+    val = loaddata[threadIdx.y][idx+V8_RANGE];
     out += ( val * g );
 
+    idx = block_x+threadIdx.x;
     idy = block_y+threadIdx.y;
     if( idx >= src_w ) return;
     if( idy >= src_h ) return;

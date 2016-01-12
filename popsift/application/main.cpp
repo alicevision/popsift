@@ -21,6 +21,8 @@
 #include <string>
 #include <cmath>
 #include <iomanip>
+#include <stdlib.h>
+
 #include "getopt.h"
 
 #include "SIFT.h"

@@ -262,6 +262,10 @@ void Pyramid::Octave::free( )
         _dog_data[i].freeDev( );
     }
 
+    delete [] _data;
+    delete [] _t_data;
+    delete [] _dog_data;
+
     cudaStreamDestroy( _stream );
 }
 

@@ -2,6 +2,7 @@
 #include "debug_macros.h"
 #include "assist.h"
 #include "clamp.h"
+#include <cuda_runtime.h>
 
 #define DEBUG_MODE 1
 
@@ -216,7 +217,6 @@ inline bool solve2( float i[3][3], float b[3] )
     det += ( i[0][2] * det2 );
 
     if( det == 0 ) {
-        printf("ZERO determinant\n");
         return false;
     }
 
