@@ -577,51 +577,50 @@ void Pyramid::build( Image* base )
 {
     cudaEvent_t start;
     cudaEvent_t stop;
-    cudaEventCreate( &start );
-    cudaEventCreate( &stop );
+    cudaError_t err;
+    err = cudaEventCreate( &start );
+    POP_CUDA_FATAL_TEST( err, "event create failed: " );
+    err = cudaEventCreate( &stop );
+    POP_CUDA_FATAL_TEST( err, "event create failed: " );
 
-    if( PYRAMID_V8_ON ) {
+    for( int mode=0; mode<3; mode++ ) {
         float duration = 0.0f;
-        for( int i=0; i<10; i++ ) {
-            cudaEventRecord( start, 0 );
-            build_v8( base );
-            cudaEventRecord( stop, 0 );
-            cudaStreamSynchronize( 0 );
+        for( int loop=0; loop<10; loop++ ) {
+            err = cudaEventRecord( start, 0 );
+            POP_CUDA_FATAL_TEST( err, "event record failed: " );
+            switch( mode ) {
+            case 0 :
+                build_v6( base );
+                POP_CHK;
+                break;
+            case 1 :
+                build_v7( base );
+                POP_CHK;
+                break;
+            case 2 :
+                build_v8( base );
+                POP_CHK;
+                break;
+            }
+            err = cudaEventRecord( stop, 0 );
+            POP_CUDA_FATAL_TEST( err, "event record failed: " );
+            err = cudaStreamSynchronize( 0 );
+            POP_CUDA_FATAL_TEST( err, "stream sync failed: " );
             float diff;
-            cudaEventElapsedTime( &diff, start, stop );
+            err = cudaEventElapsedTime( &diff, start, stop );
+            POP_CUDA_FATAL_TEST( err, "elapsed time failed: " );
             duration += diff;
         }
         duration /= 10.0f;
-        cerr << "Pyramid V8 avg duration: " << duration << " ms" << endl;
+        cerr << "Pyramid "
+             << ( (mode==0) ? "V6" : (mode==1) ? "V7" : "V8" )
+             << " avg duration: " << duration << " ms" << endl;
     }
-    if( PYRAMID_V7_ON ) {
-        float duration = 0.0f;
-        for( int i=0; i<10; i++ ) {
-            cudaEventRecord( start, 0 );
-            build_v7( base );
-            cudaEventRecord( stop, 0 );
-            cudaStreamSynchronize( 0 );
-            float diff;
-            cudaEventElapsedTime( &diff, start, stop );
-            duration += diff;
-        }
-        duration /= 10.0f;
-        cerr << "Pyramid V7 avg duration: " << duration << " ms" << endl;
-    }
-    if( PYRAMID_V6_ON ) {
-        float duration = 0.0f;
-        for( int i=0; i<10; i++ ) {
-            cudaEventRecord( start, 0 );
-            build_v6( base );
-            cudaEventRecord( stop, 0 );
-            cudaStreamSynchronize( 0 );
-            float diff;
-            cudaEventElapsedTime( &diff, start, stop );
-            duration += diff;
-        }
-        duration /= 10.0f;
-        cerr << "Pyramid V6 avg duration: " << duration << " ms" << endl;
-    }
+
+    err = cudaEventDestroy( start );
+    POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
+    err = cudaEventDestroy( stop );
+    POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
 }
 
 void Pyramid::report_times( )
