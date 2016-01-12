@@ -114,6 +114,8 @@ void keypoint_descriptors( ExtremumCandidate* cand,
             }
         }
     }
+    __syncthreads();
+
     dpt[0] += dpt[8];
 
     /* reduction here */
