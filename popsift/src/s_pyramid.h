@@ -71,6 +71,7 @@ class Pyramid
 
     public:
         cudaTextureObject_t* _data_tex;
+        cudaTextureObject_t  _interm_data_tex;
     private:
         cudaTextureDesc      _data_tex_desc;
         cudaResourceDesc     _data_res_desc;

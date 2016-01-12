@@ -220,28 +220,40 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
     _data_res_desc.res.pitch2D.desc.z       = 0;
     _data_res_desc.res.pitch2D.desc.w       = 0;
     for( int i=0; i<_levels; i++ ) {
-        assert( _data[i].elemSize() == 4 );
         _data_res_desc.res.pitch2D.devPtr       = _data[i].data;
         _data_res_desc.res.pitch2D.pitchInBytes = _data[i].step;
         _data_res_desc.res.pitch2D.width        = _data[i].getCols();
         _data_res_desc.res.pitch2D.height       = _data[i].getRows();
 
         cudaError_t err;
-        err = cudaCreateTextureObject( &_data_tex[i],
+        err = cudaCreateTextureObject( &_interm_data_tex,
                                        &_data_res_desc,
                                        &_data_tex_desc, 0 );
         POP_CUDA_FATAL_TEST( err, "Could not create texture object: " );
     }
+    _data_res_desc.res.pitch2D.devPtr       = _intermediate_data.data;
+    _data_res_desc.res.pitch2D.pitchInBytes = _intermediate_data.step;
+    _data_res_desc.res.pitch2D.width        = _intermediate_data.getCols();
+    _data_res_desc.res.pitch2D.height       = _intermediate_data.getRows();
+
+    cudaError_t err;
+    err = cudaCreateTextureObject( &_interm_data_tex,
+                                   &_data_res_desc,
+                                   &_data_tex_desc, 0 );
+    POP_CUDA_FATAL_TEST( err, "Could not create texture object: " );
 
     allocExtrema( layer_max_extrema );
 }
 
 void Pyramid::Octave::free( )
 {
+    cudaError_t err;
+
     freeExtrema( );
 
+    err = cudaDestroyTextureObject( _interm_data_tex );
+    POP_CUDA_FATAL_TEST( err, "Could not destroy texture object: " );
     for( int i=0; i<_levels; i++ ) {
-        cudaError_t err;
         err = cudaDestroyTextureObject( _data_tex[i] );
         POP_CUDA_FATAL_TEST( err, "Could not destroy texture object: " );
     }

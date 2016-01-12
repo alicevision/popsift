@@ -83,8 +83,7 @@ void filter_gauss_horiz_v12( cudaTextureObject_t src_data,
     for( ; idx < V12_EDGE_LEN+2*V12_RANGE; idx += V12_EDGE_LEN) {
         int read_x = block_x + idx - V12_RANGE;
         int read_y = block_y + idy;
-        float f = tex2D<float>( src_data, read_x, read_y );
-        loaddata[idy][idx] = f;
+        loaddata[idy][idx] = tex2D<float>( src_data, read_x, read_y );
     }
     __syncthreads();
 
@@ -117,15 +116,10 @@ void filter_gauss_horiz_v12( cudaTextureObject_t src_data,
     dst_data.ptr(idy)[idx] = out;
 }
 
-__device__
-void filter_gauss_vert_v12_sub( Plane2D_float&  src_data,
-                               Plane2D_float&  dst_data )
+__global__
+void filter_gauss_vert_v12( cudaTextureObject_t src_data,
+                            Plane2D_float       dst_data )
 {
-    // does not work on Mac !
-    // assert( blockDim.x == blockDim.y );
-    const int src_w   = src_data.getWidth();
-    const int src_h   = src_data.getHeight();
-
     /* loaddata is transposed with respect to the src plane */
     __shared__ float loaddata[V12_EDGE_LEN][V12_RANGE + V12_EDGE_LEN + V12_RANGE];
 
@@ -134,9 +128,9 @@ void filter_gauss_vert_v12_sub( Plane2D_float&  src_data,
     int idx     = threadIdx.x;
     int idy     = threadIdx.y;
     for( ; idy < V12_EDGE_LEN+2*V12_RANGE; idy += V12_EDGE_LEN) {
-        int read_x = clamp( block_x + idx,            src_w );
-        int read_y = clamp( block_y + idy - V12_RANGE, src_h );
-        loaddata[idx][idy] = src_data.ptr(read_y)[read_x];
+        int read_x = block_x + idx;
+        int read_y = block_y + idy - V12_RANGE;
+        loaddata[idy][idx] = tex2D<float>( src_data, read_x, read_y );
     }
     __syncthreads();
 
@@ -163,40 +157,32 @@ void filter_gauss_vert_v12_sub( Plane2D_float&  src_data,
 
     idx = block_x+threadIdx.x;
     idy = block_y+threadIdx.y;
-    if( idx >= src_w ) return;
-    if( idy >= src_h ) return;
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+    if( idx >= dst_w ) return;
+    if( idy >= dst_h ) return;
 
     dst_data.ptr(idy)[idx] = out;
 }
 
 __global__
-void filter_gauss_vert_v12( Plane2D_float   src_data,
-                           Plane2D_float   dst_data )
+void filter_gauss_vert_v12_dog( cudaTextureObject_t top_data,
+                                cudaTextureObject_t bot_data,
+                                Plane2D_float       dog_data )
 {
-    filter_gauss_vert_v12_sub( src_data, dst_data );
-}
-
-__global__
-void filter_gauss_vert_v12_and_dog( Plane2D_float   src_data,
-                                   Plane2D_float   dst_data,
-                                   Plane2D_float   higher_level_data,
-                                   Plane2D_float   dog_data )
-{
-    filter_gauss_vert_v12_sub( src_data, dst_data );
-
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int idy = blockIdx.y;
+    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
 
-    const int width  = src_data.getWidth();
-    const int height = src_data.getHeight();
+    float a, b;
+    a = tex2D<float>( top_data, idx, idy );
+    b = tex2D<float>( bot_data, idx, idy );
+    a = fabs( a - b );
 
+    const int width  = dog_data.getWidth();
+    const int height = dog_data.getHeight();
     if( idx >= width ) return;
     if( idy >= height ) return;
 
-    float a, b;
-    a = dst_data.ptr(idy)[idx];
-    b = higher_level_data.ptr(idy)[idx];
-    a = fabs( a - b );
     dog_data.ptr(idy)[idx] = a;
 }
 
@@ -225,17 +211,17 @@ void filter_gauss_horiz_v12_by_2( cudaTextureObject_t src_data,
         g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
 
         src_idx = 2 * ( dst_idx - offset );
-        val = tex2D<float>( src_data, src_idy, src_idx );
+        val = tex2D<float>( src_data, src_idx, src_idy );
         out += ( val * g );
 
         src_idx = 2 * ( dst_idx + offset );
-        val = tex2D<float>( src_data, src_idy, src_idx );
+        val = tex2D<float>( src_data, src_idx, src_idy );
         out += ( val * g );
     }
 
     g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
     src_idx = 2 * dst_idx;
-    val = tex2D<float>( src_data, src_idy, src_idx );
+    val = tex2D<float>( src_data, src_idx, src_idy );
     out += ( val * g );
 
     dst_data.ptr(dst_idy)[dst_idx] = out;
@@ -300,26 +286,28 @@ void Pyramid::build_v12( Image* base )
                     ( _octaves[octave]._data_tex[ level-1 ],
                       _octaves[octave].getIntermediateData( ) );
             }
-            // cudaDeviceSynchronize( );
-            // cudaError_t err = cudaGetLastError();
-            // POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v12 failed: " );
+            cudaDeviceSynchronize( );
+            cudaError_t err = cudaGetLastError();
+            POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v12 failed: " );
 
-            if( level == 0 ) {
-                filter_gauss_vert_v12
+            filter_gauss_vert_v12
+                <<<grid,block>>>
+                ( _octaves[octave]._interm_data_tex,
+                  _octaves[octave].getData( level ) );
+            cudaDeviceSynchronize( );
+            err = cudaGetLastError();
+            POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v12 failed: " );
+
+            if( level > 0 ) {
+                filter_gauss_vert_v12_dog
                     <<<grid,block>>>
-                    ( _octaves[octave].getIntermediateData( ),
-                      _octaves[octave].getData( level ) );
-            } else {
-                filter_gauss_vert_v12_and_dog
-                    <<<grid,block>>>
-                    ( _octaves[octave].getIntermediateData( ),
-                      _octaves[octave].getData( level ),
-                      _octaves[octave].getData( level-1 ),
+                    ( _octaves[octave]._data_tex[level  ],
+                      _octaves[octave]._data_tex[level-1],
                       _octaves[octave].getDogData( level-1 ) );
             }
-            // cudaDeviceSynchronize( );
-            // err = cudaGetLastError();
-            // POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v12 failed: " );
+            cudaDeviceSynchronize( );
+            err = cudaGetLastError();
+            POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v12 failed: " );
         }
     }
     cudaDeviceSynchronize( );
