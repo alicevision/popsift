@@ -515,8 +515,9 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
         devPlane.memcpyToHost( f );
         for( int y=0; y<height; y++ ) {
             for( int x=0; x<width; x++ ) {
-                float fm = f.ptr(y)[x] * 256.0;
-                c.ptr(y)[x] = htons( (uint16_t)fm );
+                float    fm = f.ptr(y)[x] * 256.0;
+                uint16_t fm_i16 = fm;
+                c.ptr(y)[x] = htons( fm_i16 );
             }
         }
         ostringstream ostr;
