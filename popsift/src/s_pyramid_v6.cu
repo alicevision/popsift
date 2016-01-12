@@ -149,8 +149,6 @@ void Pyramid::build_v6( Image* base )
          << "    aligned pix size  : " << base->a_width/base->type_size << "x" << base->a_height << endl
          << "    original pix size : " << base->u_width/base->type_size << "x" << base->u_height << endl;
 
-#else
-    cerr << "Entering " << __FUNCTION__ << " with base image "  << endl;
 #endif
 
     dim3 block;
@@ -187,39 +185,39 @@ void Pyramid::build_v6( Image* base )
             if( level == 0 ) {
                 if( octave == 0 ) {
                     filter_gauss_horiz_v6
-                        <<<grid_t,block,0,_stream>>>
+                        <<<grid_t,block>>>
                         ( base->array,
                           _octaves[octave].getTransposedData( level ) );
                 } else {
                     filter_gauss_horiz_v6_by_2
-                        <<<grid_t,block,0,_stream>>>
+                        <<<grid_t,block>>>
                         ( _octaves[octave-1].getData( V6_LEVELS-1 ),
                           _octaves[octave].getTransposedData( level ) );
                 }
             } else {
                 filter_gauss_horiz_v6
-                    <<<grid_t,block,0,_stream>>>
+                    <<<grid_t,block>>>
                     ( _octaves[octave].getData( level-1 ),
                       _octaves[octave].getTransposedData( level ) );
             }
-            cudaStreamSynchronize(_stream);
+            cudaDeviceSynchronize( );
             cudaError_t err = cudaGetLastError();
             POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v6 failed: " );
 
             if( level == 0 ) {
                 filter_gauss_horiz_v6
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getTransposedData( level ),
                       _octaves[octave].getData( level ) );
             } else {
                 filter_gauss_horiz_v6_and_dog
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getTransposedData( level ),
                       _octaves[octave].getData( level ),
                       _octaves[octave].getData( level-1 ),
                       _octaves[octave].getDogData( level-1 ) );
             }
-            cudaStreamSynchronize(_stream);
+            cudaDeviceSynchronize( );
             err = cudaGetLastError();
             POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v6 failed: " );
         }

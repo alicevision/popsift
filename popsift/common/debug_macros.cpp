@@ -4,6 +4,17 @@
 
 using namespace std;
 
+void pop_check_last_error( const char* file, size_t line )
+{
+    cudaError_t err = cudaGetLastError( );
+    if( err != cudaSuccess ) {
+        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
+                  << "    called from " << file << ":" << line << std::endl
+                  << "    cudaGetLastError failed: " << cudaGetErrorString(err) << std::endl;
+        exit( -__LINE__ );
+    }
+}
+
 void pop_info_gridsize( bool silent, dim3& grid,dim3& block, const string& kernel, const char* file, size_t line )
 {
     if( silent ) return;
@@ -39,26 +50,6 @@ void pop_stream_synchronize( cudaStream_t stream, const char* file, size_t line 
                   << "    cudaStreamSynchronize failed: " << cudaGetErrorString(err) << std::endl;
         exit( -__LINE__ );
     }
-}
-
-void pop_check_last_error( const char* file, size_t line )
-{
-    cudaError_t err = cudaGetLastError( );
-    if( err != cudaSuccess ) {
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
-                  << "    called from " << file << ":" << line << std::endl
-                  << "    cudaGetLastError failed: " << cudaGetErrorString(err) << std::endl;
-        exit( -__LINE__ );
-    }
-#if 0
-    err = cudaDeviceSynchronize();
-    if( err != cudaSuccess ) {
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
-                  << "    called from " << file << ":" << line << std::endl
-                  << "    cudaDeviceSynchronize failed: " << cudaGetErrorString(err) << std::endl;
-        exit( -__LINE__ );
-    }
-#endif
 }
 
 void pop_cuda_memcpy_async( void* dst, const void* src, size_t sz, cudaMemcpyKind type, cudaStream_t stream, bool silent, const char* file, size_t line )

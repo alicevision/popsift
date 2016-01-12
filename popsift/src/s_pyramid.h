@@ -62,9 +62,6 @@ class Pyramid
 {
     class Octave
     {
-        bool         _stream_created;
-        cudaStream_t _stream;
-
         uint32_t  _levels;
 
         Plane2D_float* _data;
@@ -149,21 +146,21 @@ class Pyramid
             return _d_extrema[level];
         }
 
-        void resetExtremaCount( cudaStream_t stream );
-        void readExtremaCount( cudaStream_t stream );
+        void resetExtremaCount( );
+        void readExtremaCount( );
         uint32_t getExtremaCount( ) const;
         uint32_t getExtremaCount( uint32_t level ) const;
 
         void        allocDescriptors( );
         Descriptor* getDescriptors( uint32_t level );
-        void        downloadDescriptor( cudaStream_t stream );
+        void        downloadDescriptor( );
         void        writeDescriptor( ostream& ostr );
 
         /**
          * alloc() - allocates all GPU memories for one octave
          * @param width in floats, not bytes!!!
          */
-        void alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema, cudaStream_t stream=0 );
+        void alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema );
         void free();
 
         /**
@@ -180,14 +177,13 @@ class Pyramid
     uint32_t     _num_octaves;
     uint32_t     _levels;
     Octave*      _octaves;
-    cudaStream_t _stream;
 
 public:
-    Pyramid( Image* base, uint32_t octaves, uint32_t levels, cudaStream_t stream );
+    Pyramid( Image* base, uint32_t octaves, uint32_t levels );
     ~Pyramid( );
 
-    static void init_filter( float sigma, uint32_t level, cudaStream_t stream );
-    static void init_sigma(  float sigma, uint32_t level, cudaStream_t stream );
+    static void init_filter( float sigma, uint32_t level );
+    static void init_sigma(  float sigma, uint32_t level );
     void build( Image* base );
 
     void find_extrema( float edgeLimit, float threshold );
@@ -211,7 +207,7 @@ private:
 
     void descriptors_v1( );
 
-    void test_last_error( int line, cudaStream_t stream );
+    void test_last_error( int line );
     void debug_out_floats  ( float* data, uint32_t pitch, uint32_t height );
     void debug_out_floats_t( float* data, uint32_t pitch, uint32_t height );
 

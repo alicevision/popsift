@@ -41,7 +41,7 @@ void p_upscale_4( Plane2D_float dst, Plane2D_uint8 src )
 }
 
 __host__
-void Image::upscale_v4( Plane2D_uint8 & src, cudaStream_t stream )
+void Image::upscale_v4( Plane2D_uint8 & src )
 {
     cerr << "Merged even-odd method" << endl;
 
@@ -51,7 +51,7 @@ void Image::upscale_v4( Plane2D_uint8 & src, cudaStream_t stream )
     dim3 block( 128 );
 
     p_upscale_4
-        <<<grid,block,0,stream>>>
+        <<<grid,block>>>
         ( this->array,
           src );
 

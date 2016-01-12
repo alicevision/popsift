@@ -20,9 +20,9 @@
 
 #define PYRAMID_PRINT_DEBUG 0
 
-#define PYRAMID_V6_ON false
+#define PYRAMID_V6_ON true
 #define PYRAMID_V7_ON true
-#define PYRAMID_V8_ON false
+#define PYRAMID_V8_ON true
 
 #define EXTREMA_V4_ON true
 #define ORIENTA_V1_ON false
@@ -81,7 +81,7 @@ void Pyramid::debug_out_floats( float* data, uint32_t pitch, uint32_t height )
           height,
           0 );
 
-    test_last_error( __LINE__, _stream );
+    test_last_error( __LINE__ );
 }
 
 void Pyramid::debug_out_floats_t( float* data, uint32_t pitch, uint32_t height )
@@ -93,17 +93,17 @@ void Pyramid::debug_out_floats_t( float* data, uint32_t pitch, uint32_t height )
           height,
           0 );
 
-    test_last_error( __LINE__, _stream );
+    test_last_error( __LINE__ );
 }
 
 /*************************************************************
  * Host-sided debug function
  *************************************************************/
 
-void Pyramid::test_last_error( int line, cudaStream_t stream )
+void Pyramid::test_last_error( int line )
 {
     cudaError_t err;
-    cudaStreamSynchronize( stream );
+    cudaDeviceSynchronize( );
     err = cudaGetLastError();
     if( err != cudaSuccess ) {
         printf("A problem in line %d, %s\n", line, cudaGetErrorString(err) );
@@ -116,8 +116,7 @@ void Pyramid::test_last_error( int line, cudaStream_t stream )
  *************************************************************/
 
 Pyramid::Octave::Octave( )
-    : _stream_created( false )
-    , _data(0)
+    : _data(0)
     , _t_data(0)
     , _dog_data(0)
     , _h_extrema_mgmt(0)
@@ -150,7 +149,7 @@ void Pyramid::Octave::allocExtrema( uint32_t layer_max_extrema )
                            _h_extrema_mgmt,
                            _levels * sizeof(ExtremaMgmt),
                            cudaMemcpyHostToDevice,
-                           _stream,
+                           0,
                            true );
 
     _d_extrema[0] = 0;
@@ -176,16 +175,9 @@ void Pyramid::Octave::freeExtrema( )
     delete [] _h_desc;
 }
 
-void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema, cudaStream_t stream )
+void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema )
 {
     _levels            = levels;
-    if( stream != 0 ) {
-        _stream_created = false;
-        _stream = stream;
-    } else {
-        _stream_created = true;
-        POP_CUDA_STREAM_CREATE( &_stream );
-    }
 
     _d_desc = new Descriptor*[_levels];
     _h_desc = new Descriptor*[_levels];
@@ -268,13 +260,9 @@ void Pyramid::Octave::free( )
     delete [] _data;
     delete [] _t_data;
     delete [] _dog_data;
-
-    if( _stream_created ) {
-        POP_CUDA_STREAM_DESTROY( _stream );
-    }
 }
 
-void Pyramid::Octave::resetExtremaCount( cudaStream_t stream )
+void Pyramid::Octave::resetExtremaCount( )
 {
     for( uint32_t i=1; i<_levels-1; i++ ) {
         _h_extrema_mgmt[i].counter = 0;
@@ -282,15 +270,19 @@ void Pyramid::Octave::resetExtremaCount( cudaStream_t stream )
     POP_CUDA_MEMCPY_ASYNC( _d_extrema_mgmt,
                            _h_extrema_mgmt,
                            _levels * sizeof(ExtremaMgmt),
-                           cudaMemcpyHostToDevice, stream, true );
+                           cudaMemcpyHostToDevice,
+                           0,
+                           true );
 }
 
-void Pyramid::Octave::readExtremaCount( cudaStream_t stream )
+void Pyramid::Octave::readExtremaCount( )
 {
     POP_CUDA_MEMCPY_ASYNC( _h_extrema_mgmt,
                            _d_extrema_mgmt,
                            _levels * sizeof(ExtremaMgmt),
-                           cudaMemcpyDeviceToHost, stream, true );
+                           cudaMemcpyDeviceToHost,
+                           0,
+                           true );
 }
 
 uint32_t Pyramid::Octave::getExtremaCount( ) const
@@ -323,7 +315,7 @@ void Pyramid::Octave::allocDescriptors( )
     }
 }
 
-void Pyramid::Octave::downloadDescriptor( cudaStream_t stream )
+void Pyramid::Octave::downloadDescriptor( )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
         uint32_t sz = _h_extrema_mgmt[l].counter;
@@ -332,12 +324,12 @@ void Pyramid::Octave::downloadDescriptor( cudaStream_t stream )
                                    _d_desc[l],
                                    sz * sizeof(Descriptor),
                                    cudaMemcpyDeviceToHost,
-                                   stream,
+                                   0,
                                    true );
         }
     }
 
-    cudaStreamSynchronize( stream );
+    cudaDeviceSynchronize( );
 }
 
 void Pyramid::Octave::writeDescriptor( ostream& ostr )
@@ -377,7 +369,7 @@ void Pyramid::download_and_save_array( const char* basename, uint32_t octave, ui
 
 void Pyramid::download_and_save_descriptors( const char* basename, uint32_t octave )
 {
-    _octaves[octave].downloadDescriptor( 0 );
+    _octaves[octave].downloadDescriptor( );
 
     struct stat st = {0};
     if (stat("dir-desc", &st) == -1) {
@@ -431,7 +423,7 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
         if( level == 0 ) {
             uint32_t total_ct = 0;
 
-            readExtremaCount( 0 );
+            readExtremaCount( );
             cudaDeviceSynchronize( );
             for( uint32_t l=0; l<_levels; l++ ) {
                 uint32_t ct = getExtremaCount( l );
@@ -544,14 +536,13 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
  * Pyramid constructor
  *************************************************************/
 
-Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, cudaStream_t stream )
+Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels )
     : _num_octaves( octaves )
     , _levels( levels + 3 )
-    , _stream( stream )
-    , _keep_time_extrema_v4( stream )
-    , _keep_time_orient_v1(  stream )
-    , _keep_time_orient_v2(  stream )
-    , _keep_time_descr_v1(   stream )
+    , _keep_time_extrema_v4( 0 )
+    , _keep_time_orient_v1(  0 )
+    , _keep_time_orient_v2(  0 )
+    , _keep_time_descr_v1(   0 )
 {
     cerr << "Entering " << __FUNCTION__ << endl;
 
@@ -563,11 +554,7 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, cudaStream_t s
 #if (PYRAMID_PRINT_DEBUG==1)
         printf("Allocating octave %u with width %u and height %u (%u levels)\n", o, w, h, _levels );
 #endif // (PYRAMID_PRINT_DEBUG==1)
-        if( o==0 ) {
-            _octaves[o].alloc( w, h, _levels, 10000, _stream );
-        } else {
-            _octaves[o].alloc( w, h, _levels, 10000 );
-        }
+        _octaves[o].alloc( w, h, _levels, 10000 );
         w = ceilf( w / 2.0f );
         h = ceilf( h / 2.0f );
     }
@@ -596,10 +583,10 @@ void Pyramid::build( Image* base )
     if( PYRAMID_V8_ON ) {
         float duration = 0.0f;
         for( int i=0; i<10; i++ ) {
-            cudaEventRecord( start, _stream );
+            cudaEventRecord( start, 0 );
             build_v8( base );
-            cudaEventRecord( stop, _stream );
-            cudaStreamSynchronize( _stream );
+            cudaEventRecord( stop, 0 );
+            cudaStreamSynchronize( 0 );
             float diff;
             cudaEventElapsedTime( &diff, start, stop );
             duration += diff;
@@ -610,10 +597,10 @@ void Pyramid::build( Image* base )
     if( PYRAMID_V7_ON ) {
         float duration = 0.0f;
         for( int i=0; i<10; i++ ) {
-            cudaEventRecord( start, _stream );
+            cudaEventRecord( start, 0 );
             build_v7( base );
-            cudaEventRecord( stop, _stream );
-            cudaStreamSynchronize( _stream );
+            cudaEventRecord( stop, 0 );
+            cudaStreamSynchronize( 0 );
             float diff;
             cudaEventElapsedTime( &diff, start, stop );
             duration += diff;
@@ -624,10 +611,10 @@ void Pyramid::build( Image* base )
     if( PYRAMID_V6_ON ) {
         float duration = 0.0f;
         for( int i=0; i<10; i++ ) {
-            cudaEventRecord( start, _stream );
+            cudaEventRecord( start, 0 );
             build_v6( base );
-            cudaEventRecord( stop, _stream );
-            cudaStreamSynchronize( _stream );
+            cudaEventRecord( stop, 0 );
+            cudaStreamSynchronize( 0 );
             float diff;
             cudaEventElapsedTime( &diff, start, stop );
             duration += diff;
@@ -658,7 +645,7 @@ void Pyramid::report_times( )
 void Pyramid::reset_extremum_counter( )
 {
     for( int o=0; o<_num_octaves; o++ ) {
-        _octaves[o].resetExtremaCount( _stream );
+        _octaves[o].resetExtremaCount( );
     }
 }
 
@@ -671,7 +658,7 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
     find_extrema_v4( 2, edgeLimit, threshold );
 
     for( int o=0; o<_num_octaves; o++ ) {
-        _octaves[o].readExtremaCount( _stream );
+        _octaves[o].readExtremaCount( );
     }
 
     if( ORIENTA_V1_ON ) { orientation_v1( ); }

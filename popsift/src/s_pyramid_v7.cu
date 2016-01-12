@@ -18,8 +18,6 @@
 
 namespace popart {
 
-__device__ uint32_t non_null_dog = 0;
-
 __global__
 void filter_gauss_horiz_v7( Plane2D_float src_data,
                             Plane2D_float dst_data )
@@ -127,10 +125,6 @@ void filter_gauss_vert_v7_and_dog( Plane2D_float   src_data,
     b = higher_level_data.ptr(idy)[idx];
     a = fabs( a - b );
     dog_data.ptr(idy)[idx] = a;
-
-    if( a > 0 ) {
-        atomicAdd( &non_null_dog, 1 );
-    }
 }
 
 __global__
@@ -190,14 +184,7 @@ void Pyramid::build_v7( Image* base )
          << "    original byte size: " << base->u_width << "x" << base->u_height << endl
          << "    aligned pix size  : " << base->a_width/base->type_size << "x" << base->a_height << endl
          << "    original pix size : " << base->u_width/base->type_size << "x" << base->u_height << endl;
-#else
-    cerr << "Entering " << __FUNCTION__ << " with base image "  << endl;
 #endif // (PYRAMID_PRINT_DEBUG==1)
-
-    cudaDeviceSynchronize();
-    uint32_t value = 0;
-    cudaMemcpyToSymbol( non_null_dog, &value, sizeof(uint32_t), 0, cudaMemcpyHostToDevice );
-    cudaDeviceSynchronize();
 
     dim3 block;
     block.x = V7_WIDTH;
@@ -224,47 +211,43 @@ void Pyramid::build_v7( Image* base )
             if( level == 0 ) {
                 if( octave == 0 ) {
                     filter_gauss_horiz_v7
-                        <<<grid,block,0,_stream>>>
+                        <<<grid,block>>>
                         ( base->array,
                           _octaves[octave].getIntermediateData( ) );
                 } else {
                     filter_gauss_horiz_v7_by_2
-                        <<<grid,block,0,_stream>>>
+                        <<<grid,block>>>
                         ( _octaves[octave-1].getData( V7_LEVELS-3 ),
                           _octaves[octave].getIntermediateData() );
                 }
             } else {
                 filter_gauss_horiz_v7
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getData( level-1 ),
                       _octaves[octave].getIntermediateData() );
             }
-            cudaStreamSynchronize( _stream );
+            cudaDeviceSynchronize( );
             cudaError_t err = cudaGetLastError();
             POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v7 failed: " );
 
             if( level == 0 ) {
                 filter_gauss_vert_v7
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getIntermediateData(),
                       _octaves[octave].getData( level ) );
             } else {
                 filter_gauss_vert_v7_and_dog
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getIntermediateData(),
                       _octaves[octave].getData( level ),
                       _octaves[octave].getData( level-1 ),
                       _octaves[octave].getDogData( level-1 ) );
             }
-            cudaStreamSynchronize( _stream );
+            cudaDeviceSynchronize( );
             err = cudaGetLastError();
             POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v7 failed: " );
         }
     }
-
-    cudaDeviceSynchronize();
-    cudaMemcpyFromSymbol( &value, non_null_dog, sizeof(uint32_t), 0, cudaMemcpyDeviceToHost );
-    cerr << "The total of dog symbols written is " << value << endl;
 }
 
 } // namespace popart

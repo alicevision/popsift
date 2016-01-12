@@ -25,7 +25,7 @@ void print_gauss_filter_symbol( uint32_t columns )
  * Initialize the Gauss filter table in constant memory
  *************************************************************/
 
-void Pyramid::init_filter( float sigma0, uint32_t levels, cudaStream_t stream )
+void Pyramid::init_filter( float sigma0, uint32_t levels )
 {
     cerr << "Entering " << __FUNCTION__ << endl;
     if( sigma0 > 2.0 )
@@ -66,17 +66,16 @@ void Pyramid::init_filter( float sigma0, uint32_t levels, cudaStream_t stream )
         local_filter[x] /= sum;
 
     cudaError_t err;
-    err = cudaMemcpyToSymbolAsync( d_gauss_filter,
-                                   local_filter,
-                                   32*sizeof(float),
-                                   0,
-                                   cudaMemcpyHostToDevice,
-                                   stream );
+    err = cudaMemcpyToSymbol( d_gauss_filter,
+                              local_filter,
+                              32*sizeof(float),
+                              0,
+                              cudaMemcpyHostToDevice );
     POP_CUDA_FATAL_TEST( err, "cudaMemcpyToSymbol failed for Gauss kernel initialization: " );
 
 #ifdef PRINT_GAUSS_FILTER_SYMBOL
     print_gauss_filter_symbol
-        <<<1,1,0,stream>>>
+        <<<1,1>>>
         ( GAUSS_SPAN );
     err = cudaGetLastError();
     POP_CUDA_FATAL_TEST( err, "print_gauss_filter_symbol failed: " );

@@ -12,7 +12,7 @@ using namespace std;
 namespace popart {
 
 __host__
-void Image::upscale( Plane2D_uint8 & src, cudaTextureObject_t & tex, size_t scalefactor, cudaStream_t stream )
+void Image::upscale( Plane2D_uint8 & src, cudaTextureObject_t & tex, size_t scalefactor )
 {
     if( scalefactor != 2 ) {
         cerr << "Scale factor is " << scalefactor << endl;
@@ -20,11 +20,11 @@ void Image::upscale( Plane2D_uint8 & src, cudaTextureObject_t & tex, size_t scal
         exit( -__LINE__ );
     }
 
-    if( false ) upscale_v1( src, stream );
-    if( false ) upscale_v2( src, stream );
-    if( false ) upscale_v3( src, stream );
-    if( false ) upscale_v4( src, stream );
-    if( true  ) upscale_v5( tex, stream );
+    if( false ) upscale_v1( src );
+    if( false ) upscale_v2( src );
+    if( false ) upscale_v3( src );
+    if( false ) upscale_v4( src );
+    if( true  ) upscale_v5( tex );
 }
 
 void Image::test_last_error( const char* file, int line )
@@ -39,6 +39,8 @@ void Image::test_last_error( const char* file, int line )
 
 void Image::download_and_save_array( const char* filename )
 {
+    test_last_error( __FILE__, __LINE__ );
+
     cerr << "Downloading image from GPU to CPU and writing to file " << filename << endl;
 
     Plane2D_float f;

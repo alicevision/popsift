@@ -161,8 +161,8 @@ void Pyramid::orientation_v1( )
 {
     _keep_time_orient_v1.start();
     for( int octave=0; octave<_num_octaves; octave++ ) {
-        _octaves[octave].readExtremaCount( _stream );
-        cudaStreamSynchronize( _stream );
+        _octaves[octave].readExtremaCount( );
+        cudaDeviceSynchronize( );
         for( int level=1; level<_levels-1; level++ ) {
             dim3 block;
             dim3 grid;
@@ -171,7 +171,7 @@ void Pyramid::orientation_v1( )
             block.x = ORI_V1_NUM_THREADS;
             if( grid.x != 0 ) {
                 compute_keypoint_orientations_v1
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getExtrema( level ),
                       _octaves[octave].getExtremaMgmtD( ),
                       level,

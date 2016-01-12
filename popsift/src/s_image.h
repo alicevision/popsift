@@ -21,8 +21,7 @@ struct Image
      */
     void upscale( Plane2D_uint8 &       src,
                   cudaTextureObject_t & tex,
-                  size_t                scalefactor,
-                  cudaStream_t          s );
+                  size_t                scalefactor );
 
     void debug_out( );
     void test_last_error( const char* file, int line );
@@ -30,11 +29,11 @@ struct Image
     void download_and_save_array( const char* filename );
 
 private:
-    void upscale_v1( Plane2D_uint8 & src, cudaStream_t stream );
-    void upscale_v2( Plane2D_uint8 & src, cudaStream_t stream );
-    void upscale_v3( Plane2D_uint8 & src, cudaStream_t stream );
-    void upscale_v4( Plane2D_uint8 & src, cudaStream_t stream );
-    void upscale_v5( cudaTextureObject_t & tex, cudaStream_t stream );
+    void upscale_v1( Plane2D_uint8 & src );
+    void upscale_v2( Plane2D_uint8 & src );
+    void upscale_v3( Plane2D_uint8 & src );
+    void upscale_v4( Plane2D_uint8 & src );
+    void upscale_v5( cudaTextureObject_t & tex );
 };
 
 } // namespace popart

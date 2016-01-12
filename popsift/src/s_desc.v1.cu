@@ -188,11 +188,11 @@ void Pyramid::descriptors_v1( )
     _keep_time_descr_v1.start();
     for( int octave=0; octave<_num_octaves; octave++ ) {
         // async copy of extrema from device to host
-        _octaves[octave].readExtremaCount( _stream );
+        _octaves[octave].readExtremaCount( );
     }
 
     // wait until that is finished, so we can alloc space for descriptor
-    cudaStreamSynchronize( _stream );
+    cudaDeviceSynchronize( );
 
     for( int octave=0; octave<_num_octaves; octave++ ) {
         // allocate the descriptor array for this octave, all levels
@@ -211,7 +211,7 @@ void Pyramid::descriptors_v1( )
                 block.z = 4;
 
                 keypoint_descriptors
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getExtrema( level ),
                       _octaves[octave].getDescriptors( level ),
                       _octaves[octave].getData( level ) );
@@ -221,7 +221,7 @@ void Pyramid::descriptors_v1( )
                 block.z = 1;
 
                 normalize_histogram
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getDescriptors( level ) );
             }
         }

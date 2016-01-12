@@ -43,24 +43,22 @@ void PopSift::init( int w, int h )
     _hst_input_image.allocHost( w, h, popart::CudaAllocated );
     _dev_input_image.allocDev( w, h );
 
-    POP_CUDA_STREAM_CREATE( &_stream );
-
-    _initTime    = new popart::KeepTime( _stream );
-    _uploadTime  = new popart::KeepTime( _stream );
-    _pyramidTime = new popart::KeepTime( _stream );
-    _extremaTime = new popart::KeepTime( _stream );
+    _initTime    = new popart::KeepTime( 0 );
+    _uploadTime  = new popart::KeepTime( 0 );
+    _pyramidTime = new popart::KeepTime( 0 );
+    _extremaTime = new popart::KeepTime( 0 );
 
     float sigma = 1.0;
 
     _initTime->start();
 
-    popart::Pyramid::init_filter( sigma, _scales, _stream );
-    popart::Pyramid::init_sigma(  sigma, _scales, _stream );
+    popart::Pyramid::init_filter( sigma, _scales );
+    popart::Pyramid::init_sigma(  sigma, _scales );
 
     _initTime->stop();
 
     _baseImg = new popart::Image( _upscaled_width, _upscaled_height );
-    _pyramid = new popart::Pyramid( _baseImg, _octaves, _scales, _stream );
+    _pyramid = new popart::Pyramid( _baseImg, _octaves, _scales );
 
     /* initializing texture for upscale V5
      */
@@ -93,16 +91,12 @@ void PopSift::init( int w, int h )
 
 void PopSift::uninit( )
 {
-    cudaStreamSynchronize( _stream );
-
     cudaError_t err;
     err = cudaDestroyTextureObject( _texture );
     POP_CUDA_FATAL_TEST( err, "Could not destroy texture object: " );
 
     _hst_input_image.freeHost( popart::CudaAllocated );
     _dev_input_image.freeDev( );
-
-    POP_CUDA_STREAM_DESTROY( _stream );
 
     _initTime   ->report( "Time to initialize:    " );
     _uploadTime ->report( "Time to upload:        " );
@@ -125,8 +119,8 @@ void PopSift::execute( imgStream inp )
 
     _uploadTime->start();
     memcpy( _hst_input_image.data, inp.data_r, inp.width * inp.height );
-    _hst_input_image.memcpyToDevice( _dev_input_image, _stream );
-    _baseImg->upscale( _dev_input_image, _texture, 1<<up, _stream );
+    _hst_input_image.memcpyToDevice( _dev_input_image );
+    _baseImg->upscale( _dev_input_image, _texture, 1<<up );
     _uploadTime->stop();
 
     _pyramidTime->start();

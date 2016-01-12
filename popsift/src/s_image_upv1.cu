@@ -44,14 +44,14 @@ void p_upscale_1( Plane2D_float dst, Plane2D_uint8 src )
 }
 
 __host__
-void Image::upscale_v1( Plane2D_uint8 & src, cudaStream_t stream )
+void Image::upscale_v1( Plane2D_uint8 & src )
 {
     cerr << "Upscaling method 1" << endl;
     dim3 grid( grid_divide( src.getCols(), 128 ), src.getRows() );
     dim3 block( 128 );
 
     p_upscale_1
-        <<<grid,block,0,stream>>>
+        <<<grid,block>>>
         ( this->array,
           src );
 

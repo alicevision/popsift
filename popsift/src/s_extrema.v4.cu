@@ -562,7 +562,7 @@ void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold
             Plane2D_float& d2( _octaves[octave].getDogData( level+1 ) );
 
             find_extrema_in_dog_v4
-                <<<grid,block,0,_stream>>>
+                <<<grid,block>>>
                 ( d0, d1, d2,
                   edgeLimit,
                   threshold,
@@ -573,14 +573,14 @@ void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold
 
 #if 1
             fix_extrema_count_v4
-                <<<1,1,0,_stream>>>
+                <<<1,1>>>
                 ( _octaves[octave].getExtremaMgmtD( ),
                   level );
 #else
     // this does not work yet: I have no idea how to link with CUDA
     // and still achieve dynamic parallelism
             start_orientation_v4
-                <<<1,1,0,_stream>>>
+                <<<1,1>>>
                 ( _octaves[octave].getExtrema( level ),
                   _octaves[octave].getExtremaMgmtD( level ),
                   d1,
@@ -589,7 +589,7 @@ void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold
 #endif
         }
     }
-    cudaStreamSynchronize( _stream );
+    cudaDeviceSynchronize( );
     cudaError_t err = cudaGetLastError();
     POP_CUDA_FATAL_TEST( err, "find_extrema_in_dog_v4 failed: " );
 
@@ -614,22 +614,20 @@ void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold
 #endif
 }
 
-void Pyramid::init_sigma( float sigma0, uint32_t levels, cudaStream_t stream )
+void Pyramid::init_sigma( float sigma0, uint32_t levels )
 {
     cudaError_t err;
 
-    err = cudaMemcpyToSymbolAsync( d_sigma0, &sigma0,
-                                   sizeof(float), 0,
-                                   cudaMemcpyHostToDevice,
-                                   stream );
+    err = cudaMemcpyToSymbol( d_sigma0, &sigma0,
+                              sizeof(float), 0,
+                              cudaMemcpyHostToDevice );
     POP_CUDA_FATAL_TEST( err, "Failed to upload sigma0 to device: " );
 
     const float sigma_k = powf(2.0f, 1.0f / levels );
 
-    err = cudaMemcpyToSymbolAsync( d_sigma_k, &sigma_k,
-                                   sizeof(float), 0,
-                                   cudaMemcpyHostToDevice,
-                                   stream );
+    err = cudaMemcpyToSymbol( d_sigma_k, &sigma_k,
+                              sizeof(float), 0,
+                              cudaMemcpyHostToDevice );
     POP_CUDA_FATAL_TEST( err, "Failed to upload sigma_k to device: " );
 }
 

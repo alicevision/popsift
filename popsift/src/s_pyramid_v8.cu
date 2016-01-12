@@ -206,8 +206,6 @@ void Pyramid::build_v8( Image* base )
          << "    original byte size: " << base->u_width << "x" << base->u_height << endl
          << "    aligned pix size  : " << base->a_width/base->type_size << "x" << base->a_height << endl
          << "    original pix size : " << base->u_width/base->type_size << "x" << base->u_height << endl;
-#else
-    cerr << "Entering " << __FUNCTION__ << " with base image "  << endl;
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
     for( int octave=0; octave<_num_octaves; octave++ ) {
@@ -238,44 +236,44 @@ void Pyramid::build_v8( Image* base )
             if( level == 0 ) {
                 if( octave == 0 ) {
                     filter_gauss_horiz_v8
-                        <<<grid,block,0,_stream>>>
+                        <<<grid,block>>>
                         ( base->array,
                           _octaves[octave].getIntermediateData( ) );
                 } else {
                     filter_gauss_horiz_v8_by_2
-                        <<<grid,block,0,_stream>>>
+                        <<<grid,block>>>
                         ( _octaves[octave-1].getData( V8_LEVELS-3 ),
                           _octaves[octave].getIntermediateData( ) );
                 }
             } else {
                 filter_gauss_horiz_v8
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getData( level-1 ),
                       _octaves[octave].getIntermediateData( ) );
             }
-            // cudaStreamSynchronize( _stream );
+            // cudaDeviceSynchronize( );
             // cudaError_t err = cudaGetLastError();
             // POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v8 failed: " );
 
             if( level == 0 ) {
                 filter_gauss_vert_v8
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getIntermediateData( ),
                       _octaves[octave].getData( level ) );
             } else {
                 filter_gauss_vert_v8_and_dog
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getIntermediateData( ),
                       _octaves[octave].getData( level ),
                       _octaves[octave].getData( level-1 ),
                       _octaves[octave].getDogData( level-1 ) );
             }
-            // cudaStreamSynchronize( _stream );
+            // cudaDeviceSynchronize( );
             // err = cudaGetLastError();
             // POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v8 failed: " );
         }
     }
-    cudaStreamSynchronize( _stream );
+    cudaDeviceSynchronize( );
     cudaError_t err = cudaGetLastError();
     POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v8 failed: " );
 }

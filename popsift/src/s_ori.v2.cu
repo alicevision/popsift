@@ -224,8 +224,8 @@ void Pyramid::orientation_v2( )
 {
     _keep_time_orient_v2.start();
     for( int octave=0; octave<_num_octaves; octave++ ) {
-        _octaves[octave].readExtremaCount( _stream );
-        cudaStreamSynchronize( _stream );
+        _octaves[octave].readExtremaCount( );
+        cudaDeviceSynchronize( );
         for( int level=1; level<_levels-1; level++ ) {
             dim3 block;
             dim3 grid;
@@ -237,12 +237,10 @@ void Pyramid::orientation_v2( )
                 cout << "computing keypoint orientation in octave "
                      << octave << " level " << level
                      << " for " << grid.x << " blocks a " << block.x << " threads" << endl;
-                cudaError_t err = cudaStreamSynchronize( _stream );
-                POP_CUDA_FATAL_TEST( err, "synchronize for orientation failed: " );
 #endif
 
                 compute_keypoint_orientations_v2
-                    <<<grid,block,0,_stream>>>
+                    <<<grid,block>>>
                     ( _octaves[octave].getExtrema( level ),
                       _octaves[octave].getExtremaMgmtD( ),
                       level,

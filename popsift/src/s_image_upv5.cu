@@ -39,7 +39,7 @@ int condition[][2] = {
     { 32, 32 },
     { 0, 0 } };
 __host__
-void Image::upscale_v5( cudaTextureObject_t & tex, cudaStream_t stream )
+void Image::upscale_v5( cudaTextureObject_t & tex )
 {
     std::map<float,string> logtimes;
 
@@ -53,17 +53,17 @@ void Image::upscale_v5( cudaTextureObject_t & tex, cudaStream_t stream )
 
         int loops  = 100;
 
-        cudaEventRecord( start, stream );
+        cudaEventRecord( start, 0 );
         for( int i=0; i<loops; i++ ) {
             int gridx = grid_divide( this->array.getCols(), blockx );
             int gridy = grid_divide( this->array.getRows(), blocky );
             dim3 grid( gridx, gridy );
             dim3 block( blockx, blocky );
 
-            p_upscale_5<<<grid,block,0,stream>>> ( this->array, tex );
+            p_upscale_5<<<grid,block>>> ( this->array, tex );
         }
-        cudaEventRecord( stop, stream );
-        cudaStreamSynchronize( stream );
+        cudaEventRecord( stop, 0 );
+        cudaDeviceSynchronize( );
         float diff;
         cudaEventElapsedTime( &diff, start, stop );
 
@@ -88,7 +88,7 @@ void Image::upscale_v5( cudaTextureObject_t & tex, cudaStream_t stream )
 }
 #else // not FIND_BLOCK_SIZE
 __host__
-void Image::upscale_v5( cudaTextureObject_t & tex, cudaStream_t stream )
+void Image::upscale_v5( cudaTextureObject_t & tex )
 {
     cerr << "Texture method" << endl;
 
@@ -98,7 +98,7 @@ void Image::upscale_v5( cudaTextureObject_t & tex, cudaStream_t stream )
     dim3 block( 64, 2 );
 
     p_upscale_5
-        <<<grid,block,0,stream>>>
+        <<<grid,block>>>
         ( this->array,
           tex );
 

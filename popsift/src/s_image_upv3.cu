@@ -47,7 +47,7 @@ void p_upscale_3_odd( Plane2D_float dst )
 }
 
 __host__
-void Image::upscale_v3( Plane2D_uint8 & src, cudaStream_t stream )
+void Image::upscale_v3( Plane2D_uint8 & src )
 {
     cerr << "Separated even-odd method" << endl;
 
@@ -56,12 +56,12 @@ void Image::upscale_v3( Plane2D_uint8 & src, cudaStream_t stream )
     dim3 block( 128 );
 
     p_upscale_3_even
-        <<<grid,block,0,stream>>>
+        <<<grid,block>>>
         ( this->array,
           src );
 
     p_upscale_3_odd
-        <<<grid,block,0,stream>>>
+        <<<grid,block>>>
         ( this->array );
 
     test_last_error( __FILE__,  __LINE__ );
