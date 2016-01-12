@@ -149,9 +149,9 @@ void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
 }
 
 
-__global__
-void filter_gauss_vert_v11( cudaTextureObject_t src_data,
-                            Plane2D_float       dst_data )
+__device__ inline
+float filter_gauss_vert_v11_sub( cudaTextureObject_t src_data,
+                                 Plane2D_float       dst_data )
 {
     int block_x = blockIdx.x * blockDim.x;
     int block_y = blockIdx.y * blockDim.y;
@@ -183,23 +183,34 @@ void filter_gauss_vert_v11( cudaTextureObject_t src_data,
     idy = block_y+threadIdx.y;
     const int dst_w = dst_data.getWidth();
     const int dst_h = dst_data.getHeight();
-    if( idx >= dst_w ) return;
-    if( idy >= dst_h ) return;
+    if( idx >= dst_w ) return 0;
+    if( idy >= dst_h ) return 0;
 
     dst_data.ptr(idy)[idx] = out;
+
+    return out;
 }
 
 __global__
-void filter_gauss_vert_v11_dog( cudaTextureObject_t top_data,
-                                cudaTextureObject_t bot_data,
+void filter_gauss_vert_v11( cudaTextureObject_t src_data,
+                            Plane2D_float       dst_data )
+{
+    filter_gauss_vert_v11_sub( src_data, dst_data );
+}
+
+__global__
+void filter_gauss_vert_v11_dog( cudaTextureObject_t src_data,
+                                Plane2D_float       dst_data,
+                                cudaTextureObject_t top_data,
                                 Plane2D_float       dog_data )
 {
+    float b = filter_gauss_vert_v11_sub( src_data, dst_data );
+
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int idy = blockIdx.y * blockDim.y + threadIdx.y;
 
-    float a, b;
+    float a;
     a = tex2D<float>( top_data, idx, idy );
-    b = tex2D<float>( bot_data, idx, idy );
     a = fabs( a - b );
 
     const int width  = dog_data.getWidth();
@@ -243,20 +254,20 @@ void Pyramid::build_v11( Image* base )
             const int width  = _octaves[octave].getData(0).getWidth();
             const int height = _octaves[octave].getData(0).getHeight();
 
-            dim3 h_block( 32, 2 );
+            dim3 h_block( 64, 2 );
             dim3 h_grid;
-            h_grid.x = grid_divide( width,  32 );
-            h_grid.y = grid_divide( height, 2 );
+            h_grid.x = grid_divide( width,  h_block.x );
+            h_grid.y = grid_divide( height, h_block.y );
 
-            dim3 v_block( 32, 2 );
+            dim3 v_block( 64, 2 );
             dim3 v_grid;
-            v_grid.x = grid_divide( width,  32 );
-            v_grid.y = grid_divide( height, 2 );
+            v_grid.x = grid_divide( width,  v_block.x );
+            v_grid.y = grid_divide( height, v_block.y );
 
-            dim3 d_block( 32, 2 );
+            dim3 d_block( 32, 1 );
             dim3 d_grid;
-            d_grid.x = grid_divide( width,  32 );
-            d_grid.y = grid_divide( height, 2 );
+            d_grid.x = grid_divide( width,  d_block.x );
+            d_grid.y = grid_divide( height, d_block.y );
 
             if( level == 0 ) {
                 if( octave == 0 ) {
@@ -286,28 +297,20 @@ void Pyramid::build_v11( Image* base )
                     ( _octaves[octave]._data_tex[ level-1 ],
                       _octaves[octave].getIntermediateData( ) );
             }
-            cudaDeviceSynchronize( );
-            cudaError_t err = cudaGetLastError();
-            POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v11 failed: " );
 
-            filter_gauss_vert_v11
-                <<<v_grid,v_block>>>
-                ( _octaves[octave]._interm_data_tex,
-                  _octaves[octave].getData( level ) );
-            cudaDeviceSynchronize( );
-            err = cudaGetLastError();
-            POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v11 failed: " );
-
-            if( level > 0 ) {
+            if( level == 0 ) {
+                filter_gauss_vert_v11
+                    <<<v_grid,v_block>>>
+                    ( _octaves[octave]._interm_data_tex,
+                      _octaves[octave].getData( level ) );
+            } else {
                 filter_gauss_vert_v11_dog
                     <<<d_grid,d_block>>>
-                    ( _octaves[octave]._data_tex[level  ],
+                    ( _octaves[octave]._interm_data_tex,
+                      _octaves[octave].getData( level ),
                       _octaves[octave]._data_tex[level-1],
                       _octaves[octave].getDogData( level-1 ) );
             }
-            cudaDeviceSynchronize( );
-            err = cudaGetLastError();
-            POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v11 failed: " );
         }
     }
     cudaDeviceSynchronize( );
