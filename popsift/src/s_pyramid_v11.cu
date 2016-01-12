@@ -67,12 +67,13 @@ void filter_gauss_horiz_v11( Plane2D_float src_data,
 
     dst_data.ptr(idy)[idx] = out;
 }
+
 __global__
 void filter_gauss_horiz_v11( cudaTextureObject_t src_data,
                              Plane2D_float       dst_data )
 {
-    int block_x = blockIdx.x * V11_EDGE_LEN;
-    int block_y = blockIdx.y * V11_EDGE_LEN;
+    int block_x = blockIdx.x * blockDim.x;
+    int block_y = blockIdx.y * blockDim.y;
     int idx;
     int idy     = threadIdx.y;
 
@@ -108,11 +109,52 @@ void filter_gauss_horiz_v11( cudaTextureObject_t src_data,
 }
 
 __global__
+void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
+                                  Plane2D_float       dst_data )
+{
+    int block_x = blockIdx.x * blockDim.x;
+    int block_y = blockIdx.y * blockDim.y;
+    int idx;
+    int idy     = threadIdx.y;
+
+    float g;
+    float val;
+    float out = 0;
+
+    for( int offset = V11_RANGE; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
+
+        idx = threadIdx.x - offset;
+        val = tex2D<float>( src_data, 2 * ( block_x + idx ), 2 * ( block_y + idy ) );
+        out += ( val * g );
+
+        idx = threadIdx.x + offset;
+        val = tex2D<float>( src_data, 2 * ( block_x + idx ), 2 * ( block_y + idy ) );
+        out += ( val * g );
+    }
+
+    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
+    idx = threadIdx.x;
+    val = tex2D<float>( src_data, 2 * ( block_x + idx ), 2 * ( block_y + idy ) );
+    out += ( val * g );
+
+    idx = block_x+threadIdx.x;
+    idy = block_y+threadIdx.y;
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+    if( idx >= dst_w ) return;
+    if( idy >= dst_h ) return;
+
+    dst_data.ptr(idy)[idx] = out;
+}
+
+
+__global__
 void filter_gauss_vert_v11( cudaTextureObject_t src_data,
                             Plane2D_float       dst_data )
 {
-    int block_x = blockIdx.x * V11_EDGE_LEN;
-    int block_y = blockIdx.y * V11_EDGE_LEN;
+    int block_x = blockIdx.x * blockDim.x;
+    int block_y = blockIdx.y * blockDim.y;
     int idx     = threadIdx.x;
     int idy;
 
@@ -168,47 +210,6 @@ void filter_gauss_vert_v11_dog( cudaTextureObject_t top_data,
     dog_data.ptr(idy)[idx] = a;
 }
 
-__global__
-void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
-                                  Plane2D_float       dst_data )
-{
-    int block_x = blockIdx.x * blockDim.x;
-    int block_y = blockIdx.y;
-
-    int       src_idx;
-    const int src_idy = 2 * block_y;
-    const int dst_w   = dst_data.getWidth();
-    const int dst_h   = dst_data.getHeight();
-    const int dst_idx = block_x + threadIdx.x;
-    const int dst_idy = block_y;
-
-    if( dst_idx >= dst_w ) return;
-    if( dst_idy >= dst_h ) return;
-
-    float g;
-    float val;
-    float out = 0;
-
-    for( int offset = V11_RANGE; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
-
-        src_idx = 2 * ( dst_idx - offset );
-        val = tex2D<float>( src_data, src_idx, src_idy );
-        out += ( val * g );
-
-        src_idx = 2 * ( dst_idx + offset );
-        val = tex2D<float>( src_data, src_idx, src_idy );
-        out += ( val * g );
-    }
-
-    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
-    src_idx = 2 * dst_idx;
-    val = tex2D<float>( src_data, src_idx, src_idy );
-    out += ( val * g );
-
-    dst_data.ptr(dst_idy)[dst_idx] = out;
-}
-
 /*************************************************************
  * V11: host side
  *************************************************************/
@@ -226,16 +227,6 @@ void Pyramid::build_v11( Image* base )
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
     for( int octave=0; octave<_num_octaves; octave++ ) {
-        dim3 block;
-        block.x = V11_EDGE_LEN;
-        block.y = V11_EDGE_LEN;
-
-        dim3 grid;
-        const int width  = _octaves[octave].getData(0).getWidth();
-        const int height = _octaves[octave].getData(0).getHeight();
-        grid.x = grid_divide( width,  V11_EDGE_LEN );
-        grid.y = grid_divide( height, V11_EDGE_LEN );
-
         for( int level=0; level<V11_LEVELS; level++ ) {
 #if 0
         cerr << "Configuration for octave " << octave << endl
@@ -249,22 +240,49 @@ void Pyramid::build_v11( Image* base )
              << "(" << block.x << "," << block.y << "," << block.z << ")" << endl;
 #endif
 
+            const int width  = _octaves[octave].getData(0).getWidth();
+            const int height = _octaves[octave].getData(0).getHeight();
+
+            dim3 h_block( 32, 2 );
+            dim3 h_grid;
+            h_grid.x = grid_divide( width,  32 );
+            h_grid.y = grid_divide( height, 2 );
+
+            dim3 v_block( 32, 2 );
+            dim3 v_grid;
+            v_grid.x = grid_divide( width,  32 );
+            v_grid.y = grid_divide( height, 2 );
+
+            dim3 d_block( 32, 2 );
+            dim3 d_grid;
+            d_grid.x = grid_divide( width,  32 );
+            d_grid.y = grid_divide( height, 2 );
 
             if( level == 0 ) {
                 if( octave == 0 ) {
+                    dim3 block;
+                    block.x = V11_EDGE_LEN;
+                    block.y = V11_EDGE_LEN;
+
+                    dim3 grid;
+                    const int width  = _octaves[octave].getData(0).getWidth();
+                    const int height = _octaves[octave].getData(0).getHeight();
+                    grid.x = grid_divide( width,  V11_EDGE_LEN );
+                    grid.y = grid_divide( height, V11_EDGE_LEN );
+
                     filter_gauss_horiz_v11
                         <<<grid,block>>>
                         ( base->array,
                           _octaves[octave].getIntermediateData( ) );
                 } else {
                     filter_gauss_horiz_v11_by_2
-                        <<<grid,block>>>
+                        <<<h_grid,h_block>>>
                         ( _octaves[octave-1]._data_tex[ V11_LEVELS-3 ],
                           _octaves[octave].getIntermediateData( ) );
                 }
             } else {
                 filter_gauss_horiz_v11
-                    <<<grid,block>>>
+                    <<<h_grid,h_block>>>
                     ( _octaves[octave]._data_tex[ level-1 ],
                       _octaves[octave].getIntermediateData( ) );
             }
@@ -273,7 +291,7 @@ void Pyramid::build_v11( Image* base )
             POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v11 failed: " );
 
             filter_gauss_vert_v11
-                <<<grid,block>>>
+                <<<v_grid,v_block>>>
                 ( _octaves[octave]._interm_data_tex,
                   _octaves[octave].getData( level ) );
             cudaDeviceSynchronize( );
@@ -282,7 +300,7 @@ void Pyramid::build_v11( Image* base )
 
             if( level > 0 ) {
                 filter_gauss_vert_v11_dog
-                    <<<grid,block>>>
+                    <<<d_grid,d_block>>>
                     ( _octaves[octave]._data_tex[level  ],
                       _octaves[octave]._data_tex[level-1],
                       _octaves[octave].getDogData( level-1 ) );
