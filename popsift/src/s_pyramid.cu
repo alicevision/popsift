@@ -584,7 +584,7 @@ void Pyramid::build( Image* base )
     err = cudaEventCreate( &stop );
     POP_CUDA_FATAL_TEST( err, "event create failed: " );
 
-    for( int mode=0; mode<3; mode++ ) {
+    for( int mode=0; mode<4; mode++ ) {
         float duration = 0.0f;
         for( int loop=0; loop<10; loop++ ) {
             err = cudaEventRecord( start, 0 );
@@ -602,6 +602,10 @@ void Pyramid::build( Image* base )
                 build_v8( base );
                 POP_CHK;
                 break;
+            case 3 :
+                build_v12( base );
+                POP_CHK;
+                break;
             }
             err = cudaEventRecord( stop, 0 );
             POP_CUDA_FATAL_TEST( err, "event record failed: " );
@@ -614,7 +618,7 @@ void Pyramid::build( Image* base )
         }
         duration /= 10.0f;
         cerr << "Pyramid "
-             << ( (mode==0) ? "V6" : (mode==1) ? "V7" : "V8" )
+             << ( (mode==0) ? "V6" : (mode==1) ? "V7" : (mode==2) ? "V8" : "V12" )
              << " avg duration: " << duration << " ms" << endl;
     }
 

@@ -69,7 +69,9 @@ class Pyramid
         Plane2D_float* _dog_data;
         Plane2D_float* _t_data;
 
+    public:
         cudaTextureObject_t* _data_tex;
+    private:
         cudaTextureDesc      _data_tex_desc;
         cudaResourceDesc     _data_res_desc;
 
@@ -198,6 +200,7 @@ private:
     void build_v6  ( Image* base );
     void build_v7  ( Image* base );
     void build_v8  ( Image* base );
+    void build_v12 ( Image* base );
 
     void reset_extremum_counter( );
     void find_extrema_v4( uint32_t height, float edgeLimit, float threshold );
