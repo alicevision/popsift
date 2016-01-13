@@ -1,5 +1,6 @@
 #include "s_pyramid.h"
 
+#include "write_plane_2d.h"
 #include "gauss_filter.h"
 #include "clamp.h"
 #include "debug_macros.h"
@@ -296,6 +297,9 @@ void Pyramid::build_v11( Image* base )
                     <<<h_grid,h_block>>>
                     ( _octaves[octave]._data_tex[ level-1 ],
                       _octaves[octave].getIntermediateData( ) );
+if(level==1 && octave==0) {
+write_plane2D( "intermediate.pgm", true, _octaves[octave].getIntermediateData( ) );
+}
             }
 
             if( level == 0 ) {
@@ -303,6 +307,9 @@ void Pyramid::build_v11( Image* base )
                     <<<v_grid,v_block>>>
                     ( _octaves[octave]._interm_data_tex,
                       _octaves[octave].getData( level ) );
+if(octave==0) {
+write_plane2D( "after-int.pgm", true, _octaves[octave].getData(0) );
+}
             } else {
                 filter_gauss_vert_v11_dog
                     <<<d_grid,d_block>>>

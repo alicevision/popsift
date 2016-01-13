@@ -37,6 +37,7 @@ void Image::test_last_error( const char* file, int line )
     }
 }
 
+#if 0
 void Image::download_and_save_array( const char* filename )
 {
     test_last_error( __FILE__, __LINE__ );
@@ -63,6 +64,7 @@ void Image::download_and_save_array( const char* filename )
 
     f.freeHost( PageAligned );
 }
+#endif
 
 Image::Image( size_t w, size_t h )
 {

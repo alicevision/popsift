@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <cuda_runtime.h>
+#include <iostream>
 
 #define PLANE2D_CUDA_OP_DEBUG
 

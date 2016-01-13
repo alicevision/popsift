@@ -4,6 +4,7 @@
 #include "clamp.h"
 #include "debug_macros.h"
 #include "assist.h"
+#include "write_plane_2d.h"
 
 /*************************************************************
  * V8: device side
@@ -37,9 +38,9 @@ void filter_gauss_horiz_v8( Plane2D_float src_data,
     }
     __syncthreads();
 
+    float out = 0;
     float g;
     float val;
-    float out = 0;
 
     for( int offset = V8_RANGE; offset>0; offset-- ) {
         g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
@@ -58,8 +59,8 @@ void filter_gauss_horiz_v8( Plane2D_float src_data,
     val = loaddata[threadIdx.y][idx+V8_RANGE];
     out += ( val * g );
 
-    idx = block_x+threadIdx.x;
-    idy = block_y+threadIdx.y;
+    idx = blockIdx.x * blockDim.x + threadIdx.x;
+    idy = blockIdx.y * blockDim.y + threadIdx.y;
     if( idx >= src_w ) return;
     if( idy >= src_h ) return;
 
@@ -76,7 +77,8 @@ void filter_gauss_vert_v8_sub( Plane2D_float&  src_data,
     const int src_h   = src_data.getHeight();
 
     /* loaddata is transposed with respect to the src plane */
-    __shared__ float loaddata[V8_EDGE_LEN][V8_RANGE + V8_EDGE_LEN + V8_RANGE];
+    // __shared__ float loaddata[V8_EDGE_LEN][V8_RANGE + V8_EDGE_LEN + V8_RANGE];
+    __shared__ float loaddata[V8_RANGE + V8_EDGE_LEN + V8_RANGE][V8_EDGE_LEN];
 
     int block_x = blockIdx.x * V8_EDGE_LEN;
     int block_y = blockIdx.y * V8_EDGE_LEN;
@@ -85,7 +87,8 @@ void filter_gauss_vert_v8_sub( Plane2D_float&  src_data,
     for( ; idy < V8_EDGE_LEN+2*V8_RANGE; idy += V8_EDGE_LEN) {
         int read_x = clamp( block_x + idx,            src_w );
         int read_y = clamp( block_y + idy - V8_RANGE, src_h );
-        loaddata[idx][idy] = src_data.ptr(read_y)[read_x];
+        // loaddata[idx][idy] = src_data.ptr(read_y)[read_x];
+        loaddata[idy][idx] = src_data.ptr(read_y)[read_x];
     }
     __syncthreads();
 
@@ -93,25 +96,24 @@ void filter_gauss_vert_v8_sub( Plane2D_float&  src_data,
     float val;
     float out = 0;
 
+    idx = threadIdx.x;
+    idy = threadIdx.y;
     for( int offset = V8_RANGE; offset>0; offset-- ) {
         g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
 
-        idx = threadIdx.x - offset;
-        val = loaddata[threadIdx.y][idx+V8_RANGE];
+        val = loaddata[idy+V8_RANGE-offset][idx];
         out += ( val * g );
 
-        idx = threadIdx.x + offset;
-        val = loaddata[threadIdx.y][idx+V8_RANGE];
+        val = loaddata[idy+V8_RANGE+offset][idx];
         out += ( val * g );
     }
 
     g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
-    idx = threadIdx.x;
-    val = loaddata[threadIdx.y][idx+V8_RANGE];
+    val = loaddata[idy+V8_RANGE][idx];
     out += ( val * g );
 
-    idx = block_x+threadIdx.x;
-    idy = block_y+threadIdx.y;
+    idx = blockIdx.x * blockDim.x + threadIdx.x;
+    idy = blockIdx.y * blockDim.y + threadIdx.y;
     if( idx >= src_w ) return;
     if( idy >= src_h ) return;
 
@@ -216,8 +218,8 @@ void Pyramid::build_v8( Image* base )
         dim3 grid;
         const int width  = _octaves[octave].getData(0).getWidth();
         const int height = _octaves[octave].getData(0).getHeight();
-        grid.x = grid_divide( width,  V8_EDGE_LEN );
-        grid.y = grid_divide( height, V8_EDGE_LEN );
+        grid.x = grid_divide( width,  block.x );
+        grid.y = grid_divide( height, block.y );
 
         for( int level=0; level<V8_LEVELS; level++ ) {
 #if 0

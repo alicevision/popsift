@@ -26,7 +26,7 @@ struct Image
     void debug_out( );
     void test_last_error( const char* file, int line );
 
-    void download_and_save_array( const char* filename );
+    // void download_and_save_array( const char* filename );
 
 private:
     void upscale_v1( Plane2D_uint8 & src );

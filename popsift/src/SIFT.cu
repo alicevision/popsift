@@ -7,6 +7,7 @@
 
 #include "SIFT.h"
 #include "debug_macros.h"
+#include "write_plane_2d.h"
 
 using namespace std;
 
@@ -132,7 +133,9 @@ void PopSift::execute( imgStream inp )
     _extremaTime->stop();
 
     if( log_to_file ) {
-        _baseImg->download_and_save_array( "upscaled-input-image.pgm" );
+        popart::write_plane2D( "upscaled-input-image.pgm",
+                               true, // is stored on device
+                               _baseImg->array );
 
         for( int o=0; o<_octaves; o++ ) {
             for( int s=0; s<_scales+3; s++ ) {

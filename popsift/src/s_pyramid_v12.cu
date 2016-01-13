@@ -4,6 +4,7 @@
 #include "clamp.h"
 #include "debug_macros.h"
 #include "assist.h"
+#include "write_plane_2d.h"
 #include <cuda_runtime.h>
 
 /*************************************************************
@@ -20,7 +21,7 @@ namespace popart {
 
 __global__
 void filter_gauss_horiz_v12( Plane2D_float src_data,
-                            Plane2D_float dst_data )
+                             Plane2D_float dst_data )
 {
 
     __shared__ float loaddata[V12_EDGE_LEN][V12_RANGE + V12_EDGE_LEN + V12_RANGE];
@@ -121,16 +122,16 @@ void filter_gauss_vert_v12( cudaTextureObject_t src_data,
                             Plane2D_float       dst_data )
 {
     /* loaddata is transposed with respect to the src plane */
-    __shared__ float loaddata[V12_EDGE_LEN][V12_RANGE + V12_EDGE_LEN + V12_RANGE];
+    __shared__ float loaddata[V12_RANGE + V12_EDGE_LEN + V12_RANGE][V12_EDGE_LEN];
 
-    int block_x = blockIdx.x * V12_EDGE_LEN;
-    int block_y = blockIdx.y * V12_EDGE_LEN;
+    int block_x = blockIdx.x * blockDim.x;
+    int block_y = blockIdx.y * blockDim.y;
     int idx     = threadIdx.x;
     int idy     = threadIdx.y;
     for( ; idy < V12_EDGE_LEN+2*V12_RANGE; idy += V12_EDGE_LEN) {
         int read_x = block_x + idx;
         int read_y = block_y + idy - V12_RANGE;
-        loaddata[idx][idy] = tex2D<float>( src_data, read_x, read_y );
+        loaddata[idy][idx] = tex2D<float>( src_data, read_x, read_y );
     }
     __syncthreads();
 
@@ -141,22 +142,19 @@ void filter_gauss_vert_v12( cudaTextureObject_t src_data,
     for( int offset = V12_RANGE; offset>0; offset-- ) {
         g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
 
-        idx = threadIdx.x - offset;
-        val = loaddata[threadIdx.y][idx+V12_RANGE];
+        val = loaddata[threadIdx.y+V12_RANGE-offset][threadIdx.x];
         out += ( val * g );
 
-        idx = threadIdx.x + offset;
-        val = loaddata[threadIdx.y][idx+V12_RANGE];
+        val = loaddata[threadIdx.y+V12_RANGE+offset][threadIdx.x];
         out += ( val * g );
     }
 
-    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
-    idx = threadIdx.x;
-    val = loaddata[threadIdx.y][idx+V12_RANGE];
+    g   = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
+    val = loaddata[threadIdx.y+V12_RANGE][threadIdx.x];
     out += ( val * g );
 
-    idx = block_x+threadIdx.x;
-    idy = block_y+threadIdx.y;
+    idx = blockIdx.x * blockDim.x + threadIdx.x;
+    idy = blockIdx.y * blockDim.y + threadIdx.y;
     const int dst_w = dst_data.getWidth();
     const int dst_h = dst_data.getHeight();
     if( idx >= dst_w ) return;
@@ -251,8 +249,8 @@ void Pyramid::build_v12( Image* base )
         dim3 grid;
         const int width  = _octaves[octave].getData(0).getWidth();
         const int height = _octaves[octave].getData(0).getHeight();
-        grid.x = grid_divide( width,  V12_EDGE_LEN );
-        grid.y = grid_divide( height, V12_EDGE_LEN );
+        grid.x = grid_divide( width,  block.x );
+        grid.y = grid_divide( height, block.y );
 
         for( int level=0; level<V12_LEVELS; level++ ) {
 #if 0
