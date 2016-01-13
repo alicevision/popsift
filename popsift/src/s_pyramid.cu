@@ -18,6 +18,8 @@
 #include "clamp.h"
 #include "gauss_filter.h"
 
+#undef PYRAMID_SPEED_TEXT
+
 #define PYRAMID_PRINT_DEBUG 0
 
 #define PYRAMID_V6_ON true
@@ -588,6 +590,7 @@ Pyramid::~Pyramid( )
 
 void Pyramid::build( Image* base )
 {
+#ifdef PYRAMID_SPEED_TEXT
     cudaEvent_t start;
     cudaEvent_t stop;
     cudaError_t err;
@@ -642,6 +645,10 @@ void Pyramid::build( Image* base )
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
     err = cudaEventDestroy( stop );
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
+#else // not PYRAMID_SPEED_TEXT
+    build_v12( base );
+    POP_CHK;
+#endif // not PYRAMID_SPEED_TEXT
 }
 
 void Pyramid::report_times( )
