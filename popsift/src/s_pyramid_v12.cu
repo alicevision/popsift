@@ -11,11 +11,9 @@
  * V12: device side
  *************************************************************/
 
-#define V12_EDGE_LEN    32
+#define V12_EDGE_LEN 32
 #define V12_RANGE    4 // RANGES from 1 to 8 are possible
-#define V12_GAUSS_BASE   ( GAUSS_ONE_SIDE_RANGE - V12_RANGE )
-#define V12_FILTERSIZE   ( V12_RANGE + 1        + V12_RANGE )
-#define V12_LEVELS       _levels
+#define V12_LEVELS   _levels
 
 namespace popart {
 

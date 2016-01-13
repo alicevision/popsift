@@ -11,11 +11,9 @@
  * V11: device side
  *************************************************************/
 
-#define V11_EDGE_LEN    32
+#define V11_EDGE_LEN 32
 #define V11_RANGE    4 // RANGES from 1 to 8 are possible
-#define V11_GAUSS_BASE   ( GAUSS_ONE_SIDE_RANGE - V11_RANGE )
-#define V11_FILTERSIZE   ( V11_RANGE + 1        + V11_RANGE )
-#define V11_LEVELS       _levels
+#define V11_LEVELS   _levels
 
 namespace popart {
 
@@ -23,19 +21,16 @@ __global__
 void filter_gauss_horiz_v11( Plane2D_float src_data,
                              Plane2D_float dst_data )
 {
-
     __shared__ float loaddata[V11_EDGE_LEN][V11_RANGE + V11_EDGE_LEN + V11_RANGE];
 
     const int src_w = src_data.getWidth();
     const int src_h = src_data.getHeight();
 
-    int block_x = blockIdx.x * V11_EDGE_LEN;
-    int block_y = blockIdx.y * V11_EDGE_LEN;
     int idx     = threadIdx.x;
     int idy     = threadIdx.y;
     for( ; idx < V11_EDGE_LEN+2*V11_RANGE; idx += V11_EDGE_LEN) {
-        int read_x = clamp( block_x + idx - V11_RANGE, src_w );
-        int read_y = clamp( block_y + idy,            src_h );
+        int read_x = clamp( blockIdx.x * blockDim.x + idx - V11_RANGE, src_w );
+        int read_y = clamp( blockIdx.y * blockDim.y + idy,             src_h );
         loaddata[idy][idx] = src_data.ptr(read_y)[read_x];
     }
     __syncthreads();
@@ -46,23 +41,17 @@ void filter_gauss_horiz_v11( Plane2D_float src_data,
 
     for( int offset = V11_RANGE; offset>0; offset-- ) {
         g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
-
-        idx = threadIdx.x - offset;
-        val = loaddata[threadIdx.y][idx+V11_RANGE];
+        val = loaddata[threadIdx.y][threadIdx.x+V11_RANGE-offset];
         out += ( val * g );
-
-        idx = threadIdx.x + offset;
-        val = loaddata[threadIdx.y][idx+V11_RANGE];
+        val = loaddata[threadIdx.y][threadIdx.x+V11_RANGE+offset];
         out += ( val * g );
     }
-
     g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
-    idx = threadIdx.x;
-    val = loaddata[threadIdx.y][idx+V11_RANGE];
+    val = loaddata[threadIdx.y][threadIdx.x+V11_RANGE];
     out += ( val * g );
 
-    idx = block_x+threadIdx.x;
-    idy = block_y+threadIdx.y;
+    idx = blockIdx.x * blockDim.x + threadIdx.x;
+    idy = blockIdx.y * blockDim.y + threadIdx.y;
     if( idx >= src_w ) return;
     if( idy >= src_h ) return;
 
