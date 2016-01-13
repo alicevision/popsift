@@ -19,7 +19,8 @@
 #include "gauss_filter.h"
 #include "write_plane_2d.h"
 
-#define PYRAMID_SPEED_TEXT
+#undef PYRAMID_SPEED_TEXT
+#define EXTREMA_SPEED_TEXT
 
 #define PYRAMID_PRINT_DEBUG 0
 
@@ -621,11 +622,37 @@ void Pyramid::reset_extremum_counter( )
 
 void Pyramid::find_extrema( float edgeLimit, float threshold )
 {
-    cerr << "enter " << __FUNCTION__ << endl;
+#ifdef EXTREMA_SPEED_TEXT
+    cudaEvent_t start;
+    cudaEvent_t stop;
+    cudaError_t err;
+    err = cudaEventCreate( &start );
+    POP_CUDA_FATAL_TEST( err, "event create failed: " );
+    err = cudaEventCreate( &stop );
+    POP_CUDA_FATAL_TEST( err, "event create failed: " );
+
+    float duration = 0.0f;
+    for( int loop=0; loop<10; loop++ ) {
+        err = cudaEventRecord( start, 0 );
+        POP_CUDA_FATAL_TEST( err, "event record failed: " );
+        reset_extremum_counter();
+        find_extrema_v4( 2, edgeLimit, threshold );
+        err = cudaEventRecord( stop, 0 );
+        POP_CUDA_FATAL_TEST( err, "event record failed: " );
+        err = cudaStreamSynchronize( 0 );
+        POP_CUDA_FATAL_TEST( err, "stream sync failed: " );
+        float diff;
+        err = cudaEventElapsedTime( &diff, start, stop );
+        POP_CUDA_FATAL_TEST( err, "elapsed time failed: " );
+        duration += diff;
+    }
+    duration /= 10.0f;
+    cerr << "find_extrema_v4 avg time " << duration << " ms" << endl;
+#else // not EXTREMA_SPEED_TEXT
     reset_extremum_counter();
 
-    // find_extrema_v3( 2 );
     find_extrema_v4( 2, edgeLimit, threshold );
+#endif // not EXTREMA_SPEED_TEXT
 
     for( int o=0; o<_num_octaves; o++ ) {
         _octaves[o].readExtremaCount( );
@@ -635,7 +662,6 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
     if( ORIENTA_V2_ON ) { orientation_v2( ); }
 
     descriptors_v1( );
-    cerr << "leave " << __FUNCTION__ << endl;
 }
 
 } // namespace popart
