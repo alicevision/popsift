@@ -67,6 +67,57 @@ void filter_gauss_horiz_v8( Plane2D_float src_data,
     dst_data.ptr(idy)[idx] = out;
 }
 
+__global__
+void filter_gauss_horiz_v8_by_2( Plane2D_float   src_data,
+                                 Plane2D_float   dst_data )
+{
+    __shared__ float loaddata[V8_EDGE_LEN][V8_RANGE + V8_EDGE_LEN + V8_RANGE];
+
+    const int src_w = src_data.getWidth();
+    const int src_h = src_data.getHeight();
+
+    int block_x = blockIdx.x * blockDim.x;
+    int block_y = blockIdx.y * blockDim.y;
+    int idx     = threadIdx.x;
+    int idy     = threadIdx.y;
+    for( ; idx < V8_EDGE_LEN+2*V8_RANGE; idx += V8_EDGE_LEN) {
+        int read_x = clamp( 2 * ( block_x + idx - V8_RANGE ), src_w );
+        int read_y = clamp( 2 * ( block_y + idy ),            src_h );
+        loaddata[idy][idx] = src_data.ptr(read_y)[read_x];
+    }
+    __syncthreads();
+
+    float out = 0;
+    float g;
+    float val;
+
+    for( int offset = V8_RANGE; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
+
+        idx = threadIdx.x - offset;
+        val = loaddata[threadIdx.y][idx+V8_RANGE];
+        out += ( val * g );
+
+        idx = threadIdx.x + offset;
+        val = loaddata[threadIdx.y][idx+V8_RANGE];
+        out += ( val * g );
+    }
+
+    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
+    idx = threadIdx.x;
+    val = loaddata[threadIdx.y][idx+V8_RANGE];
+    out += ( val * g );
+
+    idx = blockIdx.x * blockDim.x + threadIdx.x;
+    idy = blockIdx.y * blockDim.y + threadIdx.y;
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+    if( idx >= dst_w ) return;
+    if( idy >= dst_h ) return;
+
+    dst_data.ptr(idy)[idx] = out;
+}
+
 __device__
 void filter_gauss_vert_v8_sub( Plane2D_float&  src_data,
                                Plane2D_float&  dst_data )
@@ -149,49 +200,6 @@ void filter_gauss_vert_v8_and_dog( Plane2D_float   src_data,
     b = higher_level_data.ptr(idy)[idx];
     a = fabs( a - b );
     dog_data.ptr(idy)[idx] = a;
-}
-
-__global__
-void filter_gauss_horiz_v8_by_2( Plane2D_float   src_data,
-                                 Plane2D_float   dst_data )
-{
-    int block_x = blockIdx.x * blockDim.x;
-    int block_y = blockIdx.y;
-
-    const int src_w   = src_data.getWidth();
-    const int src_h   = src_data.getHeight();
-    int       src_idx;
-    const int src_idy = clamp( 2 * block_y, src_h );
-    const int dst_w   = dst_data.getWidth();
-    const int dst_h   = dst_data.getHeight();
-    const int dst_idx = block_x + threadIdx.x;
-    const int dst_idy = block_y;
-
-    if( dst_idx >= dst_w ) return;
-    if( dst_idy >= dst_h ) return;
-
-    float g;
-    float val;
-    float out = 0;
-
-    for( int offset = V8_RANGE; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
-
-        src_idx = clamp( 2 * ( dst_idx - offset ), src_w );
-        val = src_data.ptr(src_idy)[src_idx];
-        out += ( val * g );
-
-        src_idx = clamp( 2 * ( dst_idx + offset ), src_w );
-        val = src_data.ptr(src_idy)[src_idx];
-        out += ( val * g );
-    }
-
-    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
-    src_idx = clamp( 2 * dst_idx, src_w );
-    val = src_data.ptr(src_idy)[src_idx];
-    out += ( val * g );
-
-    dst_data.ptr(dst_idy)[dst_idx] = out;
 }
 
 /*************************************************************

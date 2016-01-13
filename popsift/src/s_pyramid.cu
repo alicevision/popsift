@@ -19,7 +19,7 @@
 #include "gauss_filter.h"
 #include "write_plane_2d.h"
 
-#undef PYRAMID_SPEED_TEXT
+#define PYRAMID_SPEED_TEXT
 
 #define PYRAMID_PRINT_DEBUG 0
 
@@ -585,9 +585,11 @@ void Pyramid::build( Image* base )
     err = cudaEventDestroy( stop );
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
 #else // not PYRAMID_SPEED_TEXT
+    // build_v6( base );
+    // build_v7( base );
     // build_v8( base );
-    // build_v12( base );
     build_v11( base );
+    // build_v12( base );
     POP_CHK;
 #endif // not PYRAMID_SPEED_TEXT
 }

@@ -68,6 +68,7 @@ void filter_gauss_horiz_v12( Plane2D_float src_data,
 
     dst_data.ptr(idy)[idx] = out;
 }
+
 __global__
 void filter_gauss_horiz_v12( cudaTextureObject_t src_data,
                              Plane2D_float       dst_data )
@@ -85,6 +86,55 @@ void filter_gauss_horiz_v12( cudaTextureObject_t src_data,
         int read_x = block_x + idx - V12_RANGE;
         int read_y = block_y + idy;
         loaddata[idy][idx] = tex2D<float>( src_data, read_x, read_y );
+    }
+    __syncthreads();
+
+    float g;
+    float val;
+    float out = 0;
+
+    for( int offset = V12_RANGE; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
+
+        idx = threadIdx.x - offset;
+        val = loaddata[threadIdx.y][idx+V12_RANGE];
+        out += ( val * g );
+
+        idx = threadIdx.x + offset;
+        val = loaddata[threadIdx.y][idx+V12_RANGE];
+        out += ( val * g );
+    }
+
+    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
+    idx = threadIdx.x;
+    val = loaddata[threadIdx.y][idx+V12_RANGE];
+    out += ( val * g );
+
+    idx = block_x+threadIdx.x;
+    idy = block_y+threadIdx.y;
+    if( idx >= dst_w ) return;
+    if( idy >= dst_h ) return;
+
+    dst_data.ptr(idy)[idx] = out;
+}
+
+__global__
+void filter_gauss_horiz_v12_by_2( cudaTextureObject_t src_data,
+                                  Plane2D_float       dst_data )
+{
+    __shared__ float loaddata[V12_EDGE_LEN][V12_RANGE + V12_EDGE_LEN + V12_RANGE];
+
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+
+    int block_x = blockIdx.x * blockDim.x;
+    int block_y = blockIdx.y * blockDim.y;
+    int idx     = threadIdx.x;
+    int idy     = threadIdx.y;
+    for( ; idx < V12_EDGE_LEN+2*V12_RANGE; idx += V12_EDGE_LEN) {
+        int read_x = block_x + idx - V12_RANGE;
+        int read_y = block_y + idy;
+        loaddata[idy][idx] = tex2D<float>( src_data, 2*read_x, 2*read_y );
     }
     __syncthreads();
 
@@ -182,47 +232,6 @@ void filter_gauss_vert_v12_dog( cudaTextureObject_t top_data,
     if( idy >= height ) return;
 
     dog_data.ptr(idy)[idx] = a;
-}
-
-__global__
-void filter_gauss_horiz_v12_by_2( cudaTextureObject_t src_data,
-                                  Plane2D_float       dst_data )
-{
-    int block_x = blockIdx.x * blockDim.x;
-    int block_y = blockIdx.y;
-
-    int       src_idx;
-    const int src_idy = 2 * block_y;
-    const int dst_w   = dst_data.getWidth();
-    const int dst_h   = dst_data.getHeight();
-    const int dst_idx = block_x + threadIdx.x;
-    const int dst_idy = block_y;
-
-    if( dst_idx >= dst_w ) return;
-    if( dst_idy >= dst_h ) return;
-
-    float g;
-    float val;
-    float out = 0;
-
-    for( int offset = V12_RANGE; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
-
-        src_idx = 2 * ( dst_idx - offset );
-        val = tex2D<float>( src_data, src_idx, src_idy );
-        out += ( val * g );
-
-        src_idx = 2 * ( dst_idx + offset );
-        val = tex2D<float>( src_data, src_idx, src_idy );
-        out += ( val * g );
-    }
-
-    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
-    src_idx = 2 * dst_idx;
-    val = tex2D<float>( src_data, src_idx, src_idy );
-    out += ( val * g );
-
-    dst_data.ptr(dst_idy)[dst_idx] = out;
 }
 
 /*************************************************************

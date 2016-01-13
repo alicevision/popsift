@@ -16,7 +16,7 @@ namespace popart {
 void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
 {
     if( onDevice ) {
-        cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
+        // cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
         Plane2D_float g;
         g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
         g.memcpyFromDevice( f );
@@ -29,11 +29,11 @@ void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
 
 void write_plane2D( const char* filename, Plane2D_float& f )
 {
-    cerr << "Enter " << __FUNCTION__ << endl;
+    // cerr << "Enter " << __FUNCTION__ << endl;
 
     int rows = f.getRows();
     int cols = f.getCols();
-    cerr << "    size: " << cols << "x" << rows << endl;
+    // cerr << "    size: " << cols << "x" << rows << endl;
 
     unsigned char* c = new unsigned char[rows * cols];
     float minval = std::numeric_limits<float>::max();
@@ -48,8 +48,8 @@ void write_plane2D( const char* filename, Plane2D_float& f )
     }
     // cerr << endl;
 
-    cerr << "    minval: " << minval << endl;
-    cerr << "    maxval: " << maxval << endl;
+    // cerr << "    minval: " << minval << endl;
+    // cerr << "    maxval: " << maxval << endl;
 
     float fmaxval = 255.0f / ( maxval - minval );
     for( int y=0; y<rows; y++ ) {
@@ -66,7 +66,7 @@ void write_plane2D( const char* filename, Plane2D_float& f )
     of.write( (char*)c, cols * rows );
     delete [] c;
 
-    cerr << "Leave " << __FUNCTION__ << endl;
+    // cerr << "Leave " << __FUNCTION__ << endl;
 }
 
 } // namespace popart

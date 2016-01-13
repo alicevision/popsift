@@ -289,7 +289,9 @@ void Pyramid::build_v11( Image* base )
                 } else {
                     filter_gauss_horiz_v11_by_2
                         <<<h_grid,h_block>>>
-                        ( _octaves[octave-1]._data_tex[ V11_LEVELS-3 ],
+                        (
+                          _octaves[octave-1]._data_tex[ V11_LEVELS-3 ],
+                          // _octaves[octave-1]._data_tex[ 0 ],
                           _octaves[octave].getIntermediateData( ) );
                 }
             } else {
@@ -297,9 +299,6 @@ void Pyramid::build_v11( Image* base )
                     <<<h_grid,h_block>>>
                     ( _octaves[octave]._data_tex[ level-1 ],
                       _octaves[octave].getIntermediateData( ) );
-if(level==1 && octave==0) {
-write_plane2D( "intermediate.pgm", true, _octaves[octave].getIntermediateData( ) );
-}
             }
 
             if( level == 0 ) {
@@ -307,9 +306,6 @@ write_plane2D( "intermediate.pgm", true, _octaves[octave].getIntermediateData( )
                     <<<v_grid,v_block>>>
                     ( _octaves[octave]._interm_data_tex,
                       _octaves[octave].getData( level ) );
-if(octave==0) {
-write_plane2D( "after-int.pgm", true, _octaves[octave].getData(0) );
-}
             } else {
                 filter_gauss_vert_v11_dog
                     <<<d_grid,d_block>>>
