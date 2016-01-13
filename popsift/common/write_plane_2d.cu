@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <limits>
 
 // #include "debug_macros.h"
 // #include "align_macro.h"
@@ -13,6 +14,7 @@ using namespace std;
 
 namespace popart {
 
+__host__
 void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
 {
     if( onDevice ) {
@@ -27,6 +29,7 @@ void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
     }
 }
 
+__host__
 void write_plane2D( const char* filename, Plane2D_float& f )
 {
     // cerr << "Enter " << __FUNCTION__ << endl;
