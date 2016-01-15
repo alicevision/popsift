@@ -21,9 +21,9 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
 
     ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
 
-    if( threadIdx.y >= mgmt->counter ) return;
+    int idy = clamp( threadIdx.y, mgmt->counter );
 
-    ExtremumCandidate* ext = &extremum[threadIdx.y];
+    ExtremumCandidate* ext = &extremum[idy];
 
     /* An orientation histogram is formed from the gradient
      * orientations of sample points within a region around
@@ -164,6 +164,8 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
         }
         __syncthreads();
     }
+
+    if( idy != threadIdx.y ) return;
 
     uint32_t ct = __popc( __ballot( found_angle ) );
     if( ct == 0 ) {
