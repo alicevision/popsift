@@ -1,5 +1,6 @@
 #include "s_ori.v2.h"
 #include "s_gradiant.h"
+#include "clamp.h"
 
 #define ORI_V2_NUM_THREADS 16
 #define NBINS_V2           36
@@ -137,30 +138,32 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
     bool  found_angle = false;
 
     /* find other peaks, boundary of 80% of max */
-    for( int bin=threadIdx.x; bin < NBINS_V2; bin+=ORI_V2_NUM_THREADS ) {
-        float hc = hist[bin];
-        float hn = hist[(bin+1) % NBINS_V2];
-        float hp = hist[(bin-1+NBINS_V2) % NBINS_V2];
+    for( int bin=threadIdx.x; __any(bin < NBINS_V2); bin+=ORI_V2_NUM_THREADS ) {
+        if( bin < NBINS_V2 ) {
+            float hc = hist[bin];
+            float hn = hist[(bin+1) % NBINS_V2];
+            float hp = hist[(bin-1+NBINS_V2) % NBINS_V2];
 
-        /* Find if a peak.
-         * Note that the condition may imply that we find no peak at all.
-         */
-        if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
+            /* Find if a peak.
+             * Note that the condition may imply that we find no peak at all.
+             */
+            if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
 
-            /* found another angle ! */
-            found_angle = true;
+                /* found another angle ! */
+                found_angle = true;
     
-            /* interpolate */
-            float di = bin + 0.5f * (hn - hp) / (hc+hc-hn-hp);
+                /* interpolate */
+                float di = bin + 0.5f * (hn - hp) / (hc+hc-hn-hp);
             
-            /* clamp */
-            di = (di < 0) ? (di + NBINS_V2)
-                          : ((di >= NBINS_V2) ? (di - NBINS_V2)
-                                           : (di));
+                /* clamp */
+                di = (di < 0) ? (di + NBINS_V2)
+                            : ((di >= NBINS_V2) ? (di - NBINS_V2)
+                                            : (di));
             
-            ang[angles] = ((M_PI2 * di) / NBINS_V2) - M_PI;
+                ang[angles] = ((M_PI2 * di) / NBINS_V2) - M_PI;
 
-            angles += 1;
+                angles += 1;
+            }
         }
         __syncthreads();
     }
