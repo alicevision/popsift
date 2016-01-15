@@ -21,7 +21,7 @@
 #include "write_plane_2d.h"
 
 #undef PYRAMID_SPEED_TEST
-#define EXTREMA_SPEED_TEST
+#undef EXTREMA_SPEED_TEST
 
 #define PYRAMID_PRINT_DEBUG 0
 
@@ -687,11 +687,33 @@ void Pyramid::build( Image* base )
     err = cudaEventDestroy( stop );
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
 #else // not PYRAMID_SPEED_TEST
+    cudaEvent_t start;
+    cudaEvent_t stop;
+    cudaError_t err;
+    err = cudaEventCreate( &start );
+    POP_CUDA_FATAL_TEST( err, "event create failed: " );
+    err = cudaEventCreate( &stop );
+    POP_CUDA_FATAL_TEST( err, "event create failed: " );
+
+    err = cudaEventRecord( start, 0 );
+    POP_CUDA_FATAL_TEST( err, "event record failed: " );
+
     // build_v6( base );
     // build_v7( base );
     // build_v8( base );
     build_v11( base );
     // build_v12( base );
+
+    err = cudaEventRecord( stop, 0 );
+    POP_CUDA_FATAL_TEST( err, "event record failed: " );
+
+    err = cudaStreamSynchronize( 0 );
+    POP_CUDA_FATAL_TEST( err, "stream sync failed: " );
+    float diff;
+    err = cudaEventElapsedTime( &diff, start, stop );
+    POP_CUDA_FATAL_TEST( err, "elapsed time failed: " );
+
+    cerr << "Pyramid duration: " << diff << " ms" << endl;
     POP_CHK;
 #endif // not PYRAMID_SPEED_TEST
 }

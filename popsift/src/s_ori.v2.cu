@@ -84,7 +84,7 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
 
         hist[bidx] += weight;
     }
-
+    __syncthreads();
 
     /* reduction here */
     for (int i = 0; i < NBINS_V2; i++) {
@@ -102,6 +102,8 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
         int32_t bin_next = (bin+1) % NBINS_V2;
         hist[bin] = 0.25f * hist[bin_prev] + 0.5f * hist[bin] + 0.25f * hist[bin_next];
     }
+    __syncthreads();
+
     // sync is lost at the end of this loop, but __shfl auto-syncs
     for( int bin=0; bin < NBINS_V2; bin++ ) {
         hist[bin] = __shfl( hist[bin], bin % ORI_V2_NUM_THREADS );
@@ -122,6 +124,7 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
         // this case is only for 32 (thread 0) and 33 (thread 1)
         maxh = fmaxf( maxh, hist[threadIdx.x+2*ORI_V2_NUM_THREADS] );
     }
+    __syncthreads();
     // at this point, the 16 threads contain the maxima of 2 or 3 values, now reduce
 
     maxh = fmaxf( maxh, __shfl_down( maxh, 8 ) );
@@ -168,7 +171,9 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
         __syncthreads();
     }
 
-    if( idy != threadIdx.y ) return;
+    if( idy != threadIdx.y ) {
+        found_angle = false;
+    }
 
     uint32_t ct = __popc( __ballot( found_angle ) );
     if( ct == 0 ) {
@@ -227,6 +232,7 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
 __host__
 void Pyramid::orientation_v2( )
 {
+#if 0
     _keep_time_orient_v2.start();
     for( int octave=0; octave<_num_octaves; octave++ ) {
         _octaves[octave].readExtremaCount( );
@@ -254,5 +260,6 @@ void Pyramid::orientation_v2( )
         }
     }
     _keep_time_orient_v2.stop();
+#endif
 }
 
