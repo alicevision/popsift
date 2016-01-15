@@ -105,6 +105,12 @@ void pop_cuda_memset( void*        ptr,
         POP_CUDA_FATAL_TEST( err, "cudaMallocHost failed: " ); \
     }
 
+#define POP_CUDA_FREE_HOST( ptr ) { \
+        cudaError_t err; \
+        err = cudaFreeHost( ptr ); \
+        POP_CUDA_FATAL_TEST( err, "cudaFreeHost failed: " ); \
+    }
+
 #define POP_CUDA_STREAM_CREATE( ptr ) { \
         cudaError_t err; \
         err = cudaStreamCreate( ptr ); \

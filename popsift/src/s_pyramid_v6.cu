@@ -53,6 +53,54 @@ void filter_gauss_horiz_v6( Plane2D_float src_data,
     dst_data.ptr(dst_row)[dst_col] = out;
 }
 
+#ifdef USE_DOG_ARRAY
+__global__
+void filter_gauss_horiz_v6_and_dog( Plane2D_float src_data,
+                                    Plane2D_float dst_data,
+                                    Plane2D_float higher_level_data,
+                                    cudaSurfaceObject_t dog_data,
+                                    int                 level )
+{
+    int32_t block_x = blockIdx.x * V6_WIDTH;
+    int32_t block_y = blockIdx.y;
+
+    __shared__ float px[V6_READ_RANGE];
+
+    const int src_w = src_data.getWidth();
+    const int src_h = src_data.getHeight();
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+
+    int32_t idx     = threadIdx.x - V6_RANGE;
+    int32_t src_idx = clamp( block_x + idx, src_w );
+    px[threadIdx.x] = src_data.ptr(block_y)[src_idx];
+    __syncthreads();
+
+    if( threadIdx.x >= V6_WIDTH ) return;
+
+    float out = 0;
+    #pragma unroll
+    for( int i=0; i<V6_FILTERSIZE; i++ ) {
+        out += px[threadIdx.x+i] * popart::d_gauss_filter[V6_GAUSS_BASE+i];
+    }
+
+    int dst_row   = block_x + threadIdx.x;
+    int dst_col   = block_y;
+    if( dst_col < 0 || dst_col >= dst_w ) return;
+    if( dst_row < 0 || dst_row >= dst_h ) return;
+
+    dst_data.ptr(dst_row)[dst_col] = out;
+
+    float cmp;
+    cmp = higher_level_data.ptr(dst_row)[dst_col];
+    out -= cmp;
+    out = fabs(out);
+
+    surf2DLayeredwrite( out, dog_data,
+                        dst_col*4, dst_row, level,
+                        cudaBoundaryModeZero );
+}
+#else // not USE_DOG_ARRAY
 __global__
 void filter_gauss_horiz_v6_and_dog( Plane2D_float src_data,
                                     Plane2D_float dst_data,
@@ -95,6 +143,7 @@ void filter_gauss_horiz_v6_and_dog( Plane2D_float src_data,
     out = fabs(out);
     dog_data.ptr(dst_row)[dst_col] = out;
 }
+#endif // not USE_DOG_ARRAY
 
 __global__
 void filter_gauss_horiz_v6_by_2( Plane2D_float src_data,
@@ -210,12 +259,22 @@ void Pyramid::build_v6( Image* base )
                     ( _octaves[octave].getTransposedData( level ),
                       _octaves[octave].getData( level ) );
             } else {
+#ifdef USE_DOG_ARRAY
+                filter_gauss_horiz_v6_and_dog
+                    <<<grid,block>>>
+                    ( _octaves[octave].getTransposedData( level ),
+                      _octaves[octave].getData( level ),
+                      _octaves[octave].getData( level-1 ),
+                      _octaves[octave].getDogSurface(),
+                      level-1 );
+#else // not USE_DOG_ARRAY
                 filter_gauss_horiz_v6_and_dog
                     <<<grid,block>>>
                     ( _octaves[octave].getTransposedData( level ),
                       _octaves[octave].getData( level ),
                       _octaves[octave].getData( level-1 ),
                       _octaves[octave].getDogData( level-1 ) );
+#endif // not USE_DOG_ARRAY
             }
             cudaDeviceSynchronize( );
             err = cudaGetLastError();

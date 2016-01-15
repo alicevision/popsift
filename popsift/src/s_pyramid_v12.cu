@@ -211,6 +211,26 @@ void filter_gauss_vert_v12( cudaTextureObject_t src_data,
     dst_data.ptr(idy)[idx] = out;
 }
 
+#ifdef USE_DOG_ARRAY
+__global__
+void filter_gauss_vert_v12_dog( cudaTextureObject_t top_data,
+                                cudaTextureObject_t bot_data,
+                                cudaSurfaceObject_t dog_data,
+                                int                 level )
+{
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
+
+    float a, b;
+    a = tex2D<float>( top_data, idx, idy );
+    b = tex2D<float>( bot_data, idx, idy );
+    a = fabs( a - b );
+
+    surf2DLayeredwrite( a, dog_data,
+                        idx*4, idy, level,
+                        cudaBoundaryModeZero );
+}
+#else // not USE_DOG_ARRAY
 __global__
 void filter_gauss_vert_v12_dog( cudaTextureObject_t top_data,
                                 cudaTextureObject_t bot_data,
@@ -231,6 +251,7 @@ void filter_gauss_vert_v12_dog( cudaTextureObject_t top_data,
 
     dog_data.ptr(idy)[idx] = a;
 }
+#endif // not USE_DOG_ARRAY
 
 /*************************************************************
  * V12: host side
@@ -304,11 +325,20 @@ void Pyramid::build_v12( Image* base )
             POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v12 failed: " );
 
             if( level > 0 ) {
+#ifdef USE_DOG_ARRAY
+                filter_gauss_vert_v12_dog
+                    <<<grid,block>>>
+                    ( _octaves[octave]._data_tex[level  ],
+                      _octaves[octave]._data_tex[level-1],
+                      _octaves[octave].getDogSurface( ),
+                      level-1 );
+#else // USE_DOG_ARRAY
                 filter_gauss_vert_v12_dog
                     <<<grid,block>>>
                     ( _octaves[octave]._data_tex[level  ],
                       _octaves[octave]._data_tex[level-1],
                       _octaves[octave].getDogData( level-1 ) );
+#endif // USE_DOG_ARRAY
             }
             cudaDeviceSynchronize( );
             err = cudaGetLastError();

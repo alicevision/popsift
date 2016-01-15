@@ -19,6 +19,8 @@
 #define GAUSS_ONE_SIDE_RANGE 12
 #define GAUSS_SPAN           (2*GAUSS_ONE_SIDE_RANGE+1)
 
+#define USE_DOG_ARRAY
+
 namespace popart {
 
 struct ExtremaMgmt
@@ -66,16 +68,25 @@ class Pyramid
 
         Plane2D_float* _data;
         Plane2D_float  _intermediate_data;
-        Plane2D_float* _dog_data;
         Plane2D_float* _t_data;
+#ifdef USE_DOG_ARRAY
+        cudaArray_t           _dog_3d;
+        cudaChannelFormatDesc _dog_3d_desc;
+        cudaExtent            _dog_3d_ext;
+
+        cudaSurfaceObject_t   _dog_3d_surf;
+
+        cudaTextureObject_t   _dog_3d_tex;
+
+#else // not USE_DOG_ARRAY
+        Plane2D_float* _dog_data;
+#endif // not USE_DOG_ARRAY
 
     public:
         cudaTextureObject_t* _data_tex;
         cudaTextureObject_t  _interm_data_tex;
-    private:
-        cudaTextureDesc      _data_tex_desc;
-        cudaResourceDesc     _data_res_desc;
 
+    private:
         /* It seems strange strange to collect extrema globally only.
          * Because of the global cut-off, features from the later
          * octave have a smaller chance of being accepted.
@@ -105,9 +116,24 @@ class Pyramid
         inline Plane2D_float& getIntermediateData( ) {
             return _intermediate_data;
         }
+#ifdef USE_DOG_ARRAY
+        inline cudaSurfaceObject_t& getDogSurface( ) {
+            return _dog_3d_surf;
+        }
+        inline cudaTextureObject_t& getDogTexture( ) {
+            return _dog_3d_tex;
+        }
+#else // not USE_DOG_ARRAY
         inline Plane2D_float& getDogData( uint32_t level ) {
             return _dog_data[level];
         }
+        inline uint32_t getFloatSizeDogData() const        {
+            return _dog_data[0].getByteSize() / sizeof(float);
+        }
+        inline uint32_t getByteSizeDogData() const {
+            return _dog_data[0].getByteSize();
+        }
+#endif // not USE_DOG_ARRAY
         inline Plane2D_float& getTransposedData( uint32_t level ) {
             return _t_data[level];
         }
@@ -115,17 +141,11 @@ class Pyramid
         inline uint32_t getFloatSizeData() const {
             return _data[0].getByteSize() / sizeof(float);
         }
-        inline uint32_t getFloatSizeDogData() const        {
-            return _dog_data[0].getByteSize() / sizeof(float);
-        }
         inline uint32_t getFloatSizeTransposedData() const {
             return _t_data[0].getByteSize() / sizeof(float);
         }
         inline uint32_t getByteSizeData() const {
             return _data[0].getByteSize();
-        }
-        inline uint32_t getByteSizeDogData() const {
-            return _dog_data[0].getByteSize();
         }
         inline uint32_t getByteSizeTransposedData() const {
             return _t_data[0].getByteSize();

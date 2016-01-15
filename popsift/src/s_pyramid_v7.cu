@@ -103,6 +103,35 @@ void filter_gauss_vert_v7( Plane2D_float   src_data,
     filter_gauss_vert_v7_sub( src_data, dst_data );
 }
 
+#ifdef USE_DOG_ARRAY
+__global__
+void filter_gauss_vert_v7_and_dog( Plane2D_float   src_data,
+                                   Plane2D_float   dst_data,
+                                   Plane2D_float   higher_level_data,
+                                   cudaSurfaceObject_t dog_data,
+                                   int                 level )
+{
+    filter_gauss_vert_v7_sub( src_data, dst_data );
+
+    const int idx = blockIdx.x * V7_WIDTH + threadIdx.x;
+    const int idy = blockIdx.y;
+
+    const int width  = src_data.getWidth();
+    const int height = src_data.getHeight();
+
+    if( idx >= width ) return;
+    if( idy >= height ) return;
+
+    float a, b;
+    a = dst_data.ptr(idy)[idx];
+    b = higher_level_data.ptr(idy)[idx];
+    a = fabs( a - b );
+
+    surf2DLayeredwrite( a, dog_data,
+                        idx*4, idy, level,
+                        cudaBoundaryModeZero );
+}
+#else // not USE_DOG_ARRAY
 __global__
 void filter_gauss_vert_v7_and_dog( Plane2D_float   src_data,
                                    Plane2D_float   dst_data,
@@ -126,6 +155,7 @@ void filter_gauss_vert_v7_and_dog( Plane2D_float   src_data,
     a = fabs( a - b );
     dog_data.ptr(idy)[idx] = a;
 }
+#endif // not USE_DOG_ARRAY
 
 __global__
 void filter_gauss_horiz_v7_by_2( Plane2D_float   src_data,
@@ -236,12 +266,22 @@ void Pyramid::build_v7( Image* base )
                     ( _octaves[octave].getIntermediateData(),
                       _octaves[octave].getData( level ) );
             } else {
+#ifdef USE_DOG_ARRAY
+                filter_gauss_vert_v7_and_dog
+                    <<<grid,block>>>
+                    ( _octaves[octave].getIntermediateData(),
+                      _octaves[octave].getData( level ),
+                      _octaves[octave].getData( level-1 ),
+                      _octaves[octave].getDogSurface( ),
+                      level-1 );
+#else // not USE_DOG_ARRAY
                 filter_gauss_vert_v7_and_dog
                     <<<grid,block>>>
                     ( _octaves[octave].getIntermediateData(),
                       _octaves[octave].getData( level ),
                       _octaves[octave].getData( level-1 ),
                       _octaves[octave].getDogData( level-1 ) );
+#endif // not USE_DOG_ARRAY
             }
             cudaDeviceSynchronize( );
             err = cudaGetLastError();

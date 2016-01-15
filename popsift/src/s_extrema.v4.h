@@ -1,7 +1,8 @@
 #pragma once
 
-#include <inttypes.h>
 #include "s_pyramid.h"
+
+#include <inttypes.h>
 
 using namespace popart;
 

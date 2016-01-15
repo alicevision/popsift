@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <limits>
 
 #include <npp.h>
 
@@ -19,8 +20,8 @@
 #include "gauss_filter.h"
 #include "write_plane_2d.h"
 
-#undef PYRAMID_SPEED_TEXT
-#define EXTREMA_SPEED_TEXT
+#undef PYRAMID_SPEED_TEST
+#define EXTREMA_SPEED_TEST
 
 #define PYRAMID_PRINT_DEBUG 0
 
@@ -122,7 +123,9 @@ void Pyramid::test_last_error( int line )
 Pyramid::Octave::Octave( )
     : _data(0)
     , _t_data(0)
+#ifndef USE_DOG_ARRAY
     , _dog_data(0)
+#endif // not USE_DOG_ARRAY
     , _h_extrema_mgmt(0)
     , _d_extrema_mgmt(0)
     , _d_extrema(0)
@@ -181,6 +184,8 @@ void Pyramid::Octave::freeExtrema( )
 
 void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema )
 {
+    cudaError_t err;
+
     _levels            = levels;
 
     _d_desc = new Descriptor*[_levels];
@@ -194,56 +199,104 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
 
     _data     = new Plane2D_float[_levels];
     _t_data   = new Plane2D_float[_levels];
-    _dog_data = new Plane2D_float[_levels-1];
 
     for( int i=0; i<_levels; i++ ) {
         _data[i]  .allocDev( width, height );
         _t_data[i].allocDev( height, width );
     }
     _intermediate_data.allocDev( width, height );
+#ifdef USE_DOG_ARRAY
+    _dog_3d_desc.f = cudaChannelFormatKindFloat;
+    _dog_3d_desc.x = 32;
+    _dog_3d_desc.y = 0;
+    _dog_3d_desc.z = 0;
+    _dog_3d_desc.w = 0;
+
+    _dog_3d_ext.width  = width; // for cudaMalloc3DArray, width in elements
+    _dog_3d_ext.height = height;
+    _dog_3d_ext.depth  = _levels - 1;
+
+    err = cudaMalloc3DArray( &_dog_3d,
+                             &_dog_3d_desc,
+                             _dog_3d_ext,
+                             cudaArrayLayered | cudaArraySurfaceLoadStore );
+    POP_CUDA_FATAL_TEST( err, "Could not allocate 3D DoG array: " );
+
+    cudaResourceDesc dog_res_desc;
+    dog_res_desc.resType         = cudaResourceTypeArray;
+    dog_res_desc.res.array.array = _dog_3d;
+
+    err = cudaCreateSurfaceObject( &_dog_3d_surf, &dog_res_desc );
+    POP_CUDA_FATAL_TEST( err, "Could not create DoG surface: " );
+
+    cudaTextureDesc      dog_tex_desc;
+    memset( &dog_tex_desc, 0, sizeof(cudaTextureDesc) );
+    dog_tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
+    dog_tex_desc.addressMode[0]   = cudaAddressModeClamp;
+    dog_tex_desc.addressMode[1]   = cudaAddressModeClamp;
+    dog_tex_desc.addressMode[2]   = cudaAddressModeClamp;
+    dog_tex_desc.readMode         = cudaReadModeElementType; // read as float
+    dog_tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
+
+    // cudaResourceView dog_tex_view;
+    // memset( &dog_tex_view, 0, sizeof(cudaResourceView) );
+    // dog_tex_view.format     = cudaResViewFormatFloat1;
+    // dog_tex_view.width      = width;
+    // dog_tex_view.height     = height;
+    // dog_tex_view.depth      = 1;
+    // dog_tex_view.firstLayer = 0;
+    // dog_tex_view.lastLayer  = _levels - 1;
+
+    err = cudaCreateTextureObject( &_dog_3d_tex, &dog_res_desc, &dog_tex_desc, 0 );
+    POP_CUDA_FATAL_TEST( err, "Could not create DoG texture: " );
+
+#else // not USE_DOG_ARRAY
+    _dog_data = new Plane2D_float[_levels-1];
+
     for( int i=0; i<_levels-1; i++ ) {
         _dog_data[i].allocDev( width, height );
     }
+#endif // not USE_DOG_ARRAY
 
     _data_tex = new cudaTextureObject_t[_levels];
 
-    memset( &_data_tex_desc, 0, sizeof(cudaTextureDesc) );
-    _data_tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
-    _data_tex_desc.addressMode[0]   = cudaAddressModeClamp;
-    _data_tex_desc.addressMode[1]   = cudaAddressModeClamp;
-    _data_tex_desc.addressMode[2]   = cudaAddressModeClamp;
-    _data_tex_desc.readMode         = cudaReadModeElementType; // read as float
-    _data_tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
+    cudaTextureDesc      data_tex_desc;
+    cudaResourceDesc     data_res_desc;
 
+    memset( &data_tex_desc, 0, sizeof(cudaTextureDesc) );
+    data_tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
+    data_tex_desc.addressMode[0]   = cudaAddressModeClamp;
+    data_tex_desc.addressMode[1]   = cudaAddressModeClamp;
+    data_tex_desc.addressMode[2]   = cudaAddressModeClamp;
+    data_tex_desc.readMode         = cudaReadModeElementType; // read as float
+    data_tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
 
-    memset( &_data_res_desc, 0, sizeof(cudaResourceDesc) );
-    _data_res_desc.resType                  = cudaResourceTypePitch2D;
-    _data_res_desc.res.pitch2D.desc.f       = cudaChannelFormatKindFloat;
-    _data_res_desc.res.pitch2D.desc.x       = 32;
-    _data_res_desc.res.pitch2D.desc.y       = 0;
-    _data_res_desc.res.pitch2D.desc.z       = 0;
-    _data_res_desc.res.pitch2D.desc.w       = 0;
+    memset( &data_res_desc, 0, sizeof(cudaResourceDesc) );
+    data_res_desc.resType                  = cudaResourceTypePitch2D;
+    data_res_desc.res.pitch2D.desc.f       = cudaChannelFormatKindFloat;
+    data_res_desc.res.pitch2D.desc.x       = 32;
+    data_res_desc.res.pitch2D.desc.y       = 0;
+    data_res_desc.res.pitch2D.desc.z       = 0;
+    data_res_desc.res.pitch2D.desc.w       = 0;
     for( int i=0; i<_levels; i++ ) {
-        _data_res_desc.res.pitch2D.devPtr       = _data[i].data;
-        _data_res_desc.res.pitch2D.pitchInBytes = _data[i].step;
-        _data_res_desc.res.pitch2D.width        = _data[i].getCols();
-        _data_res_desc.res.pitch2D.height       = _data[i].getRows();
+        data_res_desc.res.pitch2D.devPtr       = _data[i].data;
+        data_res_desc.res.pitch2D.pitchInBytes = _data[i].step;
+        data_res_desc.res.pitch2D.width        = _data[i].getCols();
+        data_res_desc.res.pitch2D.height       = _data[i].getRows();
 
-        cudaError_t err;
         err = cudaCreateTextureObject( &_data_tex[i],
-                                       &_data_res_desc,
-                                       &_data_tex_desc, 0 );
+                                       &data_res_desc,
+                                       &data_tex_desc, 0 );
         POP_CUDA_FATAL_TEST( err, "Could not create texture object: " );
     }
-    _data_res_desc.res.pitch2D.devPtr       = _intermediate_data.data;
-    _data_res_desc.res.pitch2D.pitchInBytes = _intermediate_data.step;
-    _data_res_desc.res.pitch2D.width        = _intermediate_data.getCols();
-    _data_res_desc.res.pitch2D.height       = _intermediate_data.getRows();
+    data_res_desc.res.pitch2D.devPtr       = _intermediate_data.data;
+    data_res_desc.res.pitch2D.pitchInBytes = _intermediate_data.step;
+    data_res_desc.res.pitch2D.width        = _intermediate_data.getCols();
+    data_res_desc.res.pitch2D.height       = _intermediate_data.getRows();
 
-    cudaError_t err;
     err = cudaCreateTextureObject( &_interm_data_tex,
-                                   &_data_res_desc,
-                                   &_data_tex_desc, 0 );
+                                   &data_res_desc,
+                                   &data_tex_desc, 0 );
     POP_CUDA_FATAL_TEST( err, "Could not create texture object: " );
 
     allocExtrema( layer_max_extrema );
@@ -269,13 +322,25 @@ void Pyramid::Octave::free( )
         _data[i]  .freeDev( );
         _t_data[i].freeDev( );
     }
+#ifdef USE_DOG_ARRAY
+    err = cudaDestroyTextureObject( _dog_3d_tex );
+    POP_CUDA_FATAL_TEST( err, "Could not destroy DoG texture: " );
+
+    err = cudaDestroySurfaceObject( _dog_3d_surf );
+    POP_CUDA_FATAL_TEST( err, "Could not destroy DoG surface: " );
+
+    err = cudaFreeArray( _dog_3d );
+    POP_CUDA_FATAL_TEST( err, "Could not free 3D DoG array: " );
+#else // not USE_DOG_ARRAY
     for( int i=0; i<_levels-1; i++ ) {
         _dog_data[i].freeDev( );
     }
 
+    delete [] _dog_data;
+#endif // not USE_DOG_ARRAY
+
     delete [] _data;
     delete [] _t_data;
-    delete [] _dog_data;
 }
 
 void Pyramid::Octave::resetExtremaCount( )
@@ -473,6 +538,39 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
     }
 #endif
 #if 1
+#ifdef USE_DOG_ARRAY
+    if( level == _levels-1 ) {
+        cudaError_t err;
+        int width  = getData(0).getWidth();
+        int height = getData(0).getHeight();
+
+        if (stat("dir-dog", &st) == -1) {
+            mkdir("dir-dog", 0700);
+        }
+
+        float* array;
+        POP_CUDA_MALLOC_HOST( &array, width * height * (_levels-1) * sizeof(float) );
+
+        cudaMemcpy3DParms s = { 0 };
+        s.srcArray = _dog_3d;
+        s.dstPtr = make_cudaPitchedPtr( array, width*sizeof(float), width, height );
+        s.extent = make_cudaExtent( width, height, _levels-1 );
+        s.kind = cudaMemcpyDeviceToHost;
+        err = cudaMemcpy3D( &s );
+        POP_CUDA_FATAL_TEST( err, "cudaMemcpy3D failed: " ); \
+
+        for( int l=0; l<_levels-1; l++ ) {
+            Plane2D_float p( width, height, &array[l*width*height], width*sizeof(float) );
+
+            ostringstream ostr;
+            ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".pgm";
+            cerr << "Writing " << ostr.str() << endl;
+            popart::write_plane2D( ostr.str().c_str(), true, p );
+        }
+
+        POP_CUDA_FREE_HOST( array );
+    }
+#else // not USE_DOG_ARRAY
     if (stat("dir-dog", &st) == -1) {
         mkdir("dir-dog", 0700);
     }
@@ -484,6 +582,7 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
 
         popart::write_plane2D( ostr.str().c_str(), true, getDogData(level) );
     }
+#endif // not USE_DOG_ARRAY
 #endif
 }
 
@@ -530,7 +629,7 @@ Pyramid::~Pyramid( )
 
 void Pyramid::build( Image* base )
 {
-#ifdef PYRAMID_SPEED_TEXT
+#ifdef PYRAMID_SPEED_TEST
     cudaEvent_t start;
     cudaEvent_t stop;
     cudaError_t err;
@@ -585,14 +684,14 @@ void Pyramid::build( Image* base )
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
     err = cudaEventDestroy( stop );
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
-#else // not PYRAMID_SPEED_TEXT
+#else // not PYRAMID_SPEED_TEST
     // build_v6( base );
     // build_v7( base );
     // build_v8( base );
     build_v11( base );
     // build_v12( base );
     POP_CHK;
-#endif // not PYRAMID_SPEED_TEXT
+#endif // not PYRAMID_SPEED_TEST
 }
 
 void Pyramid::report_times( )
@@ -622,7 +721,7 @@ void Pyramid::reset_extremum_counter( )
 
 void Pyramid::find_extrema( float edgeLimit, float threshold )
 {
-#ifdef EXTREMA_SPEED_TEXT
+#ifdef EXTREMA_SPEED_TEST
     cudaEvent_t start;
     cudaEvent_t stop;
     cudaError_t err;
@@ -632,7 +731,10 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
     POP_CUDA_FATAL_TEST( err, "event create failed: " );
 
     float duration = 0.0f;
-    for( int loop=0; loop<10; loop++ ) {
+    float min_duration = std::numeric_limits<float>::max();
+    float max_duration = std::numeric_limits<float>::min();
+    int   loop_len = 100;
+    for( int loop=0; loop<loop_len; loop++ ) {
         err = cudaEventRecord( start, 0 );
         POP_CUDA_FATAL_TEST( err, "event record failed: " );
         reset_extremum_counter();
@@ -645,14 +747,19 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
         err = cudaEventElapsedTime( &diff, start, stop );
         POP_CUDA_FATAL_TEST( err, "elapsed time failed: " );
         duration += diff;
+        min_duration = min( min_duration, diff );
+        max_duration = max( max_duration, diff );
     }
-    duration /= 10.0f;
-    cerr << "find_extrema_v4 avg time " << duration << " ms" << endl;
-#else // not EXTREMA_SPEED_TEXT
+    duration /= loop_len;
+    cerr << "find_extrema_v4 avg time " << duration << " ms "
+         << "min " << min_duration << " ms "
+         << "max " << max_duration << " ms" << endl;
+
+#else // not EXTREMA_SPEED_TEST
     reset_extremum_counter();
 
     find_extrema_v4( 2, edgeLimit, threshold );
-#endif // not EXTREMA_SPEED_TEXT
+#endif // not EXTREMA_SPEED_TEST
 
     for( int o=0; o<_num_octaves; o++ ) {
         _octaves[o].readExtremaCount( );
