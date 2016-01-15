@@ -225,7 +225,10 @@ private:
     void build_v12 ( Image* base );
 
     void reset_extremum_counter( );
-    void find_extrema_v4( uint32_t height, float edgeLimit, float threshold );
+    void find_extrema_v4( float edgeLimit, float threshold );
+
+    template<int HEIGHT>
+    void find_extrema_v4_sub( float edgeLimit, float threshold );
 
     void orientation_v1( );
     void orientation_v2( );

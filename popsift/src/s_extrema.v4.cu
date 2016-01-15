@@ -4,9 +4,7 @@
 #include "clamp.h"
 #include <cuda_runtime.h>
 
-#define DEBUG_MODE 1
-
-#define DEBUG_
+#include <cub/block/block_scan.cuh>
 
 /*************************************************************
  * V5: device side
@@ -14,23 +12,49 @@
 __device__ __constant__ float d_sigma0;
 __device__ __constant__ float d_sigma_k;
 
+#if 0
+template<int HEIGHT>
 __device__
-inline uint32_t extrema_count_v4( uint32_t indicator, ExtremaMgmt* mgmt )
+inline int extrema_count_v4( int indicator, ExtremaMgmt* mgmt )
+{
+    typedef cub::BlockScan<int, 32, cub::BLOCK_SCAN_RAKING, HEIGHT> BlockScan;
+
+    // Allocate shared memory for BlockScan
+    __shared__ typename BlockScan::TempStorage temp_storage;
+    __shared__ int base_offset;
+
+    int offset;
+    int total;
+
+    // Collectively compute the block-wide exclusive prefix sum
+    BlockScan(temp_storage).ExclusiveSum( indicator, offset, total );
+
+    if( threadIdx.x == 0 && threadIdx.y == 0 ) {
+        // atomicAdd returns the old value, we consider this the based
+        // index for this thread's write operation
+        base_offset = atomicAdd( &mgmt->counter, total );
+    }
+    int write_index = base_offset + offset;
+
+    return write_index;
+}
+#else
+template<int HEIGHT>
+__device__
+inline uint32_t extrema_count_v4( int indicator, ExtremaMgmt* mgmt )
 {
     uint32_t mask = __ballot( indicator ); // bitfield of warps with results
 
     uint32_t ct = __popc( mask );          // horizontal reduce
 
-    uint32_t leader = __ffs(mask) - 1;     // the highest thread id with indicator==true
-
     uint32_t write_index;
-    if( threadIdx.x == leader ) {
+    if( threadIdx.x == 0 ) {
         // atomicAdd returns the old value, we consider this the based
         // index for this thread's write operation
         write_index = atomicAdd( &mgmt->counter, ct );
     }
-    // broadcast from leader thread to all threads in warp
-    write_index = __shfl( write_index, leader );
+    // broadcast from thread 0 to all threads in warp
+    write_index = __shfl( write_index, 0 );
 
     // this thread's offset: count only bits below the bit of the own
     // thread index; this provides the 0 result and every result up to ct
@@ -38,6 +62,7 @@ inline uint32_t extrema_count_v4( uint32_t indicator, ExtremaMgmt* mgmt )
 
     return write_index;
 }
+#endif
 
 __device__
 inline void extremum_cmp_v4( float val, float f, uint32_t& gt, uint32_t& lt, uint32_t mask )
@@ -325,8 +350,7 @@ bool find_extrema_in_dog_v4_bemap( cudaTextureObject_t dog,
                                    float               edge_limit,
                                    float               threshold,
                                    const uint32_t      maxlevel,
-                                   ExtremaMgmt*        d_extrema_mgmt,
-                                   ExtremumCandidate*  d_extrema )
+                                   ExtremumCandidate&  ec )
 {
     /*
      * First consideration: extrema cannot be found on any outermost edge,
@@ -512,16 +536,6 @@ bool find_extrema_in_dog_v4_bemap( cudaTextureObject_t dog,
         return false;
     }
 
-    uint32_t write_index = extrema_count_v4( true, d_extrema_mgmt );
-
-    if( write_index >= d_extrema_mgmt->max1 ) {
-        // atomicAdd( &debug_r.max_exceeded, 1 );
-        return false;
-    }
-    // atomicAdd( &debug_r.continuing, 1 );
-    // __syncthreads();
-
-    ExtremumCandidate ec;
     ec.xpos    = xn;
     ec.ypos    = yn;
     ec.sigma   = d_sigma0 * pow(d_sigma_k, sn);
@@ -530,7 +544,6 @@ bool find_extrema_in_dog_v4_bemap( cudaTextureObject_t dog,
         // ec.edge    = 0;
     ec.angle_from_bemap = 0;
     ec.not_a_keypoint   = 0;
-    d_extrema[write_index] = ec;
 
     return true;
 }
@@ -543,8 +556,7 @@ bool find_extrema_in_dog_v4_bemap( Plane2D_float&     dog0,
                                    float              threshold,
                                    const uint32_t     level,
                                    const uint32_t     maxlevel,
-                                   ExtremaMgmt*       d_extrema_mgmt,
-                                   ExtremumCandidate* d_extrema )
+                                   ExtremumCandidate& ec )
 {
     /*
      * First consideration: extrema cannot be found on any outermost edge,
@@ -729,16 +741,6 @@ bool find_extrema_in_dog_v4_bemap( Plane2D_float&     dog0,
         return false;
     }
 
-    uint32_t write_index = extrema_count_v4( true, d_extrema_mgmt );
-
-    if( write_index >= d_extrema_mgmt->max1 ) {
-        // atomicAdd( &debug_r.max_exceeded, 1 );
-        return false;
-    }
-    // atomicAdd( &debug_r.continuing, 1 );
-    // __syncthreads();
-
-    ExtremumCandidate ec;
     ec.xpos    = xn;
     ec.ypos    = yn;
     ec.sigma   = d_sigma0 * pow(d_sigma_k, sn);
@@ -747,13 +749,13 @@ bool find_extrema_in_dog_v4_bemap( Plane2D_float&     dog0,
         // ec.edge    = 0;
     ec.angle_from_bemap = 0;
     ec.not_a_keypoint   = 0;
-    d_extrema[write_index] = ec;
 
     return true;
 }
 #endif // not USE_DOG_ARRAY
 
 #ifdef USE_DOG_ARRAY
+template<int HEIGHT>
 __global__
 void find_extrema_in_dog_v4( cudaTextureObject_t dog,
                              int                 level,
@@ -766,10 +768,23 @@ void find_extrema_in_dog_v4( cudaTextureObject_t dog,
                              ExtremumCandidate*  d_extrema )
 {
     ExtremaMgmt* mgmt = &mgmt_array[level];
+    ExtremumCandidate ec;
 
-    uint32_t indicator = find_extrema_in_dog_v4_bemap( dog, level, width, height, edge_limit, threshold, maxlevel, mgmt, d_extrema );
+    bool indicator = find_extrema_in_dog_v4_bemap( dog, level, width, height, edge_limit, threshold, maxlevel, ec );
+
+    uint32_t write_index = extrema_count_v4<HEIGHT>( indicator, mgmt );
+
+    if( indicator && write_index < mgmt->max1 ) {
+        // atomicAdd( &debug_r.continuing, 1 );
+        // __syncthreads();
+
+        d_extrema[write_index] = ec;
+    } else {
+        // atomicAdd( &debug_r.max_exceeded, 1 );
+    }
 }
 #else // not USE_DOG_ARRAY
+template<int HEIGHT>
 __global__
 void find_extrema_in_dog_v4( Plane2D_float      dog_upper,
                              Plane2D_float      dog_here,
@@ -782,8 +797,20 @@ void find_extrema_in_dog_v4( Plane2D_float      dog_upper,
                              ExtremumCandidate* d_extrema )
 {
     ExtremaMgmt* mgmt = &mgmt_array[level];
+    ExtremumCandidate ec;
 
-    uint32_t indicator = find_extrema_in_dog_v4_bemap( dog_upper, dog_here, dog_lower, edge_limit, threshold, level, maxlevel, mgmt, d_extrema );
+    bool indicator = find_extrema_in_dog_v4_bemap( dog_upper, dog_here, dog_lower, edge_limit, threshold, level, maxlevel, ec );
+
+    uint32_t write_index = extrema_count_v4<HEIGHT>( indicator, mgmt );
+
+    if( indicator && write_index < mgmt->max1 ) {
+        // atomicAdd( &debug_r.continuing, 1 );
+        // __syncthreads();
+
+        d_extrema[write_index] = ec;
+    } else {
+        // atomicAdd( &debug_r.max_exceeded, 1 );
+    }
 }
 #endif // not USE_DOG_ARRAY
 
@@ -793,6 +820,7 @@ void fix_extrema_count_v4( ExtremaMgmt* mgmt_array, uint32_t mgmt_level )
     ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
 
     mgmt->counter = min( mgmt->counter, mgmt->max1 );
+
     // printf("%s>%d - %d\n", __FILE__, __LINE__, mgmt->counter );
 }
 
@@ -819,8 +847,9 @@ void start_orientation_v4( ExtremumCandidate* extrema,
 /*************************************************************
  * V4: host side
  *************************************************************/
+template<int HEIGHT>
 __host__
-void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold )
+void Pyramid::find_extrema_v4_sub( float edgeLimit, float threshold )
 {
     // cerr << "Entering " << __FUNCTION__ << " - bitfield, 32x" << height << " kernels" << endl;
 
@@ -846,12 +875,10 @@ void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold
         for( int level=1; level<_levels-2; level++ ) {
             int cols = _octaves[octave].getData(level).getCols();
             int rows = _octaves[octave].getData(level).getRows();
-            dim3 block;
+            dim3 block( 32, HEIGHT );
             dim3 grid;
-            grid.x  = grid_divide( cols, 32 );
-            grid.y  = grid_divide( rows, height );
-            block.x = 32;
-            block.y = height;
+            grid.x  = grid_divide( cols, block.x );
+            grid.y  = grid_divide( rows, block.y );
 
 #if 0
         cerr << "In " << __FUNCTION__ << endl
@@ -867,7 +894,7 @@ void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold
 #endif
 
 #ifdef USE_DOG_ARRAY
-            find_extrema_in_dog_v4
+            find_extrema_in_dog_v4<HEIGHT>
                 <<<grid,block>>>
                 ( _octaves[octave].getDogTexture( ),
                   level,
@@ -883,7 +910,7 @@ void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold
             Plane2D_float& d1( _octaves[octave].getDogData( level   ) );
             Plane2D_float& d2( _octaves[octave].getDogData( level+1 ) );
 
-            find_extrema_in_dog_v4
+            find_extrema_in_dog_v4<THE_HEIGHT>
                 <<<grid,block>>>
                 ( d0, d1, d2,
                   edgeLimit,
@@ -935,6 +962,48 @@ void Pyramid::find_extrema_v4( uint32_t height, float edgeLimit, float threshold
          << "  everything OK: " << a.continuing << endl
          << endl;
 #endif
+}
+
+__host__
+void Pyramid::find_extrema_v4( float edgeLimit, float threshold )
+{
+    cudaEvent_t start;
+    cudaEvent_t stop;
+    cudaError_t err;
+    err = cudaEventCreate( &start );
+    POP_CUDA_FATAL_TEST( err, "event create failed: " );
+    err = cudaEventCreate( &stop );
+    POP_CUDA_FATAL_TEST( err, "event create failed: " );
+
+    float diff;
+
+#define MANYLY(H) \
+    err = cudaEventRecord( start, 0 ); \
+    POP_CUDA_FATAL_TEST( err, "event record failed: " ); \
+    find_extrema_v4_sub<H> ( edgeLimit, threshold ); \
+    err = cudaEventRecord( stop, 0 ); \
+    POP_CUDA_FATAL_TEST( err, "event record failed: " ); \
+    err = cudaStreamSynchronize( 0 ); \
+    POP_CUDA_FATAL_TEST( err, "stream sync failed: " ); \
+    err = cudaEventElapsedTime( &diff, start, stop ); \
+    POP_CUDA_FATAL_TEST( err, "elapsed time failed: " ); \
+    cerr << "Time for find_extrema_v4_sub<" #H ">: " << diff << " ms" << endl;
+
+    MANYLY(1)
+    MANYLY(2)
+    MANYLY(3)
+    MANYLY(4)
+    MANYLY(5)
+    MANYLY(6)
+    MANYLY(7)
+    MANYLY(8)
+    MANYLY(16)
+    MANYLY(32)
+
+    err = cudaEventDestroy( start );
+    POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
+    err = cudaEventDestroy( stop );
+    POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
 }
 
 void Pyramid::init_sigma( float sigma0, uint32_t levels )

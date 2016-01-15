@@ -141,7 +141,7 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
     bool  found_angle = false;
 
     /* find other peaks, boundary of 80% of max */
-    for( int bin=threadIdx.x; __any(bin < NBINS_V2); bin+=ORI_V2_NUM_THREADS ) {
+    for( int bin=threadIdx.x; ::__any(bin < NBINS_V2); bin+=ORI_V2_NUM_THREADS ) {
         if( bin < NBINS_V2 ) {
             float hc = hist[bin];
             float hn = hist[(bin+1) % NBINS_V2];

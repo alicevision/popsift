@@ -5,7 +5,7 @@ PROJECT( PopSift )
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
-set(CMAKE_BUILD_TYPE Debug) # Debug, Release
+set(CMAKE_BUILD_TYPE Release) # Debug, Release
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -O3")
 set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_DEBUG}   -O3")
@@ -35,6 +35,8 @@ IF(CUDA_FOUND)
 
   # library required for CUDA dynamic parallelism, forgotten by CMake 3.4
   cuda_find_library_local_first(CUDA_CUDADEVRT_LIBRARY cudadevrt "\"cudadevrt\" library")
+
+  include_directories("${CMAKE_SOURCE_DIR}/popsift/Cuda-7.0-cub")
 ELSE(CUDA_FOUND)
   message( FATAL_ERROR "Could not find CUDA >= 7.0" )
 ENDIF(CUDA_FOUND)

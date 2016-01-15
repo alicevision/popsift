@@ -762,7 +762,7 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
         err = cudaEventRecord( start, 0 );
         POP_CUDA_FATAL_TEST( err, "event record failed: " );
         reset_extremum_counter();
-        find_extrema_v4( 2, edgeLimit, threshold );
+        find_extrema_v4( edgeLimit, threshold );
         err = cudaEventRecord( stop, 0 );
         POP_CUDA_FATAL_TEST( err, "event record failed: " );
         err = cudaStreamSynchronize( 0 );
@@ -779,10 +779,15 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
          << "min " << min_duration << " ms "
          << "max " << max_duration << " ms" << endl;
 
+    err = cudaEventDestroy( start );
+    POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
+    err = cudaEventDestroy( stop );
+    POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
+
 #else // not EXTREMA_SPEED_TEST
     reset_extremum_counter();
 
-    find_extrema_v4( 2, edgeLimit, threshold );
+    find_extrema_v4( edgeLimit, threshold );
 #endif // not EXTREMA_SPEED_TEST
 
     for( int o=0; o<_num_octaves; o++ ) {
