@@ -358,6 +358,8 @@ void Pyramid::Octave::resetExtremaCount( )
 
 void Pyramid::Octave::readExtremaCount( )
 {
+    assert( _h_extrema_mgmt );
+    assert( _d_extrema_mgmt );
     POP_CUDA_MEMCPY_ASYNC( _h_extrema_mgmt,
                            _d_extrema_mgmt,
                            _levels * sizeof(ExtremaMgmt),
