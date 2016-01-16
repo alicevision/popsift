@@ -71,7 +71,6 @@ class Pyramid
 
         Plane2D_float* _data;
         Plane2D_float  _intermediate_data;
-        Plane2D_float* _t_data;
 #ifdef USE_DOG_ARRAY
         cudaArray_t           _dog_3d;
         cudaChannelFormatDesc _dog_3d_desc;
@@ -110,8 +109,6 @@ class Pyramid
         inline int getLevels() const { return _levels; }
         inline int getWidth() const  { return _data[0].getWidth(); }
         inline int getHeight() const { return _data[0].getHeight(); }
-        inline int getTransposedWidth() const  { return _t_data[0].getWidth(); }
-        inline int getTransposedHeight() const { return _t_data[0].getHeight(); }
 
         inline Plane2D_float& getData( uint32_t level ) {
             return _data[level];
@@ -137,27 +134,14 @@ class Pyramid
             return _dog_data[0].getByteSize();
         }
 #endif // not USE_DOG_ARRAY
-        inline Plane2D_float& getTransposedData( uint32_t level ) {
-            return _t_data[level];
-        }
-
         inline uint32_t getFloatSizeData() const {
             return _data[0].getByteSize() / sizeof(float);
-        }
-        inline uint32_t getFloatSizeTransposedData() const {
-            return _t_data[0].getByteSize() / sizeof(float);
         }
         inline uint32_t getByteSizeData() const {
             return _data[0].getByteSize();
         }
-        inline uint32_t getByteSizeTransposedData() const {
-            return _t_data[0].getByteSize();
-        }
         inline uint32_t getByteSizePitch() const {
             return _data[0].getPitch();
-        }
-        inline uint32_t getByteSizeTransposedPitch() const {
-            return _t_data[0].getPitch();
         }
 
         inline ExtremaMgmt* getExtremaMgmtH( uint32_t level ) {
@@ -221,7 +205,6 @@ public:
     void report_times();
 
 private:
-    void build_v6  ( Image* base );
     void build_v7  ( Image* base );
     void build_v8  ( Image* base );
     void build_v11 ( Image* base );

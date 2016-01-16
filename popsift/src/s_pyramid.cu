@@ -122,7 +122,6 @@ void Pyramid::test_last_error( int line )
 
 Pyramid::Octave::Octave( )
     : _data(0)
-    , _t_data(0)
 #ifndef USE_DOG_ARRAY
     , _dog_data(0)
 #endif // not USE_DOG_ARRAY
@@ -198,7 +197,6 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
     _data     = new Plane2D_float[_levels];
-    _t_data   = new Plane2D_float[_levels];
 
 #ifdef ALLOC_BULK
     void*  ptr;
@@ -212,19 +210,9 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
                                   (float*)( (intptr_t)ptr + i*(pitch*height) ),
                                   pitch );
     }
-
-    err = cudaMallocPitch( &ptr, &pitch, width * sizeof(float), height * _levels );
-    POP_CUDA_FATAL_TEST( err, "Cannot allocate t-data CUDA memory: " );
-    for( int i=0; i<_levels; i++ ) {
-        _t_data[i] = Plane2D_float( width,
-                                    height,
-                                    (float*)((intptr_t)ptr + i*(pitch*height)),
-                                    pitch );
-    }
 #else // not ALLOC_BULK
     for( int i=0; i<_levels; i++ ) {
         _data[i]  .allocDev( width, height );
-        _t_data[i].allocDev( height, width );
     }
 #endif // not ALLOC_BULK
     _intermediate_data.allocDev( width, height );
@@ -345,11 +333,9 @@ void Pyramid::Octave::free( )
     _intermediate_data.freeDev( );
 #ifdef ALLOC_BULK
     POP_CUDA_FREE( _data[0].data );
-    POP_CUDA_FREE( _t_data[0].data );
 #else // not ALLOC_BULK
     for( int i=0; i<_levels; i++ ) {
         _data[i]  .freeDev( );
-        _t_data[i].freeDev( );
     }
 #endif // not ALLOC_BULK
 #ifdef USE_DOG_ARRAY
@@ -370,7 +356,6 @@ void Pyramid::Octave::free( )
 #endif // not USE_DOG_ARRAY
 
     delete [] _data;
-    delete [] _t_data;
 }
 
 void Pyramid::Octave::resetExtremaCount( )
@@ -671,29 +656,25 @@ void Pyramid::build( Image* base )
     err = cudaEventCreate( &stop );
     POP_CUDA_FATAL_TEST( err, "event create failed: " );
 
-    for( int mode=0; mode<5; mode++ ) {
+    for( int mode=0; mode<4; mode++ ) {
         float duration = 0.0f;
         for( int loop=0; loop<10; loop++ ) {
             err = cudaEventRecord( start, 0 );
             POP_CUDA_FATAL_TEST( err, "event record failed: " );
             switch( mode ) {
             case 0 :
-                build_v6( base );
-                POP_CHK;
-                break;
-            case 1 :
                 build_v7( base );
                 POP_CHK;
                 break;
-            case 2 :
+            case 1 :
                 build_v8( base );
                 POP_CHK;
                 break;
-            case 3 :
+            case 2 :
                 build_v11( base );
                 POP_CHK;
                 break;
-            case 4 :
+            case 3 :
                 build_v12( base );
                 POP_CHK;
                 break;
@@ -709,7 +690,9 @@ void Pyramid::build( Image* base )
         }
         duration /= 10.0f;
         cerr << "Pyramid "
-             << ( (mode==0) ? "V6" : (mode==1) ? "V7" : (mode==2) ? "V8" : (mode==3) ? "V11" : "V12" )
+             << ( (mode==0) ? "V7" :
+                  (mode==1) ? "V8" :
+                  (mode==2) ? "V11" : "V12" )
              << " avg duration: " << duration << " ms" << endl;
     }
 
@@ -729,7 +712,6 @@ void Pyramid::build( Image* base )
     err = cudaEventRecord( start, 0 );
     POP_CUDA_FATAL_TEST( err, "event record failed: " );
 
-    // build_v6( base );
     // build_v7( base );
     // build_v8( base );
     build_v11( base );
