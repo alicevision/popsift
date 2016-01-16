@@ -22,6 +22,7 @@
 
 #undef PYRAMID_SPEED_TEST
 #undef EXTREMA_SPEED_TEST
+#define ALLOC_BULK
 
 #define PYRAMID_PRINT_DEBUG 0
 
@@ -39,7 +40,6 @@ namespace popart {
 
 #include "s_ori.v1.h"
 #include "s_ori.v2.h"
-#include "s_extrema.v4.h"
 
 /*************************************************************
  * CUDA device functions for printing debug information
@@ -200,10 +200,33 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
     _data     = new Plane2D_float[_levels];
     _t_data   = new Plane2D_float[_levels];
 
+#ifdef ALLOC_BULK
+    void*  ptr;
+    size_t pitch;
+
+    err = cudaMallocPitch( &ptr, &pitch, width * sizeof(float), height * _levels );
+    POP_CUDA_FATAL_TEST( err, "Cannot allocate data CUDA memory: " );
+    for( int i=0; i<_levels; i++ ) {
+        _data[i] = Plane2D_float( width,
+                                  height,
+                                  (float*)( (intptr_t)ptr + i*(pitch*height) ),
+                                  pitch );
+    }
+
+    err = cudaMallocPitch( &ptr, &pitch, width * sizeof(float), height * _levels );
+    POP_CUDA_FATAL_TEST( err, "Cannot allocate t-data CUDA memory: " );
+    for( int i=0; i<_levels; i++ ) {
+        _t_data[i] = Plane2D_float( width,
+                                    height,
+                                    (float*)((intptr_t)ptr + i*(pitch*height)),
+                                    pitch );
+    }
+#else // not ALLOC_BULK
     for( int i=0; i<_levels; i++ ) {
         _data[i]  .allocDev( width, height );
         _t_data[i].allocDev( height, width );
     }
+#endif // not ALLOC_BULK
     _intermediate_data.allocDev( width, height );
 #ifdef USE_DOG_ARRAY
     _dog_3d_desc.f = cudaChannelFormatKindFloat;
@@ -216,11 +239,13 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
     _dog_3d_ext.height = height;
     _dog_3d_ext.depth  = _levels - 1;
 
+    POP_PRINT_MEM( "(before DOG 3D array)" );
     err = cudaMalloc3DArray( &_dog_3d,
                              &_dog_3d_desc,
                              _dog_3d_ext,
                              cudaArrayLayered | cudaArraySurfaceLoadStore );
     POP_CUDA_FATAL_TEST( err, "Could not allocate 3D DoG array: " );
+    POP_PRINT_MEM( "(after DOG 3D array)" );
 
     cudaResourceDesc dog_res_desc;
     dog_res_desc.resType         = cudaResourceTypeArray;
@@ -318,10 +343,15 @@ void Pyramid::Octave::free( )
     delete [] _data_tex;
 
     _intermediate_data.freeDev( );
+#ifdef ALLOC_BULK
+    POP_CUDA_FREE( _data[0].data );
+    POP_CUDA_FREE( _t_data[0].data );
+#else // not ALLOC_BULK
     for( int i=0; i<_levels; i++ ) {
         _data[i]  .freeDev( );
         _t_data[i].freeDev( );
     }
+#endif // not ALLOC_BULK
 #ifdef USE_DOG_ARRAY
     err = cudaDestroyTextureObject( _dog_3d_tex );
     POP_CUDA_FATAL_TEST( err, "Could not destroy DoG texture: " );
@@ -596,6 +626,7 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels )
     : _num_octaves( octaves )
     , _levels( levels + 3 )
     , _keep_time_extrema_v4( 0 )
+    , _keep_time_extrema_v5( 0 )
     , _keep_time_orient_v1(  0 )
     , _keep_time_orient_v2(  0 )
     , _keep_time_descr_v1(   0 )
@@ -723,6 +754,7 @@ void Pyramid::report_times( )
     cudaDeviceSynchronize();
 
     _keep_time_extrema_v4.report("    V4, time for finding extrema: " );
+    _keep_time_extrema_v5.report("    V5, time for finding extrema: " );
     if( ORIENTA_V1_ON ) _keep_time_orient_v1. report("    V1, time for finding orientation: " );
     if( ORIENTA_V2_ON ) _keep_time_orient_v2. report("    V2, time for finding orientation: " );
     _keep_time_descr_v1.report("    V1, time for computing descriptors: " );
@@ -786,8 +818,10 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
 
 #else // not EXTREMA_SPEED_TEST
     reset_extremum_counter();
-
     find_extrema_v4( edgeLimit, threshold );
+
+    reset_extremum_counter();
+    find_extrema_v5( edgeLimit, threshold );
 #endif // not EXTREMA_SPEED_TEST
 
     for( int o=0; o<_num_octaves; o++ ) {

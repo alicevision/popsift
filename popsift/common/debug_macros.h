@@ -72,7 +72,7 @@ void pop_cuda_memset( void*        ptr,
         exit( -__LINE__ ); \
     }
 
-#define POP_CHECK_NON_NULL(ptr,s) if( ptr == 0 ) { POP_FATAL(s); }
+#define POP_CHECK_NON_NULL(ptr,s) if( ptr == 0 ) { POP_FATAL_FL(s,__FILE__,__LINE__); }
 
 #define POP_CHECK_NON_NULL_FL(ptr,s,file,line) if( ptr == 0 ) { POP_FATAL_FL(s,file,line); }
 
@@ -99,6 +99,12 @@ void pop_cuda_memset( void*        ptr,
         POP_CUDA_FATAL_TEST( err, "cudaMemset failed: " ); \
     }
 
+#define POP_CUDA_FREE( ptr ) { \
+        cudaError_t err; \
+        err = cudaFree( ptr ); \
+        POP_CUDA_FATAL_TEST( err, "cudaFree failed: " ); \
+    }
+
 #define POP_CUDA_MALLOC_HOST( ptr, sz ) { \
         cudaError_t err; \
         err = cudaMallocHost( ptr, sz ); \
@@ -121,5 +127,16 @@ void pop_cuda_memset( void*        ptr,
         cudaError_t err; \
         err = cudaStreamDestroy( ptr ); \
         POP_CUDA_FATAL_TEST( err, "cudaStreamDestroy failed: " ); \
+    }
+
+#define POP_PRINT_MEM( where ) { \
+        cudaError_t err; \
+        size_t      freeMem; \
+        size_t      totalMem; \
+        err = cudaMemGetInfo( &freeMem, &totalMem ); \
+        POP_CUDA_FATAL_TEST( err, "Failed to check CUDA mem/free mem: " ); \
+        std::cerr << "Free mem: " << freeMem/1024 << " kB " \
+                  << freeMem << " B " \
+                  << where << std::endl; \
     }
 

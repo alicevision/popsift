@@ -6,6 +6,7 @@
 #include <cuda_runtime.h>
 
 #include "plane_2d.h"
+#include "debug_macros.h"
 
 using namespace std;
 
@@ -14,15 +15,13 @@ namespace popart {
 __host__
 void* PlaneBase::allocDev2D( size_t& pitch, int w, int h, int elemSize )
 {
+    cerr << "Alloc " << w*h*elemSize << " B" << endl;
+    POP_PRINT_MEM( "(before alloc 2D)");
     void*       ptr;
     cudaError_t err;
     err = cudaMallocPitch( &ptr, &pitch, w * elemSize, h );
-    if( err != cudaSuccess ) {
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Cannot allocate " << w*h*elemSize << " bytes of CUDA memory" << endl
-             << "    Cause: " << cudaGetErrorString( err ) << endl;
-        exit( -1 );
-    }
+    POP_CUDA_FATAL_TEST( err, "Cannot allocate pitched CUDA memory: " );
+    POP_PRINT_MEM( "(after alloc 2D)");
     return ptr;
 }
 
@@ -31,12 +30,7 @@ void PlaneBase::freeDev2D( void* data )
 {
     cudaError_t err;
     err = cudaFree( data );
-    if( err != cudaSuccess ) {
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Failed to free CUDA memory." << endl
-             << "    Cause: " << cudaGetErrorString( err ) << endl;
-        exit( -1 );
-    }
+    POP_CUDA_FATAL_TEST( err, "Failed to free CUDA memory: " );
 }
 
 __host__
@@ -74,15 +68,8 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
         void* ptr;
         cudaError_t err;
         err = cudaMallocHost( &ptr, sz );
-
-        if( err == cudaSuccess ) return ptr;
-
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Failed to allocate " << sz << " bytes of aligned and pinned host memory." << endl
-             << "    Cause: " << cudaGetErrorString(err) << endl
-             << "    Trying to allocate unaligned instead." << endl;
-
-        return allocHost2D( w, h, elemSize, Unaligned );
+        POP_CUDA_FATAL_TEST( err, "Failed to allocate aligned and pinned host memory: " );
+        return ptr;
     } else {
         cerr << __FILE__ << ":" << __LINE__ << endl
              << "    Alignment not correctly specified in host plane allocation" << endl;
@@ -120,12 +107,7 @@ void PlaneBase::memcpyToDevice( void* dst, int dst_pitch,
                         src, src_pitch,
                         cols*elemSize, rows,
                         cudaMemcpyHostToDevice );
-    if( err != cudaSuccess ) {
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Failed to copy 2D plane host-to-device." << endl
-             << "    Cause: " << cudaGetErrorString( err ) << endl;
-        exit( -1 );
-    }
+    POP_CUDA_FATAL_TEST( err, "Failed to copy 2D plane host-to-device: " );
 }
 
 __host__
@@ -147,12 +129,7 @@ void PlaneBase::memcpyToDevice( void* dst, int dst_pitch,
                              cols*elemSize, rows,
                              cudaMemcpyHostToDevice,
                              stream );
-    if( err != cudaSuccess ) {
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Failed to copy 2D plane host-to-device." << endl
-             << "    Cause: " << cudaGetErrorString( err ) << endl;
-        exit( -1 );
-    }
+    POP_CUDA_FATAL_TEST( err, "Failed to copy 2D plane host-to-device: " );
 }
 
 __host__
@@ -172,12 +149,7 @@ void PlaneBase::memcpyToHost( void* dst, int dst_pitch,
                         src, src_pitch,
                         cols*elemSize, rows,
                         cudaMemcpyDeviceToHost );
-    if( err != cudaSuccess ) {
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Failed to copy 2D plane device-to-host." << endl
-             << "    Cause: " << cudaGetErrorString( err ) << endl;
-        exit( -1 );
-    }
+    POP_CUDA_FATAL_TEST( err, "Failed to copy 2D plane device-to-host: " );
 }
 
 __host__
@@ -199,12 +171,7 @@ void PlaneBase::memcpyToHost( void* dst, int dst_pitch,
                              cols*elemSize, rows,
                              cudaMemcpyDeviceToHost,
                              stream );
-    if( err != cudaSuccess ) {
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Failed to copy 2D plane device-to-host." << endl
-             << "    Cause: " << cudaGetErrorString( err ) << endl;
-        exit( -1 );
-    }
+    POP_CUDA_FATAL_TEST( err, "Failed to copy 2D plane device-to-host: " );
 }
 
 #ifdef PLANE2D_CUDA_OP_DEBUG
@@ -213,12 +180,7 @@ void PlaneBase::waitAndCheck( cudaStream_t stream ) const
 {
     cudaStreamSynchronize( stream );
     cudaError_t err = cudaGetLastError( );
-    if( err != cudaSuccess ) {
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Failed in error check after async 2D plane operation." << endl
-             << "    Cause: " << cudaGetErrorString( err ) << endl;
-        exit( -1 );
-    }
+    POP_CUDA_FATAL_TEST( err, "Failed in error check after async 2D plane operation: " );
 }
 #endif // PLANE2D_CUDA_OP_DEBUG
 
