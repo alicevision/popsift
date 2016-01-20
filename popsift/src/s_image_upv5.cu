@@ -90,8 +90,6 @@ void Image::upscale_v5( cudaTextureObject_t & tex )
 __host__
 void Image::upscale_v5( cudaTextureObject_t & tex )
 {
-    cerr << "Texture method" << endl;
-
     dim3 block( 64, 2 );
     int gridx = grid_divide( this->array.getCols(), block.x );
     int gridy = grid_divide( this->array.getRows(), block.y );

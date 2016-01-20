@@ -620,7 +620,7 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels )
     , _keep_time_orient_v2(  0 )
     , _keep_time_descr_v1(   0 )
 {
-    cerr << "Entering " << __FUNCTION__ << endl;
+    // cerr << "Entering " << __FUNCTION__ << endl;
 
     _octaves = new Octave[_num_octaves];
 

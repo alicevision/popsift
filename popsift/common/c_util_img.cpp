@@ -232,8 +232,8 @@ void read_pgpm(std::string & filename, imgStream & buffer, int &isPGM)
 
 void read_gray(std::string & filename, imgStream & buffer)
 {
-    cerr << "Entering " << __FUNCTION__ << endl;
-    cerr << "   filename " << filename << endl;
+    // cerr << "Entering " << __FUNCTION__ << endl;
+    // cerr << "   filename " << filename << endl;
 
     bool isPGM;
 
@@ -264,7 +264,7 @@ void read_gray(std::string & filename, imgStream & buffer)
         isPGM = true;
         break;
     case '6':
-        cerr << "    File is in PPM format" << endl;
+        // cerr << "    File is in PPM format" << endl;
         isPGM = false;
         break;
     default:
@@ -325,7 +325,7 @@ void read_gray(std::string & filename, imgStream & buffer)
             *start++ = (pixel_uc) (*buffer++);
       }
     } else {
-      cerr << "    NOT PGM case" << endl;
+      // cerr << "    NOT PGM case" << endl;
       if( not isAscii ) {    // PPM P6 image
         ptr_r = new pixel_uc[width * height];
 
@@ -360,7 +360,7 @@ void read_gray(std::string & filename, imgStream & buffer)
     buffer.data_g = 0;
     buffer.data_b = 0;
 
-    cerr << "Leaving " << __FUNCTION__ << endl;
+    // cerr << "Leaving " << __FUNCTION__ << endl;
 }
 
 /** 
