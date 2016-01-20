@@ -99,10 +99,10 @@ void PopSift::uninit( )
     _hst_input_image.freeHost( popart::CudaAllocated );
     _dev_input_image.freeDev( );
 
-    _initTime   ->report( "Time to initialize:    " );
-    _uploadTime ->report( "Time to upload:        " );
-    _pyramidTime->report( "Time to build pyramid: " );
-    _extremaTime->report( "Time to find extrema:  " );
+    _initTime   ->report( "Time to initialize:                        " );
+    _uploadTime ->report( "Time to upload:                            " );
+    _pyramidTime->report( "Time to build pyramid:                     " );
+    _extremaTime->report( "Time to find extrema & compute orientaton: " );
 
     delete _initTime;
     delete _uploadTime;

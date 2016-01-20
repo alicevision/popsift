@@ -858,15 +858,15 @@ void Pyramid::find_extrema_v5( float edgeLimit, float threshold )
     cerr << "Time for find_extrema_v5_sub<" #H ">: " << diff << " ms" << endl;
 
     MANYLY(1)
-    MANYLY(2)
-    MANYLY(3)
-    MANYLY(4)
-    MANYLY(5)
-    MANYLY(6)
-    MANYLY(7)
-    MANYLY(8)
-    MANYLY(16)
-    MANYLY(32)
+    // MANYLY(2)
+    // MANYLY(3)
+    // MANYLY(4)
+    // MANYLY(5)
+    // MANYLY(6)
+    // MANYLY(7)
+    // MANYLY(8)
+    // MANYLY(16)
+    // MANYLY(32)
 
     err = cudaEventDestroy( start );
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );

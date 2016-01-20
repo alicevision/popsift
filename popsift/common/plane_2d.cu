@@ -43,8 +43,13 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
 
         if( ptr != 0 ) return ptr;
         
+#ifdef _GNU_SOURCE
+        char b[100];
+        const char* buf = strerror_r( errno, b, 100 );
+#else
         char buf[100];
         strerror_r( errno, buf, 100 );
+#endif
         cerr << __FILE__ << ":" << __LINE__ << endl
              << "    Failed to allocate " << sz << " bytes of unaligned host memory." << endl
              << "    Cause: " << buf << endl;
@@ -56,8 +61,13 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
 
         if( retval == 0 ) return ptr;
 
+#ifdef _GNU_SOURCE
+        char b[100];
+        const char* buf = strerror_r( errno, b, 100 );
+#else
         char buf[100];
         strerror_r( errno, buf, 100 );
+#endif
         cerr << __FILE__ << ":" << __LINE__ << endl
              << "    Failed to allocate " << sz << " bytes of page-aligned host memory." << endl
              << "    Cause: " << buf << endl

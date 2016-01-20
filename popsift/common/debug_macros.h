@@ -129,6 +129,9 @@ void pop_cuda_memset( void*        ptr,
         POP_CUDA_FATAL_TEST( err, "cudaStreamDestroy failed: " ); \
     }
 
+#if 1
+#define POP_PRINT_MEM( where )
+#else
 #define POP_PRINT_MEM( where ) { \
         cudaError_t err; \
         size_t      freeMem; \
@@ -139,4 +142,5 @@ void pop_cuda_memset( void*        ptr,
                   << freeMem << " B " \
                   << where << std::endl; \
     }
+#endif
 

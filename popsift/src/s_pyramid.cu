@@ -26,9 +26,13 @@
 
 #define PYRAMID_PRINT_DEBUG 0
 
-#define PYRAMID_V6_ON true
-#define PYRAMID_V7_ON true
-#define PYRAMID_V8_ON true
+#define PYRAMID_V7_ON  false
+#define PYRAMID_V8_ON  false
+#define PYRAMID_V11_ON true
+#define PYRAMID_V12_ON false
+
+#define EXTREMA_NO_CUB true
+#define EXTREMA_CUB    false
 
 #define EXTREMA_V4_ON true
 #define ORIENTA_V1_ON false
@@ -712,10 +716,10 @@ void Pyramid::build( Image* base )
     err = cudaEventRecord( start, 0 );
     POP_CUDA_FATAL_TEST( err, "event record failed: " );
 
-    // build_v7( base );
-    // build_v8( base );
-    build_v11( base );
-    // build_v12( base );
+    if( PYRAMID_V7_ON  ) build_v7( base );
+    if( PYRAMID_V8_ON  ) build_v8( base );
+    if( PYRAMID_V11_ON ) build_v11( base );
+    if( PYRAMID_V12_ON ) build_v12( base );
 
     err = cudaEventRecord( stop, 0 );
     POP_CUDA_FATAL_TEST( err, "event record failed: " );
@@ -799,11 +803,15 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
 
 #else // not EXTREMA_SPEED_TEST
-    reset_extremum_counter();
-    find_extrema_v4( edgeLimit, threshold );
+    if( EXTREMA_NO_CUB ) {
+        reset_extremum_counter();
+        find_extrema_v4( edgeLimit, threshold );
+    }
 
-    reset_extremum_counter();
-    find_extrema_v5( edgeLimit, threshold );
+    if( EXTREMA_CUB ) {
+        reset_extremum_counter();
+        find_extrema_v5( edgeLimit, threshold );
+    }
 #endif // not EXTREMA_SPEED_TEST
 
     for( int o=0; o<_num_octaves; o++ ) {

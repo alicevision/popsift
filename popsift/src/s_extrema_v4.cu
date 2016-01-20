@@ -7,10 +7,20 @@
 
 #include <cub/block/block_scan.cuh>
 
+#undef COUNT_NUM_LOOPS
+
 namespace popart {
 /*************************************************************
  * V4: device side
  *************************************************************/
+
+#ifdef COUNT_NUM_LOOPS
+__device__ int debug_num_loops_1 = 0;
+__device__ int debug_num_loops_2 = 0;
+__device__ int debug_num_loops_3 = 0;
+__device__ int debug_num_loops_4 = 0;
+__device__ int debug_num_loops_5 = 0;
+#endif
 
 #if 0
 template<int HEIGHT>
@@ -298,8 +308,16 @@ bool find_extrema_in_dog_v4_sub( cudaTextureObject_t dog,
 
     int32_t iter;
 
+#ifdef COUNT_NUM_LOOPS
+    int debug_num_loops = 0;
+#endif
+
     /* must be execute at least once */
     for ( iter = 0; iter < 5; iter++) {
+#ifdef COUNT_NUM_LOOPS
+        debug_num_loops++;
+#endif
+
         const int z = level - 1;
         /* compute gradient */
         const float x2y1z1 = tex2DLayered<float>( dog, x+2, y+1, z+1 );
@@ -384,6 +402,22 @@ bool find_extrema_in_dog_v4_sub( cudaTextureObject_t dog,
         // atomicAdd( &debug_r.convergence_failure, 1 );
         return false;
     }
+
+#ifdef COUNT_NUM_LOOPS
+    switch( debug_num_loops )
+    {
+    case 1 : 
+        atomicAdd( &debug_num_loops_1, 1 ); break;
+    case 2 :
+        atomicAdd( &debug_num_loops_2, 1 ); break;
+    case 3 :
+        atomicAdd( &debug_num_loops_3, 1 ); break;
+    case 4 :
+        atomicAdd( &debug_num_loops_4, 1 ); break;
+    case 5 :
+        atomicAdd( &debug_num_loops_5, 1 ); break;
+    }
+#endif
 
     float contr   = v + 0.5f * (Dx * dx + Dy * dy + Ds * ds);
     float tr      = Dxx + Dyy;
@@ -511,8 +545,16 @@ bool find_extrema_in_dog_v4_sub( Plane2D_float&     dog0,
 
     int32_t iter;
 
+#ifdef COUNT_NUM_LOOPS
+    int debug_num_loops = 0;
+#endif
+
     /* must be execute at least once */
     for ( iter = 0; iter < 5; iter++) {
+#ifdef COUNT_NUM_LOOPS
+        debug_num_loops += 1;
+#endif
+
         /* compute gradient */
         Dx = 0.5 * ( dog1.ptr(y1)[x2] - dog1.ptr(y1)[x0] );
         Dy = 0.5 * ( dog1.ptr(y2)[x1] - dog1.ptr(y0)[x1] );
@@ -580,6 +622,22 @@ bool find_extrema_in_dog_v4_sub( Plane2D_float&     dog0,
         // atomicAdd( &debug_r.convergence_failure, 1 );
         return false;
     }
+
+#ifdef COUNT_NUM_LOOPS
+    switch( debug_num_loops )
+    {
+    case 1 : 
+        atomicAdd( &debug_num_loops_1, 1 ); break;
+    case 2 :
+        atomicAdd( &debug_num_loops_2, 1 ); break;
+    case 3 :
+        atomicAdd( &debug_num_loops_3, 1 ); break;
+    case 4 :
+        atomicAdd( &debug_num_loops_4, 1 ); break;
+    case 5 :
+        atomicAdd( &debug_num_loops_5, 1 ); break;
+    }
+#endif
 
     float contr   = v + 0.5f * (Dx * dx + Dy * dy + Ds * ds);
     float tr      = Dxx + Dyy;
@@ -856,20 +914,44 @@ void Pyramid::find_extrema_v4( float edgeLimit, float threshold )
     cerr << "Time for find_extrema_v4_sub<" #H ">: " << diff << " ms" << endl;
 
     MANYLY(1)
-    MANYLY(2)
-    MANYLY(3)
-    MANYLY(4)
-    MANYLY(5)
-    MANYLY(6)
-    MANYLY(7)
-    MANYLY(8)
-    MANYLY(16)
-    MANYLY(32)
+    // MANYLY(2)
+    // MANYLY(3)
+    // MANYLY(4)
+    // MANYLY(5)
+    // MANYLY(6)
+    // MANYLY(7)
+    // MANYLY(8)
+    // MANYLY(16)
+    // fails // MANYLY(32)
 
     err = cudaEventDestroy( start );
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
     err = cudaEventDestroy( stop );
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
+
+#ifdef COUNT_NUM_LOOPS
+    int num_loop_1;
+    int num_loop_2;
+    int num_loop_3;
+    int num_loop_4;
+    int num_loop_5;
+    err = cudaMemcpyFromSymbol( &num_loop_1, debug_num_loops_1, sizeof(int), 0, cudaMemcpyDeviceToHost );
+    POP_CUDA_FATAL_TEST( err, "Failed to upload sigma_k to device: " );
+    err = cudaMemcpyFromSymbol( &num_loop_2, debug_num_loops_2, sizeof(int), 0, cudaMemcpyDeviceToHost );
+    POP_CUDA_FATAL_TEST( err, "Failed to upload sigma_k to device: " );
+    err = cudaMemcpyFromSymbol( &num_loop_3, debug_num_loops_3, sizeof(int), 0, cudaMemcpyDeviceToHost );
+    POP_CUDA_FATAL_TEST( err, "Failed to upload sigma_k to device: " );
+    err = cudaMemcpyFromSymbol( &num_loop_4, debug_num_loops_4, sizeof(int), 0, cudaMemcpyDeviceToHost );
+    POP_CUDA_FATAL_TEST( err, "Failed to upload sigma_k to device: " );
+    err = cudaMemcpyFromSymbol( &num_loop_5, debug_num_loops_5, sizeof(int), 0, cudaMemcpyDeviceToHost );
+    POP_CUDA_FATAL_TEST( err, "Failed to upload sigma_k to device: " );
+    cudaDeviceSynchronize( );
+    cerr << "Number of 1 loop cases: " << num_loop_1 << endl;
+    cerr << "Number of 2 loop cases: " << num_loop_2 << endl;
+    cerr << "Number of 3 loop cases: " << num_loop_3 << endl;
+    cerr << "Number of 4 loop cases: " << num_loop_4 << endl;
+    cerr << "Number of 5 loop cases: " << num_loop_5 << endl;
+#endif // COUNT_NUM_LOOPS
 }
 
 } // namespace popart
