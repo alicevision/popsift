@@ -159,6 +159,8 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
 __host__
 void Pyramid::orientation_v1( )
 {
+    cerr << "Enter " << __FUNCTION__ << endl;
+
     _keep_time_orient_v1.start();
     for( int octave=0; octave<_num_octaves; octave++ ) {
         _octaves[octave].readExtremaCount( );
@@ -180,5 +182,7 @@ void Pyramid::orientation_v1( )
         }
     }
     _keep_time_orient_v1.stop();
+
+    cerr << "Leave " << __FUNCTION__ << endl;
 }
 
