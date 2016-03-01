@@ -67,6 +67,7 @@ class Pyramid
 {
     class Octave
     {
+        uint32_t  _debug_octave_id;
         uint32_t  _levels;
 
         Plane2D_float* _data;
@@ -105,6 +106,8 @@ class Pyramid
     public:
         Octave( );
         ~Octave( ) { this->free(); }
+
+        inline void debugSetOctave( uint32_t o ) { _debug_octave_id = o; }
 
         inline int getLevels() const { return _levels; }
         inline int getWidth() const  { return _data[0].getWidth(); }

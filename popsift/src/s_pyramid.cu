@@ -630,6 +630,7 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels )
 #if (PYRAMID_PRINT_DEBUG==1)
         printf("Allocating octave %u with width %u and height %u (%u levels)\n", o, w, h, _levels );
 #endif // (PYRAMID_PRINT_DEBUG==1)
+        _octaves[o].debugSetOctave( o );
         _octaves[o].alloc( w, h, _levels, 10000 );
         w = ceilf( w / 2.0f );
         h = ceilf( h / 2.0f );
