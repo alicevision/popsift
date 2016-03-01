@@ -18,44 +18,44 @@ void keypoint_descriptors( ExtremumCandidate* cand,
                            Descriptor*        descs,
                            Plane2D_float      layer )
 {
-    uint32_t width  = layer.getWidth();
-    uint32_t height = layer.getHeight();
+    const uint32_t width  = layer.getWidth();
+    const uint32_t height = layer.getHeight();
 
     // int bidx = blockIdx.x & 0xf; // lower 4 bits of block ID
-    int ix   = threadIdx.y; // bidx & 0x3;       // lower 2 bits of block ID
-    int iy   = threadIdx.z; // bidx >> 2;        // next lowest 2 bits of block ID
+    const int ix   = threadIdx.y; // bidx & 0x3;       // lower 2 bits of block ID
+    const int iy   = threadIdx.z; // bidx >> 2;        // next lowest 2 bits of block ID
 
     ExtremumCandidate* ext = &cand[blockIdx.x];
 
-    float x    = ext->xpos;
-    float y    = ext->ypos;
-    float sig  = ext->sigma;
-    float ang  = ext->angle_from_bemap;
-    float SBP  = fabs(MAGNIFY_V1 * sig);
+    const float x    = ext->xpos;
+    const float y    = ext->ypos;
+    const float sig  = ext->sigma;
+    const float ang  = ext->angle_from_bemap;
+    const float SBP  = fabs(MAGNIFY_V1 * sig);
 
-    float cos_t = cosf(ang);
-    float sin_t = sinf(ang);
+    const float cos_t = cosf(ang);
+    const float sin_t = sinf(ang);
 
-    float csbp  = cos_t * SBP;
-    float ssbp  = sin_t * SBP;
-    float crsbp = cos_t / SBP;
-    float srsbp = sin_t / SBP;
+    const float csbp  = cos_t * SBP;
+    const float ssbp  = sin_t * SBP;
+    const float crsbp = cos_t / SBP;
+    const float srsbp = sin_t / SBP;
 
-    float offsetptx = ix - 1.5f;
-    float offsetpty = iy - 1.5f;
-    float ptx = csbp * offsetptx - ssbp * offsetpty + x;
-    float pty = csbp * offsetpty + ssbp * offsetptx + y;
+    const float offsetptx = ix - 1.5f;
+    const float offsetpty = iy - 1.5f;
+    const float ptx = csbp * offsetptx - ssbp * offsetpty + x;
+    const float pty = csbp * offsetpty + ssbp * offsetptx + y;
 
-    float bsz = fabs(csbp) + fabs(ssbp);
+    const float bsz = fabs(csbp) + fabs(ssbp);
 
-    int32_t xmin = max(1,          (int32_t)floor(ptx - bsz));
-    int32_t ymin = max(1,          (int32_t)floor(pty - bsz));
-    int32_t xmax = min(width - 2,  (int32_t)floor(ptx + bsz));
-    int32_t ymax = min(height - 2, (int32_t)floor(pty + bsz));
+    const int32_t xmin = max(1,          (int32_t)floor(ptx - bsz));
+    const int32_t ymin = max(1,          (int32_t)floor(pty - bsz));
+    const int32_t xmax = min(width - 2,  (int32_t)floor(ptx + bsz));
+    const int32_t ymax = min(height - 2, (int32_t)floor(pty + bsz));
 
-    int32_t wx = xmax - xmin + 1;
-    int32_t hy = ymax - ymin + 1;
-    int32_t loops = wx * hy;
+    const int32_t wx = xmax - xmin + 1;
+    const int32_t hy = ymax - ymin + 1;
+    const int32_t loops = wx * hy;
 
     float dpt[9];
     for (int i = 0; i < 9; i++) dpt[i] = 0.0f;
@@ -68,15 +68,15 @@ void keypoint_descriptors( ExtremumCandidate* cand,
 
     for(int i = threadIdx.x; i < loops; i+=DESCR_V1_NUM_THREADS)
     {
-        int ii = i / wx + ymin;
-        int jj = i % wx + xmin;     
+        const int ii = i / wx + ymin;
+        const int jj = i % wx + xmin;     
 
-        float dx = jj - ptx;
-        float dy = ii - pty;
-        float nx = crsbp * dx + srsbp * dy;
-        float ny = crsbp * dy - srsbp * dx;
-        float nxn = fabs(nx);
-        float nyn = fabs(ny);
+        const float dx = jj - ptx;
+        const float dy = ii - pty;
+        const float nx = crsbp * dx + srsbp * dy;
+        const float ny = crsbp * dy - srsbp * dx;
+        const float nxn = fabs(nx);
+        const float nyn = fabs(ny);
         if (nxn < 1.0f && nyn < 1.0f) {
 #if 1
             float mod;
@@ -88,22 +88,22 @@ void keypoint_descriptors( ExtremumCandidate* cand,
             float mod = at(grad,  ii, jj);
             float th  = at(theta, ii, jj);
 #endif
-            float dnx = nx + offsetptx;
-            float dny = ny + offsetpty;
-            float ww  = __expf(-0.125f * (dnx*dnx + dny*dny));
-            float wx  = 1.0f - nxn;
-            float wy  = 1.0f - nyn;
-            float wgt = ww * wx * wy * mod;
+            const float dnx = nx + offsetptx;
+            const float dny = ny + offsetpty;
+            const float ww  = __expf(-0.125f * (dnx*dnx + dny*dny));
+            const float wx  = 1.0f - nxn;
+            const float wy  = 1.0f - nyn;
+            const float wgt = ww * wx * wy * mod;
 
             th -= ang;
             while (th < 0.0f) th += M_PI2;
             while (th >= M_PI2) th -= M_PI2;
 
-            float   tth  = th * RPI_V1;
-            int32_t fo0  = (int32_t)floor(tth);
-            float   do0  = tth - fo0;             
-            float   wgt1 = 1.0f - do0;
-            float   wgt2 = do0;
+            const float   tth  = th * RPI_V1;
+            const int32_t fo0  = (int32_t)floor(tth);
+            const float   do0  = tth - fo0;             
+            const float   wgt1 = 1.0f - do0;
+            const float   wgt2 = do0;
 
             int fo  = fo0 % DESCR_BINS_V1;
             if(fo < 8) {
