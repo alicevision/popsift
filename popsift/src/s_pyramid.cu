@@ -32,9 +32,9 @@
 #define PYRAMID_V12_ON false
 
 
-#define EXTREMA_V4 true //no cub
+#define EXTREMA_V4 false //no cub
 #define EXTREMA_V5 false // with cub
-#define EXTREMA_V6 false // array?
+#define EXTREMA_V6 true // array?
 
 #define EXTREMA_V4_ON true
 #define ORIENTA_V1_ON true
@@ -618,6 +618,7 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels )
     , _levels( levels + 3 )
     , _keep_time_extrema_v4( 0 )
     , _keep_time_extrema_v5( 0 )
+    , _keep_time_extrema_v6( 0 )
     , _keep_time_orient_v1(  0 )
     , _keep_time_orient_v2(  0 )
     , _keep_time_descr_v1(   0 )
@@ -817,7 +818,8 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
     }
 
     if(EXTREMA_V6){
-        //array todo
+        reset_extremum_counter();
+        find_extrema_v6( edgeLimit, threshold );
     }
 
 

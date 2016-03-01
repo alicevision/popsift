@@ -454,6 +454,8 @@ void Pyramid::find_extrema_v4_sub( float edgeLimit, float threshold )
 {
     // cerr << "Entering " << __FUNCTION__ << " - bitfield, 32x" << height << " kernels" << endl;
 
+#ifndef USE_DOG_ARRAY //because some code required by this function has been removed.
+
 #if 0
     cudaDeviceSynchronize();
     ReturnReasons a;
@@ -549,6 +551,8 @@ void Pyramid::find_extrema_v4_sub( float edgeLimit, float threshold )
          << "  everything OK: " << a.continuing << endl
          << endl;
 #endif
+
+#endif //USE_DOG_ARRAY
 }
 
 __host__

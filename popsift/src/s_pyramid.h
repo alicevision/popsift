@@ -222,6 +222,9 @@ private:
     void find_extrema_v4_sub( float edgeLimit, float threshold );
     template<int HEIGHT>
     void find_extrema_v5_sub( float edgeLimit, float threshold );
+    template<int HEIGHT>
+    void find_extrema_v6_sub( float edgeLimit, float threshold );
+
 
     void orientation_v1( );
     void orientation_v2( );
