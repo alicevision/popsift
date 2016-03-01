@@ -31,8 +31,10 @@
 #define PYRAMID_V11_ON true
 #define PYRAMID_V12_ON false
 
-#define EXTREMA_NO_CUB true
-#define EXTREMA_CUB    false
+
+#define EXTREMA_V4 true //no cub
+#define EXTREMA_V5 false // with cub
+#define EXTREMA_V6 false // array?
 
 #define EXTREMA_V4_ON true
 #define ORIENTA_V1_ON true
@@ -804,25 +806,34 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
 
 #else // not EXTREMA_SPEED_TEST
-    if( EXTREMA_NO_CUB ) {
+    if( EXTREMA_V4 ) {
         reset_extremum_counter();
         find_extrema_v4( edgeLimit, threshold );
     }
 
-    if( EXTREMA_CUB ) {
+    if( EXTREMA_V5 ) {
         reset_extremum_counter();
         find_extrema_v5( edgeLimit, threshold );
     }
+
+    if(EXTREMA_V6){
+        //array todo
+    }
+
+
 #endif // not EXTREMA_SPEED_TEST
 
     for( int o=0; o<_num_octaves; o++ ) {
         _octaves[o].readExtremaCount( );
     }
 
+#if 0
     if( ORIENTA_V1_ON ) { orientation_v1( ); }
     if( ORIENTA_V2_ON ) { orientation_v2( ); }
 
     descriptors_v1( );
+
+#endif
 }
 
 } // namespace popart
