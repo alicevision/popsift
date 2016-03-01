@@ -836,13 +836,10 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
         _octaves[o].readExtremaCount( );
     }
 
-#if 0
     if( ORIENTA_V1_ON ) { orientation_v1( ); }
     if( ORIENTA_V2_ON ) { orientation_v2( ); }
 
     descriptors_v1( );
-
-#endif
 }
 
 } // namespace popart
