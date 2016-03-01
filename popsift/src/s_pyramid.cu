@@ -509,8 +509,9 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
             int width  = getData(level).getWidth();
             int height = getData(level).getHeight();
 
-            Plane2D_uint8 hostPlane_c;
-            hostPlane_c.allocHost( width, height, popart::Unaligned );
+            Plane2D_float hostPlane_f;
+            hostPlane_f.allocHost( width, height, CudaAllocated );
+            hostPlane_f.memcpyFromDevice( getData(level) );
 
             uint32_t total_ct = 0;
 
@@ -530,9 +531,10 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
                     for( uint32_t i=0; i<ct; i++ ) {
                         int32_t x = roundf( cand[i].xpos );
                         int32_t y = roundf( cand[i].ypos );
+                        cerr << "(" << x << "," << y << ") scale " << cand[i].sigma << " orient " << cand[i].angle_from_bemap << endl;
                         for( int32_t j=-4; j<=4; j++ ) {
-                            hostPlane_c.ptr( clamp(y+j,height) )[ clamp(x,  width) ] = 255;
-                            hostPlane_c.ptr( clamp(y,  height) )[ clamp(x+j,width) ] = 255;
+                            hostPlane_f.ptr( clamp(y+j,height) )[ clamp(x,  width) ] = 255;
+                            hostPlane_f.ptr( clamp(y,  height) )[ clamp(x+j,width) ] = 255;
                         }
                     }
 
@@ -545,8 +547,10 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
                     mkdir("dir-feat", 0700);
                 }
 
+
                 ostringstream ostr;
                 ostr << "dir-feat/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
+        #if 0
                 ofstream of( ostr.str().c_str() );
                 cerr << "Writing " << ostr.str() << endl;
                 of << "P5" << endl
@@ -554,9 +558,12 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
                    << "255" << endl;
                 of.write( (char*)hostPlane_c.data, hostPlane_c.getByteSize() );
                 of.close();
+        #endif
+
+                popart::write_plane2D( ostr.str().c_str(), false, hostPlane_f );
             }
 
-            hostPlane_c.freeHost( popart::Unaligned );
+            hostPlane_f.freeHost( CudaAllocated );
         }
     }
 #endif
