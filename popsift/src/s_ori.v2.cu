@@ -1,5 +1,6 @@
 #include "s_ori.v2.h"
 #include "s_gradiant.h"
+#include "debug_macros.h"
 #include "clamp.h"
 
 #define ORI_V2_NUM_THREADS 16
@@ -22,9 +23,11 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
 
     ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
 
-    int idy = clamp( threadIdx.y, mgmt->counter );
+    // if( blockIdx.x >= mgmt->counter ) return; // can never happen
 
-    ExtremumCandidate* ext = &extremum[idy];
+    const int e_index = blockIdx.x;
+
+    ExtremumCandidate* ext = &extremum[e_index];
 
     /* An orientation histogram is formed from the gradient
      * orientations of sample points within a region around
@@ -47,6 +50,7 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
 
     int   rad  = (int)rintf((3.0f * sigw)); // rintf is recommended for rounding
 
+    assert( sigw != 0 );
     float factor  = -0.5f / (sigw * sigw);
     int sq_thres  = rad * rad;
     int32_t xmin = max( 1,     int32_t(x - rad));
@@ -63,6 +67,7 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
         float grad;
         float theta;
 
+        assert( wx + ymin != 0 );
         int yy = i / wx + ymin;
         int xx = i % wx + xmin;
 
@@ -76,16 +81,17 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
         float dy = yy - y;
 
         int sq_dist  = dx * dx + dy * dy;
-        if (sq_dist > sq_thres) continue;
+        if (sq_dist <= sq_thres) {
+            float   weight = grad * __expf( sq_dist * factor );
+            int32_t bidx   = (int32_t)rintf(NBINS_V2 * (theta + M_PI) / M_PI2);
+            bidx = (bidx < NBINS_V2) ? bidx : 0;
 
-        float   weight = grad * __expf( sq_dist * factor );
-        int32_t bidx   = (int32_t)rintf(NBINS_V2 * (theta + M_PI) / M_PI2);
-        bidx = (bidx < NBINS_V2) ? bidx : 0;
-
-        hist[bidx] += weight;
+            hist[bidx] += weight;
+        }
     }
     __syncthreads();
 
+#if 0
     /* reduction here */
     for (int i = 0; i < NBINS_V2; i++) {
         hist[i] += __shfl_down( hist[i], 8 );
@@ -95,8 +101,10 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
         hist[i]  = __shfl( hist[i], 0 );
     }
 
-    /* smooth histogram */
+    __syncthreads();
+// #if 0
 
+    /* smooth histogram */
     for( int bin=threadIdx.x; bin < NBINS_V2; bin+=ORI_V2_NUM_THREADS ) {
         int32_t bin_prev = (bin-1+NBINS_V2) % NBINS_V2;
         int32_t bin_next = (bin+1) % NBINS_V2;
@@ -106,9 +114,12 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
 
     // sync is lost at the end of this loop, but __shfl auto-syncs
     for( int bin=0; bin < NBINS_V2; bin++ ) {
+        // CAREFUL: THIS DOES PROBABLY NOT WORK !!!
         hist[bin] = __shfl( hist[bin], bin % ORI_V2_NUM_THREADS );
     }
+
     // all warps have the complete 1-smoothed history, not smoothe again
+    __syncthreads();
 
     for( int bin=threadIdx.x; bin < NBINS_V2; bin+=ORI_V2_NUM_THREADS ) {
         int32_t bin_prev = (bin-1+NBINS_V2) % NBINS_V2;
@@ -171,16 +182,19 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
         __syncthreads();
     }
 
-    if( idy != threadIdx.y ) {
-        found_angle = false;
-    }
+    // perform a prefix sum, provides a relative index to all threads
+    uint32_t incl_prefix_sum = angles;                  // o = 1 0 2 0 1 0 0 1
+    incl_prefix_sum += __shfl_up( incl_prefix_sum, 1 ); // 1 = 1 1 2 2 1 1 0 1
+    incl_prefix_sum += __shfl_up( incl_prefix_sum, 2 ); // 2 = 1 1 3 3 3 3 1 2
+    incl_prefix_sum += __shfl_up( incl_prefix_sum, 4 ); // 4 = 1 1 3 3 4 4 4 5
+    incl_prefix_sum += __shfl_up( incl_prefix_sum, 8 );
+    const uint32_t total_sum = __shfl( incl_prefix_sum, 15 );
 
-    uint32_t ct = __popc( __ballot( found_angle ) );
-    if( ct == 0 ) {
+    if( total_sum == 0 ) {
         if( threadIdx.x == 0 ) {
             ext->not_a_keypoint = 1;
         }
-    } else if( ct == 1 ) {
+    } else if( total_sum == 1 ) {
         if( found_angle ) {
             ext->xpos             = x;
             ext->ypos             = y;
@@ -188,42 +202,37 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
             ext->angle_from_bemap = ang[0];
         }
     } else {
-        uint32_t sum = ct;
-
-        // perform a prefix sum, provides a relative index to all threads
-        sum += __shfl_up( sum, 1 );
-        sum += __shfl_up( sum, 2 );
-        sum += __shfl_up( sum, 4 );
-        sum += __shfl_up( sum, 8 );
-
         uint32_t write_index;
-        if( threadIdx.x == 31 ) {
+        if( threadIdx.x == 0 ) {
             // adding sum-1 because the first slot is already known
-            write_index = atomicAdd( &mgmt->counter, sum-1 );
+            write_index = atomicAdd( &mgmt->counter, total_sum-1 );
         }
         // tell everybody about the base
-        write_index = __shfl( write_index, 31 );
-        int i = 0;
-        sum -= ct; // this threads's base index
-        if( ct > 0 && sum == 0 ) {
-            /* this thread should use the existing extremum */
-            // ext->x                = x;
-            // ext->y                = y;
-            // ext->sigma            = sig;
-            ext->angle_from_bemap = ang[i++];
-            ct--;
-        }
-        if( write_index + sum -1 < mgmt->max2 ) {
-            for( ; i<ct; i++ ) {
-                // reduce 1 because the lowest index is written to existing keypoint
-                ExtremumCandidate* ext = &extremum[ write_index + sum - 1 ];
+        write_index = __shfl( write_index, 0 );
+        // all 16 threads are now in sync
+
+        if( found_angle ) {
+            // Only threads that have found one or more angles are going to write
+            const uint32_t excl_prefix_sum = incl_prefix_sum - 1;
+            int            i = 0;
+            int            off = 0;
+
+            if( excl_prefix_sum == 0 ) {
+                ext->angle_from_bemap = ang[i++];
+            }
+
+            while( i<angles ) {
+                ExtremumCandidate* ext = &extremum[ write_index + excl_prefix_sum + off ];
                 ext->xpos             = x;
                 ext->ypos             = y;
                 ext->sigma            = sig;
-                ext->angle_from_bemap = ang[i++];
+                ext->angle_from_bemap = ang[i];
+                i++;
+                off++;
             }
         }
     }
+#endif
 }
 
 /*************************************************************
@@ -236,6 +245,7 @@ void Pyramid::orientation_v2( )
 
     _keep_time_orient_v2.start();
     for( int octave=0; octave<_num_octaves; octave++ ) {
+        cerr << __FILE__ << ":" << __LINE__ << " read extrema count" << endl;
         _octaves[octave].readExtremaCount( );
         cudaDeviceSynchronize( );
         for( int level=1; level<_levels-1; level++ ) {
@@ -245,11 +255,14 @@ void Pyramid::orientation_v2( )
             grid.x  = _octaves[octave].getExtremaMgmtH(level)->counter;
             block.x = ORI_V2_NUM_THREADS;
             if( grid.x != 0 ) {
-#if 0
+#if 1
                 cout << "computing keypoint orientation in octave "
                      << octave << " level " << level
                      << " for " << grid.x << " blocks a " << block.x << " threads" << endl;
 #endif
+
+                cudaDeviceSynchronize();
+                POP_CHK;
 
                 compute_keypoint_orientations_v2
                     <<<grid,block>>>
@@ -257,6 +270,9 @@ void Pyramid::orientation_v2( )
                       _octaves[octave].getExtremaMgmtD( ),
                       level,
                       _octaves[octave].getData( level ) );
+
+                cudaDeviceSynchronize();
+                POP_CHK;
             }
         }
     }

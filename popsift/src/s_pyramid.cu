@@ -35,8 +35,8 @@
 #define EXTREMA_CUB    false
 
 #define EXTREMA_V4_ON true
-#define ORIENTA_V1_ON false
-#define ORIENTA_V2_ON true
+#define ORIENTA_V1_ON true
+#define ORIENTA_V2_ON false
 
 using namespace std;
 
