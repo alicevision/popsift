@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 
 #include "device_prop.h"
 #include "debug_macros.h"
@@ -58,7 +59,10 @@ void device_prop_t::set( int n )
 {
     cudaError_t err;
     err = cudaSetDevice( n );
-    POP_CUDA_FATAL_TEST( err, "Cannot set device 0" );
+    ostringstream ostr;
+    ostr << "Cannot set device " << n;
+    POP_CUDA_FATAL_TEST( err, ostr.str() );
+    std::cout << "Choosing device " << n << ": " << _properties[n]->name << std::endl;
 }
 
 device_prop_t::~device_prop_t( )

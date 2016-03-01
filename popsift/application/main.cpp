@@ -239,7 +239,8 @@ int main(int argc, char **argv)
     cerr << "Real name of input file is " << realName << endl;
 
     device_prop_t deviceInfo;
-    // deviceInfo.print( );
+    // deviceInfo.set( 1 );
+    deviceInfo.print( );
 
     PopSift PopSift( octaves,
                      levels,
