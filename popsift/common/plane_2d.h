@@ -150,6 +150,7 @@ template <typename T> struct PitchPlane2D : public PlaneT<T>
         assert( this );
         assert( this->data );
         PlaneBase::freeDev2D( this->data );
+        this->data = 0;
     }
 
     __host__ inline void allocHost( int w, int h, PlaneMapMode mode ) {

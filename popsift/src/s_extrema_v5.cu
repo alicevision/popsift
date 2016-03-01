@@ -417,7 +417,6 @@ bool find_extrema_in_dog_v5_sub( cudaTextureObject_t dog,
         // ec.value   = 0;
         // ec.edge    = 0;
     ec.angle_from_bemap = 0;
-    ec.not_a_keypoint   = 0;
 
     return true;
 }

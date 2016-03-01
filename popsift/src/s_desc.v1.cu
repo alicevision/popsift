@@ -27,8 +27,6 @@ void keypoint_descriptors( ExtremumCandidate* cand,
 
     ExtremumCandidate* ext = &cand[blockIdx.x];
 
-    if( ext->not_a_keypoint ) return;
-
     float x    = ext->xpos;
     float y    = ext->ypos;
     float sig  = ext->sigma;

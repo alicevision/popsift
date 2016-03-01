@@ -141,7 +141,7 @@ void Pyramid::Octave::allocExtrema( uint32_t layer_max_extrema )
 {
     ExtremaMgmt*       mgmt;
 
-    _d_extrema = new ExtremumCandidate*[ _levels ];
+    _d_extrema        = new ExtremumCandidate*[ _levels ];
 
     POP_CUDA_MALLOC_HOST( &mgmt, _levels * sizeof(ExtremaMgmt) );
     memset( mgmt, 0, _levels * sizeof(ExtremaMgmt) );
@@ -177,8 +177,8 @@ void Pyramid::Octave::freeExtrema( )
 {
     for( uint32_t i=0; i<_levels; i++ ) {
         if( _h_desc    && _h_desc[i] )    cudaFreeHost( _h_desc[i] );
-        if( _d_desc    && _d_desc[i] )    cudaFree(     _d_desc[i] );
-        if( _d_extrema && _d_extrema[i] ) cudaFree(     _d_extrema[i] );
+        if( _d_desc    && _d_desc[i] )    cudaFree( _d_desc[i] );
+        if( _d_extrema && _d_extrema[i] ) cudaFree( _d_extrema[i] );
     }
     cudaFree( _d_extrema_mgmt );
     cudaFreeHost( _h_extrema_mgmt );

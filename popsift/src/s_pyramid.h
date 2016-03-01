@@ -54,7 +54,7 @@ struct ExtremumCandidate
     // float    value;
     // float edge;
     float    angle_from_bemap;
-    uint32_t not_a_keypoint;
+    // uint32_t not_a_keypoint;
     // float dummy_7;
 };
 
@@ -97,11 +97,11 @@ class Pyramid
          * must be handled per scale (level) of an octave.
          * There: one set of extrema per octave and level.
          */
-        ExtremaMgmt*        _h_extrema_mgmt; // host side info
-        ExtremaMgmt*        _d_extrema_mgmt; // device side info
-        ExtremumCandidate** _d_extrema;
-        Descriptor**        _d_desc;
-        Descriptor**        _h_desc;
+        ExtremaMgmt*         _h_extrema_mgmt; // host side info
+        ExtremaMgmt*         _d_extrema_mgmt; // device side info
+        ExtremumCandidate**  _d_extrema;
+        Descriptor**         _d_desc;
+        Descriptor**         _h_desc;
 
     public:
         Octave( );

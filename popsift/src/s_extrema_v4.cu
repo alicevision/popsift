@@ -381,7 +381,6 @@ bool find_extrema_in_dog_v4_sub( Plane2D_float&     dog0,
         // ec.value   = 0;
         // ec.edge    = 0;
     ec.angle_from_bemap = 0;
-    ec.not_a_keypoint   = 0;
 
     return true;
 }
