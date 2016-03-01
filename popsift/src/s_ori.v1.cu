@@ -10,6 +10,22 @@
  * V1: device side
  *************************************************************/
 
+__device__
+inline float compute_angle( int bin, float hc, float hn, float hp )
+{
+    /* interpolate */
+    float di = bin + 0.5f * (hn - hp) / (hc+hc-hn-hp);
+
+    /* clamp */
+    di = (di < 0) ? 
+            (di + NBINS_V1) : 
+            ((di >= NBINS_V1) ? (di - NBINS_V1) : (di));
+
+    float th = ((M_PI2 * di) / NBINS_V1) - M_PI;
+    // float th = ((M_PI2 * di) / NBINS_V1);
+    return th;
+}
+
 /*
  * Compute the keypoint orientations for each extremum
  * using 16 threads for each of them.
@@ -25,9 +41,9 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
 
     ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
 
-    if( threadIdx.y >= mgmt->counter ) return;
+    // if( threadIdx.y >= mgmt->counter ) return;
 
-    ExtremumCandidate* ext = &extremum[threadIdx.y];
+    ExtremumCandidate* ext = &extremum[blockIdx.x];
 
     float hist[NBINS_V1];
     for (int i = 0; i < NBINS_V1; i++) hist[i] = 0.0f;
@@ -89,7 +105,7 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
     if( threadIdx.x != 0 ) return;
 
     /* new oris */
-    float ang[2] = {NINF, NINF};
+    // float ang[2] = {NINF, NINF};
 
     /* smooth histogram */
     for( int iter = 0; iter < 2; iter++ ) {
@@ -107,51 +123,52 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
 
     /* find histogram maximum */
     float maxh = NINF;
+    int   binh = 0;
     for (int bin = 0; bin < NBINS_V1; bin++) {
-        maxh = fmaxf(maxh, hist[bin]);
+        // maxh = fmaxf(maxh, hist[bin]);
+        if( hist[bin] > maxh ) {
+            maxh = hist[bin];
+            binh = bin;
+        }
     }
 
+    {
+        float hc = hist[binh];
+        float hn = hist[((binh+1+NBINS_V1)%NBINS_V1)];
+        float hp = hist[((binh-1+NBINS_V1)%NBINS_V1)];
+        float th = compute_angle( binh, hc, hn, hp );
+
+        ext->angle_from_bemap = th;
+    }
+#if 1
     /* find other peaks, boundary of 80% of max */
-    int nangles = 0;
-    for (int bin = 0; bin < NBINS_V1; bin++) {
+    int nangles = 1;
+
+    for( int numloops = 1; numloops < NBINS_V1; numloops++) {
+        int bin = ( binh + numloops ) % NBINS_V1;
+
         float hc = hist[bin];
         float hn = hist[((bin+1+NBINS_V1)%NBINS_V1)];
         float hp = hist[((bin-1+NBINS_V1)%NBINS_V1)];
 
         /* find if a peak */
         if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
-    
-            /* interpolate */
-            float di = bin + 0.5f * (hn - hp) / (hc+hc-hn-hp);
-            
-            /* clamp */
-            di = (di < 0) ? 
-                (di + NBINS_V1) : 
-                ((di >= NBINS_V1) ? (di - NBINS_V1) : (di));
-            
-            double th = ((M_PI2 * di) / NBINS_V1) - M_PI;
-            ang[nangles++] = th;
-            if(nangles >= 2) break;
-        }
-    }
+            int idx = atomicAdd( &mgmt->counter, 1 );
+            if( idx >= mgmt->max2 ) break;
 
-    if( nangles < 1 ) return;
+            float th = compute_angle( bin, hc, hn, hp );
 
-    // ext->xpos             = x;
-    // ext->ypos             = y;
-    // ext->sigma            = sig;
-    ext->angle_from_bemap = ang[0];
-
-    for( int bin=1; bin<nangles; bin++ ) {
-        int idx = atomicAdd( &mgmt->counter, 1 );
-        if( idx < mgmt->max2 ) {
             ext = &extremum[idx];
             ext->xpos             = x;
             ext->ypos             = y;
             ext->sigma            = sig;
-            ext->angle_from_bemap = ang[bin];
+            ext->angle_from_bemap = th;
+
+            nangles++;
+            if(nangles > 2) break;
         }
     }
+#endif
 }
 
 /*************************************************************
