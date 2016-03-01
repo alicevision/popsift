@@ -440,7 +440,7 @@ void start_orientation_v6( ExtremumCandidate* extrema,
 #endif
 
 /*************************************************************
- * V4: host side
+ * V6: host side
  *************************************************************/
     template<int HEIGHT>
     __host__
