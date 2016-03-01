@@ -51,11 +51,7 @@ struct ExtremumCandidate
     float    xpos;
     float    ypos;
     float    sigma; // scale;
-    // float    value;
-    // float edge;
     float    angle_from_bemap;
-    // uint32_t not_a_keypoint;
-    // float dummy_7;
 };
 
 struct Descriptor
