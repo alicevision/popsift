@@ -1,4 +1,5 @@
 #include "s_ori.v1.h"
+#include "debug_macros.h"
 #include "s_gradiant.h"
 
 #define ORI_V1_NUM_THREADS 16
