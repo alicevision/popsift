@@ -91,7 +91,6 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
     }
     __syncthreads();
 
-#if 0
     /* reduction here */
     for (int i = 0; i < NBINS_V2; i++) {
         hist[i] += __shfl_down( hist[i], 8 );
@@ -102,7 +101,6 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
     }
 
     __syncthreads();
-// #if 0
 
     /* smooth histogram */
     for( int bin=threadIdx.x; bin < NBINS_V2; bin+=ORI_V2_NUM_THREADS ) {
@@ -191,9 +189,6 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
     const uint32_t total_sum = __shfl( incl_prefix_sum, 15 );
 
     if( total_sum == 0 ) {
-        if( threadIdx.x == 0 ) {
-            ext->not_a_keypoint = 1;
-        }
     } else if( total_sum == 1 ) {
         if( found_angle ) {
             ext->xpos             = x;
@@ -232,7 +227,6 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
             }
         }
     }
-#endif
 }
 
 /*************************************************************

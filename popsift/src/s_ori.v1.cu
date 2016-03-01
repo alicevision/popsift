@@ -5,6 +5,7 @@
 #define ORI_V1_NUM_THREADS 16
 #define NBINS_V1           36
 #define WINFACTOR_V1       1.5F
+#define USE_DYNAMIC_PARALLELISM
 
 /*************************************************************
  * V1: device side
@@ -174,6 +175,54 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
 /*************************************************************
  * V4: host side
  *************************************************************/
+#ifdef USE_DYNAMIC_PARALLELISM
+
+__global__
+void orientation_starter_v1( ExtremumCandidate* extremum,
+                             ExtremaMgmt*       mgmt_array,
+                             uint32_t           mgmt_level,
+                             Plane2D_float      layer )
+{
+    ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
+
+    dim3 block;
+    dim3 grid;
+    grid.x  = mgmt->counter;
+    block.x = ORI_V1_NUM_THREADS;
+
+    if( grid.x != 0 ) {
+        compute_keypoint_orientations_v1
+            <<<grid,block>>>
+            ( extremum,
+              mgmt_array,
+              mgmt_level,
+              layer );
+    }
+}
+
+__host__
+void Pyramid::orientation_v1( )
+{
+    cerr << "Enter " << __FUNCTION__ << endl;
+
+    _keep_time_orient_v1.start();
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        for( int level=1; level<_levels-1; level++ ) {
+            orientation_starter_v1
+                <<<1,1>>>
+                ( _octaves[octave].getExtrema( level ),
+                  _octaves[octave].getExtremaMgmtD( ),
+                  level,
+                  _octaves[octave].getData( level ) );
+        }
+    }
+    _keep_time_orient_v1.stop();
+
+    cerr << "Leave " << __FUNCTION__ << endl;
+}
+
+#else // not USE_DYNAMIC_PARALLELISM
+
 __host__
 void Pyramid::orientation_v1( )
 {
@@ -203,4 +252,5 @@ void Pyramid::orientation_v1( )
 
     cerr << "Leave " << __FUNCTION__ << endl;
 }
+#endif // not USE_DYNAMIC_PARALLELISM
 
