@@ -216,11 +216,15 @@ private:
     void reset_extremum_counter( );
     void find_extrema_v4( float edgeLimit, float threshold );
     void find_extrema_v5( float edgeLimit, float threshold );
+    void find_extrema_v6( float edgeLimit, float threshold );
 
     template<int HEIGHT>
     void find_extrema_v4_sub( float edgeLimit, float threshold );
     template<int HEIGHT>
     void find_extrema_v5_sub( float edgeLimit, float threshold );
+    template<int HEIGHT>
+    void find_extrema_v6_sub( float edgeLimit, float threshold );
+
 
     void orientation_v1( );
     void orientation_v2( );
@@ -233,6 +237,7 @@ private:
 
     KeepTime _keep_time_extrema_v4;
     KeepTime _keep_time_extrema_v5;
+    KeepTime _keep_time_extrema_v6;
 
     KeepTime _keep_time_orient_v1;
     KeepTime _keep_time_orient_v2;

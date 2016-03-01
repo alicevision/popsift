@@ -31,8 +31,10 @@
 #define PYRAMID_V11_ON true
 #define PYRAMID_V12_ON false
 
-#define EXTREMA_NO_CUB true
-#define EXTREMA_CUB    false
+
+#define EXTREMA_V4 false //no cub
+#define EXTREMA_V5 false // with cub
+#define EXTREMA_V6 true // array?
 
 #define EXTREMA_V4_ON true
 #define ORIENTA_V1_ON true
@@ -616,6 +618,7 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels )
     , _levels( levels + 3 )
     , _keep_time_extrema_v4( 0 )
     , _keep_time_extrema_v5( 0 )
+    , _keep_time_extrema_v6( 0 )
     , _keep_time_orient_v1(  0 )
     , _keep_time_orient_v2(  0 )
     , _keep_time_descr_v1(   0 )
@@ -804,25 +807,35 @@ void Pyramid::find_extrema( float edgeLimit, float threshold )
     POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
 
 #else // not EXTREMA_SPEED_TEST
-    if( EXTREMA_NO_CUB ) {
+    if( EXTREMA_V4 ) {
         reset_extremum_counter();
         find_extrema_v4( edgeLimit, threshold );
     }
 
-    if( EXTREMA_CUB ) {
+    if( EXTREMA_V5 ) {
         reset_extremum_counter();
         find_extrema_v5( edgeLimit, threshold );
     }
+
+    if(EXTREMA_V6){
+        reset_extremum_counter();
+        find_extrema_v6( edgeLimit, threshold );
+    }
+
+
 #endif // not EXTREMA_SPEED_TEST
 
     for( int o=0; o<_num_octaves; o++ ) {
         _octaves[o].readExtremaCount( );
     }
 
+#if 0
     if( ORIENTA_V1_ON ) { orientation_v1( ); }
     if( ORIENTA_V2_ON ) { orientation_v2( ); }
 
     descriptors_v1( );
+
+#endif
 }
 
 } // namespace popart
