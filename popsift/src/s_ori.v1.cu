@@ -3,7 +3,7 @@
 #include "s_ori.v1.h"
 #include "debug_macros.h"
 #include "s_gradiant.h"
-
+#include <stdio.h>
 #define ORI_V1_NUM_THREADS 16
 #define NBINS_V1           36
 #define WINFACTOR_V1       1.5F
@@ -132,23 +132,26 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
         hist[threadIdx.x  ] = 0.25f * prev1 + 0.5f * tmp1_curr + 0.25f * tmp1_next;
         hist[threadIdx.x*2] = 0.25f * prev2 + 0.5f * tmp2_curr + 0.25f * tmp2_next;
 
-        printf("bin %d: %f\n", threadIdx.x, hist[threadIdx.x]);
-        printf("bin %d: %f\n", threadIdx.x*2, hist[threadIdx.x*2]);
+        //printf("(%d): bin %d: %f\n", threadIdx.x, hist[threadIdx.x]);
+        //printf("(%d): bin %d: %f\n", threadIdx.x*2, hist[threadIdx.x*2]);
 
         //0->31 done
         //missing 32->35 (4 bins)
-        if(threadIdx.x < 4){
+        if(threadIdx.x < 3){
+	//0+32
+	//1+32
+	//2+32 34
             //bin 32->34
             float prev = hist[(threadIdx.x+32 - 1 + ORI_V1_NUM_THREADS) % ORI_V1_NUM_THREADS];
             float curr = hist[threadIdx.x]+32; //32->34
             float next = hist[threadIdx.x+33]; //33->35
             hist[threadIdx.x +32] = 0.25f * prev + 0.5f * curr + 0.25f * next;
-            printf("bin %d: %f\n", threadIdx.x+32, hist[threadIdx.x+32]);
-        }else if(threadIdx.x == 5){
+            //printf("(%d): bin %d: %f\n", threadIdx.x+32, hist[threadIdx.x+32]);
+        }else if(threadIdx.x == 3){
             //bin 35
             hist[threadIdx.x +32] = 0.25f * hist[threadIdx.x +32 -1]
                                    + 0.5f * hist[threadIdx.x +32] + 0.25f * first;
-            printf("bin %d: %f\n", threadIdx.x+32, hist[threadIdx.x+32]);
+            //printf("(%d): bin %d: %f\n", threadIdx.x+32, hist[threadIdx.x+32]);
         }
     }
 #else
@@ -169,7 +172,7 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
             hist[bin] = 0.25f * prev + 0.5f * hist[bin] + 0.25f * first;
             //z vprintf("val: %f, indx: %d\n", hist[bin], bin);
         }
-
+	
         /* find histogram maximum */
         float maxh = NINF;
         int binh = 0;
@@ -289,6 +292,13 @@ void Pyramid::orientation_v1( )
     cerr << "Enter " << __FUNCTION__ << endl;
 
     _keep_time_orient_v1.start();
+compute_keypoint_orientations_v1
+                    <<<dim3(16),dim3(1)>>>
+                    ( _octaves[octave].getExtrema( level ),
+                      _octaves[octave].getExtremaMgmtD( ),
+                      level,
+                      _octaves[octave].getData( level ) );
+/*
     for( int octave=0; octave<_num_octaves; octave++ ) {
         _octaves[octave].readExtremaCount( );
         cudaDeviceSynchronize( );
@@ -308,6 +318,7 @@ void Pyramid::orientation_v1( )
             }
         }
     }
+*/
     _keep_time_orient_v1.stop();
 
     cerr << "Leave " << __FUNCTION__ << endl;
