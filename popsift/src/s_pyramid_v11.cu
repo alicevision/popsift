@@ -6,6 +6,8 @@
 #include "debug_macros.h"
 #include "assist.h"
 #include <cuda_runtime.h>
+#include <curand_mtgp32_kernel.h>
+#include <device_launch_parameters.h>
 
 /*************************************************************
  * V11: device side
@@ -13,7 +15,6 @@
 
 #define V11_EDGE_LEN 32
 #define V11_RANGE    4 // RANGES from 1 to 8 are possible
-#define V11_LEVELS   _levels
 
 namespace popart {
 
@@ -225,8 +226,51 @@ void Pyramid::build_v11( Image* base )
          << "    original pix size : " << base->u_width/base->type_size << "x" << base->u_height << endl;
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        for( int level=0; level<V11_LEVELS; level++ ) {
+#if 0
+    Plane2D_float** imagus = new Plane2D_float*[_num_octaves];
+    for(int i=0;i<_num_octaves;i++){
+        imagus[i] = new Plane2D_float[_levels];
+    }
+
+    for(uint32_t octave=0; octave<_num_octaves; octave++){
+
+        const int width  = _octaves[octave].getData(0).getWidth();
+        const int height = _octaves[octave].getData(0).getHeight();
+        dim3 h_block( 64, 2 );
+        dim3 h_grid;
+
+        h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
+        h_grid.y = (unsigned int)grid_divide( height, h_block.y );
+
+        dim3 v_block( 64, 2 );
+        dim3 v_grid;
+        v_grid.x = (unsigned int)grid_divide( width,  v_block.x );
+        v_grid.y = (unsigned int)grid_divide( height, v_block.y );
+
+        dim3 d_block( 32, 1 );
+        dim3 d_grid;
+        d_grid.x = (unsigned int)grid_divide( width,  d_block.x );
+        d_grid.y = (unsigned int)grid_divide( height, d_block.y );
+
+
+        if(octave==0){
+            imagus[octave][0] = base->array;
+        }else{
+            imagus[octave][0] = _octaves[octave].getData(0);
+        }
+
+        for(uint32_t level=0; level<_levels; level++){
+            filter_gauss_horiz_v11_by_2 <<<h_grid,h_block>>> (
+                _octaves[octave-1]._data_tex[ _levels-3 ],
+                _octaves[octave].getIntermediateData( ) );
+
+
+        }
+    }
+#endif
+
+    for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
+        for( uint32_t level=0; level<_levels; level++ ) {
 #if 0
         cerr << "Configuration for octave " << octave << endl
              << "  Horiz: layer size: "
@@ -244,66 +288,57 @@ void Pyramid::build_v11( Image* base )
 
             dim3 h_block( 64, 2 );
             dim3 h_grid;
-            h_grid.x = grid_divide( width,  h_block.x );
-            h_grid.y = grid_divide( height, h_block.y );
+            h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
+            h_grid.y = (unsigned int)grid_divide( height, h_block.y );
 
             dim3 v_block( 64, 2 );
             dim3 v_grid;
-            v_grid.x = grid_divide( width,  v_block.x );
-            v_grid.y = grid_divide( height, v_block.y );
+            v_grid.x = (unsigned int)grid_divide( width,  v_block.x );
+            v_grid.y = (unsigned int)grid_divide( height, v_block.y );
 
             dim3 d_block( 32, 1 );
             dim3 d_grid;
-            d_grid.x = grid_divide( width,  d_block.x );
-            d_grid.y = grid_divide( height, d_block.y );
+            d_grid.x = (unsigned int)grid_divide( width,  d_block.x );
+            d_grid.y = (unsigned int)grid_divide( height, d_block.y );
 
             if( level == 0 ) {
                 if( octave == 0 ) {
-                    dim3 block;
-                    block.x = V11_EDGE_LEN;
-                    block.y = V11_EDGE_LEN;
+                    dim3 block(V11_EDGE_LEN,V11_EDGE_LEN);
+                    dim3 grid((unsigned int)grid_divide( width,  V11_EDGE_LEN ),
+                              (unsigned int)grid_divide( height, V11_EDGE_LEN ));
 
-                    dim3 grid;
-                    const int width  = _octaves[octave].getData(0).getWidth();
-                    const int height = _octaves[octave].getData(0).getHeight();
-                    grid.x = grid_divide( width,  V11_EDGE_LEN );
-                    grid.y = grid_divide( height, V11_EDGE_LEN );
-
-                    filter_gauss_horiz_v11
-                        <<<grid,block>>>
-                        ( base->array,
-                          _octaves[octave].getIntermediateData( ) );
+                    filter_gauss_horiz_v11 <<<grid,block>>> (
+                        base->array,//orig img size x2
+                        _octaves[octave].getIntermediateData() );
                 } else {
-                    filter_gauss_horiz_v11_by_2
-                        <<<h_grid,h_block>>>
-                        (
-                          _octaves[octave-1]._data_tex[ V11_LEVELS-3 ],
-                          // _octaves[octave-1]._data_tex[ 0 ],
-                          _octaves[octave].getIntermediateData( ) );
+                    //this scales down one size?
+                    filter_gauss_horiz_v11_by_2 <<<h_grid,h_block>>> (
+                        _octaves[octave-1]._data_tex[ _levels-3 ],
+                        _octaves[octave].getIntermediateData( ) );
                 }
-            } else {
-                filter_gauss_horiz_v11
-                    <<<h_grid,h_block>>>
-                    ( _octaves[octave]._data_tex[ level-1 ],
-                      _octaves[octave].getIntermediateData( ) );
+            }
+            else {
+                filter_gauss_horiz_v11 <<<h_grid,h_block>>> (
+                    _octaves[octave]._data_tex[ level-1 ],
+                    _octaves[octave].getIntermediateData( ) );
             }
 
             if( level == 0 ) {
-                filter_gauss_vert_v11
-                    <<<v_grid,v_block>>>
-                    ( _octaves[octave]._interm_data_tex,
-                      _octaves[octave].getData( level ) );
-            } else {
-                filter_gauss_vert_v11_dog
-                    <<<d_grid,d_block>>>
-                    ( _octaves[octave]._interm_data_tex,
-                      _octaves[octave].getData( level ),
-                      _octaves[octave]._data_tex[level-1],
-                      _octaves[octave].getDogSurface( ),
-                      level-1 );
+                filter_gauss_vert_v11 <<<v_grid,v_block>>> (
+                    _octaves[octave]._interm_data_tex,
+                    _octaves[octave].getData( level ) );
+            }
+            else {
+                filter_gauss_vert_v11_dog <<<d_grid,d_block>>> (
+                    _octaves[octave]._interm_data_tex,
+                    _octaves[octave].getData( level ),
+                    _octaves[octave]._data_tex[level-1],
+                    _octaves[octave].getDogSurface( ),
+                    level-1 );
             }
         }
     }
+
     cudaDeviceSynchronize( );
     cudaError_t err = cudaGetLastError();
     POP_CUDA_FATAL_TEST( err, "filter_gauss_horiz_v11 failed: " );
