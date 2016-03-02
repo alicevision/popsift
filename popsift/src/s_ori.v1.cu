@@ -110,7 +110,7 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
     }
 
 
-#if 1
+#if 0
     /* new oris */
     // float ang[2] = {NINF, NINF};
 
@@ -151,8 +151,9 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
             printf("bin %d: %f\n", threadIdx.x+32, hist[threadIdx.x+32]);
         }
     }
-    __syncthreads();
-    if( threadIdx.x == 0 ) {
+#else
+    
+        if(threadIdx.x != 0) return;
         for (int iter = 0; iter < 2; iter++) {
             float first = hist[0];
             float prev = hist[(NBINS_V1 - 1)];
