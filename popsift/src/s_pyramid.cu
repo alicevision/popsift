@@ -45,7 +45,6 @@ using namespace std;
 namespace popart {
 
 #include "s_ori.v1.h"
-#include "s_ori.v2.h"
 
 /*************************************************************
  * CUDA device functions for printing debug information
