@@ -1,3 +1,4 @@
+#if 0
 #pragma once
 
 #include <inttypes.h>
@@ -17,3 +18,4 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
                                        int                layer_pitch,
                                        int                layer_height );
 
+#endif

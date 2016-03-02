@@ -78,10 +78,6 @@ private:
     popart::Plane2D_uint8 _hst_input_image;
     popart::Plane2D_uint8 _dev_input_image;
     cudaStream_t          _stream;
-    popart::KeepTime*     _initTime;
-    popart::KeepTime*     _uploadTime;
-    popart::KeepTime*     _pyramidTime;
-    popart::KeepTime*     _extremaTime;
 };
 
 /**

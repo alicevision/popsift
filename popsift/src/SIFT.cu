@@ -44,19 +44,10 @@ void PopSift::init( int w, int h )
     _hst_input_image.allocHost( w, h, popart::CudaAllocated );
     _dev_input_image.allocDev( w, h );
 
-    _initTime    = new popart::KeepTime( 0 );
-    _uploadTime  = new popart::KeepTime( 0 );
-    _pyramidTime = new popart::KeepTime( 0 );
-    _extremaTime = new popart::KeepTime( 0 );
-
     float sigma = 1.0;
-
-    _initTime->start();
 
     popart::Pyramid::init_filter( sigma, _scales );
     popart::Pyramid::init_sigma(  sigma, _scales );
-
-    _initTime->stop();
 
     _baseImg = new popart::Image( _upscaled_width, _upscaled_height );
     _pyramid = new popart::Pyramid( _baseImg, _octaves, _scales );
@@ -99,16 +90,6 @@ void PopSift::uninit( )
     _hst_input_image.freeHost( popart::CudaAllocated );
     _dev_input_image.freeDev( );
 
-    _initTime   ->report( "Time to initialize:                        " );
-    _uploadTime ->report( "Time to upload:                            " );
-    _pyramidTime->report( "Time to build pyramid:                     " );
-    _extremaTime->report( "Time to find extrema & compute orientaton: " );
-
-    delete _initTime;
-    delete _uploadTime;
-    delete _pyramidTime;
-    delete _extremaTime;
-
     delete _baseImg;
     delete _pyramid;
 }
@@ -118,19 +99,13 @@ void PopSift::execute( imgStream inp )
     assert( inp.data_g == 0 );
     assert( inp.data_b == 0 );
 
-    _uploadTime->start();
     memcpy( _hst_input_image.data, inp.data_r, inp.width * inp.height );
     _hst_input_image.memcpyToDevice( _dev_input_image );
     _baseImg->upscale( _dev_input_image, _texture, 1<<up );
-    _uploadTime->stop();
 
-    _pyramidTime->start();
     _pyramid->build( _baseImg );
-    _pyramidTime->stop();
 
-    _extremaTime->start();
     _pyramid->find_extrema( _edgeLimit, _threshold );
-    _extremaTime->stop();
 
     if( log_to_file ) {
         popart::write_plane2D( "upscaled-input-image.pgm",

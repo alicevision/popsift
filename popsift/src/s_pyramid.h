@@ -1,7 +1,8 @@
 #pragma once
 
+#include <iostream>
+
 #include "s_image.h"
-#include "keep_time.h"
 
 #ifndef INF
 #define INF               (1<<29)
@@ -18,8 +19,6 @@
 
 #define GAUSS_ONE_SIDE_RANGE 12
 #define GAUSS_SPAN           (2*GAUSS_ONE_SIDE_RANGE+1)
-
-#define USE_DOG_ARRAY
 
 namespace popart {
 
@@ -63,12 +62,12 @@ class Pyramid
 {
     class Octave
     {
-        uint32_t  _debug_octave_id;
-        uint32_t  _levels;
+        uint32_t      _debug_octave_id;
+        uint32_t      _levels;
 
         Plane2D_float* _data;
         Plane2D_float  _intermediate_data;
-#ifdef USE_DOG_ARRAY
+
         cudaArray_t           _dog_3d;
         cudaChannelFormatDesc _dog_3d_desc;
         cudaExtent            _dog_3d_ext;
@@ -77,9 +76,10 @@ class Pyramid
 
         cudaTextureObject_t   _dog_3d_tex;
 
-#else // not USE_DOG_ARRAY
-        Plane2D_float* _dog_data;
-#endif // not USE_DOG_ARRAY
+        // one CUDA stream per level
+        // cosnider later whether some of them can be removed
+        cudaStream_t* _streams;
+        cudaEvent_t*  _gauss_done;
 
     public:
         cudaTextureObject_t* _data_tex;
@@ -109,30 +109,25 @@ class Pyramid
         inline int getWidth() const  { return _data[0].getWidth(); }
         inline int getHeight() const { return _data[0].getHeight(); }
 
+        inline cudaStream_t getStream( uint32_t level ) {
+            return _streams[level];
+        }
+        inline cudaEvent_t getEventGaussDone( uint32_t level ) {
+            return _gauss_done[level];
+        }
+
         inline Plane2D_float& getData( uint32_t level ) {
             return _data[level];
         }
         inline Plane2D_float& getIntermediateData( ) {
             return _intermediate_data;
         }
-#ifdef USE_DOG_ARRAY
         inline cudaSurfaceObject_t& getDogSurface( ) {
             return _dog_3d_surf;
         }
         inline cudaTextureObject_t& getDogTexture( ) {
             return _dog_3d_tex;
         }
-#else // not USE_DOG_ARRAY
-        inline Plane2D_float& getDogData( uint32_t level ) {
-            return _dog_data[level];
-        }
-        inline uint32_t getFloatSizeDogData() const        {
-            return _dog_data[0].getByteSize() / sizeof(float);
-        }
-        inline uint32_t getByteSizeDogData() const {
-            return _dog_data[0].getByteSize();
-        }
-#endif // not USE_DOG_ARRAY
         inline uint32_t getFloatSizeData() const {
             return _data[0].getByteSize() / sizeof(float);
         }
@@ -155,7 +150,7 @@ class Pyramid
             return _d_extrema[level];
         }
 
-        void resetExtremaCount( );
+        // void resetExtremaCount( );
         void readExtremaCount( );
         uint32_t getExtremaCount( ) const;
         uint32_t getExtremaCount( uint32_t level ) const;
@@ -163,7 +158,7 @@ class Pyramid
         void        allocDescriptors( );
         Descriptor* getDescriptors( uint32_t level );
         void        downloadDescriptor( );
-        void        writeDescriptor( ostream& ostr );
+        void        writeDescriptor( std::ostream& ostr );
 
         /**
          * alloc() - allocates all GPU memories for one octave
@@ -201,44 +196,22 @@ public:
 
     void download_and_save_descriptors( const char* basename, uint32_t octave );
 
-    void report_times();
-
 private:
-    void build_v7  ( Image* base );
-    void build_v8  ( Image* base );
     void build_v11 ( Image* base );
-    void build_v12 ( Image* base );
 
-    void reset_extremum_counter( );
-    void find_extrema_v4( float edgeLimit, float threshold );
-    void find_extrema_v5( float edgeLimit, float threshold );
     void find_extrema_v6( float edgeLimit, float threshold );
 
-    template<int HEIGHT>
-    void find_extrema_v4_sub( float edgeLimit, float threshold );
-    template<int HEIGHT>
-    void find_extrema_v5_sub( float edgeLimit, float threshold );
     template<int HEIGHT>
     void find_extrema_v6_sub( float edgeLimit, float threshold );
 
 
     void orientation_v1( );
-    void orientation_v2( );
 
     void descriptors_v1( );
 
     void test_last_error( int line );
     void debug_out_floats  ( float* data, uint32_t pitch, uint32_t height );
     void debug_out_floats_t( float* data, uint32_t pitch, uint32_t height );
-
-    KeepTime _keep_time_extrema_v4;
-    KeepTime _keep_time_extrema_v5;
-    KeepTime _keep_time_extrema_v6;
-
-    KeepTime _keep_time_orient_v1;
-    KeepTime _keep_time_orient_v2;
-
-    KeepTime _keep_time_descr_v1;
 };
 
 } // namespace popart

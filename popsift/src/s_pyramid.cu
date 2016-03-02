@@ -13,32 +13,13 @@
 #include <npp.h>
 
 #include "s_pyramid.h"
-#include "keep_time.h"
 #include "debug_macros.h"
 #include "align_macro.h"
 #include "clamp.h"
 #include "gauss_filter.h"
 #include "write_plane_2d.h"
 
-#undef PYRAMID_SPEED_TEST
-#undef EXTREMA_SPEED_TEST
-#define ALLOC_BULK
-
 #define PYRAMID_PRINT_DEBUG 0
-
-#define PYRAMID_V7_ON  false
-#define PYRAMID_V8_ON  false
-#define PYRAMID_V11_ON true
-#define PYRAMID_V12_ON false
-
-
-#define EXTREMA_V4 false //no cub
-#define EXTREMA_V5 false // with cub
-#define EXTREMA_V6 true // array?
-
-#define EXTREMA_V4_ON true
-#define ORIENTA_V1_ON true
-#define ORIENTA_V2_ON false
 
 using namespace std;
 
@@ -127,9 +108,6 @@ void Pyramid::test_last_error( int line )
 
 Pyramid::Octave::Octave( )
     : _data(0)
-#ifndef USE_DOG_ARRAY
-    , _dog_data(0)
-#endif // not USE_DOG_ARRAY
     , _h_extrema_mgmt(0)
     , _d_extrema_mgmt(0)
     , _d_extrema(0)
@@ -190,7 +168,7 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
 {
     cudaError_t err;
 
-    _levels            = levels;
+    _levels = levels;
 
     _d_desc = new Descriptor*[_levels];
     _h_desc = new Descriptor*[_levels];
@@ -201,9 +179,8 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
     printf("    correcting to width %u, height %u\n", _width, _height );
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
-    _data     = new Plane2D_float[_levels];
+    _data = new Plane2D_float[_levels];
 
-#ifdef ALLOC_BULK
     void*  ptr;
     size_t pitch;
 
@@ -215,13 +192,9 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
                                   (float*)( (intptr_t)ptr + i*(pitch*height) ),
                                   pitch );
     }
-#else // not ALLOC_BULK
-    for( int i=0; i<_levels; i++ ) {
-        _data[i]  .allocDev( width, height );
-    }
-#endif // not ALLOC_BULK
+
     _intermediate_data.allocDev( width, height );
-#ifdef USE_DOG_ARRAY
+
     _dog_3d_desc.f = cudaChannelFormatKindFloat;
     _dog_3d_desc.x = 32;
     _dog_3d_desc.y = 0;
@@ -268,13 +241,12 @@ void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, u
     err = cudaCreateTextureObject( &_dog_3d_tex, &dog_res_desc, &dog_tex_desc, 0 );
     POP_CUDA_FATAL_TEST( err, "Could not create DoG texture: " );
 
-#else // not USE_DOG_ARRAY
-    _dog_data = new Plane2D_float[_levels-1];
-
-    for( int i=0; i<_levels-1; i++ ) {
-        _dog_data[i].allocDev( width, height );
+    _streams = new cudaStream_t[_levels];
+    _gauss_done = new cudaEvent_t[_levels];
+    for( int i=0; i<_levels; i++ ) {
+        POP_CUDA_STREAM_CREATE( &_streams[i] );
+        POP_CUDA_EVENT_CREATE(  &_gauss_done[i] );
     }
-#endif // not USE_DOG_ARRAY
 
     _data_tex = new cudaTextureObject_t[_levels];
 
@@ -335,15 +307,16 @@ void Pyramid::Octave::free( )
 
     delete [] _data_tex;
 
-    _intermediate_data.freeDev( );
-#ifdef ALLOC_BULK
-    POP_CUDA_FREE( _data[0].data );
-#else // not ALLOC_BULK
     for( int i=0; i<_levels; i++ ) {
-        _data[i]  .freeDev( );
+        POP_CUDA_STREAM_DESTROY( _streams[i] );
+        POP_CUDA_EVENT_DESTROY(  _gauss_done[i] );
     }
-#endif // not ALLOC_BULK
-#ifdef USE_DOG_ARRAY
+    delete [] _streams;
+    delete [] _gauss_done;
+
+    _intermediate_data.freeDev( );
+    POP_CUDA_FREE( _data[0].data );
+
     err = cudaDestroyTextureObject( _dog_3d_tex );
     POP_CUDA_FATAL_TEST( err, "Could not destroy DoG texture: " );
 
@@ -352,17 +325,11 @@ void Pyramid::Octave::free( )
 
     err = cudaFreeArray( _dog_3d );
     POP_CUDA_FATAL_TEST( err, "Could not free 3D DoG array: " );
-#else // not USE_DOG_ARRAY
-    for( int i=0; i<_levels-1; i++ ) {
-        _dog_data[i].freeDev( );
-    }
-
-    delete [] _dog_data;
-#endif // not USE_DOG_ARRAY
 
     delete [] _data;
 }
 
+#if 0
 void Pyramid::Octave::resetExtremaCount( )
 {
     for( uint32_t i=1; i<_levels-1; i++ ) {
@@ -375,6 +342,7 @@ void Pyramid::Octave::resetExtremaCount( )
                            0,
                            true );
 }
+#endif
 
 void Pyramid::Octave::readExtremaCount( )
 {
@@ -384,7 +352,7 @@ void Pyramid::Octave::readExtremaCount( )
                            _d_extrema_mgmt,
                            _levels * sizeof(ExtremaMgmt),
                            cudaMemcpyDeviceToHost,
-                           0,
+                           _streams[0],
                            true );
 }
 
@@ -567,7 +535,6 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
     }
 #endif
 #if 1
-#ifdef USE_DOG_ARRAY
     if( level == _levels-1 ) {
         cudaError_t err;
         int width  = getData(0).getWidth();
@@ -599,19 +566,6 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
 
         POP_CUDA_FREE_HOST( array );
     }
-#else // not USE_DOG_ARRAY
-    if (stat("dir-dog", &st) == -1) {
-        mkdir("dir-dog", 0700);
-    }
-
-    if( level < _levels-1 ) {
-        ostringstream ostr;
-        ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << level << ".pgm";
-        cerr << "Writing " << ostr.str() << endl;
-
-        popart::write_plane2D( ostr.str().c_str(), true, getDogData(level) );
-    }
-#endif // not USE_DOG_ARRAY
 #endif
 }
 
@@ -622,12 +576,6 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
 Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels )
     : _num_octaves( octaves )
     , _levels( levels + 3 )
-    , _keep_time_extrema_v4( 0 )
-    , _keep_time_extrema_v5( 0 )
-    , _keep_time_extrema_v6( 0 )
-    , _keep_time_orient_v1(  0 )
-    , _keep_time_orient_v2(  0 )
-    , _keep_time_descr_v1(   0 )
 {
     // cerr << "Entering " << __FUNCTION__ << endl;
 
@@ -661,188 +609,16 @@ Pyramid::~Pyramid( )
 
 void Pyramid::build( Image* base )
 {
-#ifdef PYRAMID_SPEED_TEST
-    cudaEvent_t start;
-    cudaEvent_t stop;
-    cudaError_t err;
-    err = cudaEventCreate( &start );
-    POP_CUDA_FATAL_TEST( err, "event create failed: " );
-    err = cudaEventCreate( &stop );
-    POP_CUDA_FATAL_TEST( err, "event create failed: " );
-
-    for( int mode=0; mode<4; mode++ ) {
-        float duration = 0.0f;
-        for( int loop=0; loop<10; loop++ ) {
-            err = cudaEventRecord( start, 0 );
-            POP_CUDA_FATAL_TEST( err, "event record failed: " );
-            switch( mode ) {
-            case 0 :
-                build_v7( base );
-                POP_CHK;
-                break;
-            case 1 :
-                build_v8( base );
-                POP_CHK;
-                break;
-            case 2 :
-                build_v11( base );
-                POP_CHK;
-                break;
-            case 3 :
-                build_v12( base );
-                POP_CHK;
-                break;
-            }
-            err = cudaEventRecord( stop, 0 );
-            POP_CUDA_FATAL_TEST( err, "event record failed: " );
-            err = cudaStreamSynchronize( 0 );
-            POP_CUDA_FATAL_TEST( err, "stream sync failed: " );
-            float diff;
-            err = cudaEventElapsedTime( &diff, start, stop );
-            POP_CUDA_FATAL_TEST( err, "elapsed time failed: " );
-            duration += diff;
-        }
-        duration /= 10.0f;
-        cerr << "Pyramid "
-             << ( (mode==0) ? "V7" :
-                  (mode==1) ? "V8" :
-                  (mode==2) ? "V11" : "V12" )
-             << " avg duration: " << duration << " ms" << endl;
-    }
-
-    err = cudaEventDestroy( start );
-    POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
-    err = cudaEventDestroy( stop );
-    POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
-#else // not PYRAMID_SPEED_TEST
-    cudaEvent_t start;
-    cudaEvent_t stop;
-    cudaError_t err;
-    err = cudaEventCreate( &start );
-    POP_CUDA_FATAL_TEST( err, "event create failed: " );
-    err = cudaEventCreate( &stop );
-    POP_CUDA_FATAL_TEST( err, "event create failed: " );
-
-    err = cudaEventRecord( start, 0 );
-    POP_CUDA_FATAL_TEST( err, "event record failed: " );
-
-    if( PYRAMID_V7_ON  ) build_v7( base );
-    if( PYRAMID_V8_ON  ) build_v8( base );
-    if( PYRAMID_V11_ON ) build_v11( base );
-    if( PYRAMID_V12_ON ) build_v12( base );
-
-    err = cudaEventRecord( stop, 0 );
-    POP_CUDA_FATAL_TEST( err, "event record failed: " );
-
-    err = cudaStreamSynchronize( 0 );
-    POP_CUDA_FATAL_TEST( err, "stream sync failed: " );
-    float diff;
-    err = cudaEventElapsedTime( &diff, start, stop );
-    POP_CUDA_FATAL_TEST( err, "elapsed time failed: " );
-
-    cerr << "Pyramid duration: " << diff << " ms" << endl;
-    POP_CHK;
-#endif // not PYRAMID_SPEED_TEST
-}
-
-void Pyramid::report_times( )
-{
-    cudaDeviceSynchronize();
-
-    _keep_time_extrema_v4.report("    V4, time for finding extrema: " );
-    _keep_time_extrema_v5.report("    V5, time for finding extrema: " );
-    if( ORIENTA_V1_ON ) _keep_time_orient_v1. report("    V1, time for finding orientation: " );
-    if( ORIENTA_V2_ON ) _keep_time_orient_v2. report("    V2, time for finding orientation: " );
-    _keep_time_descr_v1.report("    V1, time for computing descriptors: " );
-
-    for( int o=0; o<_num_octaves; o++ ) {
-        cout << "Extrema for Octave " << o << ": ";
-        for( int l=1; l<_levels-1; l++ ) {
-            cout << setw(3) << _octaves[o].getExtremaCount( l ) << " ";
-        }
-        cout << "-> " << setw(4) << _octaves[o].getExtremaCount( ) << endl;
-    }
-}
-
-void Pyramid::reset_extremum_counter( )
-{
-    for( int o=0; o<_num_octaves; o++ ) {
-        _octaves[o].resetExtremaCount( );
-    }
+    build_v11( base );
 }
 
 void Pyramid::find_extrema( float edgeLimit, float threshold )
 {
-#ifdef EXTREMA_SPEED_TEST
-    cudaEvent_t start;
-    cudaEvent_t stop;
-    cudaError_t err;
-    err = cudaEventCreate( &start );
-    POP_CUDA_FATAL_TEST( err, "event create failed: " );
-    err = cudaEventCreate( &stop );
-    POP_CUDA_FATAL_TEST( err, "event create failed: " );
+    find_extrema_v6( edgeLimit, threshold );
 
-    float duration = 0.0f;
-    float min_duration = std::numeric_limits<float>::max();
-    float max_duration = std::numeric_limits<float>::min();
-    int   loop_len = 100;
-    for( int loop=0; loop<loop_len; loop++ ) {
-        err = cudaEventRecord( start, 0 );
-        POP_CUDA_FATAL_TEST( err, "event record failed: " );
-        reset_extremum_counter();
-        find_extrema_v4( edgeLimit, threshold );
-        err = cudaEventRecord( stop, 0 );
-        POP_CUDA_FATAL_TEST( err, "event record failed: " );
-        err = cudaStreamSynchronize( 0 );
-        POP_CUDA_FATAL_TEST( err, "stream sync failed: " );
-        float diff;
-        err = cudaEventElapsedTime( &diff, start, stop );
-        POP_CUDA_FATAL_TEST( err, "elapsed time failed: " );
-        duration += diff;
-        min_duration = min( min_duration, diff );
-        max_duration = max( max_duration, diff );
-    }
-    duration /= loop_len;
-    cerr << "find_extrema_v4 avg time " << duration << " ms "
-         << "min " << min_duration << " ms "
-         << "max " << max_duration << " ms" << endl;
-
-    err = cudaEventDestroy( start );
-    POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
-    err = cudaEventDestroy( stop );
-    POP_CUDA_FATAL_TEST( err, "event destroy failed: " );
-
-#else // not EXTREMA_SPEED_TEST
-    if( EXTREMA_V4 ) {
-        reset_extremum_counter();
-        find_extrema_v4( edgeLimit, threshold );
-    }
-
-    if( EXTREMA_V5 ) {
-        reset_extremum_counter();
-        find_extrema_v5( edgeLimit, threshold );
-    }
-
-    if(EXTREMA_V6){
-        reset_extremum_counter();
-        find_extrema_v6( edgeLimit, threshold );
-    }
-
-
-#endif // not EXTREMA_SPEED_TEST
-
-    for( int o=0; o<_num_octaves; o++ ) {
-        _octaves[o].readExtremaCount( );
-    }
-
-    //for(int i=0; i<100; i++ ) {
-        if (ORIENTA_V1_ON) { orientation_v1(); }
-        if (ORIENTA_V2_ON) { orientation_v2(); }
-    //}
+    orientation_v1();
 
     descriptors_v1( );
-
-    report_times();
 }
 
 } // namespace popart

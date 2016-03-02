@@ -60,12 +60,6 @@ void keypoint_descriptors( ExtremumCandidate* cand,
     float dpt[9];
     for (int i = 0; i < 9; i++) dpt[i] = 0.0f;
 
-#if 0
-    if( threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 ) {
-        printf("loop %d\n", loops );
-    }
-#endif
-
     for(int i = threadIdx.x; i < loops; i+=DESCR_V1_NUM_THREADS)
     {
         const int ii = i / wx + ymin;
@@ -78,16 +72,12 @@ void keypoint_descriptors( ExtremumCandidate* cand,
         const float nxn = fabs(nx);
         const float nyn = fabs(ny);
         if (nxn < 1.0f && nyn < 1.0f) {
-#if 1
             float mod;
             float th;
             get_gradiant( mod, th,
                           ii, jj,
                           layer );
-#else
-            float mod = at(grad,  ii, jj);
-            float th  = at(theta, ii, jj);
-#endif
+
             const float dnx = nx + offsetptx;
             const float dny = ny + offsetpty;
             const float ww  = __expf(-0.125f * (dnx*dnx + dny*dny));
@@ -183,12 +173,15 @@ void normalize_histogram( Descriptor* descs )
 __host__
 void Pyramid::descriptors_v1( )
 {
-    // cerr << "Enter " << __FUNCTION__ << endl;
-
-    _keep_time_descr_v1.start();
     for( int octave=0; octave<_num_octaves; octave++ ) {
+        Octave&      oct_obj = _octaves[octave];
+
+        for( int level=1; level<_levels-1; level++ ) {
+            cudaStreamSynchronize( oct_obj.getStream(level) );
+        }
+
         // async copy of extrema from device to host
-        _octaves[octave].readExtremaCount( );
+        oct_obj.readExtremaCount( );
     }
 
     // wait until that is finished, so we can alloc space for descriptor
@@ -200,10 +193,12 @@ void Pyramid::descriptors_v1( )
     }
 
     for( int octave=0; octave<_num_octaves; octave++ ) {
+        Octave&      oct_obj = _octaves[octave];
+
         for( int level=1; level<_levels-1; level++ ) {
             dim3 block;
             dim3 grid;
-            grid.x  = _octaves[octave].getExtremaMgmtH(level)->counter;
+            grid.x  = oct_obj.getExtremaMgmtH(level)->counter;
 
             if( grid.x != 0 ) {
                 block.x = DESCR_V1_NUM_THREADS;
@@ -211,27 +206,22 @@ void Pyramid::descriptors_v1( )
                 block.z = 4;
 
                 keypoint_descriptors
-                    <<<grid,block>>>
-                    ( _octaves[octave].getExtrema( level ),
-                      _octaves[octave].getDescriptors( level ),
-                      _octaves[octave].getData( level ) );
+                    <<<grid,block,0,oct_obj.getStream(level)>>>
+                    ( oct_obj.getExtrema( level ),
+                      oct_obj.getDescriptors( level ),
+                      oct_obj.getData( level ) );
 
                 block.x = DESCR_V1_NUM_THREADS;
                 block.y = 1;
                 block.z = 1;
 
                 normalize_histogram
-                    <<<grid,block>>>
-                    ( _octaves[octave].getDescriptors( level ) );
+                    <<<grid,block,0,oct_obj.getStream(level)>>>
+                    ( oct_obj.getDescriptors( level ) );
             }
         }
     }
-    _keep_time_descr_v1.stop();
 
-    // cerr << "Leave " << __FUNCTION__ << endl;
+    cudaDeviceSynchronize( );
 }
-
-#undef DESCR_BINS_V1
-#undef MAGNIFY_V1
-#undef DESCR_V1_NUM_THREADS
 

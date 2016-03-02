@@ -1,9 +1,10 @@
-#include <stdio.h>
-
-#include "s_ori.v1.h"
-#include "debug_macros.h"
+#include "s_pyramid.h"
 #include "s_gradiant.h"
+#include "debug_macros.h"
+
 #include <stdio.h>
+#include <inttypes.h>
+
 #define ORI_V1_NUM_THREADS 16
 #define NBINS_V1           36
 #define WINFACTOR_V1       1.5F
@@ -12,6 +13,8 @@
 #else
 #undef USE_DYNAMIC_PARALLELISM
 #endif
+
+using namespace popart;
 
 /*************************************************************
  * V1: device side
@@ -256,22 +259,20 @@ void orientation_starter_v1( ExtremumCandidate* extremum,
 __host__
 void Pyramid::orientation_v1( )
 {
-    cerr << "Enter " << __FUNCTION__ << endl;
-
-    _keep_time_orient_v1.start();
     for( int octave=0; octave<_num_octaves; octave++ ) {
+        Octave&      oct_obj = _octaves[octave];
+
         for( int level=1; level<_levels-1; level++ ) {
+            cudaStream_t oct_str = oct_obj.getStream(level);
+
             orientation_starter_v1
-                <<<1,1>>>
-                ( _octaves[octave].getExtrema( level ),
-                  _octaves[octave].getExtremaMgmtD( ),
+                <<<1,1,0,oct_str>>>
+                ( oct_obj.getExtrema( level ),
+                  oct_obj.getExtremaMgmtD( ),
                   level,
-                  _octaves[octave].getData( level ) );
+                  oct_obj.getData( level ) );
         }
     }
-    _keep_time_orient_v1.stop();
-
-    cerr << "Leave " << __FUNCTION__ << endl;
 }
 
 #else // not USE_DYNAMIC_PARALLELISM
@@ -288,31 +289,34 @@ void orientation_starter_v1( ExtremumCandidate*,
 __host__
 void Pyramid::orientation_v1( )
 {
-    cerr << "Enter " << __FUNCTION__ << endl;
-
-    _keep_time_orient_v1.start();
     for( int octave=0; octave<_num_octaves; octave++ ) {
-        _octaves[octave].readExtremaCount( );
-        cudaDeviceSynchronize( );
+        Octave&      oct_obj = _octaves[octave];
+
         for( int level=1; level<_levels-1; level++ ) {
+            cudaStreamSynchronize( oct_obj.getStream(level) );
+        }
+
+        oct_obj.readExtremaCount( );
+        cudaDeviceSynchronize( );
+
+        for( int level=1; level<_levels-1; level++ ) {
+            cudaStream_t oct_str = oct_obj.getStream(level);
+
             dim3 block;
             dim3 grid;
             // grid.x  = _octaves[octave].getExtremaMgmtH(level)->max1;
-            grid.x  = _octaves[octave].getExtremaMgmtH(level)->counter;
+            grid.x  = oct_obj.getExtremaMgmtH(level)->counter;
             block.x = ORI_V1_NUM_THREADS;
             if( grid.x != 0 ) {
                 compute_keypoint_orientations_v1
-                    <<<grid,block>>>
-                    ( _octaves[octave].getExtrema( level ),
-                      _octaves[octave].getExtremaMgmtD( ),
+                    <<<grid,block,0,oct_str>>>
+                    ( oct_obj.getExtrema( level ),
+                      oct_obj.getExtremaMgmtD( ),
                       level,
-                      _octaves[octave].getData( level ) );
+                      oct_obj.getData( level ) );
             }
         }
     }
-    _keep_time_orient_v1.stop();
-
-    cerr << "Leave " << __FUNCTION__ << endl;
 }
 #endif // not USE_DYNAMIC_PARALLELISM
 
