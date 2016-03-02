@@ -221,7 +221,6 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
                 if (nangles > 2) break;
             }
         }
-    }
 #endif
 
 }
@@ -292,13 +291,6 @@ void Pyramid::orientation_v1( )
     cerr << "Enter " << __FUNCTION__ << endl;
 
     _keep_time_orient_v1.start();
-compute_keypoint_orientations_v1
-                    <<<dim3(16),dim3(1)>>>
-                    ( _octaves[octave].getExtrema( level ),
-                      _octaves[octave].getExtremaMgmtD( ),
-                      level,
-                      _octaves[octave].getData( level ) );
-/*
     for( int octave=0; octave<_num_octaves; octave++ ) {
         _octaves[octave].readExtremaCount( );
         cudaDeviceSynchronize( );
@@ -318,7 +310,6 @@ compute_keypoint_orientations_v1
             }
         }
     }
-*/
     _keep_time_orient_v1.stop();
 
     cerr << "Leave " << __FUNCTION__ << endl;
