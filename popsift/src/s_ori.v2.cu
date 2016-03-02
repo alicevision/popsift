@@ -50,7 +50,9 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
 
     int   rad  = (int)rintf((3.0f * sigw)); // rintf is recommended for rounding
 
+#ifndef __APPLE__
     assert( sigw != 0 );
+#endif
     float factor  = -0.5f / (sigw * sigw);
     int sq_thres  = rad * rad;
     int32_t xmin = max( 1,     int32_t(x - rad));
@@ -66,8 +68,9 @@ void compute_keypoint_orientations_v2( ExtremumCandidate* extremum,
     {
         float grad;
         float theta;
-
+#ifndef __APPLE__
         assert( wx + ymin != 0 );
+#endif
         int yy = i / wx + ymin;
         int xx = i % wx + xmin;
 
