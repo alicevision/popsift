@@ -273,6 +273,15 @@ void Pyramid::orientation_v1( )
 
 #else // not USE_DYNAMIC_PARALLELISM
 
+__global__
+void orientation_starter_v1( ExtremumCandidate*,
+                             ExtremaMgmt*,
+                             uint32_t,
+                             Plane2D_float )
+{
+    /* dummy to make the linker happy */
+}
+
 __host__
 void Pyramid::orientation_v1( )
 {
