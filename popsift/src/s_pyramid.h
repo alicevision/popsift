@@ -68,7 +68,7 @@ class Pyramid
 
         Plane2D_float* _data;
         Plane2D_float  _intermediate_data;
-#ifdef USE_DOG_ARRAY
+
         cudaArray_t           _dog_3d;
         cudaChannelFormatDesc _dog_3d_desc;
         cudaExtent            _dog_3d_ext;
@@ -77,9 +77,6 @@ class Pyramid
 
         cudaTextureObject_t   _dog_3d_tex;
 
-#else // not USE_DOG_ARRAY
-        Plane2D_float* _dog_data;
-#endif // not USE_DOG_ARRAY
 
     public:
         cudaTextureObject_t* _data_tex;
@@ -122,17 +119,7 @@ class Pyramid
         inline cudaTextureObject_t& getDogTexture( ) {
             return _dog_3d_tex;
         }
-#else // not USE_DOG_ARRAY
-        inline Plane2D_float& getDogData( uint32_t level ) {
-            return _dog_data[level];
-        }
-        inline uint32_t getFloatSizeDogData() const        {
-            return _dog_data[0].getByteSize() / sizeof(float);
-        }
-        inline uint32_t getByteSizeDogData() const {
-            return _dog_data[0].getByteSize();
-        }
-#endif // not USE_DOG_ARRAY
+
         inline uint32_t getFloatSizeData() const {
             return _data[0].getByteSize() / sizeof(float);
         }
