@@ -112,7 +112,7 @@ class Pyramid
         inline Plane2D_float& getIntermediateData( ) {
             return _intermediate_data;
         }
-#ifdef USE_DOG_ARRAY
+        
         inline cudaSurfaceObject_t& getDogSurface( ) {
             return _dog_3d_surf;
         }
