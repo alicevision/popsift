@@ -6,6 +6,8 @@
 #include "debug_macros.h"
 #include "assist.h"
 #include <cuda_runtime.h>
+#include <curand_mtgp32_kernel.h>
+#include <device_launch_parameters.h>
 
 /*************************************************************
  * V11: device side
@@ -13,7 +15,6 @@
 
 #define V11_EDGE_LEN 32
 #define V11_RANGE    4 // RANGES from 1 to 8 are possible
-#define V11_LEVELS   _levels
 
 #define SEPARATE_DOG_BUILDING
 
@@ -186,7 +187,31 @@ void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
     dst_data.ptr(idy)[idx] = out;
 }
 
+    //input texture (src_data) has twize the size of dst_data.
+    //the block and thread dimensions are that of dst_data.
+#if 0
+__global__
+void downscale_by_2(Plane2D_float src_data,
+                    Plane2D_float dst_data)
+{
+    int block_x = blockIdx.x * blockDim.x;
+    int block_y = blockIdx.y * blockDim.y;
+    int idx     = threadIdx.x;
+    int idy     = threadIdx.y;
 
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+    if( idx >= dst_w ) return;
+    if( idy >= dst_h ) return;
+
+    //todo: cant do tex2d lookup in Plane2D_float array (not texture memory).
+    //      Need to either use another input buffer, or change to slower global memory lookup.
+    //add 0.5f to lookup coords to get interpolated values? Does it work here?
+    dst_data.ptr(idy)[idx] = tex2D<float>( src_data,
+                                           2 * ( block_x + idx ),
+                                           2 * ( block_y + idy ));
+}
+#endif
 __device__ inline
 float filter_gauss_vert_v11_sub( cudaTextureObject_t src_data,
                                  Plane2D_float       dst_data )
@@ -332,25 +357,140 @@ void Pyramid::build_v11( Image* base )
          << "    original pix size : " << base->u_width/base->type_size << "x" << base->u_height << endl;
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        for( int level=0; level<V11_LEVELS; level++ ) {
+#if 0
+    //Creating the octaves
+    for(uint32_t octave=0; octave<_num_octaves; octave++){
+        const int width  = _octaves[octave].getData(0).getWidth();
+        const int height = _octaves[octave].getData(0).getHeight();
+        dim3 h_block( 64, 2 );
+        dim3 h_grid;
+
+        h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
+        h_grid.y = (unsigned int)grid_divide( height, h_block.y );
+
+        dim3 v_block( 64, 2 );
+        dim3 v_grid;
+        v_grid.x = (unsigned int)grid_divide( width,  v_block.x );
+        v_grid.y = (unsigned int)grid_divide( height, v_block.y );
+
+        dim3 d_block( 32, 1 );
+        dim3 d_grid;
+        d_grid.x = (unsigned int)grid_divide( width,  d_block.x );
+        d_grid.y = (unsigned int)grid_divide( height, d_block.y );
+
+        if(octave==0){
+            downscale_by_2<<<h_grid,h_block>>>(base->array,
+                                               _octaves[octave  ].getData(0));
+        }else{
+            downscale_by_2<<<h_grid,h_block>>>(_octaves[octave-1].getData(0),
+                                               _octaves[octave  ].getData(0));
+        }
+
+    }
+
+    //Performing the gaussing
+    for(uint32_t octave=0; octave<_num_octaves; octave++) {
+        const int width  = _octaves[octave].getData(0).getWidth();
+        const int height = _octaves[octave].getData(0).getHeight();
+        dim3 h_block( 64, 2 );
+        dim3 h_grid;
+
+        h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
+        h_grid.y = (unsigned int)grid_divide( height, h_block.y );
+
+        dim3 v_block( 64, 2 );
+        dim3 v_grid;
+        v_grid.x = (unsigned int)grid_divide( width,  v_block.x );
+        v_grid.y = (unsigned int)grid_divide( height, v_block.y );
+
+        dim3 d_block( 32, 1 );
+        dim3 d_grid;
+        d_grid.x = (unsigned int)grid_divide( width,  d_block.x );
+        d_grid.y = (unsigned int)grid_divide( height, d_block.y );
+
+        //horizontal
+        //  input : _data_tex[level-1]
+        //  output: getIntermediateData();
+        //vertical:
+        //  input : _interm_data_tex
+        //  output:
+        //      lvl0 : getData(level)
+        //      lvl>0: getDogSurface()
+        for (uint32_t level = 0; level < _levels; level++) {
+            if(level == 0){
+                filter_gauss_horiz_v11 <<<h_grid,h_block>>> (
+                    _octaves[octave]._data_tex[level],
+                    _octaves[octave].getIntermediateData() );
+                filter_gauss_horiz_v11 <<<h_grid,h_block>>> (
+                    _octaves[octave]._data_tex[level],
+                    _octaves[octave].getIntermediateData() );
+                filter_gauss_horiz_v11 <<<h_grid,h_block>>> (
+                    _octaves[octave]._data_tex[level],
+                    _octaves[octave].getIntermediateData() );
+            }
+
+
+            if( level == 0 ) {
+                if( octave == 0 ) {
+                    dim3 block(V11_EDGE_LEN,V11_EDGE_LEN);
+                    dim3 grid((unsigned int)grid_divide( width,  V11_EDGE_LEN ),
+                              (unsigned int)grid_divide( height, V11_EDGE_LEN ));
+
+                    filter_gauss_horiz_v11 <<<grid,block>>> (
+                        _octaves[octave]._data_tex[level-1],
+                        _octaves[octave].getIntermediateData() );
+                } else {
+                    filter_gauss_horiz_v11 <<<h_grid,h_block>>> (
+                        _octaves[octave-1]._data_tex[ _levels-3 ],
+                        _octaves[octave].getIntermediateData( ) );
+                }
+            }
+            else {
+                filter_gauss_horiz_v11 <<<h_grid,h_block>>> (
+                        _octaves[octave]._data_tex[ level-1 ],
+                                _octaves[octave].getIntermediateData( ) );
+            }
+
+
+
+            if( level == 0 ) {
+                filter_gauss_vert_v11 <<<v_grid,v_block>>> (
+                        _octaves[octave]._interm_data_tex,
+                                _octaves[octave].getData( level ) );
+            }
+            else {
+                filter_gauss_vert_v11_dog <<<d_grid,d_block>>> (
+                        _octaves[octave]._interm_data_tex,
+                                _octaves[octave].getData( level ),
+                                _octaves[octave]._data_tex[level-1],
+                                _octaves[octave].getDogSurface( ),
+                                level-1 );
+            }
+        }
+    }
+
+#else
+
+    for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
+        for( uint32_t level=0; level<_levels; level++ ) {
+
             const int width  = _octaves[octave].getData(0).getWidth();
             const int height = _octaves[octave].getData(0).getHeight();
 
             dim3 h_block( 64, 2 );
             dim3 h_grid;
-            h_grid.x = grid_divide( width,  h_block.x );
-            h_grid.y = grid_divide( height, h_block.y );
+            h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
+            h_grid.y = (unsigned int)grid_divide( height, h_block.y );
 
             dim3 v_block( 64, 2 );
             dim3 v_grid;
-            v_grid.x = grid_divide( width,  v_block.x );
-            v_grid.y = grid_divide( height, v_block.y );
+            v_grid.x = (unsigned int)grid_divide( width,  v_block.x );
+            v_grid.y = (unsigned int)grid_divide( height, v_block.y );
 
             dim3 d_block( 32, 1 );
             dim3 d_grid;
-            d_grid.x = grid_divide( width,  d_block.x );
-            d_grid.y = grid_divide( height, d_block.y );
+            d_grid.x = (unsigned int)grid_divide( width,  d_block.x );
+            d_grid.y = (unsigned int)grid_divide( height, d_block.y );
 
             Octave&      oct_obj   = _octaves[octave];
             cudaStream_t oct_str_0 = oct_obj.getStream(0);
@@ -372,11 +512,11 @@ void Pyramid::build_v11( Image* base )
                           oct_obj.getIntermediateData( ) );
                 } else {
                     Octave& prev_oct_obj  = _octaves[octave-1];
-                    cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( V11_LEVELS-3 ), 0 );
+                    cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( _levels-3 ), 0 );
 
                     filter_gauss_horiz_v11_by_2
                         <<<h_grid,h_block,0,oct_str_0>>>
-                        ( prev_oct_obj._data_tex[ V11_LEVELS-3 ],
+                        ( prev_oct_obj._data_tex[ _levels-3 ],
                           // _octaves[octave-1]._data_tex[ 0 ],
                           oct_obj.getIntermediateData( ) );
                 }
@@ -518,6 +658,7 @@ void Pyramid::build_v11( Image* base )
             cudaEventRecord( oct_obj.getEventGaussDone( level ), oct_str_0 );
         }
     }
+#endif
 }
 
 } // namespace popart

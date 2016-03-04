@@ -122,12 +122,14 @@ class Pyramid
         inline Plane2D_float& getIntermediateData( ) {
             return _intermediate_data;
         }
+        
         inline cudaSurfaceObject_t& getDogSurface( ) {
             return _dog_3d_surf;
         }
         inline cudaTextureObject_t& getDogTexture( ) {
             return _dog_3d_tex;
         }
+
         inline uint32_t getFloatSizeData() const {
             return _data[0].getByteSize() / sizeof(float);
         }
