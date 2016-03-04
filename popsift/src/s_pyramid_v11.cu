@@ -141,6 +141,7 @@ void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
 
     //input texture (src_data) has twize the size of dst_data.
     //the block and thread dimensions are that of dst_data.
+#if 0
 __global__
 void downscale_by_2(Plane2D_float src_data,
                     Plane2D_float dst_data)
@@ -159,11 +160,10 @@ void downscale_by_2(Plane2D_float src_data,
     //      Need to either use another input buffer, or change to slower global memory lookup.
     //add 0.5f to lookup coords to get interpolated values? Does it work here?
     dst_data.ptr(idy)[idx] = tex2D<float>( src_data,
-                                           2 * ( block_x + idx ) /*+ 0.5f*/,
-                                           2 * ( block_y + idy )/* + 0.5f */);
-    */
+                                           2 * ( block_x + idx ),
+                                           2 * ( block_y + idy ));
 }
-
+#endif
 __device__ inline
 float filter_gauss_vert_v11_sub( cudaTextureObject_t src_data,
                                  Plane2D_float       dst_data )
