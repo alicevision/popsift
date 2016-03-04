@@ -129,6 +129,18 @@ void pop_cuda_memset( void*        ptr,
         POP_CUDA_FATAL_TEST( err, "cudaStreamDestroy failed: " ); \
     }
 
+#define POP_CUDA_EVENT_CREATE( ptr ) { \
+        cudaError_t err; \
+        err = cudaEventCreate( ptr ); \
+        POP_CUDA_FATAL_TEST( err, "cudaEventCreate failed: " ); \
+    }
+
+#define POP_CUDA_EVENT_DESTROY( ptr ) { \
+        cudaError_t err; \
+        err = cudaEventDestroy( ptr ); \
+        POP_CUDA_FATAL_TEST( err, "cudaEventDestroy failed: " ); \
+    }
+
 #if 1
 #define POP_PRINT_MEM( where )
 #else
