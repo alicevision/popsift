@@ -16,8 +16,6 @@
 #define V11_EDGE_LEN 32
 #define V11_RANGE    4 // RANGES from 1 to 8 are possible
 
-#define SEPARATE_DOG_BUILDING
-
 namespace popart {
 
 __global__
@@ -48,7 +46,7 @@ void filter_gauss_horiz_v11_128x1( Plane2D_float src_data,
     float val;
     float out = 0;
 
-    for( int offset = V11_RANGE; offset>0; offset-- ) {
+    for( int offset = 4; offset>0; offset-- ) {
         g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
         val = loaddata[threadIdx.x+4-offset];
         out += ( val * g );
@@ -56,7 +54,7 @@ void filter_gauss_horiz_v11_128x1( Plane2D_float src_data,
         out += ( val * g );
     }
     g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
-    val = loaddata[threadIdx.x+V11_RANGE];
+    val = loaddata[threadIdx.x+4];
     out += ( val * g );
 
     if( off_x >= src_w )      return;
@@ -106,6 +104,44 @@ void filter_gauss_horiz_v11( Plane2D_float src_data,
     dst_data.ptr(idy)[idx] = out;
 }
 #endif
+
+__global__
+void filter_gauss_horiz_v11_128x1( cudaTextureObject_t src_data,
+                             Plane2D_float       dst_data )
+{
+    __shared__ float loaddata[4 + 128 + 4];
+
+    const int idx   = threadIdx.x;
+    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if( idx < 4 ) {
+        loaddata[idx] = tex2D<float>( src_data, off_x-4, blockIdx.y );
+    } else if( idx >= 128-4 ) {
+        loaddata[idx+8] = tex2D<float>( src_data, off_x+4, blockIdx.y );
+    }
+    __syncthreads();
+    loaddata[idx+4] = tex2D<float>( src_data, off_x, blockIdx.y );
+
+    float g;
+    float val;
+    float out = 0;
+
+    for( int offset = V11_RANGE; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
+        val = loaddata[threadIdx.x+4-offset];
+        out += ( val * g );
+        val = loaddata[threadIdx.x+4+offset];
+        out += ( val * g );
+    }
+    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
+    val = loaddata[threadIdx.x+4];
+    out += ( val * g );
+
+    const int dst_w = dst_data.getWidth();
+    if( off_x >= dst_w )      return;
+
+    dst_data.ptr(blockIdx.y)[off_x] = out;
+}
 
 __global__
 void filter_gauss_horiz_v11( cudaTextureObject_t src_data,
@@ -212,9 +248,9 @@ void downscale_by_2(Plane2D_float src_data,
                                            2 * ( block_y + idy ));
 }
 #endif
-__device__ inline
-float filter_gauss_vert_v11_sub( cudaTextureObject_t src_data,
-                                 Plane2D_float       dst_data )
+__global__
+void filter_gauss_vert_v11( cudaTextureObject_t src_data,
+                            Plane2D_float       dst_data )
 {
     int block_x = blockIdx.x * blockDim.x;
     int block_y = blockIdx.y * blockDim.y;
@@ -246,22 +282,13 @@ float filter_gauss_vert_v11_sub( cudaTextureObject_t src_data,
     idy = block_y+threadIdx.y;
     const int dst_w = dst_data.getWidth();
     const int dst_h = dst_data.getHeight();
-    if( idx >= dst_w ) return 0;
-    if( idy >= dst_h ) return 0;
+    if( idx >= dst_w ) return;
+    if( idy >= dst_h ) return;
 
     dst_data.ptr(idy)[idx] = out;
-
-    return out;
 }
 
-__global__
-void filter_gauss_vert_v11( cudaTextureObject_t src_data,
-                            Plane2D_float       dst_data )
-{
-    filter_gauss_vert_v11_sub( src_data, dst_data );
-}
 
-#ifdef SEPARATE_DOG_BUILDING
 __global__
 void make_dog( cudaTextureObject_t this_data,
                cudaTextureObject_t top_data,
@@ -277,69 +304,8 @@ void make_dog( cudaTextureObject_t this_data,
     a = tex2D<float>( top_data, idx, idy );
     a = fabs( a - b );
 
-    surf2DLayeredwrite( a, dog_data,
-                        idx*4, idy, level,
-                        cudaBoundaryModeZero );
+    surf2DLayeredwrite( a, dog_data, idx*4, idy, level, cudaBoundaryModeZero );
 }
-__global__
-void make_dog( Plane2D_float       this_data,
-               Plane2D_float       top_data,
-               cudaSurfaceObject_t dog_data,
-               int                 level )
-{
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
-    float b = this_data.ptr(idy)[idx];
-    float a = top_data .ptr(idy)[idx];
-    a = fabs( a - b );
-
-    surf2DLayeredwrite( a, dog_data,
-                        idx*4, idy, level,
-                        cudaBoundaryModeZero );
-}
-__global__
-void make_dog4( Plane2D_float       this_data,
-                Plane2D_float       top_data,
-                cudaSurfaceObject_t dog_data,
-                int                 level )
-{
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int idy = blockIdx.y * blockDim.y + threadIdx.y * 4;
-
-    float4 b = *(float4*)&this_data.ptr(idy)[idx];
-    float4 a = *(float4*)&top_data .ptr(idy)[idx];
-    a.x = fabs( a.x - b.x );
-    a.y = fabs( a.y - b.y );
-    a.z = fabs( a.z - b.z );
-    a.w = fabs( a.w - b.w );
-
-    surf2DLayeredwrite( a, dog_data,
-                        idx*16, idy, level,
-                        cudaBoundaryModeZero );
-}
-#else // not SEPARATE_DOG_BUILDING
-__global__
-void filter_gauss_vert_v11_dog( cudaTextureObject_t src_data,
-                                Plane2D_float       dst_data,
-                                cudaTextureObject_t top_data,
-                                cudaSurfaceObject_t dog_data,
-                                int                 level )
-{
-    float b = filter_gauss_vert_v11_sub( src_data, dst_data );
-
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
-    float a;
-    a = tex2D<float>( top_data, idx, idy );
-    a = fabs( a - b );
-
-    surf2DLayeredwrite( a, dog_data,
-                        idx*4, idy, level,
-                        cudaBoundaryModeZero );
-}
-#endif // not SEPARATE_DOG_BUILDING
 
 /*************************************************************
  * V11: host side
@@ -497,13 +463,11 @@ void Pyramid::build_v11( Image* base )
 
             if( level == 0 ) {
                 if( octave == 0 ) {
-                    dim3 block;
+                    dim3 block( 128, 1 );
                     dim3 grid;
                     const int width  = _octaves[octave].getData(0).getWidth();
                     const int height = _octaves[octave].getData(0).getHeight();
 
-                    block.x = 128;
-                    block.y = 1;
                     grid.x  = grid_divide( width,  128 );
                     grid.y  = height;
                     filter_gauss_horiz_v11_128x1
@@ -525,6 +489,17 @@ void Pyramid::build_v11( Image* base )
                     <<<h_grid,h_block,0,oct_str_0>>>
                     ( oct_obj._data_tex[ level-1 ],
                       oct_obj.getIntermediateData( ) );
+
+                dim3 block( 128, 1 );
+                dim3 grid;
+                const int width  = _octaves[octave].getData(0).getWidth();
+                const int height = _octaves[octave].getData(0).getHeight();
+                grid.x  = grid_divide( width,  128 );
+                grid.y  = height;
+                filter_gauss_horiz_v11_128x1
+                    <<<grid,block,0,oct_str_0>>>
+                    ( oct_obj._data_tex[ level-1 ],
+                      oct_obj.getIntermediateData( ) );
             }
 
             if( level == 0 ) {
@@ -533,126 +508,22 @@ void Pyramid::build_v11( Image* base )
                     ( oct_obj._interm_data_tex,
                       oct_obj.getData( level ) );
             } else {
-#ifdef SEPARATE_DOG_BUILDING
                 filter_gauss_vert_v11
                     <<<v_grid,v_block,0,oct_str_0>>>
                     ( oct_obj._interm_data_tex,
                       oct_obj.getData( level ) );
 
-                dim3 e_block;
+                dim3 e_block( 128, 2 );
                 dim3 e_grid;
+                e_grid.x = grid_divide( width,  e_block.x );
+                e_grid.y = grid_divide( height, e_block.y );
 
-                e_block.x = 16;
-                e_block.y = 1;
-                e_grid.x = grid_divide( width,  d_block.x );
-                e_grid.y = grid_divide( height, d_block.y );
-                make_dog
-                    <<<e_grid,e_block,0,oct_str_0>>>
-                    ( oct_obj.getData( level ),
-                      oct_obj.getData( level-1 ),
-                      oct_obj.getDogSurface( ),
-                      level-1 );
                 make_dog
                     <<<e_grid,e_block,0,oct_str_0>>>
                     ( oct_obj._data_tex[level],
                       oct_obj._data_tex[level-1],
                       oct_obj.getDogSurface( ),
                       level-1 );
-
-                e_block.x = 32;
-                e_block.y = 1;
-                e_grid.x = grid_divide( width,  d_block.x );
-                e_grid.y = grid_divide( height, d_block.y );
-                make_dog
-                    <<<e_grid,e_block,0,oct_str_0>>>
-                    ( oct_obj.getData( level ),
-                      oct_obj.getData( level-1 ),
-                      oct_obj.getDogSurface( ),
-                      level-1 );
-                make_dog
-                    <<<e_grid,e_block,0,oct_str_0>>>
-                    ( oct_obj._data_tex[level],
-                      oct_obj._data_tex[level-1],
-                      oct_obj.getDogSurface( ),
-                      level-1 );
-
-                e_block.x = 64;
-                e_block.y = 1;
-                e_grid.x = grid_divide( width,  d_block.x );
-                e_grid.y = grid_divide( height, d_block.y );
-                make_dog
-                    <<<e_grid,e_block,0,oct_str_0>>>
-                    ( oct_obj.getData( level ),
-                      oct_obj.getData( level-1 ),
-                      oct_obj.getDogSurface( ),
-                      level-1 );
-                make_dog
-                    <<<e_grid,e_block,0,oct_str_0>>>
-                    ( oct_obj._data_tex[level],
-                      oct_obj._data_tex[level-1],
-                      oct_obj.getDogSurface( ),
-                      level-1 );
-
-                e_block.x = 16;
-                e_block.y = 2;
-                e_grid.x = grid_divide( width,  d_block.x );
-                e_grid.y = grid_divide( height, d_block.y );
-                make_dog
-                    <<<e_grid,e_block,0,oct_str_0>>>
-                    ( oct_obj.getData( level ),
-                      oct_obj.getData( level-1 ),
-                      oct_obj.getDogSurface( ),
-                      level-1 );
-                make_dog
-                    <<<e_grid,e_block,0,oct_str_0>>>
-                    ( oct_obj._data_tex[level],
-                      oct_obj._data_tex[level-1],
-                      oct_obj.getDogSurface( ),
-                      level-1 );
-
-                e_block.x = 32;
-                e_block.y = 2;
-                e_grid.x = grid_divide( width,  d_block.x );
-                e_grid.y = grid_divide( height, d_block.y );
-                make_dog
-                    <<<e_grid,e_block,0,oct_str_0>>>
-                    ( oct_obj.getData( level ),
-                      oct_obj.getData( level-1 ),
-                      oct_obj.getDogSurface( ),
-                      level-1 );
-                make_dog
-                    <<<e_grid,e_block,0,oct_str_0>>>
-                    ( oct_obj._data_tex[level],
-                      oct_obj._data_tex[level-1],
-                      oct_obj.getDogSurface( ),
-                      level-1 );
-
-                e_block.x = 64;
-                e_block.y = 2;
-                e_grid.x = grid_divide( width,  d_block.x );
-                e_grid.y = grid_divide( height, d_block.y );
-                make_dog
-                    <<<e_grid,e_block,0,oct_str_0>>>
-                    ( oct_obj.getData( level ),
-                      oct_obj.getData( level-1 ),
-                      oct_obj.getDogSurface( ),
-                      level-1 );
-                make_dog
-                    <<<e_grid,e_block,0,oct_str_0>>>
-                    ( oct_obj._data_tex[level],
-                      oct_obj._data_tex[level-1],
-                      oct_obj.getDogSurface( ),
-                      level-1 );
-
-#else // not SEPARATE_DOG_BUILDING
-                filter_gauss_vert_v11_dog
-                    <<<d_grid,d_block,0,oct_str_0>>>
-                    ( oct_obj._interm_data_tex,
-                      oct_obj.getData( level ),
-                      oct_obj._data_tex[level-1],
-                      oct_obj.getDogSurface( ),
-                      level-1 );
-#endif // not SEPARATE_DOG_BUILDING
             }
 
             cudaEventRecord( oct_obj.getEventGaussDone( level ), oct_str_0 );
