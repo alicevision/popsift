@@ -1,7 +1,7 @@
 #include "s_pyramid.h"
 #include "debug_macros.h"
 
-#undef PRINT_GAUSS_FILTER_SYMBOL
+#define PRINT_GAUSS_FILTER_SYMBOL
 
 using namespace std;
 
