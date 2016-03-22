@@ -95,6 +95,7 @@ class Pyramid
          */
         ExtremaMgmt*         _h_extrema_mgmt; // host side info
         ExtremaMgmt*         _d_extrema_mgmt; // device side info
+        ExtremumCandidate**  _h_extrema;
         ExtremumCandidate**  _d_extrema;
         Descriptor**         _d_desc;
         Descriptor**         _h_desc;

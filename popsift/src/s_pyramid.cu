@@ -110,15 +110,17 @@ Pyramid::Octave::Octave( )
     : _data(0)
     , _h_extrema_mgmt(0)
     , _d_extrema_mgmt(0)
+    , _h_extrema(0)
     , _d_extrema(0)
     , _d_desc(0)
 { }
 
 void Pyramid::Octave::allocExtrema( uint32_t layer_max_extrema )
 {
-    ExtremaMgmt*       mgmt;
+    ExtremaMgmt* mgmt;
 
-    _d_extrema        = new ExtremumCandidate*[ _levels ];
+    _d_extrema = new ExtremumCandidate*[ _levels ];
+    _h_extrema = new ExtremumCandidate*[ _levels ];
 
     POP_CUDA_MALLOC_HOST( &mgmt, _levels * sizeof(ExtremaMgmt) );
     memset( mgmt, 0, _levels * sizeof(ExtremaMgmt) );
@@ -141,12 +143,18 @@ void Pyramid::Octave::allocExtrema( uint32_t layer_max_extrema )
                            0,
                            true );
 
+    _h_extrema[0] = 0;
+    _h_extrema[_levels-1] = 0;
     _d_extrema[0] = 0;
     _d_extrema[_levels-1] = 0;
     for( uint32_t i=1; i<_levels-1; i++ ) {
         ExtremumCandidate* cand;
+
         POP_CUDA_MALLOC( &cand, sizeof(ExtremumCandidate)*_h_extrema_mgmt[i].max2 );
         _d_extrema[i] = cand;
+
+        POP_CUDA_MALLOC_HOST( &cand, sizeof(ExtremumCandidate)*_h_extrema_mgmt[i].max2 );
+        _h_extrema[i] = cand;
     }
 }
 
@@ -155,11 +163,13 @@ void Pyramid::Octave::freeExtrema( )
     for( uint32_t i=0; i<_levels; i++ ) {
         if( _h_desc    && _h_desc[i] )    cudaFreeHost( _h_desc[i] );
         if( _d_desc    && _d_desc[i] )    cudaFree( _d_desc[i] );
+        if( _h_extrema && _h_extrema[i] ) cudaFreeHost( _h_extrema[i] );
         if( _d_extrema && _d_extrema[i] ) cudaFree( _d_extrema[i] );
     }
     cudaFree( _d_extrema_mgmt );
     cudaFreeHost( _h_extrema_mgmt );
     delete [] _d_extrema;
+    delete [] _h_extrema;
     delete [] _d_desc;
     delete [] _h_desc;
 }
@@ -391,9 +401,17 @@ void Pyramid::Octave::downloadDescriptor( )
     for( uint32_t l=0; l<_levels; l++ ) {
         uint32_t sz = _h_extrema_mgmt[l].counter;
         if( sz != 0 ) {
+            if( _h_extrema[l] == 0 ) continue;
+
             POP_CUDA_MEMCPY_ASYNC( _h_desc[l],
                                    _d_desc[l],
                                    sz * sizeof(Descriptor),
+                                   cudaMemcpyDeviceToHost,
+                                   0,
+                                   true );
+            POP_CUDA_MEMCPY_ASYNC( _h_extrema[l],
+                                   _d_extrema[l],
+                                   sz * sizeof(ExtremumCandidate),
                                    cudaMemcpyDeviceToHost,
                                    0,
                                    true );
@@ -406,15 +424,21 @@ void Pyramid::Octave::downloadDescriptor( )
 void Pyramid::Octave::writeDescriptor( ostream& ostr )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
+        if( _h_extrema[l] == 0 ) continue;
+
+        ExtremumCandidate* cand = _h_extrema[l];
+
         Descriptor* desc = _h_desc[l];
         uint32_t sz = _h_extrema_mgmt[l].counter;
         for( int s=0; s<sz; s++ ) {
-            ostr << "(";
+            ostr << cand[s].xpos << " "
+                 << cand[s].ypos << " "
+                 << cand[s].sigma << " "
+                 << cand[s].angle_from_bemap << " ";
             for( int i=0; i<128; i++ ) {
                 ostr << setprecision(3) << desc[s].features[i] << " ";
-                if( i % 16 == 15 ) ostr << endl;
             }
-            ostr << ")" << endl;
+            ostr << endl;
         }
     }
 }
@@ -562,6 +586,7 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
             ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".pgm";
             cerr << "Writing " << ostr.str() << endl;
             popart::write_plane2D( ostr.str().c_str(), true, p );
+            // popart::write_plane2Dunscaled( ostr.str().c_str(), p );
         }
 
         POP_CUDA_FREE_HOST( array );
