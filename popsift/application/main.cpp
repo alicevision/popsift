@@ -45,11 +45,13 @@ int    octaves         = -1;
 int    levels          = 3;
 float  sigma           = 1.6f;
 
-float edgeLimit = 16.0; // from Celebrandil
-// float edgeLimit = 10.0; // from Bemap
+// float edgeLimit = 16.0; // from Celebrandil
+float edgeLimit = 10.0; // from Bemap
 
+// float threshold = 0.0; // default of vlFeat
+float threshold =  5.0 / 256.0;
 // float threshold = 15.0 / 256.0;  // it seems our DoG is really small ???
-float threshold = 10.0 / 256.0;
+// float threshold = 10.0 / 256.0;
 // float threshold = 5.0;  // from Celebrandil, not happening in our data
 // float threshold = 0.04 / (_levels-3.0) / 2.0f * 255;
 //                   from Bemap -> 1.69 (makes no sense)
@@ -99,7 +101,7 @@ void help(const string& filename)
         << "* Options *" << endl
         // << " --verbose                  Be verbose"<< endl
         << " --help                     Print this message"<<endl
-        // << " --octaves=INT              Number of octaves" << endl
+        << " --octaves=INT              Number of octaves" << endl
         // << " --levels=INT               Number of levels per octave" << endl
         // << " --upsampling=INT           Number of upsamplings" << endl
         << " --threshold=FLOAT          Keypoint strength threshold" << endl
