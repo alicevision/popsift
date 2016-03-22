@@ -147,7 +147,6 @@ template <typename T> struct PitchPlane2D : public PlaneT<T>
     }
 
     __host__ inline void freeDev( ) {
-        assert( this );
         assert( this->data );
         PlaneBase::freeDev2D( this->data );
         this->data = 0;
