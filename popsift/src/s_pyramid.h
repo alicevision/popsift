@@ -17,9 +17,6 @@
 #define M_PI2 (2.0F * M_PI)
 #endif
 
-#define GAUSS_ONE_SIDE_RANGE 12
-#define GAUSS_SPAN           (2*GAUSS_ONE_SIDE_RANGE+1)
-
 namespace popart {
 
 extern __device__ __constant__ float d_sigma0;

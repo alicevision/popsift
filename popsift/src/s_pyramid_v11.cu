@@ -15,15 +15,15 @@
  *************************************************************/
 
 #define V11_EDGE_LEN 32
-#define V11_RANGE    4 // RANGES from 1 to 8 are possible
 
 namespace popart {
 
 __global__
 void filter_gauss_horiz_v11_128x1( Plane2D_float src_data,
-                                   Plane2D_float dst_data )
+                                   Plane2D_float dst_data,
+                                   int level )
 {
-    __shared__ float loaddata[4 + 128 + 4];
+    __shared__ float loaddata[GAUSS_SPAN + 128 + GAUSS_SPAN];
 
     const int src_w = src_data.getWidth();
     const int src_h = src_data.getHeight();
@@ -32,30 +32,30 @@ void filter_gauss_horiz_v11_128x1( Plane2D_float src_data,
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
     int       read_x;
     int       read_y = clamp( blockIdx.y, src_h );
-    if( idx < 4 ) {
-        read_x = clamp( off_x - 4, src_w );
+    if( idx < GAUSS_SPAN ) {
+        read_x = clamp( off_x - GAUSS_SPAN, src_w );
         loaddata[idx] = src_data.ptr(read_y)[read_x];
-    } else if( idx >= 128-4 ) {
-        read_x = clamp( off_x + 4, src_w );
-        loaddata[idx+8] = src_data.ptr(read_y)[read_x];
+    } else if( idx >= 128-GAUSS_SPAN ) {
+        read_x = clamp( off_x + GAUSS_SPAN, src_w );
+        loaddata[idx+2*GAUSS_SPAN] = src_data.ptr(read_y)[read_x];
     }
     __syncthreads();
     read_x = clamp( off_x, src_w );
-    loaddata[idx+4] = src_data.ptr(read_y)[read_x];
+    loaddata[idx+GAUSS_SPAN] = src_data.ptr(read_y)[read_x];
     __syncthreads();
 
     float g;
     float val;
     float out = 0;
 
-    for( int offset = 4; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
-        val = loaddata[threadIdx.x+4-offset];
+    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter[level*GAUSS_ALIGN+offset];
+        val = loaddata[threadIdx.x+GAUSS_SPAN-offset];
         out += ( val * g );
-        val = loaddata[threadIdx.x+4+offset];
+        val = loaddata[threadIdx.x+GAUSS_SPAN+offset];
         out += ( val * g );
     }
-    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
+    g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
     val = loaddata[threadIdx.x+4];
     out += ( val * g );
 
@@ -111,35 +111,36 @@ void filter_gauss_horiz_v11( Plane2D_float src_data,
 
 __global__
 void filter_gauss_horiz_v11_128x1( cudaTextureObject_t src_data,
-                                   Plane2D_float       dst_data )
+                                   Plane2D_float       dst_data,
+                                   int level )
 {
-    __shared__ float loaddata[4 + 128 + 4];
+    __shared__ float loaddata[GAUSS_SPAN + 128 + GAUSS_SPAN];
 
     const int idx   = threadIdx.x;
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if( idx < 4 ) {
-        loaddata[idx] = tex2D<float>( src_data, off_x-4, blockIdx.y );
-    } else if( idx >= 128-4 ) {
-        loaddata[idx+8] = tex2D<float>( src_data, off_x+4, blockIdx.y );
+    if( idx < GAUSS_SPAN ) {
+        loaddata[idx] = tex2D<float>( src_data, off_x-GAUSS_SPAN, blockIdx.y );
+    } else if( idx >= 128-GAUSS_SPAN ) {
+        loaddata[idx+2*GAUSS_SPAN] = tex2D<float>( src_data, off_x+GAUSS_SPAN, blockIdx.y );
     }
     __syncthreads();
-    loaddata[idx+4] = tex2D<float>( src_data, off_x, blockIdx.y );
+    loaddata[idx+GAUSS_SPAN] = tex2D<float>( src_data, off_x, blockIdx.y );
     __syncthreads();
 
     float g;
     float val;
     float out = 0;
 
-    for( int offset = V11_RANGE; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
-        val = loaddata[threadIdx.x+4-offset];
+    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
+        val = loaddata[threadIdx.x+GAUSS_SPAN-offset];
         out += ( val * g );
-        val = loaddata[threadIdx.x+4+offset];
+        val = loaddata[threadIdx.x+GAUSS_SPAN+offset];
         out += ( val * g );
     }
-    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
-    val = loaddata[threadIdx.x+4];
+    g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
+    val = loaddata[threadIdx.x+GAUSS_SPAN];
     out += ( val * g );
 
     const int dst_w = dst_data.getWidth();
@@ -192,7 +193,8 @@ void filter_gauss_horiz_v11( cudaTextureObject_t src_data,
 
 __global__
 void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
-                                  Plane2D_float       dst_data )
+                                  Plane2D_float       dst_data,
+                                  int level )
 {
     int block_x = blockIdx.x * blockDim.x;
     int block_y = blockIdx.y * blockDim.y;
@@ -203,8 +205,8 @@ void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
     float val;
     float out = 0;
 
-    for( int offset = V11_RANGE; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
+    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
 
         idx = threadIdx.x - offset;
         val = tex2D<float>( src_data, 2 * ( block_x + idx ), 2 * ( block_y + idy ) );
@@ -215,7 +217,7 @@ void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
+    g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
     idx = threadIdx.x;
     val = tex2D<float>( src_data, 2 * ( block_x + idx ), 2 * ( block_y + idy ) );
     out += ( val * g );
@@ -257,7 +259,8 @@ void downscale_by_2(Plane2D_float src_data,
 #endif
 __global__
 void filter_gauss_vert_v11( cudaTextureObject_t src_data,
-                            Plane2D_float       dst_data )
+                            Plane2D_float       dst_data,
+                            int level )
 {
     int block_x = blockIdx.x * blockDim.x;
     int block_y = blockIdx.y * blockDim.y;
@@ -268,8 +271,8 @@ void filter_gauss_vert_v11( cudaTextureObject_t src_data,
     float val;
     float out = 0;
 
-    for( int offset = V11_RANGE; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE - offset];
+    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
 
         idy = threadIdx.y - offset;
         val = tex2D<float>( src_data, block_x + idx, block_y + idy );
@@ -280,7 +283,7 @@ void filter_gauss_vert_v11( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popart::d_gauss_filter[GAUSS_ONE_SIDE_RANGE];
+    g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
     idy = threadIdx.y;
     val = tex2D<float>( src_data, block_x + idx, block_y + idy );
     out += ( val * g );
@@ -472,7 +475,8 @@ void Pyramid::build_v11( Image* base )
                     filter_gauss_horiz_v11_128x1
                         <<<grid,block,0,oct_str_0>>>
                         ( base->array,
-                          oct_obj.getIntermediateData( ) );
+                          oct_obj.getIntermediateData( ),
+                          level );
 #endif
                 } else {
                     dim3 h_block( 64, 2 );
@@ -487,7 +491,8 @@ void Pyramid::build_v11( Image* base )
                         <<<h_grid,h_block,0,oct_str_0>>>
                         ( prev_oct_obj._data_tex[ _levels-3 ],
                           // _octaves[octave-1]._data_tex[ 0 ],
-                          oct_obj.getIntermediateData( ) );
+                          oct_obj.getIntermediateData( ),
+                          level );
                 }
             } else {
 #if 0
@@ -510,7 +515,8 @@ void Pyramid::build_v11( Image* base )
                 filter_gauss_horiz_v11_128x1
                     <<<grid,block,0,oct_str_0>>>
                     ( oct_obj._data_tex[ level-1 ],
-                      oct_obj.getIntermediateData( ) );
+                      oct_obj.getIntermediateData( ),
+                      level );
 #endif
             }
 
@@ -523,7 +529,8 @@ void Pyramid::build_v11( Image* base )
                 filter_gauss_vert_v11
                     <<<v_grid,v_block,0,oct_str_0>>>
                     ( oct_obj._interm_data_tex,
-                      oct_obj.getData( level ) );
+                      oct_obj.getData( level ),
+                      level );
             } else {
                 dim3 v_block( 64, 2 );
                 dim3 v_grid;
@@ -533,7 +540,8 @@ void Pyramid::build_v11( Image* base )
                 filter_gauss_vert_v11
                     <<<v_grid,v_block,0,oct_str_0>>>
                     ( oct_obj._interm_data_tex,
-                      oct_obj.getData( level ) );
+                      oct_obj.getData( level ),
+                      level );
 
                 dim3 e_block( 128, 2 );
                 dim3 e_grid;
