@@ -1,6 +1,7 @@
 #include "write_plane_2d.h"
 
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <limits>
 
@@ -26,6 +27,21 @@ void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
         g.freeHost( CudaAllocated );
     } else {
         write_plane2D( filename, f );
+    }
+}
+
+__host__
+void write_plane2Dunscaled( const char* filename, bool onDevice, Plane2D_float& f )
+{
+    if( onDevice ) {
+        // cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
+        Plane2D_float g;
+        g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
+        g.memcpyFromDevice( f );
+        write_plane2Dunscaled( filename, g );
+        g.freeHost( CudaAllocated );
+    } else {
+        write_plane2Dunscaled( filename, f );
     }
 }
 
@@ -62,11 +78,60 @@ void write_plane2D( const char* filename, Plane2D_float& f )
             c[y*cols+x] = (unsigned char)v;
         }
     }
+#if 1
+    ofstream of( filename );
+    of << "P2" << endl
+       << cols << " " << rows << endl
+       << "255" << endl;
+    unsigned char* cx = c;
+    for( int row=0; row<rows; row++ ) {
+        for( int col=0; col<cols; col++ ) {
+            int val = *cx;
+            cx++;
+            of << val << " ";
+        }
+        of << endl;
+    }
+    delete [] c;
+#else
     ofstream of( filename );
     of << "P5" << endl
        << cols << " " << rows << endl
        << "255" << endl;
     of.write( (char*)c, cols * rows );
+    delete [] c;
+#endif
+
+    // cerr << "Leave " << __FUNCTION__ << endl;
+}
+
+__host__
+void write_plane2Dunscaled( const char* filename, Plane2D_float& f )
+{
+    int rows = f.getRows();
+    int cols = f.getCols();
+
+    float* c = new float[rows * cols];
+    for( int y=0; y<rows; y++ ) {
+        for( int x=0; x<cols; x++ ) {
+            float v = f.ptr(y)[x];
+            c[y*cols+x] = v;
+        }
+    }
+
+    ofstream of( filename );
+    of << "nonsense" << endl
+       << cols << " " << rows << endl
+       << "maxint" << endl;
+    float* cx = c;
+    for( int row=0; row<rows; row++ ) {
+        for( int col=0; col<cols; col++ ) {
+            float val = *cx;
+            cx++;
+            of << setprecision(2) << val << " ";
+        }
+        of << endl;
+    }
     delete [] c;
 
     // cerr << "Leave " << __FUNCTION__ << endl;
