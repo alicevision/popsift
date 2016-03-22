@@ -49,9 +49,9 @@ float  sigma           = 1.6f;
 float edgeLimit = 10.0; // from Bemap
 
 // float threshold = 0.0; // default of vlFeat
-float threshold =  5.0 / 256.0;
+// float threshold =  5.0 / 256.0;
 // float threshold = 15.0 / 256.0;  // it seems our DoG is really small ???
-// float threshold = 10.0 / 256.0;
+float threshold = 10.0 / 256.0;
 // float threshold = 5.0;  // from Celebrandil, not happening in our data
 // float threshold = 0.04 / (_levels-3.0) / 2.0f * 255;
 //                   from Bemap -> 1.69 (makes no sense)
@@ -106,7 +106,7 @@ void help(const string& filename)
         // << " --upsampling=INT           Number of upsamplings" << endl
         << " --threshold=FLOAT          Keypoint strength threshold" << endl
         << " --log                      Write debugging files" << endl
-        // << " --edge-threshold=FLOAT     On-edge threshold" << endl
+        << " --edge-threshold=FLOAT     On-edge threshold" << endl
         // << " --save-gauss               Save Gaussian Scale pyramid"<<endl
         // << " --save-dog                 Save Difference of Gaussian pyramid"<<endl
         // << " --save-mag                 Save Magnitudes pyramid"<<endl
