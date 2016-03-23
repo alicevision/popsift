@@ -6,6 +6,8 @@
 
 #define PRINT_GAUSS_FILTER_SYMBOL
 
+#define VLFEAT_SIGMA_COMPUTATION
+
 using namespace std;
 
 namespace popart {
@@ -77,7 +79,14 @@ void Pyramid::init_filter( float sigma0, uint32_t levels )
         for (int x = 0; x <= GAUSS_SPAN; ++x) 
             local_filter[lvl * GAUSS_ALIGN + x] /= sum;
 
+#ifdef VLFEAT_SIGMA_COMPUTATION
         sigma *= pow( 2.0, 1.0/levels );
+#else // OpenCV sigma computation
+        const float sigmaP = sigma0 * pow( 2.0, (float)(lvl+0)/(float)levels );
+        const float sigmaS = sigma0 * pow( 2.0, (float)(lvl+1)/(float)levels );
+
+        sigma = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
+#endif // OpenCV sigma computation
     }
 
     cudaError_t err;
