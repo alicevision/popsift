@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "gauss_filter.h"
 #include "s_pyramid.h"
 #include "debug_macros.h"

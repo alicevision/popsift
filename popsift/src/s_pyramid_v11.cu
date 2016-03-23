@@ -214,7 +214,7 @@ void filter_gauss_horiz_v11_128x1_no_shared( cudaTextureObject_t src_data,
         out += ( v2 * g );
     }
     const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
-    const float v3 = loaddata[threadIdx.x+GAUSS_SPAN];
+    const float v3 = tex2D<float>( src_data, off_x, blockIdx.y );
     out += ( v3 * g );
 
     dst_data.ptr(blockIdx.y)[off_x] = out;
