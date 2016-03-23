@@ -102,7 +102,7 @@ void help(const string& filename)
         // << " --verbose                  Be verbose"<< endl
         << " --help                     Print this message"<<endl
         << " --octaves=INT              Number of octaves" << endl
-        // << " --levels=INT               Number of levels per octave" << endl
+        << " --levels=INT               Number of levels per octave" << endl
         // << " --upsampling=INT           Number of upsamplings" << endl
         << " --threshold=FLOAT          Keypoint strength threshold" << endl
         << " --log                      Write debugging files" << endl

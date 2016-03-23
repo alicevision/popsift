@@ -541,6 +541,8 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
 
                 ostringstream ostr;
                 ostr << "dir-feat/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
+                ostringstream ostr2;
+                ostr2 << "dir-feat/" << basename << "-o-" << octave << "-l-" << level << ".txt";
         #if 0
                 ofstream of( ostr.str().c_str() );
                 cerr << "Writing " << ostr.str() << endl;
@@ -552,6 +554,7 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
         #endif
 
                 popart::write_plane2D( ostr.str().c_str(), false, hostPlane_f );
+                popart::write_plane2Dunscaled( ostr2.str().c_str(), false, hostPlane_f );
             }
 
             hostPlane_f.freeHost( CudaAllocated );
@@ -586,7 +589,10 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
             ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".pgm";
             cerr << "Writing " << ostr.str() << endl;
             popart::write_plane2D( ostr.str().c_str(), true, p );
-            // popart::write_plane2Dunscaled( ostr.str().c_str(), p );
+
+            ostringstream ostr2;
+            ostr2 << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".txt";
+            popart::write_plane2Dunscaled( ostr2.str().c_str(), true, p );
         }
 
         POP_CUDA_FREE_HOST( array );
