@@ -16,6 +16,8 @@
 
 #define V11_EDGE_LEN 32
 
+#define HORIZ_NO_SHARED_128x1
+
 namespace popart {
 
 __global__
@@ -63,6 +65,46 @@ void filter_gauss_horiz_v11_128x1( Plane2D_float src_data,
 
     if( off_x >= src_w )      return;
     if( blockIdx.y >= src_h ) return;
+
+    dst_data.ptr(blockIdx.y)[off_x] = out;
+}
+
+__global__
+void filter_gauss_horiz_v11_128x1_no_shared( Plane2D_float src_data,
+                                             Plane2D_float dst_data,
+                                             int level )
+{
+    const int src_w = src_data.getWidth();
+    const int src_h = src_data.getHeight();
+
+    const int off_x  = blockIdx.x * blockDim.x + threadIdx.x;
+    int       read_x;
+    const int read_y = clamp( blockIdx.y, src_h );
+
+    if( off_x >= src_w )      return;
+    if( blockIdx.y >= src_h ) return;
+
+    float g;
+    float val;
+    float out = 0;
+
+    #pragma unroll
+    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter[level*GAUSS_ALIGN+offset];
+
+        read_x = clamp( off_x - offset, src_w );
+        val = src_data.ptr(read_y)[read_x];
+        out += ( val * g );
+
+        read_x = clamp( off_x + offset, src_w );
+        val = src_data.ptr(read_y)[read_x];
+        out += ( val * g );
+    }
+    g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
+
+    read_x = clamp( off_x, src_w );
+    val = src_data.ptr(read_y)[read_x];
+    out += ( val * g );
 
     dst_data.ptr(blockIdx.y)[off_x] = out;
 }
@@ -145,6 +187,35 @@ void filter_gauss_horiz_v11_128x1( cudaTextureObject_t src_data,
 
     const int dst_w = dst_data.getWidth();
     if( off_x >= dst_w )      return;
+
+    dst_data.ptr(blockIdx.y)[off_x] = out;
+}
+
+__global__
+void filter_gauss_horiz_v11_128x1_no_shared( cudaTextureObject_t src_data,
+                                             Plane2D_float       dst_data,
+                                             int level )
+{
+    const int dst_w = dst_data.getWidth();
+
+    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if( off_x >= dst_w ) return;
+
+    float out = 0;
+
+    #pragma unroll
+    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
+        const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
+        const float  v1 = tex2D<float>( src_data, off_x - offset, blockIdx.y );
+        out += ( v1 * g );
+
+        const float  v2 = tex2D<float>( src_data, off_x + offset, blockIdx.y );
+        out += ( v2 * g );
+    }
+    const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
+    const float v3 = loaddata[threadIdx.x+GAUSS_SPAN];
+    out += ( v3 * g );
 
     dst_data.ptr(blockIdx.y)[off_x] = out;
 }
@@ -472,11 +543,19 @@ void Pyramid::build_v11( Image* base )
                     dim3 grid;
                     grid.x  = grid_divide( width,  128 );
                     grid.y  = height;
+#ifdef HORIZ_NO_SHARED_128x1
+                    filter_gauss_horiz_v11_128x1_no_shared
+                        <<<grid,block,0,oct_str_0>>>
+                        ( base->array,
+                          oct_obj.getIntermediateData( ),
+                          level );
+#else // HORIZ_NO_SHARED_128x1
                     filter_gauss_horiz_v11_128x1
                         <<<grid,block,0,oct_str_0>>>
                         ( base->array,
                           oct_obj.getIntermediateData( ),
                           level );
+#endif // HORIZ_NO_SHARED_128x1
 #endif
                 } else {
                     dim3 h_block( 64, 2 );
@@ -512,11 +591,19 @@ void Pyramid::build_v11( Image* base )
                 dim3 grid;
                 grid.x  = grid_divide( width,  128 );
                 grid.y  = height;
+#ifdef HORIZ_NO_SHARED_128x1
+                filter_gauss_horiz_v11_128x1_no_shared
+                    <<<grid,block,0,oct_str_0>>>
+                    ( oct_obj._data_tex[ level-1 ],
+                      oct_obj.getIntermediateData( ),
+                      level );
+#else // HORIZ_NO_SHARED_128x1
                 filter_gauss_horiz_v11_128x1
                     <<<grid,block,0,oct_str_0>>>
                     ( oct_obj._data_tex[ level-1 ],
                       oct_obj.getIntermediateData( ),
                       level );
+#endif // HORIZ_NO_SHARED_128x1
 #endif
             }
 
