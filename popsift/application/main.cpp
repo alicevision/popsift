@@ -63,6 +63,7 @@ int    saveMag         = false;
 int    saveOri         = false;
 int    display         = false;
 int    log_to_file     = false;
+int    vlfeat_mode     = false;
 
 static struct option longopts[] = {
     { "verbose",         no_argument,            NULL,              'v' },
@@ -72,6 +73,8 @@ static struct option longopts[] = {
     { "upsampling",      required_argument,      NULL,              'u' },
     { "threshold",       required_argument,      NULL,              't' },
     { "edge-threshold",  required_argument,      NULL,              'e' },
+    { "sigma",           required_argument,      NULL,              's' },
+    { "vlfeat-mode",     no_argument,            &vlfeat_mode,      true},
     { "log",             no_argument,            &log_to_file,      true},
     { "save-gauss",      no_argument,            &saveGauss,        true},
     { "save-dog",        no_argument,            &saveDOG,          true},
@@ -103,10 +106,12 @@ void help(const string& filename)
         << " --help                     Print this message"<<endl
         << " --octaves=INT              Number of octaves" << endl
         << " --levels=INT               Number of levels per octave" << endl
+        << " --sigma=FLOAT               Initial sigma value" << endl
         // << " --upsampling=INT           Number of upsamplings" << endl
         << " --threshold=FLOAT          Keypoint strength threshold" << endl
         << " --log                      Write debugging files" << endl
         << " --edge-threshold=FLOAT     On-edge threshold" << endl
+        << " --vlfeat-mode              Compute Gauss filter like VLFeat instead of like OpenCV" << endl
         // << " --save-gauss               Save Gaussian Scale pyramid"<<endl
         // << " --save-dog                 Save Difference of Gaussian pyramid"<<endl
         // << " --save-mag                 Save Magnitudes pyramid"<<endl
@@ -193,6 +198,16 @@ void option(int ac, char **av)
 			}
 			break;
 
+        case 's':
+			{
+			    /* sigma */
+				std::istringstream iss(optarg);
+				float a = -1;
+				iss >> a; sigma = a;
+				ERROR_HANDLER((!iss.fail()), "Invalid argument '" + std::string(optarg) + "'");
+			}
+			break;
+
         case 'e':
 			{
 			    /* edge-threshold */
@@ -249,7 +264,8 @@ int main(int argc, char **argv)
                      upsampling,
                      threshold,
                      edgeLimit,
-                     sigma );
+                     sigma,
+                     vlfeat_mode );
 
     PopSift.init( inp.width, inp.height );
     PopSift.execute(inp);

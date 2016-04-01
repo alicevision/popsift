@@ -16,13 +16,15 @@ PopSift::PopSift( int num_octaves,
                   int upscale_factor,
                   float threshold,
                   float edgeThreshold,
-                  float sigma )
+                  float sigma,
+                  int   vlfeat_mode )
     : _octaves( num_octaves )
     , _scales( max(2,S_) ) // min is 2, GPU restriction */
     , up( upscale_factor )
     , _sigma( sigma )
     , _threshold( threshold ) // SIFT parameter
     , _edgeLimit( edgeThreshold ) // SIFT parameter
+    , _vlfeat_mode( vlfeat_mode )
 {
 }
 
@@ -44,10 +46,10 @@ void PopSift::init( int w, int h )
     _hst_input_image.allocHost( w, h, popart::CudaAllocated );
     _dev_input_image.allocDev( w, h );
 
-    float sigma = 1.0;
+    // float sigma = 1.0;
 
-    popart::Pyramid::init_filter( sigma, _scales );
-    popart::Pyramid::init_sigma(  sigma, _scales );
+    popart::Pyramid::init_filter( _sigma, _scales, _vlfeat_mode );
+    popart::Pyramid::init_sigma(  _sigma, _scales );
 
     _baseImg = new popart::Image( _upscaled_width, _upscaled_height );
     _pyramid = new popart::Pyramid( _baseImg, _octaves, _scales );

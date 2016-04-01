@@ -44,7 +44,8 @@ public:
              int   upscale,
              float threshold,
              float edgeThreshold,
-             float sigma );
+             float sigma,
+             int   vlfeat_mode );
 
     ~PopSift();
 
@@ -74,6 +75,7 @@ private:
     const float      _sigma;           /* initial sigma */
     const float      _threshold;       /* DoG threshold */
     const float      _edgeLimit;       /* edge threshold */
+    const int        _vlfeat_mode;
 
     popart::Plane2D_uint8 _hst_input_image;
     popart::Plane2D_uint8 _dev_input_image;
