@@ -59,9 +59,9 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
     for (int i = 0; i < NBINS_V1; i++) hist[i] = 0.0f;
 
     /* keypoint fractional geometry */
-    float x    = ext->xpos;
-    float y    = ext->ypos;
-    float sig  = ext->sigma;
+    const float x    = ext->xpos;
+    const float y    = ext->ypos;
+    const float sig  = ext->sigma;
 
     /* orientation histogram radius */
     float  sigw = WINFACTOR_V1 * sig;
@@ -97,8 +97,17 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
         int sq_dist  = dx * dx + dy * dy;
         if (sq_dist <= sq_thres) {
             float weight = grad * exp(sq_dist * factor);
-            int bidx = (int)rintf(NBINS_V1 * (theta + M_PI) / M_PI2);
-            bidx = (bidx < NBINS_V1) ? bidx : 0;
+
+            // int bidx = (int)rintf(NBINS_V1 * (theta + M_PI) / M_PI2);
+
+            int bidx = (int)roundf(NBINS_V1 * (theta + M_PI) / M_PI2 - 0.5f);
+
+            if( bidx > NBINS_V1 ) {
+                printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
+            }
+
+            bidx = (bidx == NBINS_V1) ? 0 : bidx;
+
             hist[bidx] += weight;
         }
     }
@@ -193,9 +202,12 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
             float hp = hist[((binh - 1 + NBINS_V1) % NBINS_V1)];
             float th = compute_angle(binh, hc, hn, hp);
 
+            if( isnan(th) ) {
+                printf("NAN value in compute_angle\n");
+            }
+
             ext->angle_from_bemap = th;
         }
-
 
         /* find other peaks, boundary of 80% of max */
         int nangles = 1;
