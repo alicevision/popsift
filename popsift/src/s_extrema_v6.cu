@@ -123,6 +123,11 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
                                  const uint32_t      maxlevel,
                                  ExtremumCandidate&  ec )
 {
+    ec.xpos    = 0;
+    ec.ypos    = 0;
+    ec.sigma   = 0;
+    ec.angle_from_bemap = 0;
+
     /*
      * First consideration: extrema cannot be found on any outermost edge,
      * one pixel on the left, right, upper, lower edge will never qualify.
