@@ -23,7 +23,7 @@ inline void get_gradiant( float&         grad,
     theta = 0.0f;
     if( x > 0 && x < layer.getCols()-1 && y > 0 && y < layer.getRows()-1 ) {
         float dx = layer.ptr(y)[x+1] - layer.ptr(y)[x-1];
-        float dy = layer.ptr(y-1)[x] - layer.ptr(y+1)[x];
+        float dy = layer.ptr(y+1)[x] - layer.ptr(y-1)[x];
         grad     = __fsqrt_rz(dx*dx + dy*dy);
         theta    = atan2f(dy, dx);
     }
