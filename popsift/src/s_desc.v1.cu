@@ -75,7 +75,7 @@ void keypoint_descriptors( ExtremumCandidate* cand,
             float mod;
             float th;
             get_gradiant( mod, th,
-                          ii, jj,
+                          jj, ii,
                           layer );
 
             const float dnx = nx + offsetptx;
