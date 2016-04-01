@@ -431,9 +431,10 @@ void Pyramid::Octave::writeDescriptor( ostream& ostr )
         Descriptor* desc = _h_desc[l];
         uint32_t sz = _h_extrema_mgmt[l].counter;
         for( int s=0; s<sz; s++ ) {
-            ostr << cand[s].xpos << " "
-                 << cand[s].ypos << " "
-                 << cand[s].sigma << " "
+            ostr << setprecision(5)
+                 << cand[s].xpos  * pow( 2.0, _debug_octave_id-1.0 ) << " "
+                 << cand[s].ypos  * pow( 2.0, _debug_octave_id-1.0 ) << " "
+                 << cand[s].sigma * pow( 2.0, _debug_octave_id-1.0 ) << " "
                  << cand[s].angle_from_bemap << " ";
             for( int i=0; i<128; i++ ) {
                 ostr << setprecision(3) << desc[s].features[i] << " ";
