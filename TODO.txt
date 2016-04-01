@@ -1,0 +1,11 @@
+Working can of ...
+
+Known TODOs:
+ - compensate for shift mistakes in downscaling (upscaling supposedly fixed)
+ - find good default parameters
+ - should we use OpenCV or VLFeat sigma values
+ - computed correct scaling for VLFeat sigma development between levels
+ - make upscaling optional (no octave -1)
+ - downscaling directly from initial image (optional)
+ - replace Gauss parameters with mix of linear interpolation and modified factors (optional, halves #*)
+ - create Gauss kernels that match Gauss filter size for each level (template, mandatory)
