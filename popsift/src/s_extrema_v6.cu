@@ -371,7 +371,7 @@ void Pyramid::find_extrema_v6_sub( float edgeLimit, float threshold )
 
             Octave&      oct_obj = _octaves[octave];
             cudaStream_t oct_str = oct_obj.getStream(level);
-            cudaEvent_t  oct_ev  = oct_obj.getEventGaussDone(level);
+            cudaEvent_t  oct_ev  = oct_obj.getEventGaussDone(level+1);
 
             cudaStreamWaitEvent( oct_str, oct_ev, 0 );
 
