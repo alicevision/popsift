@@ -99,8 +99,8 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
             float weight = grad * exp(sq_dist * factor);
 
             // int bidx = (int)rintf(NBINS_V1 * (theta + M_PI) / M_PI2);
-
-            int bidx = (int)roundf(NBINS_V1 * (theta + M_PI) / M_PI2 - 0.5f);
+            int bidx = (int)roundf(NBINS_V1 * (theta + M_PI) / M_PI2);
+            // int bidx = (int)roundf(NBINS_V1 * (theta + M_PI) / M_PI2 - 0.5f);
 
             if( bidx > NBINS_V1 ) {
                 printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
