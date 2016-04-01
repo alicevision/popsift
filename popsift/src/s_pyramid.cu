@@ -478,6 +478,8 @@ void Pyramid::download_and_save_descriptors( const char* basename, uint32_t octa
 
 void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t octave, uint32_t level )
 {
+    // cerr << "Calling " << __FUNCTION__ << " for octave " << octave << endl;
+
     if( level >= _levels ) {
         cerr << "Level " << level << " does not exist in Octave " << octave << endl;
         return;
@@ -493,7 +495,7 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
 
         ostringstream ostr;
         ostr << "dir-octave/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
-        cerr << "Writing " << ostr.str() << endl;
+        // cerr << "Writing " << ostr.str() << endl;
         popart::write_plane2D( ostr.str().c_str(), true, getData(level) );
 
         if( level == 0 ) {
@@ -538,14 +540,18 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
                     mkdir("dir-feat", 0700);
                 }
 
+                if (stat("dir-feat-txt", &st) == -1) {
+                    mkdir("dir-feat-txt", 0700);
+                }
+
 
                 ostringstream ostr;
                 ostr << "dir-feat/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
                 ostringstream ostr2;
-                ostr2 << "dir-feat/" << basename << "-o-" << octave << "-l-" << level << ".txt";
+                ostr2 << "dir-feat-txt/" << basename << "-o-" << octave << "-l-" << level << ".txt";
         #if 0
                 ofstream of( ostr.str().c_str() );
-                cerr << "Writing " << ostr.str() << endl;
+                // cerr << "Writing " << ostr.str() << endl;
                 of << "P5" << endl
                    << width << " " << height << endl
                    << "255" << endl;
@@ -571,6 +577,10 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
             mkdir("dir-dog", 0700);
         }
 
+        if (stat("dir-dog-txt", &st) == -1) {
+            mkdir("dir-dog-txt", 0700);
+        }
+
         float* array;
         POP_CUDA_MALLOC_HOST( &array, width * height * (_levels-1) * sizeof(float) );
 
@@ -587,11 +597,11 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
 
             ostringstream ostr;
             ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".pgm";
-            cerr << "Writing " << ostr.str() << endl;
+            // cerr << "Writing " << ostr.str() << endl;
             popart::write_plane2D( ostr.str().c_str(), true, p );
 
             ostringstream ostr2;
-            ostr2 << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".txt";
+            ostr2 << "dir-dog-txt/d-" << basename << "-o-" << octave << "-l-" << l << ".txt";
             popart::write_plane2Dunscaled( ostr2.str().c_str(), true, p );
         }
 
