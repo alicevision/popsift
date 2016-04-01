@@ -7,6 +7,8 @@
 #define RPI_V1               (4.0f / M_PI)
 #define EPS_V1               1E-15
 
+#define USE_ROOT_SIFT
+
 /*************************************************************
  * V1: device side
  *************************************************************/
@@ -140,6 +142,24 @@ void normalize_histogram( Descriptor* descs )
     float4 descr;
     descr = ptr4[threadIdx.x];
 
+#ifdef USE_ROOT_SIFT
+    // L1 norm
+    float norm = descr.x + descr.y + descr.z + descr.w;
+
+    norm += __shfl_down( norm, 16 );
+    norm += __shfl_down( norm,  8 );
+    norm += __shfl_down( norm,  4 );
+    norm += __shfl_down( norm,  2 );
+    norm += __shfl_down( norm,  1 );
+    norm += __shfl     ( norm,  0 );
+
+    norm = 512.0f / norm; /* multiplying with 512 is some scaling by convention */
+    descr.x *= norm;
+    descr.y *= norm;
+    descr.z *= norm;
+    descr.w *= norm;
+#else // not USE_ROOT_SIFT
+    // L2 norm
     descr.x *= descr.x;
     descr.y *= descr.y;
     descr.z *= descr.z;
@@ -157,11 +177,11 @@ void normalize_histogram( Descriptor* descs )
 
     norm += __shfl     ( norm,  0 );
 
-
     descr.x /= norm;
     descr.y /= norm;
     descr.z /= norm;
     descr.w /= norm;
+#endif // not USE_ROOT_SIFT
 
     ptr4[threadIdx.x] = descr;
 }
