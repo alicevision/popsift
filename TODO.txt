@@ -1,11 +1,19 @@
 Working can of ...
 
 Known TODOs:
- - compensate for shift mistakes in downscaling (upscaling supposedly fixed)
- - find good default parameters
- - should we use OpenCV or VLFeat sigma values
- - computed correct scaling for VLFeat sigma development between levels
+
+Carsten's TODOs:
  - make upscaling optional (no octave -1)
  - downscaling directly from initial image (optional)
- - replace Gauss parameters with mix of linear interpolation and modified factors (optional, halves #*)
  - create Gauss kernels that match Gauss filter size for each level (template, mandatory)
+ - find good default parameters
+   - keep edge-limit fix, adapt threshold
+
+Lilian's TODOs:
+ - computed correct scaling for VLFeat sigma development between levels
+ - parabola for orientation computation
+
+later TODOs:
+ - compensate for shift mistakes in downscaling (upscaling supposedly fixed)
+ - should we use OpenCV or VLFeat sigma values
+ - replace Gauss parameters with mix of linear interpolation and modified factors (optional, halves #*)
