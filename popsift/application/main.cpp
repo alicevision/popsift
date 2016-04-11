@@ -23,12 +23,11 @@
 #include <iomanip>
 #include <stdlib.h>
 
-#include "getopt.h"
+#include <getopt.h>
 
 #include "SIFT.h"
+#include "sift_conf.h"
 #include "device_prop.h"
-
-#define N_ITER 1
 
 using namespace std;
 
@@ -57,10 +56,6 @@ float threshold = 10.0 / 256.0;
 //                   from Bemap -> 1.69 (makes no sense)
 
 
-int    saveGauss       = false;
-int    saveDOG         = false;
-int    saveMag         = false;
-int    saveOri         = false;
 int    display         = false;
 int    log_to_file     = false;
 int    vlfeat_mode     = false;
@@ -76,10 +71,6 @@ static struct option longopts[] = {
     { "sigma",           required_argument,      NULL,              's' },
     { "vlfeat-mode",     no_argument,            &vlfeat_mode,      true},
     { "log",             no_argument,            &log_to_file,      true},
-    { "save-gauss",      no_argument,            &saveGauss,        true},
-    { "save-dog",        no_argument,            &saveDOG,          true},
-    { "save-mag",        no_argument,            &saveMag,          true},
-    { "save-ori",        no_argument,            &saveOri,          true},
 
     { NULL,              0,                      NULL,               0  }
 };
@@ -95,56 +86,35 @@ void help(const string& filename)
         << filename
         // << " [--verbose|-v] [--help|-h]" << endl
         << " [--help|-h]" << endl
-        // << "     [--octaves|-O INT] [--levels|-S INT] [--upsampling|-u INT]" << endl
-        // << "     [--threshold|-t FLOAT] [--edge-threshold|-e FLOAT] [--floating-point]" << endl
         << "     [--threshold|-t FLOAT] [--log]" << endl
-        // << "     [--save-gauss] [--save-dog] [--save-mag] [--save-ori] [--fast-comp]" << endl
         << "     FILENAME"
         << endl << endl
         << "* Options *" << endl
-        // << " --verbose                  Be verbose"<< endl
         << " --help                     Print this message"<<endl
         << " --octaves=INT              Number of octaves" << endl
         << " --levels=INT               Number of levels per octave" << endl
         << " --sigma=FLOAT               Initial sigma value" << endl
-        // << " --upsampling=INT           Number of upsamplings" << endl
         << " --threshold=FLOAT          Keypoint strength threshold" << endl
         << " --log                      Write debugging files" << endl
         << " --edge-threshold=FLOAT     On-edge threshold" << endl
         << " --vlfeat-mode              Compute Gauss filter like VLFeat instead of like OpenCV" << endl
-        // << " --save-gauss               Save Gaussian Scale pyramid"<<endl
-        // << " --save-dog                 Save Difference of Gaussian pyramid"<<endl
-        // << " --save-mag                 Save Magnitudes pyramid"<<endl
-        // << " --save-ori                 Save Orientations pyramid"<<endl
-        // << endl
-        // << " The keypoints will be written to [filename].key" << endl
-        // << endl
-        // << " * Examples *" << endl
-        // << filename << " [OPTS...] -v -u 2 --save-gauss --use-gpu test_data.pgm" << endl
-        // << filename << " [OPTS...] -O 5 -S 2 --outkey=test_output.key --dev-info test_data.ppm" << endl
         << endl;
     exit(0);
 }
 
-/**********************************/
-/* @name option                   */
-/* @brief Process user parameters */
-/* @param ac argc                 */
-/*        av argv                 */
-/**********************************/
-void option(int ac, char **av)
+static void parseargs( popart::Config& config, int argc, char**argv )
 {
-    if (ac == 1) std::cout << av[0] << ": Execute with default parameter(s)..\n(--help for program usage)\n\n";
+    if (argc == 1) std::cout << argv[0] << ": Execute with default parameter(s)..\n(--help for program usage)\n\n";
     int opt;
-    while ((opt = getopt_long(ac, av, "vho:S:u:t:e:gdp:", longopts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "vho:S:u:t:e:gdp:", longopts, NULL)) != -1) {
         switch (opt) {
 
         case '?' :
-            ERROR_HANDLER(0, "Invalid option '" + std::string(av[optind-1]) + "'" );
+            ERROR_HANDLER(0, "Invalid option '" + std::string(argv[optind-1]) + "'" );
             break;
 
         case ':' :
-            ERROR_HANDLER(0, "Missing argument of option '" + std::string(av[optind-1]) + "'");
+            ERROR_HANDLER(0, "Missing argument of option '" + std::string(argv[optind-1]) + "'");
             break;
 
         case 'v' :
@@ -152,7 +122,7 @@ void option(int ac, char **av)
             break;
 
         case 'h' :
-            help(av[0]);
+            help(argv[0]);
             break;
 
         case 'O':
@@ -226,16 +196,16 @@ void option(int ac, char **av)
         }
     }
 
-    ac -= optind;
-    av += optind;
+    argc -= optind;
+    argv += optind;
 
-    if (ac == 0) {
+    if (argc == 0) {
         cerr << "An input file is needed" << endl;
         exit( -1 );
     }
 
-    inputFilename = std::string(av[0]); ac--; av++;
-    ERROR_HANDLER((ac==0), "Too many input files");
+    inputFilename = std::string(argv[0]); argc--; argv++;
+    ERROR_HANDLER((argc==0), "Too many input files");
 }
 
 /*********************/
@@ -247,12 +217,15 @@ int main(int argc, char **argv)
 {
     cudaDeviceReset();
 
-    imgStream inp;
+    popart::Config config;
 
     /* Parse user input */
-    option(argc, argv);
+    parseargs( config, argc, argv );
+
+    imgStream input;
+
     realName = extract_filename(inputFilename, prefix);
-    read_gray(inputFilename, inp);
+    read_gray(inputFilename, input);
     cerr << "Real name of input file is " << realName << endl;
 
     device_prop_t deviceInfo;
