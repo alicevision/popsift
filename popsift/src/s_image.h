@@ -19,9 +19,9 @@ struct Image
      *  this image must have type_size float
      *  scalefactor is right now 2
      */
-    void upscale( Plane2D_uint8 &       src,
-                  cudaTextureObject_t & tex,
-                  size_t                scalefactor );
+    void upscale( Plane2D_uint8&       src,
+                  cudaTextureObject_t& tex,
+                  float                scalefactor );
 
     void debug_out( );
     void test_last_error( const char* file, int line );

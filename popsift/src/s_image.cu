@@ -12,9 +12,9 @@ using namespace std;
 namespace popart {
 
 __host__
-void Image::upscale( Plane2D_uint8 & src, cudaTextureObject_t & tex, size_t scalefactor )
+void Image::upscale( Plane2D_uint8 & src, cudaTextureObject_t & tex, float scalefactor )
 {
-    if( scalefactor != 2 ) {
+    if( scalefactor != 2.0f ) {
         cerr << "Scale factor is " << scalefactor << endl;
         cerr << "Currently only 2 is supported" << endl;
         exit( -__LINE__ );

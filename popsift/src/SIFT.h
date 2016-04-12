@@ -31,21 +31,14 @@
 #include "debug_macros.h"
 #include "s_image.h"
 #include "s_pyramid.h"
+#include "sift_conf.h"
 
 /* user parameters */
-extern int verbose;
-extern int log_to_file;
 
 class PopSift
 {
 public:
-    PopSift( int   octaves,
-             int   levels,
-             int   upscale,
-             float threshold,
-             float edgeThreshold,
-             float sigma,
-             int   vlfeat_mode );
+    PopSift( popart::Config config );
 
     ~PopSift();
 
@@ -70,12 +63,14 @@ private:
     cudaResourceDesc    _resDesc; // for upscale v5
 
     int              _octaves;         /* number of octaves */
-    const int        _scales;          /* number of levels */
+    const int        _levels;          /* number of levels */
     const int        up;               /* upsampling times */
     const float      _sigma;           /* initial sigma */
     const float      _threshold;       /* DoG threshold */
     const float      _edgeLimit;       /* edge threshold */
     const int        _vlfeat_mode;
+    const bool       _log_to_file;
+    const bool       _verbose;
 
     popart::Plane2D_uint8 _hst_input_image;
     popart::Plane2D_uint8 _dev_input_image;

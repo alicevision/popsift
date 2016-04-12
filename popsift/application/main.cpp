@@ -1,21 +1,3 @@
-/**
- * Copyright (c) 2012, Fixstars Corp.
- * All rights reserved.
- * 
- * Full copyright see end of file.
- */
-
-/**
- * @file   main.cpp
- * @author Yuri Ardila <y_ardila@fixstars.com>
- * @date   Tue Oct 30 16:01:19 JST 2012
- * 
- * @brief  
- *    SIFT
- *    OpenCL Implementation
- *
- */
-
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -24,6 +6,12 @@
 #include <stdlib.h>
 
 #include <getopt.h>
+#include <boost/filesystem.hpp>
+
+#include "libavformat/avformat.h"
+#include "libavutil/avutil.h"
+// #include "libavutil/log.h"
+// #include "libavutil/pixfmt.h"
 
 #include "SIFT.h"
 #include "sift_conf.h"
@@ -39,270 +27,141 @@ string inputFilename   = "";
 string realName        = ""; 
 string prefix          = "";
 
-int    upsampling      = 1;
-int    octaves         = -1;
-int    levels          = 3;
-float  sigma           = 1.6f;
+// int    upsampling      = 1;
+// int    octaves         = -1;
+// int    levels          = 3;
+// float  sigma           = 1.6f;
 
 // float edgeLimit = 16.0; // from Celebrandil
-float edgeLimit = 10.0; // from Bemap
+// float edgeLimit = 10.0; // from Bemap
 
 // float threshold = 0.0; // default of vlFeat
 // float threshold =  5.0 / 256.0;
 // float threshold = 15.0 / 256.0;  // it seems our DoG is really small ???
-float threshold = 10.0 / 256.0;
+// float threshold = 10.0 / 256.0;
 // float threshold = 5.0;  // from Celebrandil, not happening in our data
 // float threshold = 0.04 / (_levels-3.0) / 2.0f * 255;
 //                   from Bemap -> 1.69 (makes no sense)
 
+// int    display         = false;
+// int    log_to_file     = false;
+// int    vlfeat_mode     = false;
 
-int    display         = false;
-int    log_to_file     = false;
-int    vlfeat_mode     = false;
-
-static struct option longopts[] = {
-    { "verbose",         no_argument,            NULL,              'v' },
-    { "help",            no_argument,            NULL,              'h' },
-    { "octaves",         required_argument,      NULL,              'O' },
-    { "levels",          required_argument,      NULL,              'S' },
-    { "upsampling",      required_argument,      NULL,              'u' },
-    { "threshold",       required_argument,      NULL,              't' },
-    { "edge-threshold",  required_argument,      NULL,              'e' },
-    { "sigma",           required_argument,      NULL,              's' },
-    { "vlfeat-mode",     no_argument,            &vlfeat_mode,      true},
-    { "log",             no_argument,            &log_to_file,      true},
-
-    { NULL,              0,                      NULL,               0  }
-};
-
-/***************************/
-/* @name help              */
-/* @brief Print help       */
-/* @param filename argv[0] */
-/***************************/
-void help(const string& filename)
+static void usage( const char* argv )
 {
-    cout
-        << filename
-        // << " [--verbose|-v] [--help|-h]" << endl
-        << " [--help|-h]" << endl
-        << "     [--threshold|-t FLOAT] [--log]" << endl
-        << "     FILENAME"
-        << endl << endl
-        << "* Options *" << endl
-        << " --help                     Print this message"<<endl
-        << " --octaves=INT              Number of octaves" << endl
-        << " --levels=INT               Number of levels per octave" << endl
-        << " --sigma=FLOAT               Initial sigma value" << endl
-        << " --threshold=FLOAT          Keypoint strength threshold" << endl
-        << " --log                      Write debugging files" << endl
-        << " --edge-threshold=FLOAT     On-edge threshold" << endl
-        << " --vlfeat-mode              Compute Gauss filter like VLFeat instead of like OpenCV" << endl
-        << endl;
+    cout << argv
+         << "     <filename>"
+         << endl << endl
+         << "* Options *" << endl
+         << " --help / -h / -?            Print usage" << endl
+         << " --verbose / -v" << endl
+         << endl
+         << " --vlfeat-mode               Compute Gauss filter like VLFeat instead of like OpenCV" << endl
+         << " --log                       Write debugging files" << endl
+         << endl
+         << " --octaves=<int>             Number of octaves" << endl
+         << " --levels=<int>              Number of levels per octave" << endl
+         << " --sigma=<float>             Initial sigma value" << endl
+         << " --threshold=<float>         Keypoint strength threshold" << endl
+         << " --edge-threshold=<float> or" << endl
+         << " --edge-limit=<float>        On-edge threshold" << endl
+         << endl;
     exit(0);
 }
 
-static void parseargs( popart::Config& config, int argc, char**argv )
+static struct option longopts[] = {
+    { "help",            no_argument,            NULL, 'h' },
+    { "verbose",         no_argument,            NULL, 'v' },
+
+    { "octaves",         required_argument,      NULL, 1000 },
+    { "levels",          required_argument,      NULL, 1001 },
+    { "upsampling",      required_argument,      NULL, 1002 },
+    { "threshold",       required_argument,      NULL, 1003 },
+    { "edge-threshold",  required_argument,      NULL, 1004 },
+    { "edge-limit",      required_argument,      NULL, 1004 },
+    { "sigma",           required_argument,      NULL, 1005 },
+
+    { "vlfeat-mode",     no_argument,            NULL, 1100 },
+    { "log",             no_argument,            NULL, 1101 },
+    { NULL,              0,                      NULL, 0  }
+};
+
+static void parseargs( int argc, char**argv, popart::Config& config, string& inputFile )
 {
-    if (argc == 1) std::cout << argv[0] << ": Execute with default parameter(s)..\n(--help for program usage)\n\n";
+    const char* appName = argv[0];
+    if( argc == 0 ) usage( "<program>" );
+    if( argc == 1 ) usage( argv[0] );
+
     int opt;
-    while ((opt = getopt_long(argc, argv, "vho:S:u:t:e:gdp:", longopts, NULL)) != -1) {
-        switch (opt) {
 
+    while( (opt = getopt_long(argc, argv, "?hv", longopts, NULL)) != -1 )
+    {
+        switch (opt)
+        {
         case '?' :
-            ERROR_HANDLER(0, "Invalid option '" + std::string(argv[optind-1]) + "'" );
-            break;
+        case 'h' : usage( appName );       break;
+        case 'v' : config.setVerbose(); break;
 
-        case ':' :
-            ERROR_HANDLER(0, "Missing argument of option '" + std::string(argv[optind-1]) + "'");
-            break;
+        case 1100 : config.setModeVLFeat( popart::Config::VLFeat ); break;
+        case 1101 : config.setLogMode( popart::Config::All );       break;
 
-        case 'v' :
-            verbose = true;
-            break;
-
-        case 'h' :
-            help(argv[0]);
-            break;
-
-        case 'O':
-			{
-                /* number of octaves */
-				std::istringstream iss(optarg);
-				int a = -1;
-				iss >> a; octaves = a;
-				ERROR_HANDLER((!iss.fail()), "Invalid argument '" + std::string(optarg) + "'");
-				ERROR_HANDLER((octaves >= 0), "Octaves must be bigger than 0");
-			}
-			break;
-
-        case 'S':
-			{
-			    /* number of levels */
-				std::istringstream iss(optarg);
-				int a = -1;
-				iss >> a; levels = a; 
-				ERROR_HANDLER((!iss.fail()), "Invalid argument '" + std::string(optarg) + "'");
-				ERROR_HANDLER((levels >= 0), "Levels must be bigger than 0");
-			}
-			break;
-
-        case 'u':
-			{
-			    /* number of upsamplings */
-				std::istringstream iss(optarg);
-				int a = -1;
-				iss >> a; upsampling = a;
-				ERROR_HANDLER((!iss.fail()), "Invalid argument '" + std::string(optarg) + "'");
-				ERROR_HANDLER((upsampling >= 0), "Upsampling must be bigger than 0");
-			}
-			break;
-
-        case 't':
-			{
-			    /* threshold */
-				std::istringstream iss(optarg);
-				float a = -1;
-				iss >> a; threshold = a;
-				ERROR_HANDLER((!iss.fail()), "Invalid argument '" + std::string(optarg) + "'");
-			}
-			break;
-
-        case 's':
-			{
-			    /* sigma */
-				std::istringstream iss(optarg);
-				float a = -1;
-				iss >> a; sigma = a;
-				ERROR_HANDLER((!iss.fail()), "Invalid argument '" + std::string(optarg) + "'");
-			}
-			break;
-
-        case 'e':
-			{
-			    /* edge-threshold */
-				std::istringstream iss(optarg);
-				float a = -1;
-				iss >> a; edgeLimit = a;
-				ERROR_HANDLER((!iss.fail()), "Invalid argument '" + std::string(optarg) + "'");
-			}
-			break;
-
-        case 0:
-            break;
-
-        default :
-            ERROR_HANDLER(0, "Error parsing arguments");    
+        case 1000 : config.setOctaves( strtol( optarg, NULL, 0 ) ); break;
+        case 1001 : config.setLevels(  strtol( optarg, NULL, 0 ) ); break;
+        case 1002 : config.setUpsampling( strtof( optarg, NULL ) ); break;
+        case 1003 : config.setThreshold(  strtof( optarg, NULL ) ); break;
+        case 1004 : config.setEdgeLimit(  strtof( optarg, NULL ) ); break;
+        case 1005 : config.setSigma(      strtof( optarg, NULL ) ); break;
+        default   : usage( appName );
         }
     }
 
     argc -= optind;
     argv += optind;
 
-    if (argc == 0) {
-        cerr << "An input file is needed" << endl;
-        exit( -1 );
-    }
+    if( argc == 0 ) usage( appName );
 
-    inputFilename = std::string(argv[0]); argc--; argv++;
-    ERROR_HANDLER((argc==0), "Too many input files");
+    inputFile = argv[0];
 }
 
-/*********************/
-/* @name main        */
-/* @brief main       */
-/* @param argc, argv */
-/*********************/
 int main(int argc, char **argv)
 {
     cudaDeviceReset();
 
     popart::Config config;
+    string         inputFile = "";
+    const char*    appName   = argv[0];
 
-    /* Parse user input */
-    parseargs( config, argc, argv );
+    parseargs( argc, argv, config, inputFile ); // Parse command line
 
-    imgStream input;
+    if( inputFile == "" ) {
+        cerr << "No input filename given" << endl;
+        usage( appName );
+    }
 
-    realName = extract_filename(inputFilename, prefix);
-    read_gray(inputFilename, input);
-    cerr << "Real name of input file is " << realName << endl;
+    if( not boost::filesystem::exists( inputFile ) ) {
+        cerr << "File " << inputFile << " not found" << endl;
+        usage( appName );
+    }
+
+    imgStream inp;
+
+    realName = extract_filename( inputFile, prefix );
+    read_gray( inputFile, inp );
+    cerr << "Real name of input file is " << realName << endl
+         << "Width: " << inp.width
+         << " height: " << inp.height
+         << endl;
 
     device_prop_t deviceInfo;
     // deviceInfo.set( 1 );
-    deviceInfo.print( );
+    // deviceInfo.print( );
 
-    PopSift PopSift( octaves,
-                     levels,
-                     upsampling,
-                     threshold,
-                     edgeLimit,
-                     sigma,
-                     vlfeat_mode );
+    PopSift PopSift( config );
 
     PopSift.init( inp.width, inp.height );
-    PopSift.execute(inp);
+    cerr << "Width: " << inp.width << " height: " << inp.height << endl;
+    PopSift.execute( inp );
     PopSift.uninit( );
     return 0;
 }
-
-/**
- * Copyright (c) 2012, Fixstars Corp.
- * All rights reserved.
- * 
- * The following patent has been issued for methods embodied in this 
- * software: "Method and apparatus for identifying scale invariant features 
- * in an image and use of same for locating an object in an image," David 
- * G. Lowe, US Patent 6,711,293 (March 23, 2004). Provisional application 
- * filed March 8, 1999. Asignee: The University of British Columbia. For 
- * further details, contact David Lowe (lowe@cs.ubc.ca) or the 
- * University-Industry Liaison Office of the University of British 
- * Columbia.
- * 
- * Note that restrictions imposed by this patent (and possibly others) 
- * exist independently of and may be in conflict with the freedoms granted 
- * in this license, which refers to copyright of the program, not patents 
- * for any methods that it implements.  Both copyright and patent law must 
- * be obeyed to legally use and redistribute this program and it is not the 
- * purpose of this license to induce you to infringe any patents or other 
- * property right claims or to contest validity of any such claims.  If you 
- * redistribute or use the program, then this license merely protects you 
- * from committing copyright infringement.  It does not protect you from 
- * committing patent infringement.  So, before you do anything with this 
- * program, make sure that you have permission to do so not merely in terms 
- * of copyright, but also in terms of patent law.
- * 
- * Please note that this license is not to be understood as a guarantee 
- * either.  If you use the program according to this license, but in 
- * conflict with patent law, it does not mean that the licensor will refund 
- * you for any losses that you incur if you are sued for your patent 
- * infringement.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are 
- * met:
- *     * Redistributions of source code must retain the above copyright and 
- *       patent notices, this list of conditions and the following 
- *       disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in 
- *       the documentation and/or other materials provided with the 
- *       distribution.
- *     * Neither the name of Fixstars Corp. nor the names of its 
- *       contributors may be used to endorse or promote products derived 
- *       from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, 
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
- */
 

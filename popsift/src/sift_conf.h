@@ -7,18 +7,27 @@ struct Config
 {
     Config( );
 
-    void setModeVLFeat( float sigma = 0.82f );
-    void setModeOpenCV( float sigma = 1.6f );
-
     enum SiftMode {
         OpenCV,
         VLFeat
-    }
+    };
 
     enum LogMode {
         None,
         All
-    }
+    };
+
+    void setModeVLFeat( float sigma = 0.82f );
+    void setModeOpenCV( float sigma = 1.6f );
+    void setLogMode( LogMode mode = All );
+    void setVerbose( bool on = true );
+
+    void setUpsampling( float v );
+    void setOctaves( int v );
+    void setLevels( int v );
+    void setSigma( float v );
+    void setEdgeLimit( float v );
+    void setThreshold( float v );
 
     // determine the image format of the first octave
     // relative to the input image's size (x,y) as follows:
@@ -34,34 +43,27 @@ struct Config
     // feature points. The number of ...
     int      levels;
     float    sigma;
+
+    // default edge_limit 16.0f from Celebrandil
+    // default edge_limit 10.0f from Bemap
     float    edge_limit;
+
+    // default threshold 0.0 default of vlFeat
+    // default threshold 5.0 / 256.0
+    // default threshold 15.0 / 256.0 - it seems our DoG is really small ???
+    // default threshold 5.0 from Celebrandil, not happening in our data
+    // default threshold 0.04 / (_levels-3.0) / 2.0f * 255
+    //                   from Bemap -> 1.69 (makes no sense)
     float    threshold;
+
+    // default SiftMode::OpenCV
     SiftMode sift_mode;
-    LogMode  log_log;
+
+    // default LogMode::None
+    LogMode  log_mode;
+
+    bool     verbose;
 };
-
-Config::Config( )
-    : start_sampling( -1 )
-    , octaves( -1 )
-    , levels( 3 )
-    , sigma( 1.6f )
-    , edge_limit( 10.0f )
-    , threshold( 10.0f / 256.0f )
-    , sift_mode( Config::OpenCV )
-    , log_mode( Config::None )
-{ }
-
-void Config::setModeVLFeat( float s )
-{
-    sift_mode = Config::VLFeat;
-    sigma     = s;
-}
-
-void Config::setModeOpenCV( float s )
-{
-    sift_mode = Config::OpenCV;
-    sigma     = s;
-}
 
 }; // namespace popart
 

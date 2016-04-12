@@ -11,20 +11,16 @@
 
 using namespace std;
 
-PopSift::PopSift( int num_octaves,
-                  int S_,
-                  int upscale_factor,
-                  float threshold,
-                  float edgeThreshold,
-                  float sigma,
-                  int   vlfeat_mode )
-    : _octaves( num_octaves )
-    , _scales( max(2,S_) ) // min is 2, GPU restriction */
-    , up( upscale_factor )
-    , _sigma( sigma )
-    , _threshold( threshold ) // SIFT parameter
-    , _edgeLimit( edgeThreshold ) // SIFT parameter
-    , _vlfeat_mode( vlfeat_mode )
+PopSift::PopSift( popart::Config config )
+    : _octaves( config.octaves )
+    , _levels( max( 2, config.levels ) ) // min is 2, GPU restriction */
+    , up( config.start_sampling )
+    , _sigma( config.sigma )
+    , _threshold( config.threshold ) // SIFT parameter
+    , _edgeLimit( config.edge_limit ) // SIFT parameter
+    , _vlfeat_mode( config.sift_mode == popart::Config::VLFeat )
+    , _log_to_file( config.log_mode == popart::Config::All )
+    , _verbose( config.verbose )
 {
 }
 
@@ -37,22 +33,25 @@ void PopSift::init( int w, int h )
 {
     if (_octaves < 0) {
         _octaves = max(int (floor( logf( (float)min( w, h ) )
-                                   / logf( 2.0f ) ) - 3 + up), 1);
+                                   / logf( 2.0f ) ) - 3 + 1.0/pow(2.0f,up) ), 1);
     }
 
-    _upscaled_width  = w << up;
-    _upscaled_height = h << up;
+    // _upscaled_width  = w << up;
+    // _upscaled_height = h << up;
+    _upscaled_width  = w / pow( 2.0f, up );
+    _upscaled_height = h / pow( 2.0f, up );
+    cerr << "Upscaling WxH = " << _upscaled_width << "x" << _upscaled_height << endl;
 
     _hst_input_image.allocHost( w, h, popart::CudaAllocated );
     _dev_input_image.allocDev( w, h );
 
     // float sigma = 1.0;
 
-    popart::Pyramid::init_filter( _sigma, _scales, _vlfeat_mode );
-    popart::Pyramid::init_sigma(  _sigma, _scales );
+    popart::Pyramid::init_filter( _sigma, _levels, _vlfeat_mode );
+    popart::Pyramid::init_sigma(  _sigma, _levels );
 
     _baseImg = new popart::Image( _upscaled_width, _upscaled_height );
-    _pyramid = new popart::Pyramid( _baseImg, _octaves, _scales );
+    _pyramid = new popart::Pyramid( _baseImg, _octaves, _levels );
 
     /* initializing texture for upscale V5
      */
@@ -103,19 +102,19 @@ void PopSift::execute( imgStream inp )
 
     memcpy( _hst_input_image.data, inp.data_r, inp.width * inp.height );
     _hst_input_image.memcpyToDevice( _dev_input_image );
-    _baseImg->upscale( _dev_input_image, _texture, 1<<up );
+    _baseImg->upscale( _dev_input_image, _texture, 1.0 / pow( 2.0f, up ) );
 
     _pyramid->build( _baseImg );
 
     _pyramid->find_extrema( _edgeLimit, _threshold );
 
-    if( log_to_file ) {
+    if( _log_to_file ) {
         popart::write_plane2D( "upscaled-input-image.pgm",
                                true, // is stored on device
                                _baseImg->array );
 
         for( int o=0; o<_octaves; o++ ) {
-            for( int s=0; s<_scales+3; s++ ) {
+            for( int s=0; s<_levels+3; s++ ) {
                 _pyramid->download_and_save_array( "pyramid", o, s );
             }
         }
