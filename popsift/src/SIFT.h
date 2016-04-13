@@ -44,7 +44,6 @@ class PopSift
     {
         popart::Image*   _inputImage;
 
-        int              _octaves;
         popart::Pyramid* _pyramid;
     };
 public:
@@ -72,11 +71,11 @@ private:
     // popart::Image*   _baseImg;         // popart in use
     // popart::Pyramid* _pyramid;         // popart in use
 
-    cudaTextureObject_t _texture; // for upscale v5
-    cudaTextureDesc     _texDesc; // for upscale v5
-    cudaResourceDesc    _resDesc; // for upscale v5
+    // cudaTextureObject_t _texture; // for upscale v5
+    // cudaTextureDesc     _texDesc; // for upscale v5
+    // cudaResourceDesc    _resDesc; // for upscale v5
 
-    int              _octaves;         /* number of octaves */
+    int              _init_octaves;    /* number of octaves */
     const int        _levels;          /* number of levels */
     const int        up;               /* upsampling times */
     const float      _sigma;           /* initial sigma */
@@ -86,8 +85,8 @@ private:
     const bool       _log_to_file;
     const bool       _verbose;
 
-    popart::Plane2D_uint8 _hst_input_image;
-    popart::Plane2D_uint8 _dev_input_image;
+    // popart::Plane2D_uint8 _hst_input_image;
+    // popart::Plane2D_uint8 _dev_input_image;
     cudaStream_t          _stream;
 };
 

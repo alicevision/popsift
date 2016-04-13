@@ -56,8 +56,10 @@ class Pyramid
 {
     class Octave
     {
-        uint32_t      _debug_octave_id;
-        uint32_t      _levels;
+        int _w;
+        int _h;
+        int _debug_octave_id;
+        int _levels;
 
         Plane2D_float* _data;
         Plane2D_float  _intermediate_data;
@@ -161,7 +163,7 @@ class Pyramid
          * alloc() - allocates all GPU memories for one octave
          * @param width in floats, not bytes!!!
          */
-        void alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema );
+        void alloc( int width, int height, int levels, int layer_max_extrema );
         void free();
 
         /**
@@ -180,7 +182,7 @@ class Pyramid
     Octave*      _octaves;
 
 public:
-    Pyramid( Image* base, uint32_t octaves, uint32_t levels );
+    Pyramid( Image* base, uint32_t octaves, uint32_t levels, int w, int h );
     ~Pyramid( );
 
     void build( Image* base );
@@ -190,6 +192,9 @@ public:
     void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
 
     void download_and_save_descriptors( const char* basename, uint32_t octave );
+
+    inline int getNumOctaves() const { return _num_octaves; }
+    inline int getNumLevels()  const { return _levels; }
 
 private:
     void build_v11 ( Image* base );

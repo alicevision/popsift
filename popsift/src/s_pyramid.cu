@@ -174,10 +174,12 @@ void Pyramid::Octave::freeExtrema( )
     delete [] _h_desc;
 }
 
-void Pyramid::Octave::alloc( uint32_t width, uint32_t height, uint32_t levels, uint32_t layer_max_extrema )
+void Pyramid::Octave::alloc( int width, int height, int levels, int layer_max_extrema )
 {
     cudaError_t err;
 
+    _w      = width;
+    _h      = height;
     _levels = levels;
 
     _d_desc = new Descriptor*[_levels];
@@ -615,7 +617,7 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
  * Pyramid constructor
  *************************************************************/
 
-Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels )
+Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, int width, int height )
     : _num_octaves( octaves )
     , _levels( levels + 3 )
 {
@@ -623,8 +625,8 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels )
 
     _octaves = new Octave[_num_octaves];
 
-    uint32_t w = uint32_t(base->getUpscaledImage().getCols());
-    uint32_t h = uint32_t(base->getUpscaledImage().getRows());
+    int w = width;
+    int h = height;
     for( uint32_t o=0; o<_num_octaves; o++ ) {
 #if (PYRAMID_PRINT_DEBUG==1)
         printf("Allocating octave %u with width %u and height %u (%u levels)\n", o, w, h, _levels );
