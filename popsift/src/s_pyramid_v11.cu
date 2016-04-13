@@ -469,17 +469,7 @@ void Pyramid::build_v11( Image* base )
             cudaStream_t oct_str_0 = oct_obj.getStream(0);
 
             if( level == 0 ) {
-                if( octave == 0 ) {
-#if 0
-                    dim3 block( 32, 1 );
-                    dim3 grid;
-                    grid.x  = grid_divide( width,  128 );
-                    grid.y  = height;
-                    filter_gauss_horiz_v11
-                        <<<grid,block,0,oct_str_0>>>
-                        ( base->array,
-                          oct_obj.getIntermediateData( ) );
-#else
+                if( _direct_downscaling ) {
                     dim3 block( 128, 1 );
                     dim3 grid;
                     grid.x  = grid_divide( width,  128 );
@@ -489,22 +479,44 @@ void Pyramid::build_v11( Image* base )
                         ( base->getUpscaledTexture(),
                           oct_obj.getIntermediateData( ),
                           level );
-#endif
                 } else {
-                    dim3 h_block( 64, 2 );
-                    dim3 h_grid;
-                    h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
-                    h_grid.y = (unsigned int)grid_divide( height, h_block.y );
+                    if( octave == 0 ) {
+#if 0
+                        dim3 block( 32, 1 );
+                        dim3 grid;
+                        grid.x  = grid_divide( width,  128 );
+                        grid.y  = height;
+                        filter_gauss_horiz_v11
+                            <<<grid,block,0,oct_str_0>>>
+                            ( base->array,
+                            oct_obj.getIntermediateData( ) );
+#else
+                        dim3 block( 128, 1 );
+                        dim3 grid;
+                        grid.x  = grid_divide( width,  128 );
+                        grid.y  = height;
+                        filter_gauss_horiz_tex_128x1
+                            <<<grid,block,0,oct_str_0>>>
+                            ( base->getUpscaledTexture(),
+                            oct_obj.getIntermediateData( ),
+                            level );
+#endif
+                    } else {
+                        dim3 h_block( 64, 2 );
+                        dim3 h_grid;
+                        h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
+                        h_grid.y = (unsigned int)grid_divide( height, h_block.y );
 
-                    Octave& prev_oct_obj  = _octaves[octave-1];
-                    cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( _levels-3 ), 0 );
+                        Octave& prev_oct_obj  = _octaves[octave-1];
+                        cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( _levels-3 ), 0 );
 
-                    filter_gauss_horiz_v11_by_2
-                        <<<h_grid,h_block,0,oct_str_0>>>
-                        ( prev_oct_obj._data_tex[ _levels-3 ],
-                          // _octaves[octave-1]._data_tex[ 0 ],
-                          oct_obj.getIntermediateData( ),
-                          level );
+                        filter_gauss_horiz_v11_by_2
+                            <<<h_grid,h_block,0,oct_str_0>>>
+                            ( prev_oct_obj._data_tex[ _levels-3 ],
+                            // _octaves[octave-1]._data_tex[ 0 ],
+                            oct_obj.getIntermediateData( ),
+                            level );
+                    }
                 }
             } else {
 #if 0

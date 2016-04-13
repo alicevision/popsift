@@ -617,9 +617,10 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
  * Pyramid constructor
  *************************************************************/
 
-Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, int width, int height )
+Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, int width, int height, bool direct_downscaling )
     : _num_octaves( octaves )
     , _levels( levels + 3 )
+    , _direct_downscaling( direct_downscaling )
 {
     // cerr << "Entering " << __FUNCTION__ << endl;
 

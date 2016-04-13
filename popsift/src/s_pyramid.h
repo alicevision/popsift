@@ -179,10 +179,11 @@ class Pyramid
 
     uint32_t     _num_octaves;
     uint32_t     _levels;
+    bool         _direct_downscaling;
     Octave*      _octaves;
 
 public:
-    Pyramid( Image* base, uint32_t octaves, uint32_t levels, int w, int h );
+    Pyramid( Image* base, uint32_t octaves, uint32_t levels, int w, int h, bool direct_downscaling );
     ~Pyramid( );
 
     void build( Image* base );

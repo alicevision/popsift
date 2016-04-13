@@ -83,6 +83,7 @@ private:
     const float      _edgeLimit;       /* edge threshold */
     const int        _vlfeat_mode;
     const bool       _log_to_file;
+    const bool       _direct_downscaling;
     const bool       _verbose;
 
     // popart::Plane2D_uint8 _hst_input_image;

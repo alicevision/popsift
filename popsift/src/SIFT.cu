@@ -21,6 +21,7 @@ PopSift::PopSift( popart::Config config )
     , _threshold( config.threshold ) // SIFT parameter
     , _edgeLimit( config.edge_limit ) // SIFT parameter
     , _vlfeat_mode( config.sift_mode == popart::Config::VLFeat )
+    , _direct_downscaling( config.scaling_mode == popart::Config::DirectOctaves )
     , _log_to_file( config.log_mode == popart::Config::All )
     , _verbose( config.verbose )
 {
@@ -55,7 +56,8 @@ bool PopSift::init( int pipe, int w, int h )
                                                 octaves,
                                                 _levels,
                                                 ceilf( w * scaleFactor ),
-                                                ceilf( h * scaleFactor ) );
+                                                ceilf( h * scaleFactor ),
+                                                _direct_downscaling );
 
     return true;
 }

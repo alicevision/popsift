@@ -57,6 +57,7 @@ static void usage( const char* argv )
          << " --verbose / -v" << endl
          << endl
          << " --vlfeat-mode               Compute Gauss filter like VLFeat instead of like OpenCV" << endl
+         << " --direct-downscale / --dd   Direct each octave from upscaled orig instead of blurred level" << endl
          << " --log                       Write debugging files" << endl
          << endl
          << " --octaves=<int>             Number of octaves" << endl
@@ -70,20 +71,22 @@ static void usage( const char* argv )
 }
 
 static struct option longopts[] = {
-    { "help",            no_argument,            NULL, 'h' },
-    { "verbose",         no_argument,            NULL, 'v' },
+    { "help",             no_argument,            NULL, 'h' },
+    { "verbose",          no_argument,            NULL, 'v' },
 
-    { "octaves",         required_argument,      NULL, 1000 },
-    { "levels",          required_argument,      NULL, 1001 },
-    { "upsampling",      required_argument,      NULL, 1002 },
-    { "threshold",       required_argument,      NULL, 1003 },
-    { "edge-threshold",  required_argument,      NULL, 1004 },
-    { "edge-limit",      required_argument,      NULL, 1004 },
-    { "sigma",           required_argument,      NULL, 1005 },
+    { "octaves",          required_argument,      NULL, 1000 },
+    { "levels",           required_argument,      NULL, 1001 },
+    { "upsampling",       required_argument,      NULL, 1002 },
+    { "threshold",        required_argument,      NULL, 1003 },
+    { "edge-threshold",   required_argument,      NULL, 1004 },
+    { "edge-limit",       required_argument,      NULL, 1004 },
+    { "sigma",            required_argument,      NULL, 1005 },
 
-    { "vlfeat-mode",     no_argument,            NULL, 1100 },
-    { "log",             no_argument,            NULL, 1101 },
-    { NULL,              0,                      NULL, 0  }
+    { "vlfeat-mode",      no_argument,            NULL, 1100 },
+    { "direct-downscale", no_argument,            NULL, 1101 },
+    { "dd",               no_argument,            NULL, 1101 },
+    { "log",              no_argument,            NULL, 1102 },
+    { NULL,               0,                      NULL, 0  }
 };
 
 static void parseargs( int argc, char**argv, popart::Config& config, string& inputFile )
@@ -103,7 +106,8 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 'v' : config.setVerbose(); break;
 
         case 1100 : config.setModeVLFeat( popart::Config::VLFeat ); break;
-        case 1101 : config.setLogMode( popart::Config::All );       break;
+        case 1101 : config.setScalingMode( popart::Config::DirectOctaves ); break;
+        case 1102 : config.setLogMode( popart::Config::All );       break;
 
         case 1000 : config.setOctaves( strtol( optarg, NULL, 0 ) ); break;
         case 1001 : config.setLevels(  strtol( optarg, NULL, 0 ) ); break;

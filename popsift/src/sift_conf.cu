@@ -12,6 +12,7 @@ Config::Config( )
     , threshold( 10.0f / 256.0f )
     , sift_mode( Config::OpenCV )
     , log_mode( Config::None )
+    , scaling_mode( Config::DownscaledOctaves )
     , verbose( false )
 { }
 
@@ -35,6 +36,11 @@ void Config::setVerbose( bool on )
 void Config::setLogMode( LogMode mode )
 {
     log_mode = mode;
+}
+
+void Config::setScalingMode( ScalingMode mode )
+{
+    scaling_mode = mode;
 }
 
 void Config::setUpsampling( float v ) { start_sampling = v; }

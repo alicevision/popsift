@@ -17,9 +17,15 @@ struct Config
         All
     };
 
+    enum ScalingMode {
+        DirectOctaves,
+        DownscaledOctaves
+    };
+
     void setModeVLFeat( float sigma = 0.82f );
     void setModeOpenCV( float sigma = 1.6f );
     void setLogMode( LogMode mode = All );
+    void setScalingMode( ScalingMode mode = DownscaledOctaves );
     void setVerbose( bool on = true );
 
     void setUpsampling( float v );
@@ -61,6 +67,9 @@ struct Config
 
     // default LogMode::None
     LogMode  log_mode;
+
+    // default: ScalingMode::DownscaledOctaves
+    ScalingMode scaling_mode;
 
     bool     verbose;
 };
