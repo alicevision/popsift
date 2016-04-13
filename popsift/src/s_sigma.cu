@@ -1,4 +1,4 @@
-#include "s_pyramid.h"
+#include "s_sigma.h"
 
 #include "debug_macros.h"
 #include <cuda_runtime.h>
@@ -8,7 +8,7 @@ namespace popart {
 __device__ __constant__ float d_sigma0;
 __device__ __constant__ float d_sigma_k;
 
-void Pyramid::init_sigma( float sigma0, uint32_t levels )
+void init_sigma( float sigma0, int levels )
 {
     cudaError_t err;
 

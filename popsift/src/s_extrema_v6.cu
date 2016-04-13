@@ -1,4 +1,5 @@
 #include "s_pyramid.h"
+#include "s_sigma.h"
 #include "s_solve.h"
 #include "debug_macros.h"
 #include "assist.h"

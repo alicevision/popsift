@@ -46,6 +46,13 @@ public:
 	/* @brief SIFT executions */
 	/**************************/
 public:
+    /* We support more than 1 streams,
+     * but we support only one sigma and one
+     * level parameters.
+     * Separate init function for that.
+     */
+    void baseInit( );
+
     void init( int w, int h );
 
     void execute( imgStream _inp );

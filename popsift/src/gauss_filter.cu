@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 #include "gauss_filter.h"
-#include "s_pyramid.h"
+// #include "s_pyramid.h"
 #include "debug_macros.h"
 
 #undef PRINT_GAUSS_FILTER_SYMBOL
@@ -31,7 +31,7 @@ void print_gauss_filter_symbol( uint32_t columns )
  * Initialize the Gauss filter table in constant memory
  *************************************************************/
 
-void Pyramid::init_filter( float sigma0, uint32_t levels, int vlfeat_mode )
+void init_filter( float sigma0, int levels, bool vlfeat_mode )
 {
     cerr << "Entering " << __FUNCTION__ << endl;
     if( sigma0 > 2.0 )
@@ -56,13 +56,13 @@ void Pyramid::init_filter( float sigma0, uint32_t levels, int vlfeat_mode )
 
     float sigma = sigma0;
     for( int lvl=0; lvl<GAUSS_LEVELS; lvl++ ) {
-        for (int x = 1; x < GAUSS_ALIGN; ++x) {
+        for( int x = 1; x < GAUSS_ALIGN; x++ ) {
             local_filter[lvl * GAUSS_ALIGN + x] = 0.0;
         }
 
         local_filter[lvl * GAUSS_ALIGN + 0] = 1.0;
         double sum = 1.0;
-        for (int x = 1; x <= GAUSS_SPAN; ++x) {
+        for( int x = 1; x <= GAUSS_SPAN; x++ ) {
                 /* Should be:
                  * kernel[x] = exp( -0.5 * (pow((x-mean)/sigma, 2.0) ) )
                  *           / sqrt(2 * M_PI * sigma * sigma);
@@ -74,7 +74,7 @@ void Pyramid::init_filter( float sigma0, uint32_t levels, int vlfeat_mode )
             sum += 2 * local_filter[lvl * GAUSS_ALIGN + x];
         }
 
-        for (int x = 0; x <= GAUSS_SPAN; ++x) 
+        for( int x = 0; x <= GAUSS_SPAN; x++ ) 
             local_filter[lvl * GAUSS_ALIGN + x] /= sum;
 
         if( vlfeat_mode == true ) {

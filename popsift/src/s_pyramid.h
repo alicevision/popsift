@@ -19,9 +19,6 @@
 
 namespace popart {
 
-extern __device__ __constant__ float d_sigma0;
-extern __device__ __constant__ float d_sigma_k;
-
 struct ExtremaMgmt
 {
     uint32_t counter;
@@ -186,8 +183,6 @@ public:
     Pyramid( Image* base, uint32_t octaves, uint32_t levels );
     ~Pyramid( );
 
-    static void init_filter( float sigma, uint32_t level, int vlfeat_mode );
-    static void init_sigma(  float sigma, uint32_t level );
     void build( Image* base );
 
     void find_extrema( float edgeLimit, float threshold );

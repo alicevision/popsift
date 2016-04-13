@@ -6,6 +6,8 @@
 #include <assert.h>
 
 #include "SIFT.h"
+#include "s_sigma.h"
+#include "gauss_filter.h"
 #include "debug_macros.h"
 #include "write_plane_2d.h"
 
@@ -27,7 +29,11 @@ PopSift::PopSift( popart::Config config )
 PopSift::~PopSift()
 { }
 
-#define TRY_IMAGE_TWICE 0
+void PopSift::baseInit( )
+{
+    popart::init_filter( _sigma, _levels, _vlfeat_mode );
+    popart::init_sigma(  _sigma, _levels );
+}
 
 void PopSift::init( int w, int h )
 {
@@ -44,11 +50,6 @@ void PopSift::init( int w, int h )
 
     _hst_input_image.allocHost( w, h, popart::CudaAllocated );
     _dev_input_image.allocDev( w, h );
-
-    // float sigma = 1.0;
-
-    popart::Pyramid::init_filter( _sigma, _levels, _vlfeat_mode );
-    popart::Pyramid::init_sigma(  _sigma, _levels );
 
     _baseImg = new popart::Image( _upscaled_width, _upscaled_height );
     _pyramid = new popart::Pyramid( _baseImg, _octaves, _levels );
