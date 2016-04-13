@@ -106,7 +106,7 @@ Image::Image( size_t w, size_t h )
     _upscaled_image_resDesc.res.pitch2D.desc.y       = 0;
     _upscaled_image_resDesc.res.pitch2D.desc.z       = 0;
     _upscaled_image_resDesc.res.pitch2D.desc.w       = 0;
-    assert( _upscaled_image_d.elemSize() == 1 );
+    assert( _upscaled_image_d.elemSize() == 4 );
     _upscaled_image_resDesc.res.pitch2D.pitchInBytes = _upscaled_image_d.step;
     _upscaled_image_resDesc.res.pitch2D.width        = _upscaled_image_d.getCols();
     _upscaled_image_resDesc.res.pitch2D.height       = _upscaled_image_d.getRows();
