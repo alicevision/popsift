@@ -55,12 +55,12 @@ void Image::upscale_v5( cudaTextureObject_t & tex )
 
         cudaEventRecord( start, 0 );
         for( int i=0; i<loops; i++ ) {
-            int gridx = grid_divide( this->array.getCols(), blockx );
-            int gridy = grid_divide( this->array.getRows(), blocky );
+            int gridx = grid_divide( this->_upscaled_image_d.getCols(), blockx );
+            int gridy = grid_divide( this->_upscaled_image_d.getRows(), blocky );
             dim3 grid( gridx, gridy );
             dim3 block( blockx, blocky );
 
-            p_upscale_5<<<grid,block>>> ( this->array, tex );
+            p_upscale_5<<<grid,block>>> ( this->_upscaled_image_d, tex );
         }
         cudaEventRecord( stop, 0 );
         cudaDeviceSynchronize( );
@@ -91,13 +91,13 @@ __host__
 void Image::upscale_v5( cudaTextureObject_t & tex )
 {
     dim3 block( 64, 2 );
-    int gridx = grid_divide( this->array.getCols(), block.x );
-    int gridy = grid_divide( this->array.getRows(), block.y );
+    int gridx = grid_divide( this->_upscaled_image_d.getCols(), block.x );
+    int gridy = grid_divide( this->_upscaled_image_d.getRows(), block.y );
     dim3 grid( gridx, gridy );
 
     p_upscale_5
         <<<grid,block>>>
-        ( this->array,
+        ( this->_upscaled_image_d,
           tex );
 
     test_last_error( __FILE__,  __LINE__ );

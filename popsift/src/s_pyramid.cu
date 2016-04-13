@@ -623,8 +623,8 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels )
 
     _octaves = new Octave[_num_octaves];
 
-    uint32_t w = uint32_t(base->array.getCols());
-    uint32_t h = uint32_t(base->array.getRows());
+    uint32_t w = uint32_t(base->getUpscaledImage().getCols());
+    uint32_t h = uint32_t(base->getUpscaledImage().getRows());
     for( uint32_t o=0; o<_num_octaves; o++ ) {
 #if (PYRAMID_PRINT_DEBUG==1)
         printf("Allocating octave %u with width %u and height %u (%u levels)\n", o, w, h, _levels );

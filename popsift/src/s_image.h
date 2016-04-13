@@ -8,8 +8,6 @@ namespace popart {
 
 struct Image
 {
-    Plane2D_float array;    // 2D plane allocated on device
-
     /** Create a device-sided buffer of the given dimensions */
     Image( size_t w, size_t h );
 
@@ -28,12 +26,16 @@ struct Image
 
     // void download_and_save_array( const char* filename );
 
+    inline Plane2D_float& getUpscaledImage() {
+        return _upscaled_image_d;
+    }
+
 private:
-    void upscale_v1( Plane2D_uint8 & src );
-    void upscale_v2( Plane2D_uint8 & src );
-    void upscale_v3( Plane2D_uint8 & src );
-    void upscale_v4( Plane2D_uint8 & src );
     void upscale_v5( cudaTextureObject_t & tex );
+
+    /** 2D plane holding upscaled image, allocated on device
+     */
+    Plane2D_float _upscaled_image_d;
 };
 
 } // namespace popart

@@ -33,11 +33,24 @@
 #include "s_pyramid.h"
 #include "sift_conf.h"
 
+#define MAX_PIPES 3
+
+
 /* user parameters */
 
 class PopSift
 {
+    struct Pipe
+    {
+        popart::Image*   _inputImage;
+
+        int              _octaves;
+        popart::Pyramid* _pyramid;
+    };
 public:
+    /* We support more than 1 streams, but we support only one sigma and one
+     * level parameters.
+     */
     PopSift( popart::Config config );
 
     ~PopSift();
@@ -46,24 +59,18 @@ public:
 	/* @brief SIFT executions */
 	/**************************/
 public:
-    /* We support more than 1 streams,
-     * but we support only one sigma and one
-     * level parameters.
-     * Separate init function for that.
-     */
-    void baseInit( );
+    bool init( int pipe, int w, int h );
 
-    void init( int w, int h );
+    void execute( int pipe, imgStream _inp );
 
-    void execute( imgStream _inp );
-
-    void uninit( );
+    void uninit( int pipe );
 
 private:
     size_t           _upscaled_width;  // popart in use
     size_t           _upscaled_height; // popart in use
-    popart::Image*   _baseImg;         // popart in use
-    popart::Pyramid* _pyramid;         // popart in use
+    Pipe             _pipe[MAX_PIPES];
+    // popart::Image*   _baseImg;         // popart in use
+    // popart::Pyramid* _pyramid;         // popart in use
 
     cudaTextureObject_t _texture; // for upscale v5
     cudaTextureDesc     _texDesc; // for upscale v5

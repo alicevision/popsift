@@ -158,10 +158,10 @@ int main(int argc, char **argv)
 
     PopSift PopSift( config );
 
-    PopSift.init( inp.width, inp.height );
+    PopSift.init( 0, inp.width, inp.height );
     cerr << "Width: " << inp.width << " height: " << inp.height << endl;
-    PopSift.execute( inp );
-    PopSift.uninit( );
+    PopSift.execute( 0, inp );
+    PopSift.uninit( 0 );
     return 0;
 }
 

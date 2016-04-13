@@ -24,22 +24,22 @@ PopSift::PopSift( popart::Config config )
     , _log_to_file( config.log_mode == popart::Config::All )
     , _verbose( config.verbose )
 {
+    popart::init_filter( _sigma, _levels, _vlfeat_mode );
+    popart::init_sigma(  _sigma, _levels );
 }
 
 PopSift::~PopSift()
 { }
 
-void PopSift::baseInit( )
+bool PopSift::init( int pipe, int w, int h )
 {
-    popart::init_filter( _sigma, _levels, _vlfeat_mode );
-    popart::init_sigma(  _sigma, _levels );
-}
+    if( pipe < 0 && pipe >= MAX_PIPES ) {
+        return false;
+    }
 
-void PopSift::init( int w, int h )
-{
     if (_octaves < 0) {
-        _octaves = max(int (floor( logf( (float)min( w, h ) )
-                                   / logf( 2.0f ) ) - 3 + 1.0/pow(2.0f,up) ), 1);
+        _pipe[pipe]._octaves = max(int (floor( logf( (float)min( w, h ) )
+                                        / logf( 2.0f ) ) - 3 + 1.0/pow(2.0f,up) ), 1);
     }
 
     // _upscaled_width  = w << up;
@@ -51,8 +51,8 @@ void PopSift::init( int w, int h )
     _hst_input_image.allocHost( w, h, popart::CudaAllocated );
     _dev_input_image.allocDev( w, h );
 
-    _baseImg = new popart::Image( _upscaled_width, _upscaled_height );
-    _pyramid = new popart::Pyramid( _baseImg, _octaves, _levels );
+    _pipe[pipe]._inputImage = new popart::Image( _upscaled_width, _upscaled_height );
+    _pipe[pipe]._pyramid = new popart::Pyramid( _pipe[pipe]._inputImage, _octaves, _levels );
 
     /* initializing texture for upscale V5
      */
@@ -81,10 +81,14 @@ void PopSift::init( int w, int h )
     cudaError_t err;
     err = cudaCreateTextureObject( &_texture, &_resDesc, &_texDesc, 0 );
     POP_CUDA_FATAL_TEST( err, "Could not create texture object: " );
+
+    return true;
 }
 
-void PopSift::uninit( )
+void PopSift::uninit( int pipe )
 {
+    if( pipe < 0 && pipe >= MAX_PIPES ) return;
+
     cudaError_t err;
     err = cudaDestroyTextureObject( _texture );
     POP_CUDA_FATAL_TEST( err, "Could not destroy texture object: " );
@@ -92,35 +96,37 @@ void PopSift::uninit( )
     _hst_input_image.freeHost( popart::CudaAllocated );
     _dev_input_image.freeDev( );
 
-    delete _baseImg;
-    delete _pyramid;
+    delete _pipe[pipe]._inputImage;
+    delete _pipe[pipe]._pyramid;
 }
 
-void PopSift::execute( imgStream inp )
+void PopSift::execute( int pipe, imgStream inp )
 {
+    if( pipe < 0 && pipe >= MAX_PIPES ) return;
+
     assert( inp.data_g == 0 );
     assert( inp.data_b == 0 );
 
     memcpy( _hst_input_image.data, inp.data_r, inp.width * inp.height );
     _hst_input_image.memcpyToDevice( _dev_input_image );
-    _baseImg->upscale( _dev_input_image, _texture, 1.0 / pow( 2.0f, up ) );
+    _pipe[pipe]._inputImage->upscale( _dev_input_image, _texture, 1.0 / pow( 2.0f, up ) );
 
-    _pyramid->build( _baseImg );
+    _pipe[pipe]._pyramid->build( _pipe[pipe]._inputImage );
 
-    _pyramid->find_extrema( _edgeLimit, _threshold );
+    _pipe[pipe]._pyramid->find_extrema( _edgeLimit, _threshold );
 
     if( _log_to_file ) {
         popart::write_plane2D( "upscaled-input-image.pgm",
                                true, // is stored on device
-                               _baseImg->array );
+                               _pipe[pipe]._inputImage->getUpscaledImage() );
 
         for( int o=0; o<_octaves; o++ ) {
             for( int s=0; s<_levels+3; s++ ) {
-                _pyramid->download_and_save_array( "pyramid", o, s );
+                _pipe[pipe]._pyramid->download_and_save_array( "pyramid", o, s );
             }
         }
         for( int o=0; o<_octaves; o++ ) {
-            _pyramid->download_and_save_descriptors( "pyramid", o );
+            _pipe[pipe]._pyramid->download_and_save_descriptors( "pyramid", o );
         }
     }
 }

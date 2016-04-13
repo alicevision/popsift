@@ -20,10 +20,6 @@ void Image::upscale( Plane2D_uint8 & src, cudaTextureObject_t & tex, float scale
         exit( -__LINE__ );
     }
 
-    if( false ) upscale_v1( src );
-    if( false ) upscale_v2( src );
-    if( false ) upscale_v3( src );
-    if( false ) upscale_v4( src );
     if( true  ) upscale_v5( tex );
 }
 
@@ -45,9 +41,9 @@ void Image::download_and_save_array( const char* filename )
     cerr << "Downloading image from GPU to CPU and writing to file " << filename << endl;
 
     Plane2D_float f;
-    f.allocHost( this->array.getCols(), this->array.getRows(), PageAligned );
+    f.allocHost( this->_upscaled_image_d.getCols(), this->_upscaled_image_d.getRows(), PageAligned );
 
-    f.memcpyFromDevice( array );
+    f.memcpyFromDevice( _upscaled_image_d );
 
     unsigned char* c = new unsigned char[ f.getCols() * f.getRows() ];
     for( int y=0; y<f.getRows(); y++ ) {
@@ -68,12 +64,12 @@ void Image::download_and_save_array( const char* filename )
 
 Image::Image( size_t w, size_t h )
 {
-    array.allocDev( w, h );
+    _upscaled_image_d.allocDev( w, h );
 }
 
 Image::~Image( )
 {
-    array.freeDev( );
+    _upscaled_image_d.freeDev( );
 }
 
 } // namespace popart

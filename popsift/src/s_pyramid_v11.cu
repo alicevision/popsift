@@ -544,13 +544,13 @@ void Pyramid::build_v11( Image* base )
 #ifdef HORIZ_NO_SHARED_128x1
                     filter_gauss_horiz_v11_128x1_no_shared
                         <<<grid,block,0,oct_str_0>>>
-                        ( base->array,
+                        ( base->getUpscaledImage(),
                           oct_obj.getIntermediateData( ),
                           level );
 #else // HORIZ_NO_SHARED_128x1
                     filter_gauss_horiz_v11_128x1
                         <<<grid,block,0,oct_str_0>>>
-                        ( base->array,
+                        ( base->getUpscaledImage(),
                           oct_obj.getIntermediateData( ),
                           level );
 #endif // HORIZ_NO_SHARED_128x1
