@@ -5,7 +5,7 @@
 
 using namespace std;
 
-PopSift::PopSift( popart::Config config )
+PopSift::PopSift( const popart::Config& config )
     : _config( config )
 {
     _config.levels = max( 2, config.levels );
