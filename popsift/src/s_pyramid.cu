@@ -437,7 +437,7 @@ void Pyramid::Octave::writeDescriptor( ostream& ostr )
                  << ( cand[s].xpos - 0.0f ) * pow( 2.0, _debug_octave_id-1.0 ) << " "
                  << ( cand[s].ypos - 0.0f ) * pow( 2.0, _debug_octave_id-1.0 ) << " "
                  << cand[s].sigma * pow( 2.0, _debug_octave_id-1.0 ) << " "
-                 << cand[s].angle_from_bemap << " ";
+                 << cand[s].orientation << " ";
             for( int i=0; i<128; i++ ) {
                 ostr << setprecision(3) << desc[s].features[i] << " ";
             }
@@ -527,7 +527,7 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
                     for( uint32_t i=0; i<ct; i++ ) {
                         int32_t x = roundf( cand[i].xpos );
                         int32_t y = roundf( cand[i].ypos );
-                        // cerr << "(" << x << "," << y << ") scale " << cand[i].sigma << " orient " << cand[i].angle_from_bemap << endl;
+                        // cerr << "(" << x << "," << y << ") scale " << cand[i].sigma << " orient " << cand[i].orientation << endl;
                         for( int32_t j=-4; j<=4; j++ ) {
                             hostPlane_f.ptr( clamp(y+j,height) )[ clamp(x,  width) ] = 255;
                             hostPlane_f.ptr( clamp(y,  height) )[ clamp(x+j,width) ] = 255;

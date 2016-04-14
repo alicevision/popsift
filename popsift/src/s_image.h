@@ -19,8 +19,6 @@ struct Image
     void debug_out( );
     void test_last_error( const char* file, int line );
 
-    // void download_and_save_array( const char* filename );
-
     inline Plane2D_float& getUpscaledImage() {
         return _upscaled_image_d;
     }

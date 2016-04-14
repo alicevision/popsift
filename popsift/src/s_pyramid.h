@@ -42,10 +42,10 @@ struct ExtremaMgmt
 
 struct ExtremumCandidate
 {
-    float    xpos;
-    float    ypos;
-    float    sigma; // scale;
-    float    angle_from_bemap;
+    float xpos;
+    float ypos;
+    float sigma; // scale;
+    float orientation;
 };
 
 struct Descriptor

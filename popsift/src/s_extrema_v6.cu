@@ -127,7 +127,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     ec.xpos    = 0;
     ec.ypos    = 0;
     ec.sigma   = 0;
-    ec.angle_from_bemap = 0;
+    ec.orientation = 0;
 
     /*
      * First consideration: extrema cannot be found on any outermost edge,
@@ -163,7 +163,6 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
         return false;
     }
 
-#if 1
     // based on Bemap
     float Dx  = 0.0f;
     float Dy  = 0.0f;
@@ -305,13 +304,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     // key_candidate->sigma = sigma0 * pow(sigma_k, sn);
     // ec.value   = 0;
     // ec.edge    = 0;
-    ec.angle_from_bemap = 0;
-#else
-    ec.xpos    = x+1;
-    ec.ypos    = y+1;
-    ec.sigma   = d_sigma0 * pow(d_sigma_k, level);
-    ec.angle_from_bemap = 0;
-#endif
+    ec.orientation = 0;
 
     return true;
 }

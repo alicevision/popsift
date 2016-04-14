@@ -32,7 +32,7 @@ void keypoint_descriptors( ExtremumCandidate* cand,
     const float x    = ext->xpos;
     const float y    = ext->ypos;
     const float sig  = ext->sigma;
-    const float ang  = ext->angle_from_bemap;
+    const float ang  = ext->orientation;
     const float SBP  = fabs(MAGNIFY_V1 * sig);
 
     const float cos_t = cosf(ang);

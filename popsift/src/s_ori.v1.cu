@@ -206,7 +206,7 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
                 printf("NAN value in compute_angle\n");
             }
 
-            ext->angle_from_bemap = th;
+            ext->orientation = th;
         }
 
         /* find other peaks, boundary of 80% of max */
@@ -230,7 +230,7 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
                 ext->xpos = x;
                 ext->ypos = y;
                 ext->sigma = sig;
-                ext->angle_from_bemap = th;
+                ext->orientation = th;
 
                 nangles++;
                 if (nangles > 2) break;
