@@ -459,7 +459,7 @@ void Pyramid::build_v11( Image* base )
                             get_by_2
                                 <<<h_grid,h_block,0,oct_str_0>>>
                                 ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
-                                  oct_obj.getIntermediateData( ),
+                                  oct_obj.getData( level ),
                                   level );
                         } else if( _scaling_mode == Config::IndirectDownscaling ) {
                             dim3 h_block( 64, 2 );
@@ -470,7 +470,7 @@ void Pyramid::build_v11( Image* base )
                             filter_gauss_horiz_v11_by_2
                                 <<<h_grid,h_block,0,oct_str_0>>>
                                 ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
-                                  oct_obj.getData( level ),
+                                  oct_obj.getIntermediateData( ),
                                   level );
                         } else {
                             cerr << __FILE__ << ":" << __LINE__ << ": unknown scaling mode" << endl;
