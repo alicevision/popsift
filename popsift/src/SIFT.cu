@@ -16,14 +16,14 @@ using namespace std;
 PopSift::PopSift( popart::Config config )
     : _init_octaves( config.octaves )
     , _levels( max( 2, config.levels ) ) // min is 2, GPU restriction */
-    , up( config.start_sampling )
+    , _downscale( config.start_sampling )
     , _sigma( config.sigma )
     , _threshold( config.threshold ) // SIFT parameter
     , _edgeLimit( config.edge_limit ) // SIFT parameter
     , _vlfeat_mode( config.sift_mode == popart::Config::VLFeat )
-    , _direct_downscaling( config.scaling_mode == popart::Config::DirectOctaves )
     , _log_to_file( config.log_mode == popart::Config::All )
     , _verbose( config.verbose )
+    , _downscaling_mode( config.scaling_mode )
 {
     popart::init_filter( _sigma, _levels, _vlfeat_mode );
     popart::init_sigma(  _sigma, _levels );
@@ -44,7 +44,7 @@ bool PopSift::init( int pipe, int w, int h )
      * up= 0 -> scale factor=1
      * up= 1 -> scale factor=0.5
      */
-    float scaleFactor = 1.0 / pow( 2.0, up );
+    float scaleFactor = 1.0 / pow( 2.0, _downscale );
 
     if( octaves < 0 ) {
         octaves = max(int (floor( logf( (float)min( w, h ) )
@@ -57,7 +57,7 @@ bool PopSift::init( int pipe, int w, int h )
                                                 _levels,
                                                 ceilf( w * scaleFactor ),
                                                 ceilf( h * scaleFactor ),
-                                                _direct_downscaling );
+                                                _downscaling_mode );
 
     return true;
 }

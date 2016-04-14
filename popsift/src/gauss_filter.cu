@@ -33,7 +33,6 @@ void print_gauss_filter_symbol( uint32_t columns )
 
 void init_filter( float sigma0, int levels, bool vlfeat_mode )
 {
-    cerr << "Entering " << __FUNCTION__ << endl;
     if( sigma0 > 2.0 )
     {
         cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "

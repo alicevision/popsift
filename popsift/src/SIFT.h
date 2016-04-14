@@ -77,14 +77,15 @@ private:
 
     int              _init_octaves;    /* number of octaves */
     const int        _levels;          /* number of levels */
-    const int        up;               /* upsampling times */
+    const float      _downscale;       /* downscale by 2^this */
     const float      _sigma;           /* initial sigma */
     const float      _threshold;       /* DoG threshold */
     const float      _edgeLimit;       /* edge threshold */
     const int        _vlfeat_mode;
     const bool       _log_to_file;
-    const bool       _direct_downscaling;
     const bool       _verbose;
+
+    const popart::Config::ScalingMode _downscaling_mode;
 
     // popart::Plane2D_uint8 _hst_input_image;
     // popart::Plane2D_uint8 _dev_input_image;

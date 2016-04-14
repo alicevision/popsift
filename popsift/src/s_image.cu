@@ -62,6 +62,8 @@ Image::Image( size_t w, size_t h )
 
     _upscaled_image_d.allocDev( 2 * w, 2 * h );
 
+    cout << "Upscaled size of the input image: " << 2*w << "X" << 2*h << endl;
+
     /* initializing texture for upscaling
      */
     memset( &_input_image_texDesc, 0, sizeof(cudaTextureDesc) );

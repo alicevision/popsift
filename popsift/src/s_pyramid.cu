@@ -484,7 +484,7 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
     // cerr << "Calling " << __FUNCTION__ << " for octave " << octave << endl;
 
     if( level >= _levels ) {
-        cerr << "Level " << level << " does not exist in Octave " << octave << endl;
+        // cerr << "Level " << level << " does not exist in Octave " << octave << endl;
         return;
     }
 
@@ -617,10 +617,15 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
  * Pyramid constructor
  *************************************************************/
 
-Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, int width, int height, bool direct_downscaling )
+Pyramid::Pyramid( Image* base,
+                  int octaves,
+                  int levels,
+                  int width,
+                  int height,
+                  Config::ScalingMode scaling_mode )
     : _num_octaves( octaves )
     , _levels( levels + 3 )
-    , _direct_downscaling( direct_downscaling )
+    , _scaling_mode( scaling_mode )
 {
     // cerr << "Entering " << __FUNCTION__ << endl;
 
@@ -628,6 +633,9 @@ Pyramid::Pyramid( Image* base, uint32_t octaves, uint32_t levels, int width, int
 
     int w = width;
     int h = height;
+
+    cout << "Size of the first octave's images: " << w << "X" << h << endl;
+
     for( uint32_t o=0; o<_num_octaves; o++ ) {
 #if (PYRAMID_PRINT_DEBUG==1)
         printf("Allocating octave %u with width %u and height %u (%u levels)\n", o, w, h, _levels );

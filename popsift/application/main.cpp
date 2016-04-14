@@ -27,26 +27,6 @@ string inputFilename   = "";
 string realName        = ""; 
 string prefix          = "";
 
-// int    upsampling      = 1;
-// int    octaves         = -1;
-// int    levels          = 3;
-// float  sigma           = 1.6f;
-
-// float edgeLimit = 16.0; // from Celebrandil
-// float edgeLimit = 10.0; // from Bemap
-
-// float threshold = 0.0; // default of vlFeat
-// float threshold =  5.0 / 256.0;
-// float threshold = 15.0 / 256.0;  // it seems our DoG is really small ???
-// float threshold = 10.0 / 256.0;
-// float threshold = 5.0;  // from Celebrandil, not happening in our data
-// float threshold = 0.04 / (_levels-3.0) / 2.0f * 255;
-//                   from Bemap -> 1.69 (makes no sense)
-
-// int    display         = false;
-// int    log_to_file     = false;
-// int    vlfeat_mode     = false;
-
 static void usage( const char* argv )
 {
     cout << argv
@@ -55,38 +35,51 @@ static void usage( const char* argv )
          << "* Options *" << endl
          << " --help / -h / -?            Print usage" << endl
          << " --verbose / -v" << endl
+         << " --log / -l                  Write debugging files" << endl
          << endl
-         << " --vlfeat-mode               Compute Gauss filter like VLFeat instead of like OpenCV" << endl
-         << " --direct-downscale / --dd   Direct each octave from upscaled orig instead of blurred level" << endl
-         << " --log                       Write debugging files" << endl
-         << endl
+         << "* Parameters *" << endl
          << " --octaves=<int>             Number of octaves" << endl
          << " --levels=<int>              Number of levels per octave" << endl
          << " --sigma=<float>             Initial sigma value" << endl
          << " --threshold=<float>         Keypoint strength threshold" << endl
          << " --edge-threshold=<float> or" << endl
          << " --edge-limit=<float>        On-edge threshold" << endl
+         << " --downsampling=<float>      Downscale width and height of input by 2^N (default N=-1)" << endl
+         << endl
+         << "* Modes *" << endl
+         << " --vlfeat-mode               Compute Gauss filter like VLFeat instead of like OpenCV" << endl
+         << "                             Default filtering mode is \"indirect filtered\", which means" << endl
+         << "                             that level-3 of an octave is downscaled and Gaussian blur" << endl
+         << "                             is applied to get level 0 of the new octave." << endl
+         << " --direct-downscale / --dd     Direct each octave from upscaled orig instead of blurred level" << endl
+         << " --indirect-downscale / --id   Downscaling from level-3 and applying Gaussian blur" << endl
+         << " --indirect-unfiltered / --iu  Downscaling from level-3, without applying Gaussian blur" << endl
          << endl;
     exit(0);
 }
 
 static struct option longopts[] = {
-    { "help",             no_argument,            NULL, 'h' },
-    { "verbose",          no_argument,            NULL, 'v' },
+    { "help",                no_argument,            NULL, 'h' },
+    { "verbose",             no_argument,            NULL, 'v' },
+    { "log",                 no_argument,            NULL, 'l' },
 
-    { "octaves",          required_argument,      NULL, 1000 },
-    { "levels",           required_argument,      NULL, 1001 },
-    { "upsampling",       required_argument,      NULL, 1002 },
-    { "threshold",        required_argument,      NULL, 1003 },
-    { "edge-threshold",   required_argument,      NULL, 1004 },
-    { "edge-limit",       required_argument,      NULL, 1004 },
-    { "sigma",            required_argument,      NULL, 1005 },
+    { "octaves",             required_argument,      NULL, 1000 },
+    { "levels",              required_argument,      NULL, 1001 },
+    { "downsampling",        required_argument,      NULL, 1002 },
+    { "threshold",           required_argument,      NULL, 1003 },
+    { "edge-threshold",      required_argument,      NULL, 1004 },
+    { "edge-limit",          required_argument,      NULL, 1004 },
+    { "sigma",               required_argument,      NULL, 1005 },
 
-    { "vlfeat-mode",      no_argument,            NULL, 1100 },
-    { "direct-downscale", no_argument,            NULL, 1101 },
-    { "dd",               no_argument,            NULL, 1101 },
-    { "log",              no_argument,            NULL, 1102 },
-    { NULL,               0,                      NULL, 0  }
+    { "vlfeat-mode",         no_argument,            NULL, 1100 },
+    { "direct-downscale",    no_argument,            NULL, 1101 },
+    { "dd",                  no_argument,            NULL, 1101 },
+    { "indirect-downscale",  no_argument,            NULL, 1102 },
+    { "id",                  no_argument,            NULL, 1102 },
+    { "indirect-unfiltered", no_argument,            NULL, 1103 },
+    { "iu",                  no_argument,            NULL, 1103 },
+
+    { NULL,                  0,                      NULL, 0  }
 };
 
 static void parseargs( int argc, char**argv, popart::Config& config, string& inputFile )
@@ -97,21 +90,24 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
 
     int opt;
 
-    while( (opt = getopt_long(argc, argv, "?hv", longopts, NULL)) != -1 )
+    while( (opt = getopt_long(argc, argv, "?hvl", longopts, NULL)) != -1 )
     {
         switch (opt)
         {
         case '?' :
-        case 'h' : usage( appName );       break;
+        case 'h' : usage( appName ); break;
         case 'v' : config.setVerbose(); break;
+        case 'l' : config.setLogMode( popart::Config::All ); break;
 
         case 1100 : config.setModeVLFeat( popart::Config::VLFeat ); break;
-        case 1101 : config.setScalingMode( popart::Config::DirectOctaves ); break;
-        case 1102 : config.setLogMode( popart::Config::All );       break;
+        case 1101 : config.setScalingMode( popart::Config::DirectDownscaling ); break;
+        case 1102 : config.setScalingMode( popart::Config::IndirectDownscaling ); break;
+        case 1103 : config.setScalingMode( popart::Config::IndirectUnfilteredDownscaling ); break;
+
 
         case 1000 : config.setOctaves( strtol( optarg, NULL, 0 ) ); break;
         case 1001 : config.setLevels(  strtol( optarg, NULL, 0 ) ); break;
-        case 1002 : config.setUpsampling( strtof( optarg, NULL ) ); break;
+        case 1002 : config.setDownsampling( strtof( optarg, NULL ) ); break;
         case 1003 : config.setThreshold(  strtof( optarg, NULL ) ); break;
         case 1004 : config.setEdgeLimit(  strtof( optarg, NULL ) ); break;
         case 1005 : config.setSigma(      strtof( optarg, NULL ) ); break;
@@ -151,10 +147,9 @@ int main(int argc, char **argv)
 
     realName = extract_filename( inputFile, prefix );
     read_gray( inputFile, inp );
-    cerr << "Real name of input file is " << realName << endl
-         << "Width: " << inp.width
-         << " height: " << inp.height
-         << endl;
+    cerr << "Input image size: "
+         << inp.width << "X" << inp.height
+         << " filename: " << realName << endl;
 
     device_prop_t deviceInfo;
     // deviceInfo.set( 1 );
@@ -163,7 +158,6 @@ int main(int argc, char **argv)
     PopSift PopSift( config );
 
     PopSift.init( 0, inp.width, inp.height );
-    cerr << "Width: " << inp.width << " height: " << inp.height << endl;
     PopSift.execute( 0, inp );
     PopSift.uninit( 0 );
     return 0;

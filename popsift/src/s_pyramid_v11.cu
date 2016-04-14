@@ -206,6 +206,23 @@ void filter_gauss_horiz_v11( cudaTextureObject_t src_data,
 #endif
 
 __global__
+void get_by_2( cudaTextureObject_t src_data,
+               Plane2D_float       dst_data,
+               int level )
+{
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
+
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+    if( idx >= dst_w ) return;
+    if( idy >= dst_h ) return;
+
+    const float val = tex2D<float>( src_data, 2 * idx, 2 * idy );
+    dst_data.ptr(idy)[idx] = val;
+}
+
+__global__
 void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
                                   Plane2D_float       dst_data,
                                   int level )
@@ -469,7 +486,7 @@ void Pyramid::build_v11( Image* base )
             cudaStream_t oct_str_0 = oct_obj.getStream(0);
 
             if( level == 0 ) {
-                if( _direct_downscaling ) {
+                if( _scaling_mode == Config::DirectDownscaling ) {
                     dim3 block( 128, 1 );
                     dim3 grid;
                     grid.x  = grid_divide( width,  128 );
@@ -502,20 +519,34 @@ void Pyramid::build_v11( Image* base )
                             level );
 #endif
                     } else {
-                        dim3 h_block( 64, 2 );
-                        dim3 h_grid;
-                        h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
-                        h_grid.y = (unsigned int)grid_divide( height, h_block.y );
-
                         Octave& prev_oct_obj  = _octaves[octave-1];
                         cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( _levels-3 ), 0 );
 
-                        filter_gauss_horiz_v11_by_2
-                            <<<h_grid,h_block,0,oct_str_0>>>
-                            ( prev_oct_obj._data_tex[ _levels-3 ],
-                            // _octaves[octave-1]._data_tex[ 0 ],
-                            oct_obj.getIntermediateData( ),
-                            level );
+                        if( _scaling_mode == Config::IndirectDownscaling ) {
+                            dim3 h_block( 64, 2 );
+                            dim3 h_grid;
+                            h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
+                            h_grid.y = (unsigned int)grid_divide( height, h_block.y );
+
+                            get_by_2
+                                <<<h_grid,h_block,0,oct_str_0>>>
+                                ( prev_oct_obj._data_tex[ _levels-3 ],
+                                  oct_obj.getIntermediateData( ),
+                                  level );
+                        } else if( _scaling_mode == Config::IndirectUnfilteredDownscaling ) {
+                            dim3 h_block( 64, 2 );
+                            dim3 h_grid;
+                            h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
+                            h_grid.y = (unsigned int)grid_divide( height, h_block.y );
+
+                            filter_gauss_horiz_v11_by_2
+                                <<<h_grid,h_block,0,oct_str_0>>>
+                                ( prev_oct_obj._data_tex[ _levels-3 ],
+                                  oct_obj.getData( level ),
+                                  level );
+                        } else {
+                            cerr << __FILE__ << ":" << __LINE__ << ": unknown scaling mode" << endl;
+                        }
                     }
                 }
             } else {
@@ -545,16 +576,30 @@ void Pyramid::build_v11( Image* base )
             }
 
             if( level == 0 ) {
-                dim3 v_block( 64, 2 );
-                dim3 v_grid;
-                v_grid.x = (unsigned int)grid_divide( width,  v_block.x );
-                v_grid.y = (unsigned int)grid_divide( height, v_block.y );
+                switch( _scaling_mode )
+                {
+                case Config::IndirectUnfilteredDownscaling :
+                    if( octave != 0 )
+                        break;
+                case Config::DirectDownscaling :
+                case Config::IndirectDownscaling :
+                    {
+                        dim3 v_block( 64, 2 );
+                        dim3 v_grid;
+                        v_grid.x = (unsigned int)grid_divide( width,  v_block.x );
+                        v_grid.y = (unsigned int)grid_divide( height, v_block.y );
 
-                filter_gauss_vert_v11
-                    <<<v_grid,v_block,0,oct_str_0>>>
-                    ( oct_obj._interm_data_tex,
-                      oct_obj.getData( level ),
-                      level );
+                        filter_gauss_vert_v11
+                            <<<v_grid,v_block,0,oct_str_0>>>
+                            ( oct_obj._interm_data_tex,
+                              oct_obj.getData( level ),
+                              level );
+                    }
+                    break;
+                default :
+                    cerr << __FILE__ << ":" << __LINE__ << ": Missing scaling mode" << endl;
+                    exit( -1 );
+                }
             } else {
                 dim3 v_block( 64, 2 );
                 dim3 v_grid;

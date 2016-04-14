@@ -18,17 +18,18 @@ struct Config
     };
 
     enum ScalingMode {
-        DirectOctaves,
-        DownscaledOctaves
+        DirectDownscaling,
+        IndirectDownscaling,
+        IndirectUnfilteredDownscaling
     };
 
     void setModeVLFeat( float sigma = 0.82f );
     void setModeOpenCV( float sigma = 1.6f );
     void setLogMode( LogMode mode = All );
-    void setScalingMode( ScalingMode mode = DownscaledOctaves );
+    void setScalingMode( ScalingMode mode = IndirectDownscaling );
     void setVerbose( bool on = true );
 
-    void setUpsampling( float v );
+    void setDownsampling( float v );
     void setOctaves( int v );
     void setLevels( int v );
     void setSigma( float v );

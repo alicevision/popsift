@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "s_image.h"
+#include "sift_conf.h"
 
 #ifndef INF
 #define INF               (1<<29)
@@ -179,11 +180,17 @@ class Pyramid
 
     uint32_t     _num_octaves;
     uint32_t     _levels;
-    bool         _direct_downscaling;
     Octave*      _octaves;
 
+    Config::ScalingMode _scaling_mode;
+
 public:
-    Pyramid( Image* base, uint32_t octaves, uint32_t levels, int w, int h, bool direct_downscaling );
+    Pyramid( Image* base,
+             int    octaves,
+             int    levels,
+             int    w,
+             int    h,
+             Config::ScalingMode scaling_mode );
     ~Pyramid( );
 
     void build( Image* base );
