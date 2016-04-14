@@ -14,11 +14,11 @@ __device__ __constant__ float d_gauss_filter[ GAUSS_ALIGN * GAUSS_LEVELS ];
 
 #ifdef PRINT_GAUSS_FILTER_SYMBOL
 __global__
-void print_gauss_filter_symbol( uint32_t columns )
+void print_gauss_filter_symbol( int columns )
 {
     printf("Entering print_gauss_filter_symbol\n");
     for( int lvl=0; lvl<GAUSS_LEVELS; lvl++ ) {
-        for( uint32_t x=0; x<GAUSS_ALIGN; x++ ) {
+        for( int x=0; x<GAUSS_ALIGN; x++ ) {
             printf("%0.3f ", d_gauss_filter[lvl*GAUSS_ALIGN+x] );
         }
         printf("\n");

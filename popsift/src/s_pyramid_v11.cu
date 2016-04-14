@@ -25,10 +25,9 @@ void filter_gauss_horiz_tex_128x1( cudaTextureObject_t src_data,
                                    Plane2D_float       dst_data,
                                    int                 level )
 {
-#ifdef HORIZ_NO_SHARED_128x1
     const float dst_w  = dst_data.getWidth();
     const float dst_h  = dst_data.getHeight();
-    const float read_y = blockIdx.y / dst_h;
+    const float read_y = ( blockIdx.y + 0.5 ) / dst_h;
 
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -39,61 +38,20 @@ void filter_gauss_horiz_tex_128x1( cudaTextureObject_t src_data,
     #pragma unroll
     for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
         const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
-        const float read_x_l = ( off_x - offset ) / dst_w;
-        const float  v1 = tex2D<float>( src_data, read_x_l, read_y );
+        const float read_x_l = ( off_x - offset );
+        const float  v1 = tex2D<float>( src_data, ( read_x_l + 0.5 ) / dst_w, read_y );
         out += ( v1 * g );
 
-        const float read_x_r = ( off_x + offset ) / dst_w;
-        const float  v2 = tex2D<float>( src_data, read_x_r, read_y );
+        const float read_x_r = ( off_x + offset );
+        const float  v2 = tex2D<float>( src_data, ( read_x_r + 0.5 ) / dst_w, read_y );
         out += ( v2 * g );
     }
     const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
-    const float read_x = off_x / dst_w;
-    const float v3 = tex2D<float>( src_data, read_x, read_y );
+    const float read_x = off_x;
+    const float v3 = tex2D<float>( src_data, ( read_x + 0.5 ) / dst_w, read_y );
     out += ( v3 * g );
 
     dst_data.ptr(blockIdx.y)[off_x] = out;
-#else // not HORIZ_NO_SHARED_128x1
-    __shared__ float loaddata[GAUSS_SPAN + 128 + GAUSS_SPAN];
-
-    const float dst_w  = dst_data.getWidth();
-    const float dst_h  = dst_data.getHeight();
-    const float read_y = blockIdx.y / dst_h;
-
-    const int idx   = threadIdx.x;
-    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if( idx < GAUSS_SPAN ) {
-        const float read_x = ( off_x - GAUSS_SPAN ) / dst_w;
-        loaddata[idx] = tex2D<float>( src_data, read_x, read_y );
-    } else if( idx >= 128-GAUSS_SPAN ) {
-        const float read_x = ( off_x + GAUSS_SPAN ) / dst_w;
-        loaddata[idx+2*GAUSS_SPAN] = tex2D<float>( src_data, read_x, read_y );
-    }
-    __syncthreads();
-    const float read_x = off_x / dst_w;
-    loaddata[idx+GAUSS_SPAN] = tex2D<float>( src_data, read_x, read_y );
-    __syncthreads();
-
-    float g;
-    float val;
-    float out = 0;
-
-    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
-        val = loaddata[threadIdx.x+GAUSS_SPAN-offset];
-        out += ( val * g );
-        val = loaddata[threadIdx.x+GAUSS_SPAN+offset];
-        out += ( val * g );
-    }
-    g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
-    val = loaddata[threadIdx.x+GAUSS_SPAN];
-    out += ( val * g );
-
-    if( off_x >= dst_w )      return;
-
-    dst_data.ptr(blockIdx.y)[off_x] = out;
-#endif // not HORIZ_NO_SHARED_128x1
 }
 
 
@@ -102,7 +60,6 @@ void filter_gauss_horiz_v11_128x1( cudaTextureObject_t src_data,
                                    Plane2D_float       dst_data,
                                    int                 level )
 {
-#ifdef HORIZ_NO_SHARED_128x1
     const int dst_w = dst_data.getWidth();
 
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -114,52 +71,17 @@ void filter_gauss_horiz_v11_128x1( cudaTextureObject_t src_data,
     #pragma unroll
     for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
         const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
-        const float  v1 = tex2D<float>( src_data, off_x - offset, blockIdx.y );
+        const float  v1 = tex2D<float>( src_data, off_x - offset + 0.5, blockIdx.y + 0.5 );
         out += ( v1 * g );
 
-        const float  v2 = tex2D<float>( src_data, off_x + offset, blockIdx.y );
+        const float  v2 = tex2D<float>( src_data, off_x + offset + 0.5, blockIdx.y + 0.5 );
         out += ( v2 * g );
     }
     const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
-    const float v3 = tex2D<float>( src_data, off_x, blockIdx.y );
+    const float v3 = tex2D<float>( src_data, off_x+0.5, blockIdx.y+0.5 );
     out += ( v3 * g );
 
     dst_data.ptr(blockIdx.y)[off_x] = out;
-#else // not HORIZ_NO_SHARED_128x1
-    __shared__ float loaddata[GAUSS_SPAN + 128 + GAUSS_SPAN];
-
-    const int idx   = threadIdx.x;
-    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if( idx < GAUSS_SPAN ) {
-        loaddata[idx] = tex2D<float>( src_data, off_x-GAUSS_SPAN, blockIdx.y );
-    } else if( idx >= 128-GAUSS_SPAN ) {
-        loaddata[idx+2*GAUSS_SPAN] = tex2D<float>( src_data, off_x+GAUSS_SPAN, blockIdx.y );
-    }
-    __syncthreads();
-    loaddata[idx+GAUSS_SPAN] = tex2D<float>( src_data, off_x, blockIdx.y );
-    __syncthreads();
-
-    float g;
-    float val;
-    float out = 0;
-
-    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
-        val = loaddata[threadIdx.x+GAUSS_SPAN-offset];
-        out += ( val * g );
-        val = loaddata[threadIdx.x+GAUSS_SPAN+offset];
-        out += ( val * g );
-    }
-    g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
-    val = loaddata[threadIdx.x+GAUSS_SPAN];
-    out += ( val * g );
-
-    const int dst_w = dst_data.getWidth();
-    if( off_x >= dst_w )      return;
-
-    dst_data.ptr(blockIdx.y)[off_x] = out;
-#endif // not HORIZ_NO_SHARED_128x1
 }
 
 
@@ -218,7 +140,7 @@ void get_by_2( cudaTextureObject_t src_data,
     if( idx >= dst_w ) return;
     if( idy >= dst_h ) return;
 
-    const float val = tex2D<float>( src_data, 2.0f * idx + 0.5f, 2.0f * idy + 0.5f );
+    const float val = tex2D<float>( src_data, 2.0f * idx + 1.0f, 2.0f * idy + 1.0f );
     dst_data.ptr(idy)[idx] = val;
 }
 
@@ -240,17 +162,18 @@ void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
         g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
 
         idx = threadIdx.x - offset;
-        val = tex2D<float>( src_data, 2 * ( block_x + idx ), 2 * ( block_y + idy ) );
+        // add +1.0f because we must shift by 0.5 pixels upscaled by 2 in the previous octave
+        val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0, 2 * ( block_y + idy ) + 1.0 );
         out += ( val * g );
 
         idx = threadIdx.x + offset;
-        val = tex2D<float>( src_data, 2 * ( block_x + idx ), 2 * ( block_y + idy ) );
+        val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0, 2 * ( block_y + idy ) + 1.0 );
         out += ( val * g );
     }
 
     g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
     idx = threadIdx.x;
-    val = tex2D<float>( src_data, 2 * ( block_x + idx ), 2 * ( block_y + idy ) );
+    val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0, 2 * ( block_y + idy ) + 1.0 );
     out += ( val * g );
 
     idx = block_x+threadIdx.x;
@@ -293,6 +216,9 @@ void filter_gauss_vert_v11( cudaTextureObject_t src_data,
                             Plane2D_float       dst_data,
                             int level )
 {
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+
     int block_x = blockIdx.x * blockDim.x;
     int block_y = blockIdx.y * blockDim.y;
     int idx     = threadIdx.x;
@@ -306,23 +232,22 @@ void filter_gauss_vert_v11( cudaTextureObject_t src_data,
         g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
 
         idy = threadIdx.y - offset;
-        val = tex2D<float>( src_data, block_x + idx, block_y + idy );
+        val = tex2D<float>( src_data, block_x + idx + 0.5, block_y + idy + 0.5 );
         out += ( val * g );
 
         idy = threadIdx.y + offset;
-        val = tex2D<float>( src_data, block_x + idx, block_y + idy );
+        val = tex2D<float>( src_data, block_x + idx + 0.5, block_y + idy + 0.5 );
         out += ( val * g );
     }
 
     g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
     idy = threadIdx.y;
-    val = tex2D<float>( src_data, block_x + idx, block_y + idy );
+    val = tex2D<float>( src_data, block_x + idx + 0.5, block_y + idy + 0.5 );
     out += ( val * g );
 
     idx = block_x+threadIdx.x;
     idy = block_y+threadIdx.y;
-    const int dst_w = dst_data.getWidth();
-    const int dst_h = dst_data.getHeight();
+
     if( idx >= dst_w ) return;
     if( idy >= dst_h ) return;
 
@@ -515,14 +440,17 @@ void Pyramid::build_v11( Image* base )
                         filter_gauss_horiz_tex_128x1
                             <<<grid,block,0,oct_str_0>>>
                             ( base->getUpscaledTexture(),
-                            oct_obj.getIntermediateData( ),
-                            level );
+                              oct_obj.getIntermediateData( ),
+                              level );
 #endif
                     } else {
+#define PREV_LEVEL 3
+// #define PREV_LEVEL 5
                         Octave& prev_oct_obj  = _octaves[octave-1];
-                        cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( _levels-3 ), 0 );
+                        cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( _levels-PREV_LEVEL ), 0 );
 
-                        if( _scaling_mode == Config::IndirectDownscaling ) {
+                        cout << "We are blurring from level " << _levels-PREV_LEVEL << endl;
+                        if( _scaling_mode == Config::IndirectUnfilteredDownscaling ) {
                             dim3 h_block( 64, 2 );
                             dim3 h_grid;
                             h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
@@ -530,10 +458,10 @@ void Pyramid::build_v11( Image* base )
 
                             get_by_2
                                 <<<h_grid,h_block,0,oct_str_0>>>
-                                ( prev_oct_obj._data_tex[ _levels-3 ],
+                                ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
                                   oct_obj.getIntermediateData( ),
                                   level );
-                        } else if( _scaling_mode == Config::IndirectUnfilteredDownscaling ) {
+                        } else if( _scaling_mode == Config::IndirectDownscaling ) {
                             dim3 h_block( 64, 2 );
                             dim3 h_grid;
                             h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
@@ -541,7 +469,7 @@ void Pyramid::build_v11( Image* base )
 
                             filter_gauss_horiz_v11_by_2
                                 <<<h_grid,h_block,0,oct_str_0>>>
-                                ( prev_oct_obj._data_tex[ _levels-3 ],
+                                ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
                                   oct_obj.getData( level ),
                                   level );
                         } else {
