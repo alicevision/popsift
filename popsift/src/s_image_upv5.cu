@@ -19,8 +19,12 @@ void p_upscale_5( Plane2D_float dst, cudaTextureObject_t src )
     int idy  = blockIdx.y * blockDim.y + threadIdx.y;
     if( idx >= dst.getCols() ) return;
     if( idy >= dst.getRows() ) return;
+    // const float src_x = (float(idx))/float(dst.getCols());
+    // const float src_y = (float(idy))/float(dst.getRows());
     const float src_x = (float(idx)+0.5f)/float(dst.getCols());
     const float src_y = (float(idy)+0.5f)/float(dst.getRows());
+    // const float src_x = (float(idx)-0.5f)/float(dst.getCols());
+    // const float src_y = (float(idy)-0.5f)/float(dst.getRows());
     float d = tex2D<float>( src, src_x, src_y );
     dst.ptr(idy)[idx] = d * 255.0f;
 }

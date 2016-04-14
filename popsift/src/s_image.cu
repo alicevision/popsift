@@ -43,6 +43,7 @@ Image::Image( size_t w, size_t h )
     _input_image_texDesc.addressMode[2]   = cudaAddressModeClamp;
     _input_image_texDesc.readMode         = cudaReadModeNormalizedFloat; // automatic conversion from uchar to float
     _input_image_texDesc.filterMode       = cudaFilterModeLinear; // bilinear interpolation
+    // _input_image_texDesc.filterMode       = cudaFilterModePoint; // nearest neighbour mode
 
     memset( &_input_image_resDesc, 0, sizeof(cudaResourceDesc) );
     _input_image_resDesc.resType                  = cudaResourceTypePitch2D;
