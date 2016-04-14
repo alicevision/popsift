@@ -271,7 +271,8 @@ void Pyramid::Octave::alloc( int width, int height, int levels, int layer_max_ex
     data_tex_desc.addressMode[1]   = cudaAddressModeClamp;
     data_tex_desc.addressMode[2]   = cudaAddressModeClamp;
     data_tex_desc.readMode         = cudaReadModeElementType; // read as float
-    data_tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
+    // data_tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
+    data_tex_desc.filterMode       = cudaFilterModeLinear; // bilinear interpolation
 
     memset( &data_res_desc, 0, sizeof(cudaResourceDesc) );
     data_res_desc.resType                  = cudaResourceTypePitch2D;

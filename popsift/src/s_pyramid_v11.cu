@@ -22,8 +22,8 @@ namespace popart {
 
 __global__
 void filter_gauss_horiz_tex_128x1( cudaTextureObject_t src_data,
-                                             Plane2D_float       dst_data,
-                                             int level )
+                                   Plane2D_float       dst_data,
+                                   int                 level )
 {
 #ifdef HORIZ_NO_SHARED_128x1
     const float dst_w  = dst_data.getWidth();
@@ -99,8 +99,8 @@ void filter_gauss_horiz_tex_128x1( cudaTextureObject_t src_data,
 
 __global__
 void filter_gauss_horiz_v11_128x1( cudaTextureObject_t src_data,
-                                             Plane2D_float       dst_data,
-                                             int level )
+                                   Plane2D_float       dst_data,
+                                   int                 level )
 {
 #ifdef HORIZ_NO_SHARED_128x1
     const int dst_w = dst_data.getWidth();
@@ -218,7 +218,7 @@ void get_by_2( cudaTextureObject_t src_data,
     if( idx >= dst_w ) return;
     if( idy >= dst_h ) return;
 
-    const float val = tex2D<float>( src_data, 2 * idx, 2 * idy );
+    const float val = tex2D<float>( src_data, 2.0f * idx + 0.5f, 2.0f * idy + 0.5f );
     dst_data.ptr(idy)[idx] = val;
 }
 
