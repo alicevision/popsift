@@ -4,6 +4,8 @@
 #define DESCR_BINS_V1        8
 #define MAGNIFY_V1           3.0f
 #define DESCR_V1_NUM_THREADS 32
+// #define DESCR_V1_NUM_THREADS 16
+// #define DESCR_V1_NUM_THREADS 8
 #define RPI_V1               (4.0f / M_PI)
 #define EPS_V1               1E-15
 
@@ -110,8 +112,13 @@ void keypoint_descriptors( ExtremumCandidate* cand,
 
     /* reduction here */
     for (int i = 0; i < 8; i++) {
+#if DESCR_V1_NUM_THREADS==32
         dpt[i] += __shfl_down( dpt[i], 16 );
+#endif
+#if DESCR_V1_NUM_THREADS==32 || DESCR_V1_NUM_THREADS==16
         dpt[i] += __shfl_down( dpt[i], 8 );
+#else
+#endif
         dpt[i] += __shfl_down( dpt[i], 4 );
         dpt[i] += __shfl_down( dpt[i], 2 );
         dpt[i] += __shfl_down( dpt[i], 1 );
@@ -231,7 +238,7 @@ void Pyramid::descriptors_v1( )
                       oct_obj.getDescriptors( level ),
                       oct_obj.getData( level ) );
 
-                block.x = DESCR_V1_NUM_THREADS;
+                block.x = 32;
                 block.y = 1;
                 block.z = 1;
 
