@@ -29,18 +29,25 @@
 
 IMAGE1=../sample/img1.ppm
 IMAGE2=../sample/img2.ppm
-PARAMS="--sigma=0.82  --threshold=0.1 --edge-threshold=50.0 --vlfeat-mode" # finds 4 points
-rm -rf 1 2 dir-*
+# PARAMS="--sigma=0.82  --threshold=0.1 --edge-threshold=50.0 --vlfeat-mode" # finds 4 points
+PARAMS="--downsampling=0 --threshold=0.1 --edge-threshold=50.0" # finds 4 points
+rm -rf 1 2 3 4 dir-*
 
 ./sift_v4 \
-	$PARAMS --log \
+	$PARAMS --iu --log \
 	$IMAGE1
 mkdir 1
 mv dir-* 1/
 
 ./sift_v4 \
-	$PARAMS --log \
-	$IMAGE2
+	$PARAMS --dd --log \
+	$IMAGE1
 mkdir 2
 mv dir-* 2/
+
+./sift_v4 \
+	$PARAMS --id --log \
+	$IMAGE1
+mkdir 3
+mv dir-* 3/
 
