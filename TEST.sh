@@ -33,21 +33,23 @@ IMAGE2=../sample/img2.ppm
 PARAMS="--downsampling=0 --threshold=0.1 --edge-threshold=50.0" # finds 4 points
 rm -rf 1 2 3 4 dir-*
 
-./sift_v4 \
-	$PARAMS --iu --log \
-	$IMAGE1
+echo ./sift_v4 $PARAMS --iu --log $IMAGE1
+./sift_v4 $PARAMS --iu --log $IMAGE1
 mkdir 1
 mv dir-* 1/
 
-./sift_v4 \
-	$PARAMS --dd --log \
-	$IMAGE1
+echo ./sift_v4 $PARAMS --dd --log $IMAGE1
+./sift_v4 $PARAMS --dd --log $IMAGE1
 mkdir 2
 mv dir-* 2/
 
-./sift_v4 \
-	$PARAMS --id --log \
-	$IMAGE1
+echo ./sift_v4 $PARAMS --iu --log $IMAGE2
+./sift_v4 $PARAMS --iu --log $IMAGE2
 mkdir 3
 mv dir-* 3/
+
+echo ./sift_v4 $PARAMS --dd --log $IMAGE2
+./sift_v4 $PARAMS --dd --log $IMAGE2
+mkdir 4
+mv dir-* 4/
 
