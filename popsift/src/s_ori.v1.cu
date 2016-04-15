@@ -122,53 +122,15 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
     }
 
 
-#if 0
-    /* new oris */
-    // float ang[2] = {NINF, NINF};
+#undef OLD_ORIENTATION
 
-    /* smooth histogram */
-    //0->1
-    for (int iter = 0; iter < 2; iter++) {
-        float first = hist[0];//needed for last bin as it's last bins 'next'
-
-        float prev1 = hist[(threadIdx.x     - 1 + ORI_V1_NUM_THREADS) % ORI_V1_NUM_THREADS];
-        float prev2 = hist[(threadIdx.x * 2 - 1 + ORI_V1_NUM_THREADS) % ORI_V1_NUM_THREADS];
-
-        //we need to handle 36 values with 16 threads, rip.
-        float tmp1_curr = hist[threadIdx.x];    //0->15
-        float tmp1_next = hist[threadIdx.x+1];  //1->16
-
-        float tmp2_curr = hist[threadIdx.x*2];  //16->31
-        float tmp2_next = hist[threadIdx.x*2+1];//17->32
-
-        hist[threadIdx.x  ] = 0.25f * prev1 + 0.5f * tmp1_curr + 0.25f * tmp1_next;
-        hist[threadIdx.x*2] = 0.25f * prev2 + 0.5f * tmp2_curr + 0.25f * tmp2_next;
-
-        //printf("(%d): bin %d: %f\n", threadIdx.x, hist[threadIdx.x]);
-        //printf("(%d): bin %d: %f\n", threadIdx.x*2, hist[threadIdx.x*2]);
-
-        //0->31 done
-        //missing 32->35 (4 bins)
-        if(threadIdx.x < 3){
-	//0+32
-	//1+32
-	//2+32 34
-            //bin 32->34
-            float prev = hist[(threadIdx.x+32 - 1 + ORI_V1_NUM_THREADS) % ORI_V1_NUM_THREADS];
-            float curr = hist[threadIdx.x]+32; //32->34
-            float next = hist[threadIdx.x+33]; //33->35
-            hist[threadIdx.x +32] = 0.25f * prev + 0.5f * curr + 0.25f * next;
-            //printf("(%d): bin %d: %f\n", threadIdx.x+32, hist[threadIdx.x+32]);
-        }else if(threadIdx.x == 3){
-            //bin 35
-            hist[threadIdx.x +32] = 0.25f * hist[threadIdx.x +32 -1]
-                                   + 0.5f * hist[threadIdx.x +32] + 0.25f * first;
-            //printf("(%d): bin %d: %f\n", threadIdx.x+32, hist[threadIdx.x+32]);
-        }
-    }
-#else
-    
         if(threadIdx.x != 0) return;
+
+    // for (int bin = 0; bin < NBINS_V1; bin++) {
+        // printf( "%f %f %d %f\n", x, y, bin, hist[bin] );
+    // }
+
+#ifdef OLD_ORIENTATION
         for (int iter = 0; iter < 2; iter++) {
             float first = hist[0];
             float prev = hist[(NBINS_V1 - 1)];
@@ -236,8 +198,37 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
                 if (nangles > 2) break;
             }
         }
-#endif
+#else // not OLD_ORIENTATION
+        float xcoord[NBINS_V1];
+        float yval[NBINS_V1];
 
+        int   maxbin = 0;
+        float y_max = 0;
+        for(int bin = 0; bin < NBINS_V1; bin++) {
+            int prev = bin - 1;
+            if( prev < 0 ) prev = NBINS_V1 - 1;
+            int next = bin + 1;
+            if( next == NBINS_V1 ) next = 0;
+
+            if( hist[bin] > max( hist[prev], hist[next] ) ) {
+                const float num = 3.0f * hist[prev] - 4.0f * hist[bin] + hist[next];
+                const float denB = 2.0f * ( hist[prev] - 2.0f * hist[bin] + hist[next] );
+                float newbin = num / denB; // * M_PI/18.0f; // * 10.0f;
+                if( newbin >= 0 && newbin <= 2 ) {
+                    xcoord[bin] = prev + newbin;
+                    yval[bin]   = -(num*num) / (4.0f * denB) + hist[prev];
+
+                    if( yval[bin] > y_max ) {
+                        y_max = yval[bin];
+                        maxbin = bin;
+                    }
+                }
+            }
+        }
+        float th = ((M_PI2 * xcoord[maxbin]) / NBINS_V1) - M_PI;
+
+        ext->orientation = th;
+#endif // not OLD_ORIENTATION
 }
 
 /*************************************************************
