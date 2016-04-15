@@ -52,8 +52,9 @@ static void usage( const char* argv )
          << "                             that level-3 of an octave is downscaled and Gaussian blur" << endl
          << "                             is applied to get level 0 of the new octave." << endl
          << " --direct-downscale / --dd     Direct each octave from upscaled orig instead of blurred level" << endl
-         << " --indirect-downscale / --id   Downscaling from level-3 and applying Gaussian blur" << endl
          << " --indirect-unfiltered / --iu  Downscaling from level-3, without applying Gaussian blur" << endl
+         << " --indirect-downscale          Downscaling from level-3 and applying Gaussian blur" << endl
+         << "                               Note: indirect-downscale blurs much more than it should" << endl
          << endl;
     exit(0);
 }
@@ -75,7 +76,6 @@ static struct option longopts[] = {
     { "direct-downscale",    no_argument,            NULL, 1101 },
     { "dd",                  no_argument,            NULL, 1101 },
     { "indirect-downscale",  no_argument,            NULL, 1102 },
-    { "id",                  no_argument,            NULL, 1102 },
     { "indirect-unfiltered", no_argument,            NULL, 1103 },
     { "iu",                  no_argument,            NULL, 1103 },
 
