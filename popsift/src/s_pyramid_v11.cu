@@ -449,7 +449,6 @@ void Pyramid::build_v11( Image* base )
                         Octave& prev_oct_obj  = _octaves[octave-1];
                         cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( _levels-PREV_LEVEL ), 0 );
 
-                        cout << "We are blurring from level " << _levels-PREV_LEVEL << endl;
                         if( _scaling_mode == Config::IndirectUnfilteredDownscaling ) {
                             dim3 h_block( 64, 2 );
                             dim3 h_grid;
