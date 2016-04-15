@@ -207,6 +207,13 @@ public:
 private:
     void build_v11 ( Image* base );
 
+    inline void horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data, int octave );
+    inline void downscale_from_prev_octave( int octave, int level );
+    inline void downscale_from_prev_octave_and_horiz_blur( int octave, int level );
+    inline void horiz_from_prev_level( int octave, int level );
+    inline void vert_from_interm( int octave, int level );
+    inline void dog_from_blurred( int octave, int level );
+
     void find_extrema_v6( float edgeLimit, float threshold );
 
     template<int HEIGHT>
