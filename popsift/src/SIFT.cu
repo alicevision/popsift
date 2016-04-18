@@ -20,6 +20,12 @@ PopSift::~PopSift()
 
 bool PopSift::init( int pipe, int w, int h )
 {
+    cudaEvent_t start, end;
+    cudaEventCreate( &start );
+    cudaEventCreate( &end );
+    cudaDeviceSynchronize();
+    cudaEventRecord( start, 0 );
+
     if( pipe < 0 && pipe >= MAX_PIPES ) {
         return false;
     }
@@ -45,6 +51,14 @@ bool PopSift::init( int pipe, int w, int h )
                                                 ceilf( h * scaleFactor ),
                                                 _config.scaling_mode );
 
+    cudaDeviceSynchronize();
+    cudaEventRecord( end, 0 );
+    cudaEventSynchronize( end );
+    float elapsedTime;
+    cudaEventElapsedTime( &elapsedTime, start, end );
+
+    cerr << "Initialization of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
+
     return true;
 }
 
@@ -60,6 +74,12 @@ void PopSift::execute( int pipe, imgStream inp )
 {
     if( pipe < 0 && pipe >= MAX_PIPES ) return;
 
+    cudaEvent_t start, end;
+    cudaEventCreate( &start );
+    cudaEventCreate( &end );
+    cudaDeviceSynchronize();
+    cudaEventRecord( start, 0 );
+
     assert( inp.data_g == 0 );
     assert( inp.data_b == 0 );
 
@@ -74,6 +94,15 @@ void PopSift::execute( int pipe, imgStream inp )
     for( int o=0; o<octaves; o++ ) {
         _pipe[pipe]._pyramid->download_descriptors( o );
     }
+
+    cudaDeviceSynchronize();
+    cudaEventRecord( end, 0 );
+    cudaEventSynchronize( end );
+    float elapsedTime;
+    cudaEventElapsedTime( &elapsedTime, start, end );
+
+    cerr << "Execution of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
+
     bool log_to_file = ( _config.log_mode == popart::Config::All );
     if( log_to_file ) {
         popart::write_plane2D( "upscaled-input-image.pgm",
