@@ -12,9 +12,9 @@ using namespace popart;
 using namespace std;
 
 __global__
-void keypoint_descriptors( Extremum* cand,
-                           Descriptor*        descs,
-                           Plane2D_float      layer )
+void keypoint_descriptors( Extremum*     cand,
+                           Descriptor*   descs,
+                           Plane2D_float layer )
 {
     const uint32_t width  = layer.getWidth();
     const uint32_t height = layer.getHeight();

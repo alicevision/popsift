@@ -127,6 +127,24 @@ class Octave
          * download a level and write to disk
          */
         void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
+private:
+    void alloc_data_planes( );
+    void alloc_data_tex( );
+    void alloc_interm_plane( );
+    void alloc_interm_tex( );
+    void alloc_dog_array( );
+    void alloc_dog_tex( );
+    void alloc_extrema_mgmt( int layer_max_extrema );
+    void alloc_extrema( );
+
+    void free_extrema( );
+    void free_extrema_mgmt( );
+    void free_dog_tex( );
+    void free_dog_array( );
+    void free_interm_tex( );
+    void free_interm_plane( );
+    void free_data_tex( );
+    void free_data_planes( );
 };
 
 } // namespace popart
