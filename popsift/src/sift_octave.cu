@@ -24,12 +24,8 @@ Octave::Octave( )
     , _d_extrema_mgmt(0)
     , _h_extrema(0)
     , _d_extrema(0)
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-    , _d_desc_pre(0)
-    , _h_desc_pre(0)
-#else
     , _d_desc(0)
-#endif
+    , _h_desc(0)
 { }
 
 
@@ -179,28 +175,21 @@ void Octave::alloc( int width, int height, int levels, int layer_max_extrema )
         _h_extrema[i] = popart::cuda::malloc_hstT<Extremum>( _h_extrema_mgmt[i].getOrientationMax(), __FILE__, __LINE__ );
     }
 
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-    _d_desc_pre = new Descriptor*[_levels];
-    _h_desc_pre = new Descriptor*[_levels];
+    _d_desc = new Descriptor*[_levels];
+    _h_desc = new Descriptor*[_levels];
 
-    _max_desc_pre = _h_extrema_mgmt[1].getOrientationMax(); // 1.25 * layer_max_extrema
+    _max_desc = _h_extrema_mgmt[1].getOrientationMax(); // 1.25 * layer_max_extrema
 
     for( uint32_t l=0; l<_levels; l++ ) {
         uint32_t sz = _h_extrema_mgmt[l].getOrientationMax();
         if( sz == 0 ) {
-            _d_desc_pre[l] = 0;
-            _h_desc_pre[l] = 0;
+            _d_desc[l] = 0;
+            _h_desc[l] = 0;
         } else {
-            _d_desc_pre[l] = popart::cuda::malloc_devT<Descriptor>( sz, __FILE__, __LINE__ );
-            _h_desc_pre[l] = popart::cuda::malloc_hstT<Descriptor>( sz, __FILE__, __LINE__ );
+            _d_desc[l] = popart::cuda::malloc_devT<Descriptor>( sz, __FILE__, __LINE__ );
+            _h_desc[l] = popart::cuda::malloc_hstT<Descriptor>( sz, __FILE__, __LINE__ );
         }
     }
-#else
-    _d_desc = new Descriptor*[_levels];
-    _h_desc = new Descriptor*[_levels];
-    memset( _d_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
-    memset( _h_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
-#endif
 }
 
 void Octave::free( )
@@ -208,13 +197,8 @@ void Octave::free( )
     cudaError_t err;
 
     for( int i=0; i<_levels; i++ ) {
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-        if( _h_desc_pre && _h_desc_pre[i] ) cudaFreeHost( _h_desc_pre[i] );
-        if( _d_desc_pre && _d_desc_pre[i] ) cudaFree(     _d_desc_pre[i] );
-#else
-        if( _h_desc    && _h_desc[i] )    cudaFreeHost( _h_desc[i] );
-        if( _d_desc    && _d_desc[i] )    cudaFree( _d_desc[i] );
-#endif
+        if( _h_desc && _h_desc[i] ) cudaFreeHost( _h_desc[i] );
+        if( _d_desc && _d_desc[i] ) cudaFree(     _d_desc[i] );
         if( _h_extrema && _h_extrema[i] ) cudaFreeHost( _h_extrema[i] );
         if( _d_extrema && _d_extrema[i] ) cudaFree( _d_extrema[i] );
     }
@@ -222,13 +206,8 @@ void Octave::free( )
     cudaFreeHost( _h_extrema_mgmt );
     delete [] _d_extrema;
     delete [] _h_extrema;
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-    delete [] _d_desc_pre;
-    delete [] _h_desc_pre;
-#else
     delete [] _d_desc;
     delete [] _h_desc;
-#endif
 
     err = cudaDestroyTextureObject( _interm_data_tex );
     POP_CUDA_FATAL_TEST( err, "Could not destroy texture object: " );
@@ -303,23 +282,6 @@ int Octave::getExtremaCount( uint32_t level ) const
     return _h_extrema_mgmt[level].getCounter();
 }
 
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-#else
-void Octave::allocDescriptors( )
-{
-    for( uint32_t l=0; l<_levels; l++ ) {
-        int sz = _h_extrema_mgmt[l].getCounter();
-        if( sz == 0 ) {
-            _d_desc[l] = 0;
-            _h_desc[l] = 0;
-        } else {
-            POP_CUDA_MALLOC(      &_d_desc[l], sz * sizeof(Descriptor) );
-            POP_CUDA_MALLOC_HOST( &_h_desc[l], sz * sizeof(Descriptor) );
-        }
-    }
-}
-#endif
-
 void Octave::downloadDescriptor( )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
@@ -327,19 +289,11 @@ void Octave::downloadDescriptor( )
         if( sz != 0 ) {
             if( _h_extrema[l] == 0 ) continue;
 
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-            popcuda_memcpy_async( _h_desc_pre[l],
-                                  _d_desc_pre[l],
-                                  sz * sizeof(Descriptor),
-                                  cudaMemcpyDeviceToHost,
-                                  0 );
-#else
             popcuda_memcpy_async( _h_desc[l],
                                   _d_desc[l],
                                   sz * sizeof(Descriptor),
                                   cudaMemcpyDeviceToHost,
                                   0 );
-#endif
             popcuda_memcpy_async( _h_extrema[l],
                                   _d_extrema[l],
                                   sz * sizeof(Extremum),
@@ -358,11 +312,7 @@ void Octave::writeDescriptor( ostream& ostr, float downsampling_factor )
 
         Extremum* cand = _h_extrema[l];
 
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-        Descriptor* desc = _h_desc_pre[l];
-#else
         Descriptor* desc = _h_desc[l];
-#endif
         int sz = _h_extrema_mgmt[l].getCounter();
         for( int s=0; s<sz; s++ ) {
             const float reduce = downsampling_factor;
@@ -382,11 +332,7 @@ void Octave::writeDescriptor( ostream& ostr, float downsampling_factor )
 
 Descriptor* Octave::getDescriptors( uint32_t level )
 {
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-    return _d_desc_pre[level];
-#else
     return _d_desc[level];
-#endif
 }
 
 /*************************************************************

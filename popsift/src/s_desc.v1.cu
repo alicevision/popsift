@@ -187,7 +187,7 @@ void normalize_histogram( Descriptor* descs )
     ptr4[threadIdx.x] = descr;
 }
 
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+#ifdef USE_DYNAMIC_PARALLELISM
 __global__ void descriptor_starter( int                level,
                                     ExtremaMgmt*       mgmt_array,
                                     Extremum* extrema,
@@ -220,7 +220,7 @@ __global__ void descriptor_starter( int                level,
         <<<grid,block>>>
         ( descs );
 }
-#else // not ( defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM) )
+#else // not USE_DYNAMIC_PARALLELISM
 __global__ void descriptor_starter( int                level,
                                     ExtremaMgmt*       mgmt_array,
                                     Extremum* extrema,
@@ -229,7 +229,7 @@ __global__ void descriptor_starter( int                level,
 {
     // dummy for happy linker
 }
-#endif // not ( defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM) )
+#endif // not USE_DYNAMIC_PARALLELISM
 
 /*************************************************************
  * V4: host side
@@ -237,7 +237,7 @@ __global__ void descriptor_starter( int                level,
 __host__
 void Pyramid::descriptors_v1( )
 {
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+#ifdef USE_DYNAMIC_PARALLELISM
     cerr << "Calling descriptors with dynamic parallelism" << endl;
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
@@ -258,7 +258,7 @@ void Pyramid::descriptors_v1( )
         Octave&      oct_obj = _octaves[octave];
         oct_obj.readExtremaCount( );
     }
-#else // not ( defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM) )
+#else // not USE_DYNAMIC_PARALLELISM
     cerr << "Calling descriptors -no- dynamic parallelism" << endl;
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
@@ -310,6 +310,6 @@ void Pyramid::descriptors_v1( )
     }
 
     cudaDeviceSynchronize( );
-#endif // not ( defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM) )
+#endif // not USE_DYNAMIC_PARALLELISM
 }
 

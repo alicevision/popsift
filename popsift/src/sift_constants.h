@@ -37,11 +37,6 @@
  */
 #define DESC_USE_ROOT_SIFT
 
-/* Preallocate memory for descriptors. Experimental option.
- * Must be made default mode.
- */
-#define PREALLOC_DESC
-
 /* CUDA Dynamic Parallelism does not work with all devices.
  * Try to maintain the possibility to compile without this.
  */

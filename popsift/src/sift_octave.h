@@ -7,9 +7,6 @@
 #include "sift_extremum.h"
 #include "sift_extrema_mgmt.h"
 
-#define PREALLOC_DESC
-#define USE_DYNAMIC_PARALLELISM
-
 namespace popart {
 
 class Octave
@@ -49,16 +46,11 @@ class Octave
          */
         ExtremaMgmt*         _h_extrema_mgmt; // host side info
         ExtremaMgmt*         _d_extrema_mgmt; // device side info
-        Extremum**  _h_extrema;
-        Extremum**  _d_extrema;
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-        int                  _max_desc_pre;
-        Descriptor**         _d_desc_pre;
-        Descriptor**         _h_desc_pre;
-#else
+        Extremum**           _h_extrema;
+        Extremum**           _d_extrema;
+        int                  _max_desc;
         Descriptor**         _d_desc;
         Descriptor**         _h_desc;
-#endif
 
     public:
         Octave( );
@@ -118,11 +110,7 @@ class Octave
         int getExtremaCount( ) const;
         int getExtremaCount( uint32_t level ) const;
 
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-        int getMaxDescriptors() const { return _max_desc_pre; }
-#else
-        void        allocDescriptors( );
-#endif
+        int getMaxDescriptors() const { return _max_desc; }
         Descriptor* getDescriptors( uint32_t level );
         void        downloadDescriptor( );
         void        writeDescriptor( std::ostream& ostr, float downsampling_factor );
