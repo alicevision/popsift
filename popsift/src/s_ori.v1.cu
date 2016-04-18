@@ -117,7 +117,7 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
     }
 
 
-#undef OLD_ORIENTATION
+#define OLD_ORIENTATION
 
         if(threadIdx.x != 0) return;
 
