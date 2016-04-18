@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "s_pyramid.h"
+#include "sift_pyramid.h"
 #include "s_gradiant.h"
 
 #define DESCR_BINS_V1        8
@@ -22,7 +22,7 @@ using namespace popart;
 using namespace std;
 
 __global__
-void keypoint_descriptors( ExtremumCandidate* cand,
+void keypoint_descriptors( Extremum* cand,
                            Descriptor*        descs,
                            Plane2D_float      layer )
 {
@@ -33,7 +33,7 @@ void keypoint_descriptors( ExtremumCandidate* cand,
     const int ix   = threadIdx.y; // bidx & 0x3;       // lower 2 bits of block ID
     const int iy   = threadIdx.z; // bidx >> 2;        // next lowest 2 bits of block ID
 
-    ExtremumCandidate* ext = &cand[blockIdx.x];
+    Extremum* ext = &cand[blockIdx.x];
 
     const float x    = ext->xpos;
     const float y    = ext->ypos;
@@ -200,7 +200,7 @@ void normalize_histogram( Descriptor* descs )
 #if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
 __global__ void descriptor_starter( int                level,
                                     ExtremaMgmt*       mgmt_array,
-                                    ExtremumCandidate* extrema,
+                                    Extremum* extrema,
                                     Descriptor*        descs,
                                     Plane2D_float      layer )
 {
@@ -208,7 +208,7 @@ __global__ void descriptor_starter( int                level,
 
     dim3 block;
     dim3 grid;
-    grid.x  = mgmt->counter;
+    grid.x  = mgmt->getCounter();
 
     if( grid.x == 0 ) return;
 
@@ -233,7 +233,7 @@ __global__ void descriptor_starter( int                level,
 #else // not ( defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM) )
 __global__ void descriptor_starter( int                level,
                                     ExtremaMgmt*       mgmt_array,
-                                    ExtremumCandidate* extrema,
+                                    Extremum* extrema,
                                     Descriptor*        descs,
                                     Plane2D_float      layer )
 {

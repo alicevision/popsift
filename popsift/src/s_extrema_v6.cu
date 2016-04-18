@@ -1,10 +1,11 @@
-#include "s_pyramid.h"
+#include "sift_pyramid.h"
 #include "s_sigma.h"
 #include "s_solve.h"
 #include "debug_macros.h"
 #include "assist.h"
 #include "clamp.h"
 #include <cuda_runtime.h>
+#include <stdio.h>
 
 namespace popart{
 
@@ -21,11 +22,11 @@ inline uint32_t extrema_count( int indicator, ExtremaMgmt* mgmt )
 
     uint32_t ct = __popc( mask );          // horizontal reduce
 
-    uint32_t write_index;
+    int write_index;
     if( threadIdx.x == 0 ) {
         // atomicAdd returns the old value, we consider this the based
         // index for this thread's write operation
-        write_index = atomicAdd( &mgmt->counter, ct );
+        write_index = mgmt->atomicAddCounter( ct );
     }
     // broadcast from thread 0 to all threads in warp
     write_index = __shfl( write_index, 0 );
@@ -122,7 +123,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
                                  float               edge_limit,
                                  float               threshold,
                                  const uint32_t      maxlevel,
-                                 ExtremumCandidate&  ec )
+                                 Extremum&           ec )
 {
     ec.xpos    = 0;
     ec.ypos    = 0;
@@ -321,16 +322,16 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
                              float               threshold,
                              const uint32_t      maxlevel,
                              ExtremaMgmt*        mgmt_array,
-                             ExtremumCandidate*  d_extrema )
+                             Extremum*           d_extrema )
 {
     ExtremaMgmt* mgmt = &mgmt_array[level];
-    ExtremumCandidate ec;
+    Extremum ec;
 
     bool indicator = find_extrema_in_dog_v6_sub( dog, level, width, height, edge_limit, threshold, maxlevel, ec );
 
     uint32_t write_index = extrema_count<HEIGHT>( indicator, mgmt );
 
-    if( indicator && write_index < mgmt->max1 ) {
+    if( indicator && write_index < mgmt->getExtremaMax() ) {
         d_extrema[write_index] = ec;
     }
 }
@@ -341,7 +342,7 @@ void reset_extrema_count_v6( ExtremaMgmt* mgmt_array, uint32_t mgmt_level )
 {
     ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
 
-    mgmt->counter = 0;
+    mgmt->resetCounter();
 }
 
 __global__
@@ -349,7 +350,9 @@ void fix_extrema_count_v6( ExtremaMgmt* mgmt_array, uint32_t mgmt_level )
 {
     ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
 
-    mgmt->counter = min( mgmt->counter, mgmt->max1 );
+    mgmt->clampCounter1();
+
+    printf("Number of extrema: %d\n", mgmt->getCounter() );
 }
 
 /*************************************************************

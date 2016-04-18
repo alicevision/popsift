@@ -1,4 +1,4 @@
-#include "s_pyramid.h"
+#include "sift_pyramid.h"
 #include "s_gradiant.h"
 #include "debug_macros.h"
 
@@ -36,7 +36,7 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
  * using 16 threads for each of them.
  */
 __global__
-void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
+void compute_keypoint_orientations_v1( Extremum* extremum,
                                        ExtremaMgmt*       mgmt_array,
                                        uint32_t           mgmt_level,
                                        Plane2D_float      layer )
@@ -46,9 +46,9 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
 
     ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
 
-    // if( threadIdx.y >= mgmt->counter ) return;
+    // if( threadIdx.y >= mgmt->getCounter() ) return;
 
-    ExtremumCandidate* ext = &extremum[blockIdx.x];
+    Extremum* ext = &extremum[blockIdx.x];
 
     float hist[NBINS_V1];
     for (int i = 0; i < NBINS_V1; i++) hist[i] = 0.0f;
@@ -178,8 +178,8 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
 
             /* find if a peak */
             if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
-                int idx = atomicAdd(&mgmt->counter, 1);
-                if (idx >= mgmt->max2) break;
+                int idx = mgmt->atomicAddCounter( 1 );
+                if( idx >= mgmt->getOrientationMax() ) break;
 
                 float th = compute_angle(bin, hc, hn, hp);
 
@@ -232,7 +232,7 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
 #ifdef USE_DYNAMIC_PARALLELISM // defined in_s_pyramid.h
 
 __global__
-void orientation_starter_v1( ExtremumCandidate* extremum,
+void orientation_starter_v1( Extremum* extremum,
                              ExtremaMgmt*       mgmt_array,
                              uint32_t           mgmt_level,
                              Plane2D_float      layer )
@@ -241,7 +241,7 @@ void orientation_starter_v1( ExtremumCandidate* extremum,
 
     dim3 block;
     dim3 grid;
-    grid.x  = mgmt->counter;
+    grid.x  = mgmt->getCounter();
     block.x = ORI_V1_NUM_THREADS;
 
     if( grid.x != 0 ) {
@@ -276,7 +276,7 @@ void Pyramid::orientation_v1( )
 #else // not USE_DYNAMIC_PARALLELISM
 
 __global__
-void orientation_starter_v1( ExtremumCandidate*,
+void orientation_starter_v1( Extremum*,
                              ExtremaMgmt*,
                              uint32_t,
                              Plane2D_float )
@@ -303,7 +303,7 @@ void Pyramid::orientation_v1( )
             dim3 block;
             dim3 grid;
             // grid.x  = _octaves[octave].getExtremaMgmtH(level)->max1;
-            grid.x  = oct_obj.getExtremaMgmtH(level)->counter;
+            grid.x  = oct_obj.getExtremaMgmtH(level)->getCounter();
             block.x = ORI_V1_NUM_THREADS;
             if( grid.x != 0 ) {
                 compute_keypoint_orientations_v1

@@ -1,112 +1,38 @@
-#include <iostream>
-#include <fstream>
+// #include <iostream>
+// #include <fstream>
 #include <sstream>
-#include <stdio.h>
-#include <algorithm>
-#include <functional>
-#include <arpa/inet.h>
-#include <sys/types.h>
+// #include <stdio.h>
+// #include <algorithm>
+// #include <functional>
+// #include <arpa/inet.h>
+// #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
-#include <limits>
+// #include <unistd.h>
+// #include <limits>
 
-#include <npp.h>
+// #include <npp.h>
 
-#include "s_pyramid.h"
+#include "sift_pyramid.h"
 #include "debug_macros.h"
-#include "align_macro.h"
+// #include "align_macro.h"
 #include "clamp.h"
-#include "gauss_filter.h"
+// #include "gauss_filter.h"
 #include "write_plane_2d.h"
 
-#define PYRAMID_PRINT_DEBUG 0
+// #define PYRAMID_PRINT_DEBUG 0
 
 using namespace std;
 
 namespace popart {
 
-#include "s_ori.v1.h"
+// #include "s_ori.v1.h"
+#include "sift_octave.h"
 
 /*************************************************************
- * CUDA device functions for printing debug information
+ * Octave
  *************************************************************/
 
-__global__
-void py_print_corner_float( float* img, uint32_t pitch, uint32_t height, uint32_t level )
-{
-    const int xbase = 0;
-    const int ybase = level * height + 0;
-    for( int i=0; i<10; i++ ) {
-        for( int j=0; j<10; j++ ) {
-            printf("%3.3f ", img[(ybase+i)*pitch+xbase+j] );
-        }
-        printf("\n");
-    }
-    printf("\n");
-}
-
-__global__
-void py_print_corner_float_transposed( float* img, uint32_t pitch, uint32_t height, uint32_t level )
-{
-    const int xbase = 0;
-    const int ybase = level * height + 0;
-    for( int i=0; i<10; i++ ) {
-        for( int j=0; j<10; j++ ) {
-            printf("%3.3f ", img[(ybase+j)*pitch+xbase+i] );
-        }
-        printf("\n");
-    }
-    printf("\n");
-}
-
-/*************************************************************
- * Callers for CUDA device functions that print debug information
- *************************************************************/
-
-void Pyramid::debug_out_floats( float* data, uint32_t pitch, uint32_t height )
-{
-    py_print_corner_float
-        <<<1,1>>>
-        ( data,
-          pitch,
-          height,
-          0 );
-
-    test_last_error( __LINE__ );
-}
-
-void Pyramid::debug_out_floats_t( float* data, uint32_t pitch, uint32_t height )
-{
-    py_print_corner_float_transposed
-        <<<1,1>>>
-        ( data,
-          pitch,
-          height,
-          0 );
-
-    test_last_error( __LINE__ );
-}
-
-/*************************************************************
- * Host-sided debug function
- *************************************************************/
-
-void Pyramid::test_last_error( int line )
-{
-    cudaError_t err;
-    cudaDeviceSynchronize( );
-    err = cudaGetLastError();
-    if( err != cudaSuccess ) {
-        printf("A problem in line %d, %s\n", line, cudaGetErrorString(err) );
-        exit( -__LINE__ );
-    }
-}
-
-/*************************************************************
- * Pyramid::Octave
- *************************************************************/
-
-Pyramid::Octave::Octave( )
+Octave::Octave( )
     : _data(0)
     , _h_extrema_mgmt(0)
     , _d_extrema_mgmt(0)
@@ -120,12 +46,12 @@ Pyramid::Octave::Octave( )
 #endif
 { }
 
-void Pyramid::Octave::allocExtrema( uint32_t layer_max_extrema )
+void Octave::allocExtrema( uint32_t layer_max_extrema )
 {
     ExtremaMgmt* mgmt;
 
-    _d_extrema = new ExtremumCandidate*[ _levels ];
-    _h_extrema = new ExtremumCandidate*[ _levels ];
+    _d_extrema = new Extremum*[ _levels ];
+    _h_extrema = new Extremum*[ _levels ];
 
     POP_CUDA_MALLOC_HOST( &mgmt, _levels * sizeof(ExtremaMgmt) );
     memset( mgmt, 0, _levels * sizeof(ExtremaMgmt) );
@@ -153,12 +79,12 @@ void Pyramid::Octave::allocExtrema( uint32_t layer_max_extrema )
     _d_extrema[0] = 0;
     _d_extrema[_levels-1] = 0;
     for( uint32_t i=1; i<_levels-1; i++ ) {
-        ExtremumCandidate* cand;
+        Extremum* cand;
 
-        POP_CUDA_MALLOC( &cand, sizeof(ExtremumCandidate)*_h_extrema_mgmt[i].max2 );
+        POP_CUDA_MALLOC( &cand, sizeof(Extremum)*_h_extrema_mgmt[i].getOrientationMax() );
         _d_extrema[i] = cand;
 
-        POP_CUDA_MALLOC_HOST( &cand, sizeof(ExtremumCandidate)*_h_extrema_mgmt[i].max2 );
+        POP_CUDA_MALLOC_HOST( &cand, sizeof(Extremum)*_h_extrema_mgmt[i].getOrientationMax() );
         _h_extrema[i] = cand;
     }
 
@@ -166,10 +92,10 @@ void Pyramid::Octave::allocExtrema( uint32_t layer_max_extrema )
     _d_desc_pre = new Descriptor*[_levels];
     _h_desc_pre = new Descriptor*[_levels];
 
-    _max_desc_pre = _h_extrema_mgmt[1].max2; // 1.25 * layer_max_extrema
+    _max_desc_pre = _h_extrema_mgmt[1].getOrientationMax(); // 1.25 * layer_max_extrema
 
     for( uint32_t l=0; l<_levels; l++ ) {
-        uint32_t sz = _h_extrema_mgmt[l].max2;
+        uint32_t sz = _h_extrema_mgmt[l].getOrientationMax();
         if( sz == 0 ) {
             _d_desc_pre[l] = 0;
             _h_desc_pre[l] = 0;
@@ -186,7 +112,7 @@ void Pyramid::Octave::allocExtrema( uint32_t layer_max_extrema )
 #endif
 }
 
-void Pyramid::Octave::freeExtrema( )
+void Octave::freeExtrema( )
 {
     for( uint32_t i=0; i<_levels; i++ ) {
 #if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
@@ -212,7 +138,7 @@ void Pyramid::Octave::freeExtrema( )
 #endif
 }
 
-void Pyramid::Octave::alloc( int width, int height, int levels, int layer_max_extrema )
+void Octave::alloc( int width, int height, int levels, int layer_max_extrema )
 {
     cudaError_t err;
 
@@ -338,7 +264,7 @@ void Pyramid::Octave::alloc( int width, int height, int levels, int layer_max_ex
     allocExtrema( layer_max_extrema );
 }
 
-void Pyramid::Octave::free( )
+void Octave::free( )
 {
     cudaError_t err;
 
@@ -376,10 +302,10 @@ void Pyramid::Octave::free( )
 }
 
 #if 0
-void Pyramid::Octave::resetExtremaCount( )
+void Octave::resetExtremaCount( )
 {
     for( uint32_t i=1; i<_levels-1; i++ ) {
-        _h_extrema_mgmt[i].counter = 0;
+        _h_extrema_mgmt[i].resetCounter();
     }
     POP_CUDA_MEMCPY_ASYNC( _d_extrema_mgmt,
                            _h_extrema_mgmt,
@@ -390,7 +316,7 @@ void Pyramid::Octave::resetExtremaCount( )
 }
 #endif
 
-void Pyramid::Octave::readExtremaCount( )
+void Octave::readExtremaCount( )
 {
     assert( _h_extrema_mgmt );
     assert( _d_extrema_mgmt );
@@ -402,28 +328,28 @@ void Pyramid::Octave::readExtremaCount( )
                            true );
 }
 
-uint32_t Pyramid::Octave::getExtremaCount( ) const
+int Octave::getExtremaCount( ) const
 {
-    uint32_t ct = 0;
+    int ct = 0;
     for( uint32_t i=1; i<_levels-1; i++ ) {
-        ct += _h_extrema_mgmt[i].counter;
+        ct += _h_extrema_mgmt[i].getCounter();
     }
     return ct;
 }
 
-uint32_t Pyramid::Octave::getExtremaCount( uint32_t level ) const
+int Octave::getExtremaCount( uint32_t level ) const
 {
     if( level < 1 )         return 0;
     if( level > _levels-2 ) return 0;
-    return _h_extrema_mgmt[level].counter;
+    return _h_extrema_mgmt[level].getCounter();
 }
 
 #if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
 #else
-void Pyramid::Octave::allocDescriptors( )
+void Octave::allocDescriptors( )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
-        uint32_t sz = _h_extrema_mgmt[l].counter;
+        int sz = _h_extrema_mgmt[l].getCounter();
         if( sz == 0 ) {
             _d_desc[l] = 0;
             _h_desc[l] = 0;
@@ -435,10 +361,10 @@ void Pyramid::Octave::allocDescriptors( )
 }
 #endif
 
-void Pyramid::Octave::downloadDescriptor( )
+void Octave::downloadDescriptor( )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
-        uint32_t sz = _h_extrema_mgmt[l].counter;
+        int sz = _h_extrema_mgmt[l].getCounter();
         if( sz != 0 ) {
             if( _h_extrema[l] == 0 ) continue;
 
@@ -459,7 +385,7 @@ void Pyramid::Octave::downloadDescriptor( )
 #endif
             POP_CUDA_MEMCPY_ASYNC( _h_extrema[l],
                                    _d_extrema[l],
-                                   sz * sizeof(ExtremumCandidate),
+                                   sz * sizeof(Extremum),
                                    cudaMemcpyDeviceToHost,
                                    0,
                                    true );
@@ -469,19 +395,19 @@ void Pyramid::Octave::downloadDescriptor( )
     cudaDeviceSynchronize( );
 }
 
-void Pyramid::Octave::writeDescriptor( ostream& ostr, float downsampling_factor )
+void Octave::writeDescriptor( ostream& ostr, float downsampling_factor )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
         if( _h_extrema[l] == 0 ) continue;
 
-        ExtremumCandidate* cand = _h_extrema[l];
+        Extremum* cand = _h_extrema[l];
 
 #if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
         Descriptor* desc = _h_desc_pre[l];
 #else
         Descriptor* desc = _h_desc[l];
 #endif
-        uint32_t sz = _h_extrema_mgmt[l].counter;
+        int sz = _h_extrema_mgmt[l].getCounter();
         for( int s=0; s<sz; s++ ) {
             const float reduce = downsampling_factor;
 
@@ -498,7 +424,7 @@ void Pyramid::Octave::writeDescriptor( ostream& ostr, float downsampling_factor 
     }
 }
 
-Descriptor* Pyramid::Octave::getDescriptors( uint32_t level )
+Descriptor* Octave::getDescriptors( uint32_t level )
 {
 #if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
     return _d_desc_pre[level];
@@ -511,34 +437,7 @@ Descriptor* Pyramid::Octave::getDescriptors( uint32_t level )
  * Debug output: write an octave/level to disk as PGM
  *************************************************************/
 
-void Pyramid::download_and_save_array( const char* basename, uint32_t octave, uint32_t level )
-{
-    if( octave < _num_octaves ) {
-        _octaves[octave].download_and_save_array( basename, octave, level );
-    } else {
-        cerr << "Octave " << octave << " does not exist" << endl;
-        return;
-    }
-}
-
-void Pyramid::download_descriptors( uint32_t octave )
-{
-    _octaves[octave].downloadDescriptor( );
-}
-
-void Pyramid::save_descriptors( const char* basename, uint32_t octave, int downscale_factor )
-{
-    struct stat st = {0};
-    if (stat("dir-desc", &st) == -1) {
-        mkdir("dir-desc", 0700);
-    }
-    ostringstream ostr;
-    ostr << "dir-desc/desc-" << basename << "-o-" << octave << ".txt";
-    ofstream of( ostr.str().c_str() );
-    _octaves[octave].writeDescriptor( of, downscale_factor );
-}
-
-void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t octave, uint32_t level )
+void Octave::download_and_save_array( const char* basename, uint32_t octave, uint32_t level )
 {
     // cerr << "Calling " << __FUNCTION__ << " for octave " << octave << endl;
 
@@ -577,11 +476,11 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
                 if( ct > 0 ) {
                     total_ct += ct;
 
-                    ExtremumCandidate* cand = new ExtremumCandidate[ct];
+                    Extremum* cand = new Extremum[ct];
 
                     POP_CUDA_MEMCPY( cand,
                                     _d_extrema[l],
-                                    ct * sizeof(ExtremumCandidate),
+                                    ct * sizeof(Extremum),
                                     cudaMemcpyDeviceToHost );
                     for( uint32_t i=0; i<ct; i++ ) {
                         int32_t x = roundf( cand[i].xpos );
@@ -670,67 +569,6 @@ void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t oc
         POP_CUDA_FREE_HOST( array );
     }
 #endif
-}
-
-/*************************************************************
- * Pyramid constructor
- *************************************************************/
-
-Pyramid::Pyramid( Image* base,
-                  int octaves,
-                  int levels,
-                  int width,
-                  int height,
-                  Config::ScalingMode scaling_mode )
-    : _num_octaves( octaves )
-    , _levels( levels + 3 )
-    , _scaling_mode( scaling_mode )
-{
-    // cerr << "Entering " << __FUNCTION__ << endl;
-
-    _octaves = new Octave[_num_octaves];
-
-    int w = width;
-    int h = height;
-
-    cout << "Size of the first octave's images: " << w << "X" << h << endl;
-
-    for( uint32_t o=0; o<_num_octaves; o++ ) {
-#if (PYRAMID_PRINT_DEBUG==1)
-        printf("Allocating octave %u with width %u and height %u (%u levels)\n", o, w, h, _levels );
-#endif // (PYRAMID_PRINT_DEBUG==1)
-        _octaves[o].debugSetOctave( o );
-        _octaves[o].alloc( w, h, _levels, 10000 );
-        w = ceilf( w / 2.0f );
-        h = ceilf( h / 2.0f );
-    }
-}
-
-/*************************************************************
- * Pyramid destructor
- *************************************************************/
-
-Pyramid::~Pyramid( )
-{
-    delete [] _octaves;
-}
-
-/*************************************************************
- * Build the pyramid in all levels, one octave
- *************************************************************/
-
-void Pyramid::build( Image* base )
-{
-    build_v11( base );
-}
-
-void Pyramid::find_extrema( float edgeLimit, float threshold )
-{
-    find_extrema_v6( edgeLimit, threshold );
-
-    orientation_v1();
-
-    descriptors_v1( );
 }
 
 } // namespace popart

@@ -1,4 +1,4 @@
-#include "s_pyramid.h"
+#include "sift_pyramid.h"
 
 #include "write_plane_2d.h"
 #include "gauss_filter.h"

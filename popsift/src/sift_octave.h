@@ -4,62 +4,16 @@
 
 #include "s_image.h"
 #include "sift_conf.h"
-
-#ifndef INF
-#define INF               (1<<29)
-#endif
-#ifndef NINF
-#define NINF              (-INF)
-#endif
-#ifndef M_PI
-#define M_PI  3.1415926535897932384626433832F
-#endif
-#ifndef M_PI2
-#define M_PI2 (2.0F * M_PI)
-#endif
+#include "sift_extremum.h"
+#include "sift_extrema_mgmt.h"
 
 #define PREALLOC_DESC
 #define USE_DYNAMIC_PARALLELISM
 
 namespace popart {
 
-struct ExtremaMgmt
+class Octave
 {
-    uint32_t counter;
-    uint32_t max1;     // initial max
-    uint32_t max2;     // max after finding alternative angles
-                       // Lowe says it happens to 15%, I reserve floor(25%)
-    void init( uint32_t m1 ) {
-        counter = 0;
-        max1    = m1;
-        max2    = m1 + m1/4;
-    }
-    ExtremaMgmt( ) { }
-
-    ExtremaMgmt( uint32_t m1 ) {
-        counter = 0;
-        max1    = m1;
-        max2    = m1 + m1/4;
-    }
-};
-
-struct ExtremumCandidate
-{
-    float xpos;
-    float ypos;
-    float sigma; // scale;
-    float orientation;
-};
-
-struct Descriptor
-{
-    float features[128];
-};
-
-class Pyramid
-{
-    class Octave
-    {
         int _w;
         int _h;
         int _debug_octave_id;
@@ -95,8 +49,8 @@ class Pyramid
          */
         ExtremaMgmt*         _h_extrema_mgmt; // host side info
         ExtremaMgmt*         _d_extrema_mgmt; // device side info
-        ExtremumCandidate**  _h_extrema;
-        ExtremumCandidate**  _d_extrema;
+        Extremum**  _h_extrema;
+        Extremum**  _d_extrema;
 #if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
         int                  _max_desc_pre;
         Descriptor**         _d_desc_pre;
@@ -155,14 +109,14 @@ class Pyramid
             return _d_extrema_mgmt;
         }
 
-        inline ExtremumCandidate* getExtrema( uint32_t level ) {
+        inline Extremum* getExtrema( uint32_t level ) {
             return _d_extrema[level];
         }
 
         // void resetExtremaCount( );
         void readExtremaCount( );
-        uint32_t getExtremaCount( ) const;
-        uint32_t getExtremaCount( uint32_t level ) const;
+        int getExtremaCount( ) const;
+        int getExtremaCount( uint32_t level ) const;
 
 #if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
         int getMaxDescriptors() const { return _max_desc_pre; }
@@ -189,59 +143,6 @@ class Pyramid
     private:
         void allocExtrema( uint32_t layer_max_extrema );
         void freeExtrema( );
-    };
-
-    uint32_t     _num_octaves;
-    uint32_t     _levels;
-    Octave*      _octaves;
-
-    Config::ScalingMode _scaling_mode;
-
-public:
-    Pyramid( Image* base,
-             int    octaves,
-             int    levels,
-             int    w,
-             int    h,
-             Config::ScalingMode scaling_mode );
-    ~Pyramid( );
-
-    void build( Image* base );
-
-    void find_extrema( float edgeLimit, float threshold );
-
-    void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
-
-    void download_descriptors( uint32_t octave );
-    void save_descriptors( const char* basename, uint32_t octave, int downscale_factor );
-
-
-    inline int getNumOctaves() const { return _num_octaves; }
-    inline int getNumLevels()  const { return _levels; }
-
-private:
-    void build_v11 ( Image* base );
-
-    inline void horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data, int octave );
-    inline void downscale_from_prev_octave( int octave, int level );
-    inline void downscale_from_prev_octave_and_horiz_blur( int octave, int level );
-    inline void horiz_from_prev_level( int octave, int level );
-    inline void vert_from_interm( int octave, int level );
-    inline void dog_from_blurred( int octave, int level );
-
-    void find_extrema_v6( float edgeLimit, float threshold );
-
-    template<int HEIGHT>
-    void find_extrema_v6_sub( float edgeLimit, float threshold );
-
-
-    void orientation_v1( );
-
-    void descriptors_v1( );
-
-    void test_last_error( int line );
-    void debug_out_floats  ( float* data, uint32_t pitch, uint32_t height );
-    void debug_out_floats_t( float* data, uint32_t pitch, uint32_t height );
 };
 
 } // namespace popart

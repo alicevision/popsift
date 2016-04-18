@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 
 #include "c_util_img.h"
-#include "s_pyramid.h"
+#include "sift_pyramid.h"
 #include "sift_conf.h"
 
 #define MAX_PIPES 3
