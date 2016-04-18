@@ -69,13 +69,17 @@ void PopSift::execute( int pipe, imgStream inp )
 
     _pipe[pipe]._pyramid->find_extrema( _config.edge_limit, _config.threshold );
 
+    int octaves = _pipe[pipe]._pyramid->getNumOctaves();
+
+    for( int o=0; o<octaves; o++ ) {
+        _pipe[pipe]._pyramid->download_descriptors( o );
+    }
     bool log_to_file = ( _config.log_mode == popart::Config::All );
     if( log_to_file ) {
         popart::write_plane2D( "upscaled-input-image.pgm",
                                true, // is stored on device
                                _pipe[pipe]._inputImage->getUpscaledImage() );
 
-        int octaves = _pipe[pipe]._pyramid->getNumOctaves();
         int levels  = _pipe[pipe]._pyramid->getNumLevels();
 
         for( int o=0; o<octaves; o++ ) {
@@ -84,7 +88,7 @@ void PopSift::execute( int pipe, imgStream inp )
             }
         }
         for( int o=0; o<octaves; o++ ) {
-            _pipe[pipe]._pyramid->download_and_save_descriptors( "pyramid", o );
+            _pipe[pipe]._pyramid->save_descriptors( "pyramid", o, _config.start_sampling );
         }
     }
 }

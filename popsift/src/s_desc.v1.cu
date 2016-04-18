@@ -1,8 +1,11 @@
+#include <iostream>
+
 #include "s_pyramid.h"
 #include "s_gradiant.h"
 
 #define DESCR_BINS_V1        8
 #define MAGNIFY_V1           3.0f
+// #define MAGNIFY_V1           6.0f
 #define DESCR_V1_NUM_THREADS 32
 // #define DESCR_V1_NUM_THREADS 16
 // #define DESCR_V1_NUM_THREADS 8
@@ -16,6 +19,7 @@
  *************************************************************/
 
 using namespace popart;
+using namespace std;
 
 __global__
 void keypoint_descriptors( ExtremumCandidate* cand,
@@ -193,6 +197,49 @@ void normalize_histogram( Descriptor* descs )
     ptr4[threadIdx.x] = descr;
 }
 
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+__global__ void descriptor_starter( int                level,
+                                    ExtremaMgmt*       mgmt_array,
+                                    ExtremumCandidate* extrema,
+                                    Descriptor*        descs,
+                                    Plane2D_float      layer )
+{
+    ExtremaMgmt* mgmt = &mgmt_array[level];
+
+    dim3 block;
+    dim3 grid;
+    grid.x  = mgmt->counter;
+
+    if( grid.x == 0 ) return;
+
+    block.x = DESCR_V1_NUM_THREADS;
+    block.y = 4;
+    block.z = 4;
+
+    keypoint_descriptors
+        <<<grid,block>>>
+        ( extrema,
+          descs,
+          layer );
+
+    block.x = 32;
+    block.y = 1;
+    block.z = 1;
+
+    normalize_histogram
+        <<<grid,block>>>
+        ( descs );
+}
+#else // not ( defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM) )
+__global__ void descriptor_starter( int                level,
+                                    ExtremaMgmt*       mgmt_array,
+                                    ExtremumCandidate* extrema,
+                                    Descriptor*        descs,
+                                    Plane2D_float      layer )
+{
+    // dummy for happy linker
+}
+#endif // not ( defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM) )
 
 /*************************************************************
  * V4: host side
@@ -200,6 +247,29 @@ void normalize_histogram( Descriptor* descs )
 __host__
 void Pyramid::descriptors_v1( )
 {
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+    cerr << "Calling descriptors with dynamic parallelism" << endl;
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        Octave&      oct_obj = _octaves[octave];
+
+        for( int level=1; level<_levels-1; level++ ) {
+            cudaStream_t oct_str = oct_obj.getStream(level);
+            descriptor_starter
+                <<<1,1,0,oct_str>>>
+                ( level,
+                  oct_obj.getExtremaMgmtD( ),
+                  oct_obj.getExtrema( level ),
+                  oct_obj.getDescriptors( level ),
+                  oct_obj.getData( level ) );
+        }
+    }
+
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        Octave&      oct_obj = _octaves[octave];
+        oct_obj.readExtremaCount( );
+    }
+#else // not ( defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM) )
+    cerr << "Calling descriptors -no- dynamic parallelism" << endl;
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
@@ -250,5 +320,6 @@ void Pyramid::descriptors_v1( )
     }
 
     cudaDeviceSynchronize( );
+#endif // not ( defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM) )
 }
 

@@ -8,11 +8,6 @@
 #define ORI_V1_NUM_THREADS 16
 #define NBINS_V1           36
 #define WINFACTOR_V1       1.5F
-#if __CUDA_ARCH__ >= 350
-#define USE_DYNAMIC_PARALLELISM
-#else
-#undef USE_DYNAMIC_PARALLELISM
-#endif
 
 using namespace popart;
 
@@ -234,7 +229,7 @@ void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
 /*************************************************************
  * V4: host side
  *************************************************************/
-#ifdef USE_DYNAMIC_PARALLELISM
+#ifdef USE_DYNAMIC_PARALLELISM // defined in_s_pyramid.h
 
 __global__
 void orientation_starter_v1( ExtremumCandidate* extremum,

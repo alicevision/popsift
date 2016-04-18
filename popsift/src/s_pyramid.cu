@@ -112,7 +112,12 @@ Pyramid::Octave::Octave( )
     , _d_extrema_mgmt(0)
     , _h_extrema(0)
     , _d_extrema(0)
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+    , _d_desc_pre(0)
+    , _h_desc_pre(0)
+#else
     , _d_desc(0)
+#endif
 { }
 
 void Pyramid::Octave::allocExtrema( uint32_t layer_max_extrema )
@@ -156,13 +161,41 @@ void Pyramid::Octave::allocExtrema( uint32_t layer_max_extrema )
         POP_CUDA_MALLOC_HOST( &cand, sizeof(ExtremumCandidate)*_h_extrema_mgmt[i].max2 );
         _h_extrema[i] = cand;
     }
+
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+    _d_desc_pre = new Descriptor*[_levels];
+    _h_desc_pre = new Descriptor*[_levels];
+
+    _max_desc_pre = _h_extrema_mgmt[1].max2; // 1.25 * layer_max_extrema
+
+    for( uint32_t l=0; l<_levels; l++ ) {
+        uint32_t sz = _h_extrema_mgmt[l].max2;
+        if( sz == 0 ) {
+            _d_desc_pre[l] = 0;
+            _h_desc_pre[l] = 0;
+        } else {
+            POP_CUDA_MALLOC(      &_d_desc_pre[l], sz * sizeof(Descriptor) );
+            POP_CUDA_MALLOC_HOST( &_h_desc_pre[l], sz * sizeof(Descriptor) );
+        }
+    }
+#else
+    _d_desc = new Descriptor*[_levels];
+    _h_desc = new Descriptor*[_levels];
+    memset( _d_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
+    memset( _h_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
+#endif
 }
 
 void Pyramid::Octave::freeExtrema( )
 {
     for( uint32_t i=0; i<_levels; i++ ) {
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+        if( _h_desc_pre && _h_desc_pre[i] ) cudaFreeHost( _h_desc_pre[i] );
+        if( _d_desc_pre && _d_desc_pre[i] ) cudaFree(     _d_desc_pre[i] );
+#else
         if( _h_desc    && _h_desc[i] )    cudaFreeHost( _h_desc[i] );
         if( _d_desc    && _d_desc[i] )    cudaFree( _d_desc[i] );
+#endif
         if( _h_extrema && _h_extrema[i] ) cudaFreeHost( _h_extrema[i] );
         if( _d_extrema && _d_extrema[i] ) cudaFree( _d_extrema[i] );
     }
@@ -170,8 +203,13 @@ void Pyramid::Octave::freeExtrema( )
     cudaFreeHost( _h_extrema_mgmt );
     delete [] _d_extrema;
     delete [] _h_extrema;
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+    delete [] _d_desc_pre;
+    delete [] _h_desc_pre;
+#else
     delete [] _d_desc;
     delete [] _h_desc;
+#endif
 }
 
 void Pyramid::Octave::alloc( int width, int height, int levels, int layer_max_extrema )
@@ -181,11 +219,6 @@ void Pyramid::Octave::alloc( int width, int height, int levels, int layer_max_ex
     _w      = width;
     _h      = height;
     _levels = levels;
-
-    _d_desc = new Descriptor*[_levels];
-    _h_desc = new Descriptor*[_levels];
-    memset( _d_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
-    memset( _h_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
 
 #if (PYRAMID_PRINT_DEBUG==1)
     printf("    correcting to width %u, height %u\n", _width, _height );
@@ -385,6 +418,8 @@ uint32_t Pyramid::Octave::getExtremaCount( uint32_t level ) const
     return _h_extrema_mgmt[level].counter;
 }
 
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+#else
 void Pyramid::Octave::allocDescriptors( )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
@@ -398,6 +433,7 @@ void Pyramid::Octave::allocDescriptors( )
         }
     }
 }
+#endif
 
 void Pyramid::Octave::downloadDescriptor( )
 {
@@ -406,12 +442,21 @@ void Pyramid::Octave::downloadDescriptor( )
         if( sz != 0 ) {
             if( _h_extrema[l] == 0 ) continue;
 
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+            POP_CUDA_MEMCPY_ASYNC( _h_desc_pre[l],
+                                   _d_desc_pre[l],
+                                   sz * sizeof(Descriptor),
+                                   cudaMemcpyDeviceToHost,
+                                   0,
+                                   true );
+#else
             POP_CUDA_MEMCPY_ASYNC( _h_desc[l],
                                    _d_desc[l],
                                    sz * sizeof(Descriptor),
                                    cudaMemcpyDeviceToHost,
                                    0,
                                    true );
+#endif
             POP_CUDA_MEMCPY_ASYNC( _h_extrema[l],
                                    _d_extrema[l],
                                    sz * sizeof(ExtremumCandidate),
@@ -424,20 +469,26 @@ void Pyramid::Octave::downloadDescriptor( )
     cudaDeviceSynchronize( );
 }
 
-void Pyramid::Octave::writeDescriptor( ostream& ostr )
+void Pyramid::Octave::writeDescriptor( ostream& ostr, float downsampling_factor )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
         if( _h_extrema[l] == 0 ) continue;
 
         ExtremumCandidate* cand = _h_extrema[l];
 
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+        Descriptor* desc = _h_desc_pre[l];
+#else
         Descriptor* desc = _h_desc[l];
+#endif
         uint32_t sz = _h_extrema_mgmt[l].counter;
         for( int s=0; s<sz; s++ ) {
+            const float reduce = downsampling_factor;
+
             ostr << setprecision(5)
-                 << ( cand[s].xpos - 0.0f ) * pow( 2.0, _debug_octave_id-1.0 ) << " "
-                 << ( cand[s].ypos - 0.0f ) * pow( 2.0, _debug_octave_id-1.0 ) << " "
-                 << cand[s].sigma * pow( 2.0, _debug_octave_id-1.0 ) << " "
+                 << ( cand[s].xpos - 0.0f ) * pow( 2.0, _debug_octave_id + reduce ) << " "
+                 << ( cand[s].ypos - 0.0f ) * pow( 2.0, _debug_octave_id + reduce ) << " "
+                 << cand[s].sigma * pow( 2.0, _debug_octave_id + reduce ) << " "
                  << cand[s].orientation << " ";
             for( int i=0; i<128; i++ ) {
                 ostr << setprecision(3) << desc[s].features[i] << " ";
@@ -449,7 +500,11 @@ void Pyramid::Octave::writeDescriptor( ostream& ostr )
 
 Descriptor* Pyramid::Octave::getDescriptors( uint32_t level )
 {
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+    return _d_desc_pre[level];
+#else
     return _d_desc[level];
+#endif
 }
 
 /*************************************************************
@@ -466,10 +521,13 @@ void Pyramid::download_and_save_array( const char* basename, uint32_t octave, ui
     }
 }
 
-void Pyramid::download_and_save_descriptors( const char* basename, uint32_t octave )
+void Pyramid::download_descriptors( uint32_t octave )
 {
     _octaves[octave].downloadDescriptor( );
+}
 
+void Pyramid::save_descriptors( const char* basename, uint32_t octave, int downscale_factor )
+{
     struct stat st = {0};
     if (stat("dir-desc", &st) == -1) {
         mkdir("dir-desc", 0700);
@@ -477,7 +535,7 @@ void Pyramid::download_and_save_descriptors( const char* basename, uint32_t octa
     ostringstream ostr;
     ostr << "dir-desc/desc-" << basename << "-o-" << octave << ".txt";
     ofstream of( ostr.str().c_str() );
-    _octaves[octave].writeDescriptor( of );
+    _octaves[octave].writeDescriptor( of, downscale_factor );
 }
 
 void Pyramid::Octave::download_and_save_array( const char* basename, uint32_t octave, uint32_t level )

@@ -152,7 +152,7 @@ int main(int argc, char **argv)
          << " filename: " << realName << endl;
 
     device_prop_t deviceInfo;
-    // deviceInfo.set( 1 );
+    deviceInfo.set( 0 );
     // deviceInfo.print( );
 
     PopSift PopSift( config );

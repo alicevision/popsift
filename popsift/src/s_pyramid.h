@@ -18,6 +18,9 @@
 #define M_PI2 (2.0F * M_PI)
 #endif
 
+#define PREALLOC_DESC
+#define USE_DYNAMIC_PARALLELISM
+
 namespace popart {
 
 struct ExtremaMgmt
@@ -94,8 +97,14 @@ class Pyramid
         ExtremaMgmt*         _d_extrema_mgmt; // device side info
         ExtremumCandidate**  _h_extrema;
         ExtremumCandidate**  _d_extrema;
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+        int                  _max_desc_pre;
+        Descriptor**         _d_desc_pre;
+        Descriptor**         _h_desc_pre;
+#else
         Descriptor**         _d_desc;
         Descriptor**         _h_desc;
+#endif
 
     public:
         Octave( );
@@ -155,10 +164,14 @@ class Pyramid
         uint32_t getExtremaCount( ) const;
         uint32_t getExtremaCount( uint32_t level ) const;
 
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+        int getMaxDescriptors() const { return _max_desc_pre; }
+#else
         void        allocDescriptors( );
+#endif
         Descriptor* getDescriptors( uint32_t level );
         void        downloadDescriptor( );
-        void        writeDescriptor( std::ostream& ostr );
+        void        writeDescriptor( std::ostream& ostr, float downsampling_factor );
 
         /**
          * alloc() - allocates all GPU memories for one octave
@@ -199,7 +212,9 @@ public:
 
     void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
 
-    void download_and_save_descriptors( const char* basename, uint32_t octave );
+    void download_descriptors( uint32_t octave );
+    void save_descriptors( const char* basename, uint32_t octave, int downscale_factor );
+
 
     inline int getNumOctaves() const { return _num_octaves; }
     inline int getNumLevels()  const { return _levels; }
