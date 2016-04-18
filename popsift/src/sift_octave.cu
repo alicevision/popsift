@@ -1,32 +1,18 @@
-// #include <iostream>
-// #include <fstream>
 #include <sstream>
-// #include <stdio.h>
-// #include <algorithm>
-// #include <functional>
-// #include <arpa/inet.h>
-// #include <sys/types.h>
 #include <sys/stat.h>
-// #include <unistd.h>
-// #include <limits>
-
-// #include <npp.h>
+#include <new> // for placement new
 
 #include "sift_pyramid.h"
 #include "debug_macros.h"
-// #include "align_macro.h"
 #include "clamp.h"
-// #include "gauss_filter.h"
 #include "write_plane_2d.h"
+#include "sift_octave.h"
 
 // #define PYRAMID_PRINT_DEBUG 0
 
 using namespace std;
 
 namespace popart {
-
-// #include "s_ori.v1.h"
-#include "sift_octave.h"
 
 /*************************************************************
  * Octave
@@ -46,97 +32,6 @@ Octave::Octave( )
 #endif
 { }
 
-void Octave::allocExtrema( uint32_t layer_max_extrema )
-{
-    ExtremaMgmt* mgmt;
-
-    _d_extrema = new Extremum*[ _levels ];
-    _h_extrema = new Extremum*[ _levels ];
-
-    POP_CUDA_MALLOC_HOST( &mgmt, _levels * sizeof(ExtremaMgmt) );
-    memset( mgmt, 0, _levels * sizeof(ExtremaMgmt) );
-    _h_extrema_mgmt = mgmt;
-
-    POP_CUDA_MALLOC( &mgmt, _levels * sizeof(ExtremaMgmt) );
-    POP_CUDA_MEMSET( mgmt, 0, _levels * sizeof(ExtremaMgmt) );
-    _d_extrema_mgmt = mgmt;
-
-    _h_extrema_mgmt[0].init( 0 );
-    _h_extrema_mgmt[_levels-1].init( 0 );
-    for( uint32_t i=1; i<_levels-1; i++ ) {
-        _h_extrema_mgmt[i].init( layer_max_extrema );
-    }
-
-    POP_CUDA_MEMCPY_ASYNC( _d_extrema_mgmt,
-                           _h_extrema_mgmt,
-                           _levels * sizeof(ExtremaMgmt),
-                           cudaMemcpyHostToDevice,
-                           0,
-                           true );
-
-    _h_extrema[0] = 0;
-    _h_extrema[_levels-1] = 0;
-    _d_extrema[0] = 0;
-    _d_extrema[_levels-1] = 0;
-    for( uint32_t i=1; i<_levels-1; i++ ) {
-        Extremum* cand;
-
-        POP_CUDA_MALLOC( &cand, sizeof(Extremum)*_h_extrema_mgmt[i].getOrientationMax() );
-        _d_extrema[i] = cand;
-
-        POP_CUDA_MALLOC_HOST( &cand, sizeof(Extremum)*_h_extrema_mgmt[i].getOrientationMax() );
-        _h_extrema[i] = cand;
-    }
-
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-    _d_desc_pre = new Descriptor*[_levels];
-    _h_desc_pre = new Descriptor*[_levels];
-
-    _max_desc_pre = _h_extrema_mgmt[1].getOrientationMax(); // 1.25 * layer_max_extrema
-
-    for( uint32_t l=0; l<_levels; l++ ) {
-        uint32_t sz = _h_extrema_mgmt[l].getOrientationMax();
-        if( sz == 0 ) {
-            _d_desc_pre[l] = 0;
-            _h_desc_pre[l] = 0;
-        } else {
-            POP_CUDA_MALLOC(      &_d_desc_pre[l], sz * sizeof(Descriptor) );
-            POP_CUDA_MALLOC_HOST( &_h_desc_pre[l], sz * sizeof(Descriptor) );
-        }
-    }
-#else
-    _d_desc = new Descriptor*[_levels];
-    _h_desc = new Descriptor*[_levels];
-    memset( _d_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
-    memset( _h_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
-#endif
-}
-
-void Octave::freeExtrema( )
-{
-    for( uint32_t i=0; i<_levels; i++ ) {
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-        if( _h_desc_pre && _h_desc_pre[i] ) cudaFreeHost( _h_desc_pre[i] );
-        if( _d_desc_pre && _d_desc_pre[i] ) cudaFree(     _d_desc_pre[i] );
-#else
-        if( _h_desc    && _h_desc[i] )    cudaFreeHost( _h_desc[i] );
-        if( _d_desc    && _d_desc[i] )    cudaFree( _d_desc[i] );
-#endif
-        if( _h_extrema && _h_extrema[i] ) cudaFreeHost( _h_extrema[i] );
-        if( _d_extrema && _d_extrema[i] ) cudaFree( _d_extrema[i] );
-    }
-    cudaFree( _d_extrema_mgmt );
-    cudaFreeHost( _h_extrema_mgmt );
-    delete [] _d_extrema;
-    delete [] _h_extrema;
-#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-    delete [] _d_desc_pre;
-    delete [] _h_desc_pre;
-#else
-    delete [] _d_desc;
-    delete [] _h_desc;
-#endif
-}
 
 void Octave::alloc( int width, int height, int levels, int layer_max_extrema )
 {
@@ -176,13 +71,11 @@ void Octave::alloc( int width, int height, int levels, int layer_max_extrema )
     _dog_3d_ext.height = height;
     _dog_3d_ext.depth  = _levels - 1;
 
-    POP_PRINT_MEM( "(before DOG 3D array)" );
     err = cudaMalloc3DArray( &_dog_3d,
                              &_dog_3d_desc,
                              _dog_3d_ext,
                              cudaArrayLayered | cudaArraySurfaceLoadStore );
     POP_CUDA_FATAL_TEST( err, "Could not allocate 3D DoG array: " );
-    POP_PRINT_MEM( "(after DOG 3D array)" );
 
     cudaResourceDesc dog_res_desc;
     dog_res_desc.resType         = cudaResourceTypeArray;
@@ -215,8 +108,8 @@ void Octave::alloc( int width, int height, int levels, int layer_max_extrema )
     _streams = new cudaStream_t[_levels];
     _gauss_done = new cudaEvent_t[_levels];
     for( int i=0; i<_levels; i++ ) {
-        POP_CUDA_STREAM_CREATE( &_streams[i] );
-        POP_CUDA_EVENT_CREATE(  &_gauss_done[i] );
+        _streams[i]    = popart::cuda::stream_create( __FILE__, __LINE__ );
+        _gauss_done[i] = popart::cuda::event_create( __FILE__, __LINE__ );
     }
 
     _data_tex = new cudaTextureObject_t[_levels];
@@ -261,14 +154,81 @@ void Octave::alloc( int width, int height, int levels, int layer_max_extrema )
                                    &data_tex_desc, 0 );
     POP_CUDA_FATAL_TEST( err, "Could not create texture object: " );
 
-    allocExtrema( layer_max_extrema );
+    _d_extrema = new Extremum*[ _levels ];
+    _h_extrema = new Extremum*[ _levels ];
+
+    _h_extrema_mgmt = popart::cuda::malloc_hstT<ExtremaMgmt>( _levels, __FILE__, __LINE__ );
+    _h_extrema_mgmt[0].init( 0 );
+    _h_extrema_mgmt[_levels-1].init( 0 );
+    for( uint32_t i=1; i<_levels-1; i++ ) {
+        _h_extrema_mgmt[i].init( layer_max_extrema );
+    }
+
+    _d_extrema_mgmt = popart::cuda::malloc_devT<ExtremaMgmt>( _levels, __FILE__, __LINE__ );
+    popcuda_memcpy_sync( _d_extrema_mgmt,
+                         _h_extrema_mgmt,
+                         _levels * sizeof(ExtremaMgmt),
+                         cudaMemcpyHostToDevice );
+
+    _h_extrema[0] = 0;
+    _h_extrema[_levels-1] = 0;
+    _d_extrema[0] = 0;
+    _d_extrema[_levels-1] = 0;
+    for( uint32_t i=1; i<_levels-1; i++ ) {
+        _d_extrema[i] = popart::cuda::malloc_devT<Extremum>( _h_extrema_mgmt[i].getOrientationMax(), __FILE__, __LINE__ );
+        _h_extrema[i] = popart::cuda::malloc_hstT<Extremum>( _h_extrema_mgmt[i].getOrientationMax(), __FILE__, __LINE__ );
+    }
+
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+    _d_desc_pre = new Descriptor*[_levels];
+    _h_desc_pre = new Descriptor*[_levels];
+
+    _max_desc_pre = _h_extrema_mgmt[1].getOrientationMax(); // 1.25 * layer_max_extrema
+
+    for( uint32_t l=0; l<_levels; l++ ) {
+        uint32_t sz = _h_extrema_mgmt[l].getOrientationMax();
+        if( sz == 0 ) {
+            _d_desc_pre[l] = 0;
+            _h_desc_pre[l] = 0;
+        } else {
+            _d_desc_pre[l] = popart::cuda::malloc_devT<Descriptor>( sz, __FILE__, __LINE__ );
+            _h_desc_pre[l] = popart::cuda::malloc_hstT<Descriptor>( sz, __FILE__, __LINE__ );
+        }
+    }
+#else
+    _d_desc = new Descriptor*[_levels];
+    _h_desc = new Descriptor*[_levels];
+    memset( _d_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
+    memset( _h_desc, 0, _levels*sizeof(void*) ); // dynamic size, alloc later
+#endif
 }
 
 void Octave::free( )
 {
     cudaError_t err;
 
-    freeExtrema( );
+    for( int i=0; i<_levels; i++ ) {
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+        if( _h_desc_pre && _h_desc_pre[i] ) cudaFreeHost( _h_desc_pre[i] );
+        if( _d_desc_pre && _d_desc_pre[i] ) cudaFree(     _d_desc_pre[i] );
+#else
+        if( _h_desc    && _h_desc[i] )    cudaFreeHost( _h_desc[i] );
+        if( _d_desc    && _d_desc[i] )    cudaFree( _d_desc[i] );
+#endif
+        if( _h_extrema && _h_extrema[i] ) cudaFreeHost( _h_extrema[i] );
+        if( _d_extrema && _d_extrema[i] ) cudaFree( _d_extrema[i] );
+    }
+    cudaFree( _d_extrema_mgmt );
+    cudaFreeHost( _h_extrema_mgmt );
+    delete [] _d_extrema;
+    delete [] _h_extrema;
+#if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
+    delete [] _d_desc_pre;
+    delete [] _h_desc_pre;
+#else
+    delete [] _d_desc;
+    delete [] _h_desc;
+#endif
 
     err = cudaDestroyTextureObject( _interm_data_tex );
     POP_CUDA_FATAL_TEST( err, "Could not destroy texture object: " );
@@ -280,8 +240,8 @@ void Octave::free( )
     delete [] _data_tex;
 
     for( int i=0; i<_levels; i++ ) {
-        POP_CUDA_STREAM_DESTROY( _streams[i] );
-        POP_CUDA_EVENT_DESTROY(  _gauss_done[i] );
+        popart::cuda::stream_destroy( _streams[i], __FILE__, __LINE__ );
+        popart::cuda::event_destroy( _gauss_done[i], __FILE__, __LINE__ );
     }
     delete [] _streams;
     delete [] _gauss_done;
@@ -320,12 +280,11 @@ void Octave::readExtremaCount( )
 {
     assert( _h_extrema_mgmt );
     assert( _d_extrema_mgmt );
-    POP_CUDA_MEMCPY_ASYNC( _h_extrema_mgmt,
-                           _d_extrema_mgmt,
-                           _levels * sizeof(ExtremaMgmt),
-                           cudaMemcpyDeviceToHost,
-                           _streams[0],
-                           true );
+    popcuda_memcpy_async( _h_extrema_mgmt,
+                          _d_extrema_mgmt,
+                          _levels * sizeof(ExtremaMgmt),
+                          cudaMemcpyDeviceToHost,
+                          _streams[0] );
 }
 
 int Octave::getExtremaCount( ) const
@@ -369,26 +328,23 @@ void Octave::downloadDescriptor( )
             if( _h_extrema[l] == 0 ) continue;
 
 #if defined(PREALLOC_DESC) && defined(USE_DYNAMIC_PARALLELISM)
-            POP_CUDA_MEMCPY_ASYNC( _h_desc_pre[l],
-                                   _d_desc_pre[l],
-                                   sz * sizeof(Descriptor),
-                                   cudaMemcpyDeviceToHost,
-                                   0,
-                                   true );
+            popcuda_memcpy_async( _h_desc_pre[l],
+                                  _d_desc_pre[l],
+                                  sz * sizeof(Descriptor),
+                                  cudaMemcpyDeviceToHost,
+                                  0 );
 #else
-            POP_CUDA_MEMCPY_ASYNC( _h_desc[l],
-                                   _d_desc[l],
-                                   sz * sizeof(Descriptor),
-                                   cudaMemcpyDeviceToHost,
-                                   0,
-                                   true );
+            popcuda_memcpy_async( _h_desc[l],
+                                  _d_desc[l],
+                                  sz * sizeof(Descriptor),
+                                  cudaMemcpyDeviceToHost,
+                                  0 );
 #endif
-            POP_CUDA_MEMCPY_ASYNC( _h_extrema[l],
-                                   _d_extrema[l],
-                                   sz * sizeof(Extremum),
-                                   cudaMemcpyDeviceToHost,
-                                   0,
-                                   true );
+            popcuda_memcpy_async( _h_extrema[l],
+                                  _d_extrema[l],
+                                  sz * sizeof(Extremum),
+                                  cudaMemcpyDeviceToHost,
+                                  0 );
         }
     }
 
@@ -478,10 +434,10 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
 
                     Extremum* cand = new Extremum[ct];
 
-                    POP_CUDA_MEMCPY( cand,
-                                    _d_extrema[l],
-                                    ct * sizeof(Extremum),
-                                    cudaMemcpyDeviceToHost );
+                    popcuda_memcpy_sync( cand,
+                                         _d_extrema[l],
+                                         ct * sizeof(Extremum),
+                                         cudaMemcpyDeviceToHost );
                     for( uint32_t i=0; i<ct; i++ ) {
                         int32_t x = roundf( cand[i].xpos );
                         int32_t y = roundf( cand[i].ypos );

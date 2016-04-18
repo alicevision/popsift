@@ -1,13 +1,10 @@
 #include "sift_pyramid.h"
+#include "sift_constants.h"
 #include "s_gradiant.h"
 #include "debug_macros.h"
 
 #include <stdio.h>
 #include <inttypes.h>
-
-#define ORI_V1_NUM_THREADS 16
-#define NBINS_V1           36
-#define WINFACTOR_V1       1.5F
 
 using namespace popart;
 
@@ -23,11 +20,11 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
 
     /* clamp */
     di = (di < 0) ? 
-            (di + NBINS_V1) : 
-            ((di >= NBINS_V1) ? (di - NBINS_V1) : (di));
+            (di + ORI_NBINS) : 
+            ((di >= ORI_NBINS) ? (di - ORI_NBINS) : (di));
 
-    float th = ((M_PI2 * di) / NBINS_V1) - M_PI;
-    // float th = ((M_PI2 * di) / NBINS_V1);
+    float th = ((M_PI2 * di) / ORI_NBINS) - M_PI;
+    // float th = ((M_PI2 * di) / ORI_NBINS);
     return th;
 }
 
@@ -50,8 +47,8 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
 
     Extremum* ext = &extremum[blockIdx.x];
 
-    float hist[NBINS_V1];
-    for (int i = 0; i < NBINS_V1; i++) hist[i] = 0.0f;
+    float hist[ORI_NBINS];
+    for (int i = 0; i < ORI_NBINS; i++) hist[i] = 0.0f;
 
     /* keypoint fractional geometry */
     const float x    = ext->xpos;
@@ -59,7 +56,7 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
     const float sig  = ext->sigma;
 
     /* orientation histogram radius */
-    float  sigw = WINFACTOR_V1 * sig;
+    float  sigw = ORI_WINFACTOR * sig;
     int32_t rad  = (int)rintf((3.0f * sigw));
 
     float factor = -0.5f / (sigw * sigw);
@@ -93,22 +90,22 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
         if (sq_dist <= sq_thres) {
             float weight = grad * exp(sq_dist * factor);
 
-            // int bidx = (int)rintf(NBINS_V1 * (theta + M_PI) / M_PI2);
-            int bidx = (int)roundf(NBINS_V1 * (theta + M_PI) / M_PI2);
-            // int bidx = (int)roundf(NBINS_V1 * (theta + M_PI) / M_PI2 - 0.5f);
+            // int bidx = (int)rintf(ORI_NBINS * (theta + M_PI) / M_PI2);
+            int bidx = (int)roundf(ORI_NBINS * (theta + M_PI) / M_PI2);
+            // int bidx = (int)roundf(ORI_NBINS * (theta + M_PI) / M_PI2 - 0.5f);
 
-            if( bidx > NBINS_V1 ) {
+            if( bidx > ORI_NBINS ) {
                 printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
             }
 
-            bidx = (bidx == NBINS_V1) ? 0 : bidx;
+            bidx = (bidx == ORI_NBINS) ? 0 : bidx;
 
             hist[bidx] += weight;
         }
     }
 
     /* reduction here */
-    for (int i = 0; i < NBINS_V1; i++) {
+    for (int i = 0; i < ORI_NBINS; i++) {
         hist[i] += __shfl_down( hist[i], 8 );
         hist[i] += __shfl_down( hist[i], 4 );
         hist[i] += __shfl_down( hist[i], 2 );
@@ -121,18 +118,18 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
 
         if(threadIdx.x != 0) return;
 
-    // for (int bin = 0; bin < NBINS_V1; bin++) {
+    // for (int bin = 0; bin < ORI_NBINS; bin++) {
         // printf( "%f %f %d %f\n", x, y, bin, hist[bin] );
     // }
 
 #ifdef OLD_ORIENTATION
         for (int iter = 0; iter < 2; iter++) {
             float first = hist[0];
-            float prev = hist[(NBINS_V1 - 1)];
+            float prev = hist[(ORI_NBINS - 1)];
 
             int bin;
             //0,35
-            for (bin = 0; bin < NBINS_V1 - 1; bin++) {
+            for (bin = 0; bin < ORI_NBINS - 1; bin++) {
                 float temp = hist[bin];
                 hist[bin] = 0.25f * prev + 0.5f * hist[bin] + 0.25f * hist[bin + 1];
                 prev = temp;
@@ -145,7 +142,7 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
         /* find histogram maximum */
         float maxh = NINF;
         int binh = 0;
-        for (int bin = 0; bin < NBINS_V1; bin++) {
+        for (int bin = 0; bin < ORI_NBINS; bin++) {
             // maxh = fmaxf(maxh, hist[bin]);
             if (hist[bin] > maxh) {
                 maxh = hist[bin];
@@ -155,8 +152,8 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
 
         {
             float hc = hist[binh];
-            float hn = hist[((binh + 1 + NBINS_V1) % NBINS_V1)];
-            float hp = hist[((binh - 1 + NBINS_V1) % NBINS_V1)];
+            float hn = hist[((binh + 1 + ORI_NBINS) % ORI_NBINS)];
+            float hp = hist[((binh - 1 + ORI_NBINS) % ORI_NBINS)];
             float th = compute_angle(binh, hc, hn, hp);
 
             if( isnan(th) ) {
@@ -169,12 +166,12 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
         /* find other peaks, boundary of 80% of max */
         int nangles = 1;
 
-        for (int numloops = 1; numloops < NBINS_V1; numloops++) {
-            int bin = (binh + numloops) % NBINS_V1;
+        for (int numloops = 1; numloops < ORI_NBINS; numloops++) {
+            int bin = (binh + numloops) % ORI_NBINS;
 
             float hc = hist[bin];
-            float hn = hist[((bin + 1 + NBINS_V1) % NBINS_V1)];
-            float hp = hist[((bin - 1 + NBINS_V1) % NBINS_V1)];
+            float hn = hist[((bin + 1 + ORI_NBINS) % ORI_NBINS)];
+            float hp = hist[((bin - 1 + ORI_NBINS) % ORI_NBINS)];
 
             /* find if a peak */
             if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
@@ -194,16 +191,16 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
             }
         }
 #else // not OLD_ORIENTATION
-        float xcoord[NBINS_V1];
-        float yval[NBINS_V1];
+        float xcoord[ORI_NBINS];
+        float yval[ORI_NBINS];
 
         int   maxbin = 0;
         float y_max = 0;
-        for(int bin = 0; bin < NBINS_V1; bin++) {
+        for(int bin = 0; bin < ORI_NBINS; bin++) {
             int prev = bin - 1;
-            if( prev < 0 ) prev = NBINS_V1 - 1;
+            if( prev < 0 ) prev = ORI_NBINS - 1;
             int next = bin + 1;
-            if( next == NBINS_V1 ) next = 0;
+            if( next == ORI_NBINS ) next = 0;
 
             if( hist[bin] > max( hist[prev], hist[next] ) ) {
                 const float num = 3.0f * hist[prev] - 4.0f * hist[bin] + hist[next];
@@ -220,7 +217,7 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
                 }
             }
         }
-        float th = ((M_PI2 * xcoord[maxbin]) / NBINS_V1) - M_PI;
+        float th = ((M_PI2 * xcoord[maxbin]) / ORI_NBINS) - M_PI;
 
         ext->orientation = th;
 #endif // not OLD_ORIENTATION

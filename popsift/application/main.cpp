@@ -10,10 +10,8 @@
 
 #include "libavformat/avformat.h"
 #include "libavutil/avutil.h"
-// #include "libavutil/log.h"
-// #include "libavutil/pixfmt.h"
 
-#include "SIFT.h"
+#include "popsift.h"
 #include "sift_conf.h"
 #include "device_prop.h"
 

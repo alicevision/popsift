@@ -1,8 +1,6 @@
 #pragma once
 
-#define GAUSS_ALIGN  16
-#define GAUSS_SPAN   8
-#define GAUSS_LEVELS 12
+#include "sift_constants.h"
 
 namespace popart {
 

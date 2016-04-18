@@ -139,10 +139,6 @@ class Octave
          * download a level and write to disk
          */
         void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
-
-    private:
-        void allocExtrema( uint32_t layer_max_extrema );
-        void freeExtrema( );
 };
 
 } // namespace popart

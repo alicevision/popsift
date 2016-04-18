@@ -16,12 +16,10 @@ __host__
 void* PlaneBase::allocDev2D( size_t& pitch, int w, int h, int elemSize )
 {
     // cerr << "Alloc " << w*h*elemSize << " B" << endl;
-    POP_PRINT_MEM( "(before alloc 2D)");
     void*       ptr;
     cudaError_t err;
     err = cudaMallocPitch( &ptr, &pitch, w * elemSize, h );
     POP_CUDA_FATAL_TEST( err, "Cannot allocate pitched CUDA memory: " );
-    POP_PRINT_MEM( "(after alloc 2D)");
     return ptr;
 }
 

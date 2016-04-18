@@ -7,60 +7,54 @@
 #include <assert.h>
 #include <cuda_runtime.h>
 
-void pop_info_gridsize( bool               silent,
-                        dim3&              grid,
-                        dim3&              block,
-                        const std::string& kernel,
-                        const char*        file,
-                        size_t             line );
-#define POP_INFO_GRIDSIZE(silent,grid,block,kernel) \
-    pop_info_gridsize(silent,grid,block,kernel,__FILE__,__LINE__)
-
-void pop_stream_synchronize( cudaStream_t stream,
-                             const char*  file,
-                             size_t       line );
-#define POP_SYNC( stream ) pop_stream_synchronize( stream, __FILE__, __LINE__ )
-
 void pop_check_last_error( const char* file,
                            size_t      line );
 #define POP_CHK pop_check_last_error( __FILE__, __LINE__ )
 
-void pop_cuda_memcpy_async( void*          dst,
-                            const void*    src,
-                            size_t         sz,
-                            cudaMemcpyKind type,
-                            cudaStream_t   stream,
-                            bool           silent,
-                            const char*    file,
-                            size_t         line );
-#define POP_CUDA_MEMCPY_ASYNC( dst, src, sz, type, stream, silent ) \
-    pop_cuda_memcpy_async( dst, src, sz, type, stream, silent, __FILE__, __LINE__ )
+namespace popart {
+namespace cuda {
+void malloc_dev( void** ptr, int sz,
+                 const char* file, int line );
 
-void pop_cuda_memcpy( void*          dst,
-                      const void*    src,
-                      size_t         sz,
-                      cudaMemcpyKind type,
-                      const char*    file,
-                      size_t         line );
-#define POP_CUDA_MEMCPY( dst, src, sz, type ) \
-    pop_cuda_memcpy( dst, src, sz, type, __FILE__, __LINE__ )
+void malloc_hst( void** ptr, int sz,
+                 const char* file, int line );
 
-void pop_cuda_memset_async( void*        ptr,
-                            int          value,
-                            size_t       bytes,
-                            cudaStream_t stream,
-                            const char*  file,
-                            size_t       line );
-#define POP_CUDA_MEMSET_ASYNC( ptr, val, sz, stream ) \
-    pop_cuda_memset_async( ptr, val, sz, stream, __FILE__, __LINE__ )
+template<class T>
+T* malloc_devT( int num, const char* file, int line ) {
+    void* ptr;
+    malloc_dev( &ptr, num*sizeof(T), file, line );
+    return (T*)ptr;
+}
 
-void pop_cuda_memset( void*        ptr,
-                      int          value,
-                      size_t       bytes,
-                      const char*  file,
-                      size_t       line );
-#define POP_CUDA_MEMSET( ptr, val, sz ) \
-    pop_cuda_memset( ptr, val, sz, __FILE__, __LINE__ )
+template<class T>
+T* malloc_hstT( int num, const char* file, int line ) {
+    void* ptr;
+    malloc_hst( &ptr, num*sizeof(T), file, line );
+    return (T*)ptr;
+}
+
+void memcpy_sync( void* dst, const void* src, size_t sz,
+                   cudaMemcpyKind type,
+                   const char* file, size_t line );
+#define popcuda_memcpy_sync( dst, src, sz, type ) \
+    popart::cuda::memcpy_sync( dst, src, sz, type, __FILE__, __LINE__ )
+
+void memcpy_async( void* dst, const void* src, size_t sz,
+                   cudaMemcpyKind type, cudaStream_t stream,
+                   const char* file, size_t line );
+#define popcuda_memcpy_async( dst, src, sz, type, stream ) \
+    popart::cuda::memcpy_async( dst, src, sz, type, stream, __FILE__, __LINE__ )
+
+void memset( void* ptr, int value, size_t bytes, const char* file, size_t line );
+#define popcuda_memset( ptr, val, sz ) \
+    popart::cuda::memset( ptr, val, sz, __FILE__, __LINE__ )
+
+cudaStream_t stream_create( const char* file, size_t line );
+void         stream_destroy( cudaStream_t s, const char* file, size_t line );
+cudaEvent_t  event_create( const char* file, size_t line );
+void         event_destroy( cudaEvent_t ev, const char* file, size_t line );
+};
+};
 
 #define POP_FATAL(s) { \
         std::cerr << __FILE__ << ":" << __LINE__ << std::endl << "    " << s << std::endl; \
@@ -91,14 +85,6 @@ void pop_cuda_memset( void*        ptr,
     }
 #define POP_CUDA_FATAL_TEST(err,s) if( err != cudaSuccess ) { POP_CUDA_FATAL(err,s); }
 
-#define POP_CUDA_MALLOC( ptr, sz ) { \
-        cudaError_t err; \
-        err = cudaMalloc( ptr, sz ); \
-        POP_CUDA_FATAL_TEST( err, "cudaMalloc failed: " ); \
-        err = cudaMemset( *ptr, 0, sz ); \
-        POP_CUDA_FATAL_TEST( err, "cudaMemset failed: " ); \
-    }
-
 #define POP_CUDA_FREE( ptr ) { \
         cudaError_t err; \
         err = cudaFree( ptr ); \
@@ -116,43 +102,4 @@ void pop_cuda_memset( void*        ptr,
         err = cudaFreeHost( ptr ); \
         POP_CUDA_FATAL_TEST( err, "cudaFreeHost failed: " ); \
     }
-
-#define POP_CUDA_STREAM_CREATE( ptr ) { \
-        cudaError_t err; \
-        err = cudaStreamCreate( ptr ); \
-        POP_CUDA_FATAL_TEST( err, "cudaStreamCreate failed: " ); \
-    }
-
-#define POP_CUDA_STREAM_DESTROY( ptr ) { \
-        cudaError_t err; \
-        err = cudaStreamDestroy( ptr ); \
-        POP_CUDA_FATAL_TEST( err, "cudaStreamDestroy failed: " ); \
-    }
-
-#define POP_CUDA_EVENT_CREATE( ptr ) { \
-        cudaError_t err; \
-        err = cudaEventCreate( ptr ); \
-        POP_CUDA_FATAL_TEST( err, "cudaEventCreate failed: " ); \
-    }
-
-#define POP_CUDA_EVENT_DESTROY( ptr ) { \
-        cudaError_t err; \
-        err = cudaEventDestroy( ptr ); \
-        POP_CUDA_FATAL_TEST( err, "cudaEventDestroy failed: " ); \
-    }
-
-#if 1
-#define POP_PRINT_MEM( where )
-#else
-#define POP_PRINT_MEM( where ) { \
-        cudaError_t err; \
-        size_t      freeMem; \
-        size_t      totalMem; \
-        err = cudaMemGetInfo( &freeMem, &totalMem ); \
-        POP_CUDA_FATAL_TEST( err, "Failed to check CUDA mem/free mem: " ); \
-        std::cerr << "Free mem: " << freeMem/1024 << " kB " \
-                  << freeMem << " B " \
-                  << where << std::endl; \
-    }
-#endif
 

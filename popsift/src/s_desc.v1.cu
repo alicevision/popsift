@@ -1,18 +1,8 @@
 #include <iostream>
 
 #include "sift_pyramid.h"
+#include "sift_constants.h"
 #include "s_gradiant.h"
-
-#define DESCR_BINS_V1        8
-#define MAGNIFY_V1           3.0f
-// #define MAGNIFY_V1           6.0f
-#define DESCR_V1_NUM_THREADS 32
-// #define DESCR_V1_NUM_THREADS 16
-// #define DESCR_V1_NUM_THREADS 8
-#define RPI_V1               (4.0f / M_PI)
-#define EPS_V1               1E-15
-
-#define USE_ROOT_SIFT
 
 /*************************************************************
  * V1: device side
@@ -39,7 +29,7 @@ void keypoint_descriptors( Extremum* cand,
     const float y    = ext->ypos;
     const float sig  = ext->sigma;
     const float ang  = ext->orientation;
-    const float SBP  = fabs(MAGNIFY_V1 * sig);
+    const float SBP  = fabs(DESC_MAGNIFY * sig);
 
     const float cos_t = cosf(ang);
     const float sin_t = sinf(ang);
@@ -68,7 +58,7 @@ void keypoint_descriptors( Extremum* cand,
     float dpt[9];
     for (int i = 0; i < 9; i++) dpt[i] = 0.0f;
 
-    for(int i = threadIdx.x; i < loops; i+=DESCR_V1_NUM_THREADS)
+    for(int i = threadIdx.x; i < loops; i+=DESC_NUM_THREADS)
     {
         const int ii = i / wx + ymin;
         const int jj = i % wx + xmin;     
@@ -97,13 +87,13 @@ void keypoint_descriptors( Extremum* cand,
             while (th < 0.0f) th += M_PI2;
             while (th >= M_PI2) th -= M_PI2;
 
-            const float   tth  = th * RPI_V1;
+            const float   tth  = th * M_4RPI;
             const int32_t fo0  = (int32_t)floor(tth);
             const float   do0  = tth - fo0;             
             const float   wgt1 = 1.0f - do0;
             const float   wgt2 = do0;
 
-            int fo  = fo0 % DESCR_BINS_V1;
+            int fo  = fo0 % DESC_BINS;
             if(fo < 8) {
                 dpt[fo]   += (wgt1*wgt);
                 dpt[fo+1] += (wgt2*wgt);
@@ -116,10 +106,10 @@ void keypoint_descriptors( Extremum* cand,
 
     /* reduction here */
     for (int i = 0; i < 8; i++) {
-#if DESCR_V1_NUM_THREADS==32
+#if DESC_NUM_THREADS==32
         dpt[i] += __shfl_down( dpt[i], 16 );
 #endif
-#if DESCR_V1_NUM_THREADS==32 || DESCR_V1_NUM_THREADS==16
+#if DESC_NUM_THREADS==32 || DESC_NUM_THREADS==16
         dpt[i] += __shfl_down( dpt[i], 8 );
 #else
 #endif
@@ -153,7 +143,7 @@ void normalize_histogram( Descriptor* descs )
     float4 descr;
     descr = ptr4[threadIdx.x];
 
-#ifdef USE_ROOT_SIFT
+#ifdef DESC_USE_ROOT_SIFT
     // L1 norm
     float norm = descr.x + descr.y + descr.z + descr.w;
 
@@ -169,7 +159,7 @@ void normalize_histogram( Descriptor* descs )
     descr.y *= norm;
     descr.z *= norm;
     descr.w *= norm;
-#else // not USE_ROOT_SIFT
+#else // not DESC_USE_ROOT_SIFT
     // L2 norm
     descr.x *= descr.x;
     descr.y *= descr.y;
@@ -184,7 +174,7 @@ void normalize_histogram( Descriptor* descs )
     norm += __shfl_down( norm,  2 );
     norm += __shfl_down( norm,  1 );
 
-    norm = sqrt(norm) + EPS_V1;
+    norm = sqrt(norm) + DESC_MIN_FLOAT;
 
     norm += __shfl     ( norm,  0 );
 
@@ -192,7 +182,7 @@ void normalize_histogram( Descriptor* descs )
     descr.y /= norm;
     descr.z /= norm;
     descr.w /= norm;
-#endif // not USE_ROOT_SIFT
+#endif // not DESC_USE_ROOT_SIFT
 
     ptr4[threadIdx.x] = descr;
 }
@@ -212,7 +202,7 @@ __global__ void descriptor_starter( int                level,
 
     if( grid.x == 0 ) return;
 
-    block.x = DESCR_V1_NUM_THREADS;
+    block.x = DESC_NUM_THREADS;
     block.y = 4;
     block.z = 4;
 
@@ -298,7 +288,7 @@ void Pyramid::descriptors_v1( )
             grid.x  = oct_obj.getExtremaMgmtH(level)->counter;
 
             if( grid.x != 0 ) {
-                block.x = DESCR_V1_NUM_THREADS;
+                block.x = DESC_NUM_THREADS;
                 block.y = 4;
                 block.z = 4;
 

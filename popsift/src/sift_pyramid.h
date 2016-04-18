@@ -8,22 +8,6 @@
 #include "sift_extrema_mgmt.h"
 #include "sift_octave.h"
 
-#ifndef INF
-#define INF               (1<<29)
-#endif
-#ifndef NINF
-#define NINF              (-INF)
-#endif
-#ifndef M_PI
-#define M_PI  3.1415926535897932384626433832F
-#endif
-#ifndef M_PI2
-#define M_PI2 (2.0F * M_PI)
-#endif
-
-#define PREALLOC_DESC
-#define USE_DYNAMIC_PARALLELISM
-
 namespace popart {
 
 class Pyramid

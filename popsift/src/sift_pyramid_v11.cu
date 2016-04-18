@@ -1,22 +1,12 @@
 #include "sift_pyramid.h"
-
-#include "write_plane_2d.h"
 #include "gauss_filter.h"
-#include "clamp.h"
-#include "debug_macros.h"
 #include "assist.h"
-#include <cuda_runtime.h>
-#include <curand_mtgp32_kernel.h>
-#include <device_launch_parameters.h>
-#include <stdio.h>
+
+#include <iostream>
 
 /*************************************************************
  * V11: device side
  *************************************************************/
-
-#define V11_EDGE_LEN 32
-
-#define HORIZ_NO_SHARED_128x1
 
 namespace popart {
 
