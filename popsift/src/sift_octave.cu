@@ -442,8 +442,11 @@ void Octave::alloc_interm_tex( )
     data_tex_desc.addressMode[1]   = cudaAddressModeClamp;
     data_tex_desc.addressMode[2]   = cudaAddressModeClamp;
     data_tex_desc.readMode         = cudaReadModeElementType; // read as float
-    // data_tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
+#ifdef GAUSS_INTERM_FILTER_MODE_POINT
+    data_tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
+#else // not GAUSS_INTERM_FILTER_MODE_POINT
     data_tex_desc.filterMode       = cudaFilterModeLinear; // bilinear interpolation
+#endif // not GAUSS_INTERM_FILTER_MODE_POINT
 
     memset( &data_res_desc, 0, sizeof(cudaResourceDesc) );
     data_res_desc.resType                  = cudaResourceTypePitch2D;

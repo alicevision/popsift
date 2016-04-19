@@ -152,6 +152,24 @@ void vert( cudaTextureObject_t src_data,
     float val;
     float out = 0;
 
+#ifdef GAUSS_INTERM_FILTER_MODE_POINT
+    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
+
+        idy = threadIdx.y - offset;
+        val = tex2D<float>( src_data, block_x + idx, block_y + idy );
+        out += ( val * g );
+
+        idy = threadIdx.y + offset;
+        val = tex2D<float>( src_data, block_x + idx, block_y + idy );
+        out += ( val * g );
+    }
+
+    g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
+    idy = threadIdx.y;
+    val = tex2D<float>( src_data, block_x + idx, block_y + idy );
+    out += ( val * g );
+#else // not GAUSS_INTERM_FILTER_MODE_POINT
     for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
         g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
 
@@ -168,6 +186,7 @@ void vert( cudaTextureObject_t src_data,
     idy = threadIdx.y;
     val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
     out += ( val * g );
+#endif // not GAUSS_INTERM_FILTER_MODE_POINT
 
     idx = block_x+threadIdx.x;
     idy = block_y+threadIdx.y;
