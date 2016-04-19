@@ -165,14 +165,11 @@ Pyramid::~Pyramid( )
  * Build the pyramid in all levels, one octave
  *************************************************************/
 
-void Pyramid::build( Image* base )
+void Pyramid::find_extrema( Image* base )
 {
     build_v11( base );
-}
 
-void Pyramid::find_extrema( float edgeLimit, float threshold )
-{
-    find_extrema_v6( edgeLimit, threshold );
+    find_extrema_v6( );
 
     orientation_v1();
 

@@ -8,8 +8,8 @@ Config::Config( )
     , octaves( -1 )
     , levels( 3 )
     , sigma( 1.6f )
-    , edge_limit( 10.0f )
-    , threshold( 10.0f / 256.0f )
+    , _edge_limit( 10.0f )
+    , _threshold( 10.0f / 256.0f )
     , sift_mode( Config::OpenCV )
     , log_mode( Config::None )
     , scaling_mode( Config::IndirectDownscaling )
@@ -48,8 +48,8 @@ void Config::setDownsampling( float v ) { start_sampling = v; }
 void Config::setOctaves( int v ) { octaves = v; }
 void Config::setLevels( int v ) { levels = v; }
 void Config::setSigma( float v ) { sigma = v; }
-void Config::setEdgeLimit( float v ) { edge_limit = v; }
-void Config::setThreshold( float v ) { threshold = v; }
+void Config::setEdgeLimit( float v ) { _edge_limit = v; }
+void Config::setThreshold( float v ) { _threshold = v; }
 
 void Config::setGaussGroup( int groupsize )
 {

@@ -120,8 +120,6 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
                                  int                 level,
                                  int                 width,
                                  int                 height,
-                                 float               edge_limit,
-                                 float               threshold,
                                  const uint32_t      maxlevel,
                                  Extremum&           ec )
 {
@@ -156,7 +154,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
     float val = tex2DLayered<float>( dog, x+1, y+1, level );
 
-    if( fabs( val ) < threshold ) {
+    if( fabs( val ) < d_threshold ) {
         return false;
     }
 
@@ -290,12 +288,12 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     }
 
     /* accept-reject extremum */
-    if( fabs(contr) < (threshold*2.0f) ) {
+    if( fabs(contr) < (d_threshold*2.0f) ) {
         return false;
     }
 
     /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
-    if( edgeval >= (edge_limit+1.0f)*(edge_limit+1.0f)/edge_limit ) {
+    if( edgeval >= (d_edge_limit+1.0f)*(d_edge_limit+1.0f)/d_edge_limit ) {
         return false;
     }
 
@@ -318,8 +316,6 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
                              int                 level,
                              int                 width,
                              int                 height,
-                             float               edge_limit,
-                             float               threshold,
                              const uint32_t      maxlevel,
                              ExtremaMgmt*        mgmt_array,
                              Extremum*           d_extrema )
@@ -327,7 +323,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
     ExtremaMgmt* mgmt = &mgmt_array[level];
     Extremum ec;
 
-    bool indicator = find_extrema_in_dog_v6_sub( dog, level, width, height, edge_limit, threshold, maxlevel, ec );
+    bool indicator = find_extrema_in_dog_v6_sub( dog, level, width, height, maxlevel, ec );
 
     uint32_t write_index = extrema_count<HEIGHT>( indicator, mgmt );
 
@@ -360,7 +356,7 @@ void fix_extrema_count_v6( ExtremaMgmt* mgmt_array, uint32_t mgmt_level )
  *************************************************************/
 template<int HEIGHT>
 __host__
-void Pyramid::find_extrema_v6_sub( float edgeLimit, float threshold )
+void Pyramid::find_extrema_v6_sub( )
 {
     for( int octave=0; octave<_num_octaves; octave++ ) {
         for( int level=1; level<_levels-2; level++ ) {
@@ -375,11 +371,11 @@ void Pyramid::find_extrema_v6_sub( float edgeLimit, float threshold )
             cudaStream_t oct_str = oct_obj.getStream(level);
             cudaEvent_t  oct_ev  = oct_obj.getEventGaussDone(level+1);
 
-            cudaStreamWaitEvent( oct_str, oct_ev, 0 );
-
             reset_extrema_count_v6
                 <<<1,1,0,oct_str>>>
                 ( _octaves[octave].getExtremaMgmtD( ), level );
+
+            cudaStreamWaitEvent( oct_str, oct_ev, 0 );
 
             find_extrema_in_dog_v6<HEIGHT>
                 <<<grid,block,0,oct_str>>>
@@ -387,36 +383,22 @@ void Pyramid::find_extrema_v6_sub( float edgeLimit, float threshold )
                   level,
                   cols,
                   rows,
-                  edgeLimit,
-                  threshold,
                   _levels,
                   _octaves[octave].getExtremaMgmtD( ),
                   _octaves[octave].getExtrema( level ) );
 
-#if 1
             fix_extrema_count_v6
                 <<<1,1,0,oct_str>>>
                 ( _octaves[octave].getExtremaMgmtD( ), level );
-#else
-            // this does not work yet: I have no idea how to link with CUDA
-            // and still achieve dynamic parallelism
-            start_orientation_v6
-                <<<1,1>>>
-                ( _octaves[octave].getExtrema( level ),
-                  _octaves[octave].getExtremaMgmtD( level ),
-                  d1,
-                  _octaves[octave].getPitch( ),
-                  _octaves[octave].getHeight( ) );
-#endif
         }
     }
 }
 
 __host__
-void Pyramid::find_extrema_v6( float edgeLimit, float threshold )
+void Pyramid::find_extrema_v6( )
 {
 #define MANYLY(H) \
-    find_extrema_v6_sub<H> ( edgeLimit, threshold );
+    find_extrema_v6_sub<H> ( );
 
     MANYLY(1)
     // MANYLY(2)

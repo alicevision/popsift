@@ -12,7 +12,8 @@ PopSift::PopSift( const popart::Config& config )
 
     const bool vlfeat_mode = ( config.sift_mode == popart::Config::VLFeat );
     popart::init_filter( _config.sigma, _config.levels, vlfeat_mode );
-    popart::init_sigma(  _config.sigma, _config.levels );
+    popart::init_sigma(  _config.sigma, _config.levels, _config._threshold, _config._edge_limit );
+
 }
 
 PopSift::~PopSift()
@@ -86,9 +87,7 @@ void PopSift::execute( int pipe, imgStream inp )
 
     _pipe[pipe]._inputImage->load( inp );
 
-    _pipe[pipe]._pyramid->build( _pipe[pipe]._inputImage );
-
-    _pipe[pipe]._pyramid->find_extrema( _config.edge_limit, _config.threshold );
+    _pipe[pipe]._pyramid->find_extrema( _pipe[pipe]._inputImage );
 
     int octaves = _pipe[pipe]._pyramid->getNumOctaves();
 

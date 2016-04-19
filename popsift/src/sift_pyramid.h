@@ -26,9 +26,7 @@ public:
              int     h );
     ~Pyramid( );
 
-    void build( Image* base );
-
-    void find_extrema( float edgeLimit, float threshold );
+    void find_extrema( Image* base );
 
     void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
 
@@ -49,11 +47,10 @@ private:
     inline void vert_from_interm( int octave, int level );
     inline void dog_from_blurred( int octave, int level );
 
-    void find_extrema_v6( float edgeLimit, float threshold );
+    void find_extrema_v6( );
 
     template<int HEIGHT>
-    void find_extrema_v6_sub( float edgeLimit, float threshold );
-
+    void find_extrema_v6_sub( );
 
     void orientation_v1( );
 

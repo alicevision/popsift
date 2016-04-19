@@ -56,7 +56,7 @@ struct Config
 
     // default edge_limit 16.0f from Celebrandil
     // default edge_limit 10.0f from Bemap
-    float    edge_limit;
+    float    _edge_limit;
 
     // default threshold 0.0 default of vlFeat
     // default threshold 5.0 / 256.0
@@ -64,7 +64,7 @@ struct Config
     // default threshold 5.0 from Celebrandil, not happening in our data
     // default threshold 0.04 / (_levels-3.0) / 2.0f * 255
     //                   from Bemap -> 1.69 (makes no sense)
-    float    threshold;
+    float    _threshold;
 
     // default SiftMode::OpenCV
     SiftMode sift_mode;
