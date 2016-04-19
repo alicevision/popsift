@@ -33,7 +33,7 @@ IMAGE3=../sample/boat/img3.ppm
 IMAGE4=../sample/boat/img4.ppm
 IMAGE5=../sample/boat/img5.ppm
 IMAGE6=../sample/boat/img6.ppm
-PARAMS="--downsampling=0 --octaves=3 --threshold=0.1 --edge-threshold=50.0 --vlfeat-mode" # finds 4 points
+PARAMS="--octaves=3 --threshold=0.1 --edge-threshold=50.0 --vlfeat-mode" # finds 4 points
 # PARAMS="--downsampling=0 --octaves=3 --sigma=0.82  --threshold=0.1 --edge-threshold=50.0 --vlfeat-mode" # finds 4 points
 # PARAMS="--downsampling=0 --threshold=0.1 --edge-threshold=50.0" # finds 4 points
 # LOG=--log

@@ -3,6 +3,7 @@
 #include <new> // for placement new
 
 #include "sift_pyramid.h"
+#include "sift_constants.h"
 #include "debug_macros.h"
 #include "clamp.h"
 #include "write_plane_2d.h"
