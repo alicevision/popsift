@@ -15,6 +15,7 @@ class Octave
         int _h;
         int _debug_octave_id;
         int _levels;
+        int _gauss_group;
 
         Plane2D_float* _data;
         Plane2D_float  _intermediate_data;
@@ -119,7 +120,11 @@ class Octave
          * alloc() - allocates all GPU memories for one octave
          * @param width in floats, not bytes!!!
          */
-        void alloc( int width, int height, int levels, int layer_max_extrema );
+        void alloc( int width,
+                    int height,
+                    int levels,
+                    int layer_max_extrema,
+                    int gauss_group );
         void free();
 
         /**

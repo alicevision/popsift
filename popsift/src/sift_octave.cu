@@ -29,11 +29,12 @@ Octave::Octave( )
 { }
 
 
-void Octave::alloc( int width, int height, int levels, int layer_max_extrema )
+void Octave::alloc( int width, int height, int levels, int layer_max_extrema, int gauss_group )
 {
-    _w      = width;
-    _h      = height;
-    _levels = levels;
+    _w           = width;
+    _h           = height;
+    _levels      = levels;
+    _gauss_group = gauss_group;
 
 #if (PYRAMID_PRINT_DEBUG==1)
     printf("    correcting to width %u, height %u\n", _width, _height );
@@ -413,7 +414,14 @@ void Octave::free_data_tex( )
 
 void Octave::alloc_interm_plane( )
 {
-    _intermediate_data.allocDev( _w, _h );
+    /* Usually we alloc only one plane's worth of floats.
+     * When we group gauss filters, we need #groupsize intermediate
+     * planes. For efficiency, we use only a single allocation,
+     * but if we use interpolation, we should better have a buffer
+     * filled with zeros between the sections of the plane.
+     * We give this buffer 4 rows.
+     */
+    _intermediate_data.allocDev( _w, _gauss_group * ( _h + 4 ) );
 }
 
 void Octave::free_interm_plane( )

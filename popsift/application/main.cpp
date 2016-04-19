@@ -17,6 +17,8 @@
 
 using namespace std;
 
+static void validate( const char* appName, popart::Config& config );
+
 /* User parameters */
 int    verbose         = false;
 
@@ -53,6 +55,8 @@ static void usage( const char* argv )
          << " --indirect-unfiltered / --iu  Downscaling from level-3, without applying Gaussian blur" << endl
          << " --indirect-downscale          Downscaling from level-3 and applying Gaussian blur" << endl
          << "                               Note: indirect-downscale blurs much more than it should" << endl
+         << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
+         << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
          << endl;
     exit(0);
 }
@@ -76,6 +80,7 @@ static struct option longopts[] = {
     { "indirect-downscale",  no_argument,            NULL, 1102 },
     { "indirect-unfiltered", no_argument,            NULL, 1103 },
     { "iu",                  no_argument,            NULL, 1103 },
+    { "group-gauss",         required_argument,      NULL, 1104 },
 
     { NULL,                  0,                      NULL, 0  }
 };
@@ -103,7 +108,7 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 1101 : config.setScalingMode( popart::Config::DirectDownscaling ); break;
         case 1102 : config.setScalingMode( popart::Config::IndirectDownscaling ); break;
         case 1103 : config.setScalingMode( popart::Config::IndirectUnfilteredDownscaling ); break;
-
+        case 1104 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
 
         case 1000 : config.setOctaves( strtol( optarg, NULL, 0 ) ); break;
         case 1001 : config.setLevels(  strtol( optarg, NULL, 0 ) ); break;
@@ -116,6 +121,8 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
     }
 
     if( applySigma ) config.setSigma( sigma );
+
+    validate( appName, config );
 
     argc -= optind;
     argv += optind;
@@ -155,7 +162,7 @@ int main(int argc, char **argv)
 
     device_prop_t deviceInfo;
     deviceInfo.set( 0 );
-    // deviceInfo.print( );
+    deviceInfo.print( );
 
     PopSift PopSift( config );
 
@@ -163,5 +170,21 @@ int main(int argc, char **argv)
     PopSift.execute( 0, inp );
     PopSift.uninit( 0 );
     return 0;
+}
+
+static void validate( const char* appName, popart::Config& config )
+{
+    switch( config.getGaussGroup() )
+    {
+    case 1 :
+    case 2 :
+    case 3 :
+    case 8 :
+        break;
+    default :
+        cerr << "Only 2, 3 or 8 Gauss levels can be combined at this time" << endl;
+        usage( appName );
+        exit( -1 );
+    }
 }
 

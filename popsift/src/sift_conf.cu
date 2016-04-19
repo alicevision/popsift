@@ -14,6 +14,7 @@ Config::Config( )
     , log_mode( Config::None )
     , scaling_mode( Config::IndirectDownscaling )
     , verbose( false )
+    , gauss_group_size( 1 )
 { }
 
 void Config::setModeVLFeat( )
@@ -49,6 +50,16 @@ void Config::setLevels( int v ) { levels = v; }
 void Config::setSigma( float v ) { sigma = v; }
 void Config::setEdgeLimit( float v ) { edge_limit = v; }
 void Config::setThreshold( float v ) { threshold = v; }
+
+void Config::setGaussGroup( int groupsize )
+{
+    gauss_group_size = groupsize;
+}
+
+int  Config::getGaussGroup( ) const
+{
+    return gauss_group_size;
+}
 
 }; // namespace popart
 

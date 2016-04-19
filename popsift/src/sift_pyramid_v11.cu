@@ -9,11 +9,13 @@
  *************************************************************/
 
 namespace popart {
+namespace gauss {
+namespace v11 {
 
 __global__
-void filter_gauss_horiz_tex_128x1( cudaTextureObject_t src_data,
-                                   Plane2D_float       dst_data,
-                                   int                 level )
+void horiz_tex_128x1( cudaTextureObject_t src_data,
+                      Plane2D_float       dst_data,
+                      int                 level )
 {
     const float dst_w  = dst_data.getWidth();
     const float dst_h  = dst_data.getHeight();
@@ -46,9 +48,9 @@ void filter_gauss_horiz_tex_128x1( cudaTextureObject_t src_data,
 
 
 __global__
-void filter_gauss_horiz_v11_128x1( cudaTextureObject_t src_data,
-                                   Plane2D_float       dst_data,
-                                   int                 level )
+void horiz_128x1( cudaTextureObject_t src_data,
+                  Plane2D_float       dst_data,
+                  int                 level )
 {
     const int dst_w = dst_data.getWidth();
 
@@ -92,9 +94,9 @@ void get_by_2( cudaTextureObject_t src_data,
 }
 
 __global__
-void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
-                                  Plane2D_float       dst_data,
-                                  int level )
+void horiz_by_2( cudaTextureObject_t src_data,
+                 Plane2D_float       dst_data,
+                 int level )
 {
     int block_x = blockIdx.x * blockDim.x;
     int block_y = blockIdx.y * blockDim.y;
@@ -134,9 +136,9 @@ void filter_gauss_horiz_v11_by_2( cudaTextureObject_t src_data,
 }
 
 __global__
-void filter_gauss_vert_v11( cudaTextureObject_t src_data,
-                            Plane2D_float       dst_data,
-                            int level )
+void vert( cudaTextureObject_t src_data,
+           Plane2D_float       dst_data,
+           int level )
 {
     const int dst_w = dst_data.getWidth();
     const int dst_h = dst_data.getHeight();
@@ -193,6 +195,9 @@ void make_dog( cudaTextureObject_t this_data,
     surf2DLayeredwrite( c, dog_data, idx*4, idy, level, cudaBoundaryModeZero );
 }
 
+} // namespace gauss
+} // namespace v11
+
 __host__
 inline void Pyramid::horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data,
                                             int                 octave )
@@ -207,7 +212,7 @@ inline void Pyramid::horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data,
     dim3 grid;
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
-    filter_gauss_horiz_tex_128x1
+    gauss::v11::horiz_tex_128x1
         <<<grid,block,0,oct_str_0>>>
         ( src_data,
           oct_obj.getIntermediateData( ),
@@ -234,7 +239,7 @@ inline void Pyramid::downscale_from_prev_octave( int octave, int level )
     h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
     h_grid.y = (unsigned int)grid_divide( height, h_block.y );
 
-    get_by_2
+    gauss::v11::get_by_2
         <<<h_grid,h_block,0,oct_str_0>>>
         ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
           oct_obj.getData( level ),
@@ -258,7 +263,7 @@ inline void Pyramid::downscale_from_prev_octave_and_horiz_blur( int octave, int 
     h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
     h_grid.y = (unsigned int)grid_divide( height, h_block.y );
 
-    filter_gauss_horiz_v11_by_2
+    gauss::v11::horiz_by_2
         <<<h_grid,h_block,0,oct_str_0>>>
         ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
           oct_obj.getIntermediateData( ),
@@ -278,7 +283,7 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level )
     dim3 grid;
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
-    filter_gauss_horiz_v11_128x1
+    gauss::v11::horiz_128x1
         <<<grid,block,0,oct_str_0>>>
         ( oct_obj._data_tex[ level-1 ],
           oct_obj.getIntermediateData( ),
@@ -299,7 +304,7 @@ inline void Pyramid::vert_from_interm( int octave, int level )
     v_grid.x = (unsigned int)grid_divide( width,  v_block.x );
     v_grid.y = (unsigned int)grid_divide( height, v_block.y );
 
-    filter_gauss_vert_v11
+    gauss::v11::vert
         <<<v_grid,v_block,0,oct_str_0>>>
         ( oct_obj._interm_data_tex,
           oct_obj.getData( level ),
@@ -320,7 +325,7 @@ inline void Pyramid::dog_from_blurred( int octave, int level )
     grid.x = grid_divide( width,  block.x );
     grid.y = grid_divide( height, block.y );
 
-    make_dog
+    gauss::v11::make_dog
         <<<grid,block,0,oct_str_0>>>
         ( oct_obj._data_tex[level],
           oct_obj._data_tex[level-1],

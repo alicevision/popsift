@@ -29,6 +29,9 @@ struct Config
     void setScalingMode( ScalingMode mode = IndirectDownscaling );
     void setVerbose( bool on = true );
 
+    void setGaussGroup( int groupsize );
+    int  getGaussGroup( ) const;
+
     void setDownsampling( float v );
     void setOctaves( int v );
     void setLevels( int v );
@@ -73,6 +76,12 @@ struct Config
     ScalingMode scaling_mode;
 
     bool     verbose;
+
+    /* A single Gauss filtering step filters for several levels at once,
+     * saving load operations. Accuracy is maintained only for very small
+     * numbers.
+     */
+    int gauss_group_size;
 };
 
 }; // namespace popart

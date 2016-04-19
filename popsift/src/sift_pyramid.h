@@ -12,19 +12,18 @@ namespace popart {
 
 class Pyramid
 {
-    uint32_t     _num_octaves;
-    uint32_t     _levels;
-    Octave*      _octaves;
+    int     _num_octaves;
+    int     _levels;
+    Octave* _octaves;
+    int     _gauss_group;
 
     Config::ScalingMode _scaling_mode;
 
 public:
-    Pyramid( Image* base,
-             int    octaves,
-             int    levels,
-             int    w,
-             int    h,
-             Config::ScalingMode scaling_mode );
+    Pyramid( Config& config,
+             Image*  base,
+             int     w,
+             int     h );
     ~Pyramid( );
 
     void build( Image* base );

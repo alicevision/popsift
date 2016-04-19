@@ -123,15 +123,14 @@ void Pyramid::save_descriptors( const char* basename, uint32_t octave, int downs
  * Pyramid constructor
  *************************************************************/
 
-Pyramid::Pyramid( Image* base,
-                  int octaves,
-                  int levels,
+Pyramid::Pyramid( Config& config,
+                  Image* base,
                   int width,
-                  int height,
-                  Config::ScalingMode scaling_mode )
-    : _num_octaves( octaves )
-    , _levels( levels + 3 )
-    , _scaling_mode( scaling_mode )
+                  int height )
+    : _num_octaves( config.octaves )
+    , _levels( config.levels + 3 )
+    , _scaling_mode( config.scaling_mode )
+    , _gauss_group( config.gauss_group_size )
 {
     // cerr << "Entering " << __FUNCTION__ << endl;
 
@@ -142,12 +141,12 @@ Pyramid::Pyramid( Image* base,
 
     cout << "Size of the first octave's images: " << w << "X" << h << endl;
 
-    for( uint32_t o=0; o<_num_octaves; o++ ) {
+    for( int o=0; o<_num_octaves; o++ ) {
 #if (PYRAMID_PRINT_DEBUG==1)
         printf("Allocating octave %u with width %u and height %u (%u levels)\n", o, w, h, _levels );
 #endif // (PYRAMID_PRINT_DEBUG==1)
         _octaves[o].debugSetOctave( o );
-        _octaves[o].alloc( w, h, _levels, 10000 );
+        _octaves[o].alloc( w, h, _levels, 10000, _gauss_group );
         w = ceilf( w / 2.0f );
         h = ceilf( h / 2.0f );
     }

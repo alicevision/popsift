@@ -30,26 +30,27 @@ bool PopSift::init( int pipe, int w, int h )
         return false;
     }
 
-    int octaves = _config.octaves;
-
     /* up=-1 -> scale factor=2
      * up= 0 -> scale factor=1
      * up= 1 -> scale factor=0.5
      */
     float scaleFactor = 1.0 / pow( 2.0, _config.start_sampling );
 
-    if( octaves < 0 ) {
-        octaves = max(int (floor( logf( (float)min( w, h ) )
-                                / logf( 2.0f ) ) - 3.0f + scaleFactor ), 1);
+    if( _config.octaves < 0 ) {
+        int oct = _config.octaves;
+        oct = max(int (floor( logf( (float)min( w, h ) )
+                            / logf( 2.0f ) ) - 3.0f + scaleFactor ), 1);
+        _config.octaves = oct;
     }
 
     _pipe[pipe]._inputImage = new popart::Image( w, h );
-    _pipe[pipe]._pyramid = new popart::Pyramid( _pipe[pipe]._inputImage,
-                                                octaves,
-                                                _config.levels,
+    _pipe[pipe]._pyramid = new popart::Pyramid( _config,
+                                                _pipe[pipe]._inputImage,
+                                                // octaves,
+                                                // _config.levels,
                                                 ceilf( w * scaleFactor ),
-                                                ceilf( h * scaleFactor ),
-                                                _config.scaling_mode );
+                                                ceilf( h * scaleFactor ) );
+                                                // _config.scaling_mode );
 
     cudaDeviceSynchronize();
     cudaEventRecord( end, 0 );
