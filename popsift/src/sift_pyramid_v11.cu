@@ -413,8 +413,21 @@ void Pyramid::build_v11( Image* base )
             {
                 horiz_from_prev_level( octave, level );
                 vert_from_interm( octave, level );
-                dog_from_blurred( octave, level );
             }
+
+        }
+    }
+    cudaDeviceSynchronize();
+    for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
+        for( uint32_t level=1; level<_levels; level++ ) {
+            dog_from_blurred( octave, level );
+        }
+    }
+    cudaDeviceSynchronize();
+    for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
+        for( uint32_t level=0; level<_levels; level++ ) {
+            Octave&      oct_obj   = _octaves[octave];
+            cudaStream_t oct_str_0 = oct_obj.getStream(0);
 
             cudaEventRecord( oct_obj.getEventGaussDone( level ), oct_str_0 );
         }

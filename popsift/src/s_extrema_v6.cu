@@ -360,6 +360,19 @@ void Pyramid::find_extrema_v6_sub( )
 {
     for( int octave=0; octave<_num_octaves; octave++ ) {
         for( int level=1; level<_levels-2; level++ ) {
+            Octave&      oct_obj = _octaves[octave];
+            cudaStream_t oct_str = oct_obj.getStream(level);
+
+            reset_extrema_count_v6
+                <<<1,1,0,oct_str>>>
+                ( _octaves[octave].getExtremaMgmtD( ), level );
+        }
+    }
+
+    cudaDeviceSynchronize();
+
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        for( int level=1; level<_levels-2; level++ ) {
             int cols = _octaves[octave].getData(level).getCols();
             int rows = _octaves[octave].getData(level).getRows();
             dim3 block( 32, HEIGHT );
@@ -370,10 +383,6 @@ void Pyramid::find_extrema_v6_sub( )
             Octave&      oct_obj = _octaves[octave];
             cudaStream_t oct_str = oct_obj.getStream(level);
             cudaEvent_t  oct_ev  = oct_obj.getEventGaussDone(level+1);
-
-            reset_extrema_count_v6
-                <<<1,1,0,oct_str>>>
-                ( _octaves[octave].getExtremaMgmtD( ), level );
 
             cudaStreamWaitEvent( oct_str, oct_ev, 0 );
 
@@ -386,6 +395,15 @@ void Pyramid::find_extrema_v6_sub( )
                   _levels,
                   _octaves[octave].getExtremaMgmtD( ),
                   _octaves[octave].getExtrema( level ) );
+        }
+    }
+
+    cudaDeviceSynchronize();
+
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        for( int level=1; level<_levels-2; level++ ) {
+            Octave&      oct_obj = _octaves[octave];
+            cudaStream_t oct_str = oct_obj.getStream(level);
 
             fix_extrema_count_v6
                 <<<1,1,0,oct_str>>>
