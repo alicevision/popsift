@@ -19,28 +19,28 @@ void horiz_tex_128x1( cudaTextureObject_t src_data,
 {
     const float dst_w  = dst_data.getWidth();
     const float dst_h  = dst_data.getHeight();
-    const float read_y = ( blockIdx.y + 0.5 ) / dst_h;
+    const float read_y = ( blockIdx.y + 0.5f ) / dst_h;
 
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
 
     if( off_x >= dst_w ) return;
 
-    float out = 0;
+    float out = 0.0f;
 
     #pragma unroll
     for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
         const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
         const float read_x_l = ( off_x - offset );
-        const float  v1 = tex2D<float>( src_data, ( read_x_l + 0.5 ) / dst_w, read_y );
+        const float  v1 = tex2D<float>( src_data, ( read_x_l + 0.5f ) / dst_w, read_y );
         out += ( v1 * g );
 
         const float read_x_r = ( off_x + offset );
-        const float  v2 = tex2D<float>( src_data, ( read_x_r + 0.5 ) / dst_w, read_y );
+        const float  v2 = tex2D<float>( src_data, ( read_x_r + 0.5f ) / dst_w, read_y );
         out += ( v2 * g );
     }
     const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
     const float read_x = off_x;
-    const float v3 = tex2D<float>( src_data, ( read_x + 0.5 ) / dst_w, read_y );
+    const float v3 = tex2D<float>( src_data, ( read_x + 0.5f ) / dst_w, read_y );
     out += ( v3 * g );
 
     dst_data.ptr(blockIdx.y)[off_x] = out;
@@ -58,19 +58,19 @@ void horiz_128x1( cudaTextureObject_t src_data,
 
     if( off_x >= dst_w ) return;
 
-    float out = 0;
+    float out = 0.0f;
 
     #pragma unroll
     for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
         const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
-        const float  v1 = tex2D<float>( src_data, off_x - offset + 0.5, blockIdx.y + 0.5 );
+        const float  v1 = tex2D<float>( src_data, off_x - offset + 0.5f, blockIdx.y + 0.5f );
         out += ( v1 * g );
 
-        const float  v2 = tex2D<float>( src_data, off_x + offset + 0.5, blockIdx.y + 0.5 );
+        const float  v2 = tex2D<float>( src_data, off_x + offset + 0.5f, blockIdx.y + 0.5f );
         out += ( v2 * g );
     }
     const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
-    const float v3 = tex2D<float>( src_data, off_x+0.5, blockIdx.y+0.5 );
+    const float v3 = tex2D<float>( src_data, off_x+0.5f, blockIdx.y+0.5f );
     out += ( v3 * g );
 
     dst_data.ptr(blockIdx.y)[off_x] = out;
@@ -112,17 +112,17 @@ void horiz_by_2( cudaTextureObject_t src_data,
 
         idx = threadIdx.x - offset;
         // add +1.0f because we must shift by 0.5 pixels upscaled by 2 in the previous octave
-        val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0, 2 * ( block_y + idy ) + 1.0 );
+        val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0f, 2 * ( block_y + idy ) + 1.0f );
         out += ( val * g );
 
         idx = threadIdx.x + offset;
-        val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0, 2 * ( block_y + idy ) + 1.0 );
+        val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0f, 2 * ( block_y + idy ) + 1.0f );
         out += ( val * g );
     }
 
     g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
     idx = threadIdx.x;
-    val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0, 2 * ( block_y + idy ) + 1.0 );
+    val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0f, 2 * ( block_y + idy ) + 1.0f );
     out += ( val * g );
 
     idx = block_x+threadIdx.x;
@@ -156,17 +156,17 @@ void vert( cudaTextureObject_t src_data,
         g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
 
         idy = threadIdx.y - offset;
-        val = tex2D<float>( src_data, block_x + idx + 0.5, block_y + idy + 0.5 );
+        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
         out += ( val * g );
 
         idy = threadIdx.y + offset;
-        val = tex2D<float>( src_data, block_x + idx + 0.5, block_y + idy + 0.5 );
+        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
         out += ( val * g );
     }
 
     g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
     idy = threadIdx.y;
-    val = tex2D<float>( src_data, block_x + idx + 0.5, block_y + idy + 0.5 );
+    val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
     out += ( val * g );
 
     idx = block_x+threadIdx.x;
