@@ -17,6 +17,17 @@ set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -DGRIFF_DEBUG")
 # endif(APPLE)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
 
+find_package(Boost 1.53.0 REQUIRED COMPONENTS system filesystem)
+
+if(Boost_FOUND)
+  include_directories(${Boost_INCLUDE_DIRS})
+  # link_directories(${Boost_LIB_DIR})
+  add_definitions(${Boost_DEFINITIONS})
+  message( STATUS "Found BOOST: ${Boost_LIBRARIES}" )
+else(Boost_FOUND)
+  message( FATAL_ERROR "Boost not found" )
+endif(Boost_FOUND)
+
 find_package(CUDA 7.0)
 
 IF(CUDA_FOUND)

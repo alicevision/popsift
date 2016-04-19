@@ -10,6 +10,5 @@ target_include_directories( sift_v4 PRIVATE
 target_link_libraries( sift_v4 popsift
                                ${CUDA_LIBRARIES}
 			       ${CUDA_CUDADEVRT_LIBRARY}
-			       -lboost_filesystem
-			       -lboost_system )
+			       ${Boost_LIBRARIES} )
 
