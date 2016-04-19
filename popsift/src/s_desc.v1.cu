@@ -271,21 +271,13 @@ void Pyramid::descriptors_v1( )
         oct_obj.readExtremaCount( );
     }
 
-    // wait until that is finished, so we can alloc space for descriptor
-    cudaDeviceSynchronize( );
-
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        // allocate the descriptor array for this octave, all levels
-        _octaves[octave].allocDescriptors( );
-    }
-
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
         for( int level=1; level<_levels-1; level++ ) {
             dim3 block;
             dim3 grid;
-            grid.x  = oct_obj.getExtremaMgmtH(level)->counter;
+            grid.x  = oct_obj.getExtremaMgmtH(level)->getCounter();
 
             if( grid.x != 0 ) {
                 block.x = DESC_NUM_THREADS;
