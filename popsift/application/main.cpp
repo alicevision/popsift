@@ -87,6 +87,8 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
     if( argc == 1 ) usage( argv[0] );
 
     int opt;
+    bool applySigma = false;
+    float sigma;
 
     while( (opt = getopt_long(argc, argv, "?hvl", longopts, NULL)) != -1 )
     {
@@ -97,7 +99,7 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 'v' : config.setVerbose(); break;
         case 'l' : config.setLogMode( popart::Config::All ); break;
 
-        case 1100 : config.setModeVLFeat( popart::Config::VLFeat ); break;
+        case 1100 : config.setModeVLFeat( ); break;
         case 1101 : config.setScalingMode( popart::Config::DirectDownscaling ); break;
         case 1102 : config.setScalingMode( popart::Config::IndirectDownscaling ); break;
         case 1103 : config.setScalingMode( popart::Config::IndirectUnfilteredDownscaling ); break;
@@ -108,10 +110,12 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 1002 : config.setDownsampling( strtof( optarg, NULL ) ); break;
         case 1003 : config.setThreshold(  strtof( optarg, NULL ) ); break;
         case 1004 : config.setEdgeLimit(  strtof( optarg, NULL ) ); break;
-        case 1005 : config.setSigma(      strtof( optarg, NULL ) ); break;
+        case 1005 : applySigma = true; sigma = strtof( optarg, NULL ); break;
         default   : usage( appName );
         }
     }
+
+    if( applySigma ) config.setSigma( sigma );
 
     argc -= optind;
     argv += optind;

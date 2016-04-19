@@ -16,16 +16,16 @@ Config::Config( )
     , verbose( false )
 { }
 
-void Config::setModeVLFeat( float s )
+void Config::setModeVLFeat( )
 {
     sift_mode = Config::VLFeat;
-    sigma     = s;
+    sigma     = 0.82f;
 }
 
-void Config::setModeOpenCV( float s )
+void Config::setModeOpenCV( )
 {
     sift_mode = Config::OpenCV;
-    sigma     = s;
+    sigma     = 1.6f;
 }
 
 void Config::setVerbose( bool on )
