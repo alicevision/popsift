@@ -20,7 +20,8 @@ using namespace std;
 static void validate( const char* appName, popart::Config& config );
 
 /* User parameters */
-int    verbose         = false;
+// int    verbose         = false;
+static bool print_info      = false;
 
 string keyFilename     = "";
 string inputFilename   = "";
@@ -36,6 +37,7 @@ static void usage( const char* argv )
          << " --help / -h / -?            Print usage" << endl
          << " --verbose / -v" << endl
          << " --log / -l                  Write debugging files" << endl
+         << " --print-info / -p           Print info about GPUs" << endl
          << endl
          << "* Parameters *" << endl
          << " --octaves=<int>             Number of octaves" << endl
@@ -65,6 +67,7 @@ static struct option longopts[] = {
     { "help",                no_argument,            NULL, 'h' },
     { "verbose",             no_argument,            NULL, 'v' },
     { "log",                 no_argument,            NULL, 'l' },
+    { "print-info",          no_argument,            NULL, 'p' },
 
     { "octaves",             required_argument,      NULL, 1000 },
     { "levels",              required_argument,      NULL, 1001 },
@@ -95,7 +98,7 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
     bool applySigma = false;
     float sigma;
 
-    while( (opt = getopt_long(argc, argv, "?hvl", longopts, NULL)) != -1 )
+    while( (opt = getopt_long(argc, argv, "?hvlp", longopts, NULL)) != -1 )
     {
         switch (opt)
         {
@@ -103,6 +106,7 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 'h' : usage( appName ); break;
         case 'v' : config.setVerbose(); break;
         case 'l' : config.setLogMode( popart::Config::All ); break;
+        case 'p' : print_info = true; break;
 
         case 1100 : config.setModeVLFeat( ); break;
         case 1101 : config.setScalingMode( popart::Config::DirectDownscaling ); break;
@@ -162,7 +166,9 @@ int main(int argc, char **argv)
 
     device_prop_t deviceInfo;
     deviceInfo.set( 0 );
-    deviceInfo.print( );
+    if( print_info ) {
+        deviceInfo.print( );
+    }
 
     PopSift PopSift( config );
 
