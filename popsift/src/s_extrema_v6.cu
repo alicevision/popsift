@@ -338,6 +338,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
         if( ct >= number_of_blocks-1 ) {
             int num_ext = atomicMin( extrema_counter, d_max_extrema );
             // printf("counted to %d, num extrema %d\n", ct, num_ext );
+            printf("Number of extrema at level %d: %d\n", level, num_ext );
         }
     }
 }
@@ -398,7 +399,7 @@ void Pyramid::find_extrema_v6_sub( )
         }
     }
 
-    cudaDeviceSynchronize();
+    // cudaDeviceSynchronize();
 }
 
 __host__
