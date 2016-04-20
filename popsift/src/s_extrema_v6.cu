@@ -16,7 +16,7 @@ namespace popart{
 template<int HEIGHT>
 __device__
 static
-inline uint32_t extrema_count( int indicator, ExtremaMgmt* mgmt )
+inline uint32_t extrema_count( int indicator, int* extrema_counter )
 {
     uint32_t mask = __ballot( indicator ); // bitfield of warps with results
 
@@ -26,7 +26,7 @@ inline uint32_t extrema_count( int indicator, ExtremaMgmt* mgmt )
     if( threadIdx.x == 0 ) {
         // atomicAdd returns the old value, we consider this the based
         // index for this thread's write operation
-        write_index = atomicAdd( &mgmt->_counter, ct );
+        write_index = atomicAdd( extrema_counter, ct );
     }
     // broadcast from thread 0 to all threads in warp
     write_index = __shfl( write_index, 0 );
@@ -317,15 +317,14 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
                              int                 width,
                              int                 height,
                              const uint32_t      maxlevel,
-                             ExtremaMgmt*        mgmt_array,
+                             int*                extrema_counter,
                              Extremum*           d_extrema )
 {
-    ExtremaMgmt* mgmt = &mgmt_array[level];
     Extremum ec;
 
     bool indicator = find_extrema_in_dog_v6_sub( dog, level, width, height, maxlevel, ec );
 
-    uint32_t write_index = extrema_count<HEIGHT>( indicator, mgmt );
+    uint32_t write_index = extrema_count<HEIGHT>( indicator, extrema_counter );
 
     if( indicator && write_index < d_max_extrema ) {
         d_extrema[write_index] = ec;
@@ -334,21 +333,21 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
 
 
 __global__
-void reset_extrema_count_v6( ExtremaMgmt* mgmt_array, uint32_t mgmt_level )
+void reset_extrema_count_v6( int* extrema_counter )
 {
-    ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
-
-    mgmt->_counter = 0;
+    *extrema_counter = 0;
 }
 
 __global__
-void fix_extrema_count_v6( ExtremaMgmt* mgmt_array, uint32_t mgmt_level )
+void fix_extrema_count_v6( int* extrema_counters, int levels )
 {
-    ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
-
-    int ct = atomicMin( &mgmt->_counter, d_max_extrema );
-
-    printf("Number of extrema: %d\n", ct );
+    for( int i=0; i<levels; i++ )
+    {
+        int ct = extrema_counters[i];
+        ct     = min( ct, d_max_extrema );
+        extrema_counters[i] = ct;
+        printf("Number of extrema at level %d: %d\n", i, ct );
+    }
 }
 
 /*************************************************************
@@ -359,19 +358,15 @@ __host__
 void Pyramid::find_extrema_v6_sub( )
 {
     for( int octave=0; octave<_num_octaves; octave++ ) {
-        for( int level=1; level<_levels-2; level++ ) {
-            Octave&      oct_obj = _octaves[octave];
-            cudaStream_t oct_str = oct_obj.getStream(level);
+        int* extrema_counters = _octaves[octave].getExtremaMgmtD( );
 
-            reset_extrema_count_v6
-                <<<1,1,0,oct_str>>>
-                ( _octaves[octave].getExtremaMgmtD( ), level );
-        }
+        popcuda_memset( extrema_counters, 0, _levels*sizeof(int) );
     }
 
     cudaDeviceSynchronize();
 
     for( int octave=0; octave<_num_octaves; octave++ ) {
+        int* extrema_counters = _octaves[octave].getExtremaMgmtD( );
         for( int level=1; level<_levels-2; level++ ) {
             int cols = _octaves[octave].getData(level).getCols();
             int rows = _octaves[octave].getData(level).getRows();
@@ -384,6 +379,8 @@ void Pyramid::find_extrema_v6_sub( )
             cudaStream_t oct_str = oct_obj.getStream(level);
             cudaEvent_t  oct_ev  = oct_obj.getEventGaussDone(level+1);
 
+            int* extrema_counter = &extrema_counters[level];
+
             cudaStreamWaitEvent( oct_str, oct_ev, 0 );
 
             find_extrema_in_dog_v6<HEIGHT>
@@ -393,7 +390,7 @@ void Pyramid::find_extrema_v6_sub( )
                   cols,
                   rows,
                   _levels,
-                  _octaves[octave].getExtremaMgmtD( ),
+                  extrema_counter,
                   _octaves[octave].getExtrema( level ) );
         }
     }
@@ -401,14 +398,13 @@ void Pyramid::find_extrema_v6_sub( )
     cudaDeviceSynchronize();
 
     for( int octave=0; octave<_num_octaves; octave++ ) {
-        for( int level=1; level<_levels-2; level++ ) {
-            Octave&      oct_obj = _octaves[octave];
-            cudaStream_t oct_str = oct_obj.getStream(level);
+        Octave&      oct_obj = _octaves[octave];
 
-            fix_extrema_count_v6
-                <<<1,1,0,oct_str>>>
-                ( _octaves[octave].getExtremaMgmtD( ), level );
-        }
+        int* extrema_counters = oct_obj.getExtremaMgmtD( );
+
+        fix_extrema_count_v6
+            <<<1,1>>>
+            ( extrema_counters, _levels );
     }
 }
 

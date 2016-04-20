@@ -12,7 +12,7 @@ using namespace popart;
  */
 __global__
 void compute_keypoint_orientations_v1( ExtremumCandidate* extremum,
-                                       ExtremaMgmt*       mgmt_array,
+                                       int*               mgmt_array,
                                        uint32_t           mgmt_level,
                                        const float*       layer,
                                        int                layer_pitch,

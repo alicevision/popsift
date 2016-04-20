@@ -45,12 +45,12 @@ class Octave
          * must be handled per scale (level) of an octave.
          * There: one set of extrema per octave and level.
          */
-        ExtremaMgmt*         _h_extrema_mgmt; // host side info
-        ExtremaMgmt*         _d_extrema_mgmt; // device side info
-        Extremum**           _h_extrema;
-        Extremum**           _d_extrema;
-        Descriptor**         _d_desc;
-        Descriptor**         _h_desc;
+        int*         _h_extrema_mgmt; // host side info
+        int*         _d_extrema_mgmt; // device side info
+        Extremum**   _h_extrema;
+        Extremum**   _d_extrema;
+        Descriptor** _d_desc;
+        Descriptor** _h_desc;
 
     public:
         Octave( );
@@ -93,11 +93,11 @@ class Octave
             return _data[0].getPitch();
         }
 
-        inline ExtremaMgmt* getExtremaMgmtH( uint32_t level ) {
+        inline int* getExtremaMgmtH( uint32_t level ) {
             return &_h_extrema_mgmt[level];
         }
 
-        inline ExtremaMgmt* getExtremaMgmtD( ) {
+        inline int* getExtremaMgmtD( ) {
             return _d_extrema_mgmt;
         }
 

@@ -12,9 +12,4 @@ extern __device__ __constant__ int d_max_orientations;
 
 void init_extrema_limits( int max_extrema );
 
-struct ExtremaMgmt
-{
-    int _counter;
-};
-
 } // namespace popart

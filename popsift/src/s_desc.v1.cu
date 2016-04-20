@@ -187,18 +187,15 @@ void normalize_histogram( Descriptor* descs )
     ptr4[threadIdx.x] = descr;
 }
 
-#ifdef USE_DYNAMIC_PARALLELISM
-__global__ void descriptor_starter( int                level,
-                                    ExtremaMgmt*       mgmt_array,
-                                    Extremum* extrema,
-                                    Descriptor*        descs,
-                                    Plane2D_float      layer )
+__global__ void descriptor_starter( int*          extrema_counter,
+                                    Extremum*     extrema,
+                                    Descriptor*   descs,
+                                    Plane2D_float layer )
 {
-    ExtremaMgmt* mgmt = &mgmt_array[level];
-
+#ifdef USE_DYNAMIC_PARALLELISM
     dim3 block;
     dim3 grid;
-    grid.x  = mgmt->_counter;
+    grid.x  = *extrema_counter;
 
     if( grid.x == 0 ) return;
 
@@ -219,17 +216,8 @@ __global__ void descriptor_starter( int                level,
     normalize_histogram
         <<<grid,block>>>
         ( descs );
-}
-#else // not USE_DYNAMIC_PARALLELISM
-__global__ void descriptor_starter( int                level,
-                                    ExtremaMgmt*       mgmt_array,
-                                    Extremum* extrema,
-                                    Descriptor*        descs,
-                                    Plane2D_float      layer )
-{
-    // dummy for happy linker
-}
 #endif // not USE_DYNAMIC_PARALLELISM
+}
 
 /*************************************************************
  * V4: host side
@@ -244,10 +232,11 @@ void Pyramid::descriptors_v1( )
 
         for( int level=1; level<_levels-1; level++ ) {
             cudaStream_t oct_str = oct_obj.getStream(level);
+            int* extrema_counters = oct_obj.getExtremaMgmtD();
+            int* extrema_counter  = &extrema_counters[level];
             descriptor_starter
                 <<<1,1,0,oct_str>>>
-                ( level,
-                  oct_obj.getExtremaMgmtD( ),
+                ( extrema_counter,
                   oct_obj.getExtrema( level ),
                   oct_obj.getDescriptors( level ),
                   oct_obj.getData( level ) );
@@ -277,7 +266,7 @@ void Pyramid::descriptors_v1( )
         for( int level=1; level<_levels-1; level++ ) {
             dim3 block;
             dim3 grid;
-            grid.x  = oct_obj.getExtremaMgmtH(level)->getCounter();
+            grid.x  = oct_obj.getExtremaMgmtH(level);
 
             if( grid.x != 0 ) {
                 block.x = DESC_NUM_THREADS;

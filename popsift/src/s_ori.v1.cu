@@ -33,15 +33,12 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
  * using 16 threads for each of them.
  */
 __global__
-void compute_keypoint_orientations_v1( Extremum* extremum,
-                                       ExtremaMgmt*       mgmt_array,
-                                       uint32_t           mgmt_level,
-                                       Plane2D_float      layer )
+void compute_keypoint_orientations_v1( Extremum*     extremum,
+                                       int*          extrema_counter,
+                                       Plane2D_float layer )
 {
     uint32_t w   = layer.getWidth();
     uint32_t h   = layer.getHeight();
-
-    ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
 
     // if( threadIdx.y >= mgmt->getCounter() ) return;
 
@@ -175,7 +172,7 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
 
             /* find if a peak */
             if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
-                int idx = atomicAdd( &mgmt->_counter, 1 );
+                int idx = atomicAdd( extrema_counter, 1 );
                 if( idx >= d_max_orientations ) break;
 
                 float th = compute_angle(bin, hc, hn, hp);
@@ -229,24 +226,20 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
 #ifdef USE_DYNAMIC_PARALLELISM // defined in_s_pyramid.h
 
 __global__
-void orientation_starter_v1( Extremum* extremum,
-                             ExtremaMgmt*       mgmt_array,
-                             uint32_t           mgmt_level,
-                             Plane2D_float      layer )
+void orientation_starter_v1( Extremum*     extremum,
+                             int*          extrema_counter,
+                             Plane2D_float layer )
 {
-    ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
-
     dim3 block;
     dim3 grid;
-    grid.x  = mgmt->_counter;
+    grid.x  = *extrema_counter;
     block.x = ORI_V1_NUM_THREADS;
 
     if( grid.x != 0 ) {
         compute_keypoint_orientations_v1
             <<<grid,block>>>
             ( extremum,
-              mgmt_array,
-              mgmt_level,
+              extrema_counter,
               layer );
     }
 }
@@ -260,11 +253,12 @@ void Pyramid::orientation_v1( )
         for( int level=1; level<_levels-1; level++ ) {
             cudaStream_t oct_str = oct_obj.getStream(level);
 
+            int* extrema_counters = oct_obj.getExtremaMgmtD( );
+            int* extrema_counter  = &extrema_counters[level];
             orientation_starter_v1
                 <<<1,1,0,oct_str>>>
                 ( oct_obj.getExtrema( level ),
-                  oct_obj.getExtremaMgmtD( ),
-                  level,
+                  extrema_counter,
                   oct_obj.getData( level ) );
         }
     }
