@@ -53,12 +53,8 @@ void Octave::alloc( int width, int height, int levels, int gauss_group )
     alloc_extrema_mgmt( );
     alloc_extrema( );
 
-    _streams = new cudaStream_t[_levels];
-    _gauss_done = new cudaEvent_t[_levels];
-    for( int i=0; i<_levels; i++ ) {
-        _streams[i]    = popart::cuda::stream_create( __FILE__, __LINE__ );
-        _gauss_done[i] = popart::cuda::event_create( __FILE__, __LINE__ );
-    }
+    alloc_streams( );
+    alloc_events( );
 
     _d_desc = new Descriptor*[_levels];
     _h_desc = new Descriptor*[_levels];
@@ -84,12 +80,8 @@ void Octave::free( )
     delete [] _d_desc;
     delete [] _h_desc;
 
-    for( int i=0; i<_levels; i++ ) {
-        popart::cuda::stream_destroy( _streams[i], __FILE__, __LINE__ );
-        popart::cuda::event_destroy( _gauss_done[i], __FILE__, __LINE__ );
-    }
-    delete [] _streams;
-    delete [] _gauss_done;
+    free_events( );
+    free_streams( );
 
     free_extrema( );
     free_extrema_mgmt( );
@@ -104,20 +96,11 @@ void Octave::free( )
     free_data_planes( );
 }
 
-#if 0
-void Octave::resetExtremaCount( )
+void Octave::reset_extrema_mgmt( )
 {
-    for( uint32_t i=1; i<_levels-1; i++ ) {
-        _h_extrema_mgmt[i].resetCounter();
-    }
-    POP_CUDA_MEMCPY_ASYNC( _d_extrema_mgmt,
-                           _h_extrema_mgmt,
-                           _levels * sizeof(ExtremaMgmt),
-                           cudaMemcpyHostToDevice,
-                           0,
-                           true );
+    memset( _h_extrema_mgmt, 0, _levels * sizeof(int) );
+    popcuda_memset_sync( _d_extrema_mgmt, 0, _levels * sizeof(int) );
 }
-#endif
 
 void Octave::readExtremaCount( )
 {
@@ -550,10 +533,7 @@ void Octave::free_dog_tex( )
 void Octave::alloc_extrema_mgmt( )
 {
     _h_extrema_mgmt = popart::cuda::malloc_hstT<int>( _levels, __FILE__, __LINE__ );
-    memset( _h_extrema_mgmt, 0, _levels * sizeof(int) );
-
     _d_extrema_mgmt = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
-    popcuda_memset( _d_extrema_mgmt, 0, _levels * sizeof(int) );
 }
 
 void Octave::free_extrema_mgmt( )
@@ -591,6 +571,44 @@ void Octave::free_extrema( )
     cudaFree(     _d_extrema[1] );
     delete [] _d_extrema;
     delete [] _h_extrema;
+}
+
+void Octave::alloc_streams( )
+{
+    _streams = new cudaStream_t[_levels];
+
+    for( int i=0; i<_levels; i++ ) {
+        _streams[i]    = popart::cuda::stream_create( __FILE__, __LINE__ );
+    }
+}
+
+void Octave::free_streams( )
+{
+    for( int i=0; i<_levels; i++ ) {
+        popart::cuda::stream_destroy( _streams[i], __FILE__, __LINE__ );
+    }
+    delete [] _streams;
+}
+
+void Octave::alloc_events( )
+{
+    _gauss_done   = new cudaEvent_t[_levels];
+    _extrema_done = new cudaEvent_t[_levels];
+    for( int i=0; i<_levels; i++ ) {
+        _gauss_done[i]   = popart::cuda::event_create( __FILE__, __LINE__ );
+        _extrema_done[i] = popart::cuda::event_create( __FILE__, __LINE__ );
+    }
+}
+
+void Octave::free_events( )
+{
+    for( int i=0; i<_levels; i++ ) {
+        popart::cuda::event_destroy( _gauss_done[i],   __FILE__, __LINE__ );
+        popart::cuda::event_destroy( _extrema_done[i], __FILE__, __LINE__ );
+    }
+
+    delete [] _gauss_done;
+    delete [] _extrema_done;
 }
 
 } // namespace popart

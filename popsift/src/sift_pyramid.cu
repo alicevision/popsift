@@ -167,6 +167,8 @@ Pyramid::~Pyramid( )
 
 void Pyramid::find_extrema( Image* base )
 {
+    reset_extrema_mgmt( );
+
     build_v11( base );
 
     find_extrema_v6( );
@@ -174,6 +176,13 @@ void Pyramid::find_extrema( Image* base )
     orientation_v1();
 
     descriptors_v1( );
+}
+
+void Pyramid::reset_extrema_mgmt( )
+{
+    for( int o=0; o<_num_octaves; o++ ) {
+        _octaves[o].reset_extrema_mgmt( );
+    }
 }
 
 } // namespace popart

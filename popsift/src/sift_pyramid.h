@@ -47,6 +47,7 @@ private:
     inline void vert_from_interm( int octave, int level );
     inline void dog_from_blurred( int octave, int level );
 
+    void reset_extrema_mgmt( );
     void find_extrema_v6( );
 
     template<int HEIGHT>

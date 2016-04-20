@@ -27,7 +27,7 @@ void malloc_dev( void** ptr, int sz,
         exit( -__LINE__ );
     }
 #ifdef DEBUG_INIT_DEVICE_ALLOCATIONS
-    popart::cuda::memset( *ptr, 0, sz, file, line );
+    popart::cuda::memset_sync( *ptr, 0, sz, file, line );
 #endif // NDEBUG
 }
 } }
@@ -72,9 +72,7 @@ void memcpy_async( void* dst, const void* src, size_t sz,
     }
     POP_CUDA_FATAL_TEST( err, "Failed to copy host-to-device: " );
 }
-} }
 
-namespace popart { namespace cuda {
 void memcpy_sync( void* dst, const void* src, size_t sz, cudaMemcpyKind type, const char* file, size_t line )
 {
     POP_CHECK_NON_NULL( dst, "Dest ptr in memcpy async is null." );
@@ -94,10 +92,19 @@ void memcpy_sync( void* dst, const void* src, size_t sz, cudaMemcpyKind type, co
     }
     POP_CUDA_FATAL_TEST( err, "Failed to copy host-to-device: " );
 }
-} }
 
-namespace popart { namespace cuda {
-void memset( void* ptr, int value, size_t bytes, const char* file, size_t line )
+void memset_async( void* ptr, int value, size_t bytes, cudaStream_t stream, const char* file, size_t line )
+{
+    cudaError_t err;
+    err = cudaMemsetAsync( ptr, value, bytes, stream );
+    if( err != cudaSuccess ) {
+        std::cerr << file << ":" << line << std::endl
+                  << "    cudaMemsetAsync failed: " << cudaGetErrorString(err) << std::endl;
+        exit( -__LINE__ );
+    }
+}
+
+void memset_sync( void* ptr, int value, size_t bytes, const char* file, size_t line )
 {
     cudaError_t err;
     err = cudaMemset( ptr, value, bytes );

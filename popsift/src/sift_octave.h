@@ -32,6 +32,7 @@ class Octave
         // cosnider later whether some of them can be removed
         cudaStream_t* _streams;
         cudaEvent_t*  _gauss_done;
+        cudaEvent_t*  _extrema_done;
 
     public:
         cudaTextureObject_t* _data_tex;
@@ -78,14 +79,17 @@ class Octave
             return _h;
         }
 
-        inline cudaStream_t getStream( uint32_t level ) {
+        inline cudaStream_t getStream( int level ) {
             return _streams[level];
         }
-        inline cudaEvent_t getEventGaussDone( uint32_t level ) {
+        inline cudaEvent_t getEventGaussDone( int level ) {
             return _gauss_done[level];
         }
+        inline cudaEvent_t getEventExtremaDone( int level ) {
+            return _extrema_done[level];
+        }
 
-        inline Plane2D_float& getData( uint32_t level ) {
+        inline Plane2D_float& getData( int level ) {
             return _data[level];
         }
         inline Plane2D_float& getIntermediateData( ) {
@@ -140,6 +144,10 @@ class Octave
                     int gauss_group );
         void free();
 
+        /** Call this once for every loaded frame.
+         */
+        void reset_extrema_mgmt( );
+
         /**
          * debug:
          * download a level and write to disk
@@ -154,7 +162,11 @@ private:
     void alloc_dog_tex( );
     void alloc_extrema_mgmt( );
     void alloc_extrema( );
+    void alloc_streams( );
+    void alloc_events( );
 
+    void free_events( );
+    void free_streams( );
     void free_extrema( );
     void free_extrema_mgmt( );
     void free_dog_tex( );
