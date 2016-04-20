@@ -1,5 +1,6 @@
 #include "sift_pyramid.h"
 #include "gauss_filter.h"
+#include "debug_macros.h"
 #include "assist.h"
 
 #include <iostream>
@@ -218,21 +219,23 @@ void make_dog( cudaTextureObject_t this_data,
 } // namespace v11
 
 __host__
-inline void Pyramid::horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data,
-                                            int                 octave )
+inline void Pyramid::horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data, int octave, cudaStream_t stream )
 {
-    Octave&      oct_obj   = _octaves[octave];
-    cudaStream_t oct_str_0 = oct_obj.getStream(0);
+    Octave&      oct_obj = _octaves[octave];
 
-    const int width  = _octaves[octave].getWidth();
-    const int height = _octaves[octave].getHeight();
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    /* I believe that waiting is not necessary because image is upscaled
+     * in default stream */
 
     dim3 block( 128, 1 );
     dim3 grid;
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
+
     gauss::v11::horiz_tex_128x1
-        <<<grid,block,0,oct_str_0>>>
+        <<<grid,block,0,stream>>>
         ( src_data,
           oct_obj.getIntermediateData( ),
           0 ); // level is always 0
@@ -242,16 +245,17 @@ inline void Pyramid::horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data,
 // #define PREV_LEVEL 5
 
 __host__
-inline void Pyramid::downscale_from_prev_octave( int octave, int level )
+inline void Pyramid::downscale_from_prev_octave( int octave, int level, cudaStream_t stream )
 {
-    Octave&      oct_obj   = _octaves[octave];
-    cudaStream_t oct_str_0 = oct_obj.getStream(0);
+    Octave&      oct_obj = _octaves[octave];
+    Octave& prev_oct_obj = _octaves[octave-1];
 
-    Octave& prev_oct_obj  = _octaves[octave-1];
-    cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( _levels-PREV_LEVEL ), 0 );
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
 
-    const int width  = _octaves[octave].getWidth();
-    const int height = _octaves[octave].getHeight();
+    /* Necessary to wait for a lower level in the previous octave */
+    cudaEvent_t ev = prev_oct_obj.getEventGaussDone( _levels-PREV_LEVEL );
+    cudaStreamWaitEvent( stream, ev, 0 );
 
     dim3 h_block( 64, 2 );
     dim3 h_grid;
@@ -259,23 +263,24 @@ inline void Pyramid::downscale_from_prev_octave( int octave, int level )
     h_grid.y = (unsigned int)grid_divide( height, h_block.y );
 
     gauss::v11::get_by_2
-        <<<h_grid,h_block,0,oct_str_0>>>
+        <<<h_grid,h_block,0,stream>>>
         ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
           oct_obj.getData( level ),
           level );
 }
 
 __host__
-inline void Pyramid::downscale_from_prev_octave_and_horiz_blur( int octave, int level )
+inline void Pyramid::downscale_from_prev_octave_and_horiz_blur( int octave, int level, cudaStream_t stream )
 {
-    Octave&      oct_obj   = _octaves[octave];
-    cudaStream_t oct_str_0 = oct_obj.getStream(0);
-
+    Octave&      oct_obj  = _octaves[octave];
     Octave& prev_oct_obj  = _octaves[octave-1];
-    cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( _levels-PREV_LEVEL ), 0 );
 
-    const int width  = _octaves[octave].getWidth();
-    const int height = _octaves[octave].getHeight();
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    /* Necessary to wait for a lower level in the previous octave */
+    cudaEvent_t ev = prev_oct_obj.getEventGaussDone( _levels-PREV_LEVEL );
+    cudaStreamWaitEvent( stream, ev, 0 );
 
     dim3 h_block( 64, 2 );
     dim3 h_grid;
@@ -283,48 +288,53 @@ inline void Pyramid::downscale_from_prev_octave_and_horiz_blur( int octave, int 
     h_grid.y = (unsigned int)grid_divide( height, h_block.y );
 
     gauss::v11::horiz_by_2
-        <<<h_grid,h_block,0,oct_str_0>>>
+        <<<h_grid,h_block,0,stream>>>
         ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
           oct_obj.getIntermediateData( ),
           level );
 }
 
 __host__
-inline void Pyramid::horiz_from_prev_level( int octave, int level )
+inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t stream )
 {
-    Octave&      oct_obj   = _octaves[octave];
-    cudaStream_t oct_str_0 = oct_obj.getStream(0);
+    Octave&      oct_obj = _octaves[octave];
 
-    const int width  = _octaves[octave].getWidth();
-    const int height = _octaves[octave].getHeight();
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    /* waiting for previous level in same octave */
+    cudaEvent_t ev = oct_obj.getEventGaussDone( level-1 );
+    cudaStreamWaitEvent( stream, ev, 0 );
 
     dim3 block( 128, 1 );
     dim3 grid;
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
     gauss::v11::horiz_128x1
-        <<<grid,block,0,oct_str_0>>>
+        <<<grid,block,0,stream>>>
         ( oct_obj._data_tex[ level-1 ],
           oct_obj.getIntermediateData( ),
           level );
 }
 
 __host__
-inline void Pyramid::vert_from_interm( int octave, int level )
+inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t stream )
 {
-    Octave&      oct_obj   = _octaves[octave];
-    cudaStream_t oct_str_0 = oct_obj.getStream(0);
+    Octave& oct_obj = _octaves[octave];
 
-    const int width  = _octaves[octave].getWidth();
-    const int height = _octaves[octave].getHeight();
+    /* waiting for any events is not necessary, it's in the same stream as horiz
+     */
 
-    dim3 v_block( 64, 2 );
-    dim3 v_grid;
-    v_grid.x = (unsigned int)grid_divide( width,  v_block.x );
-    v_grid.y = (unsigned int)grid_divide( height, v_block.y );
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    dim3 block( 64, 2 );
+    dim3 grid;
+    grid.x = (unsigned int)grid_divide( width,  block.x );
+    grid.y = (unsigned int)grid_divide( height, block.y );
 
     gauss::v11::vert
-        <<<v_grid,v_block,0,oct_str_0>>>
+        <<<grid,block,0,stream>>>
         ( oct_obj._interm_data_tex,
           oct_obj.getData( level ),
           level );
@@ -335,8 +345,6 @@ inline void Pyramid::dog_from_blurred( int octave, int level )
 {
     Octave&      oct_obj = _octaves[octave];
     cudaStream_t oct_str = oct_obj.getStream(level);
-    cudaEvent_t  ev1     = oct_obj.getEventGaussDone( level-1 );
-    cudaEvent_t  ev2     = oct_obj.getEventGaussDone( level );
 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
@@ -346,8 +354,11 @@ inline void Pyramid::dog_from_blurred( int octave, int level )
     grid.x = grid_divide( width,  block.x );
     grid.y = grid_divide( height, block.y );
 
-    cudaStreamWaitEvent( oct_str, ev1, 0 );
-    cudaStreamWaitEvent( oct_str, ev2, 0 );
+    /* waiting for lower level is automatic, it's in the same stream.
+     * waiting for upper level is necessary, it's in another stream.
+     */
+    cudaEvent_t  ev     = oct_obj.getEventGaussDone( level-1 );
+    cudaStreamWaitEvent( oct_str, ev, 0 );
 
     gauss::v11::make_dog
         <<<grid,block,0,oct_str>>>
@@ -363,6 +374,8 @@ inline void Pyramid::dog_from_blurred( int octave, int level )
 __host__
 void Pyramid::build_v11( Image* base )
 {
+    cudaError_t err;
+
 #if (PYRAMID_PRINT_DEBUG==1)
     cerr << "Entering " << __FUNCTION__ << " with base image "  << endl
          << "    type size         : " << base->type_size << endl
@@ -373,6 +386,8 @@ void Pyramid::build_v11( Image* base )
          << "    original pix size : " << base->u_width/base->type_size << "x" << base->u_height << endl;
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
+    cudaDeviceSynchronize();
+
     for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
         Octave& oct_obj   = _octaves[octave];
 
@@ -381,15 +396,16 @@ void Pyramid::build_v11( Image* base )
             const int width  = oct_obj.getWidth();
             const int height = oct_obj.getHeight();
 
-            cudaStream_t oct_str_0 = oct_obj.getStream(0);
+            cudaStream_t stream = oct_obj.getStream(level);
+            cudaEvent_t  ev     = oct_obj.getEventGaussDone(level);
 
             if( level == 0 )
             {
                 if( octave == 0 )
                 {
                     cudaTextureObject_t& tex = base->getUpscaledTexture();
-                    horiz_from_upscaled_orig_tex( tex, octave );
-                    vert_from_interm( octave, level );
+                    horiz_from_upscaled_orig_tex( tex, octave, stream );
+                    vert_from_interm( octave, level, stream );
                 }
                 else 
                 {
@@ -398,16 +414,16 @@ void Pyramid::build_v11( Image* base )
                     case Config::DirectDownscaling :
                         {
                             cudaTextureObject_t& tex = base->getUpscaledTexture();
-                            horiz_from_upscaled_orig_tex( tex, octave );
-                            vert_from_interm( octave, level );
+                            horiz_from_upscaled_orig_tex( tex, octave, stream );
+                            vert_from_interm( octave, level, stream );
                         }
                         break;
                     case Config::IndirectUnfilteredDownscaling :
-                        downscale_from_prev_octave( octave, level );
+                        downscale_from_prev_octave( octave, level, stream );
                         break;
                     case Config::IndirectDownscaling :
-                        downscale_from_prev_octave_and_horiz_blur( octave, level );
-                        vert_from_interm( octave, level );
+                        downscale_from_prev_octave_and_horiz_blur( octave, level, stream );
+                        vert_from_interm( octave, level, stream );
                         break;
                     default :
                         cerr << __FILE__ << ":" << __LINE__ << ": unknown scaling mode" << endl;
@@ -417,11 +433,12 @@ void Pyramid::build_v11( Image* base )
             }
             else
             {
-                horiz_from_prev_level( octave, level );
-                vert_from_interm( octave, level );
+                horiz_from_prev_level( octave, level, stream );
+                vert_from_interm( octave, level, stream );
             }
 
-            cudaEventRecord( oct_obj.getEventGaussDone( level ), oct_str_0 );
+            err = cudaEventRecord( ev, stream );
+            POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
         }
     }
 
