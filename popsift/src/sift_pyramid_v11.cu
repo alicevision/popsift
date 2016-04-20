@@ -341,10 +341,9 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
 }
 
 __host__
-inline void Pyramid::dog_from_blurred( int octave, int level )
+inline void Pyramid::dog_from_blurred( int octave, int level, cudaStream_t stream )
 {
     Octave&      oct_obj = _octaves[octave];
-    cudaStream_t oct_str = oct_obj.getStream(level);
 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
@@ -358,10 +357,10 @@ inline void Pyramid::dog_from_blurred( int octave, int level )
      * waiting for upper level is necessary, it's in another stream.
      */
     cudaEvent_t  ev     = oct_obj.getEventGaussDone( level-1 );
-    cudaStreamWaitEvent( oct_str, ev, 0 );
+    cudaStreamWaitEvent( stream, ev, 0 );
 
     gauss::v11::make_dog
-        <<<grid,block,0,oct_str>>>
+        <<<grid,block,0,stream>>>
         ( oct_obj._data_tex[level],
           oct_obj._data_tex[level-1],
           oct_obj.getDogSurface( ),
@@ -441,7 +440,7 @@ void Pyramid::build_v11( Image* base )
             POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
 
             if( level > 0 ) {
-                dog_from_blurred( octave, level );
+                dog_from_blurred( octave, level, stream );
             }
         }
     }

@@ -45,7 +45,7 @@ private:
     inline void downscale_from_prev_octave_and_horiz_blur( int octave, int level, cudaStream_t stream );
     inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream );
     inline void vert_from_interm( int octave, int level, cudaStream_t stream );
-    inline void dog_from_blurred( int octave, int level );
+    inline void dog_from_blurred( int octave, int level, cudaStream_t stream );
 
     void reset_extrema_mgmt( );
     void find_extrema_v6( );
