@@ -231,7 +231,7 @@ void Pyramid::descriptors_v1( )
         Octave&      oct_obj = _octaves[octave];
 
         for( int level=1; level<_levels-2; level++ ) {
-            cudaStream_t oct_str = oct_obj.getStream(level);
+            cudaStream_t oct_str = oct_obj.getStream(level+2);
             int* extrema_counters = oct_obj.getExtremaMgmtD();
             int* extrema_counter  = &extrema_counters[level];
             descriptor_starter
@@ -244,7 +244,7 @@ void Pyramid::descriptors_v1( )
     }
 
     for( int octave=0; octave<_num_octaves; octave++ ) {
-        Octave&      oct_obj = _octaves[octave];
+        Octave& oct_obj = _octaves[octave];
         oct_obj.readExtremaCount( );
     }
 #else // not USE_DYNAMIC_PARALLELISM
@@ -252,7 +252,7 @@ void Pyramid::descriptors_v1( )
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
-        for( int level=1; level<_levels-2; level++ ) {
+        for( int level=3; level<_levels; level++ ) {
             cudaStreamSynchronize( oct_obj.getStream(level) );
         }
 
@@ -274,7 +274,7 @@ void Pyramid::descriptors_v1( )
                 block.z = 4;
 
                 keypoint_descriptors
-                    <<<grid,block,0,oct_obj.getStream(level)>>>
+                    <<<grid,block,0,oct_obj.getStream(level+2)>>>
                     ( oct_obj.getExtrema( level ),
                       oct_obj.getDescriptors( level ),
                       oct_obj.getData( level ) );
@@ -284,7 +284,7 @@ void Pyramid::descriptors_v1( )
                 block.z = 1;
 
                 normalize_histogram
-                    <<<grid,block,0,oct_obj.getStream(level)>>>
+                    <<<grid,block,0,oct_obj.getStream(level+2)>>>
                     ( oct_obj.getDescriptors( level ) );
             }
         }

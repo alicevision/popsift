@@ -373,13 +373,18 @@ void Pyramid::find_extrema_v6_sub( )
             grid.x  = grid_divide( cols, block.x );
             grid.y  = grid_divide( rows, block.y );
 
-            cudaStream_t oct_str = oct_obj.getStream(level);
-            cudaEvent_t  oct_ev  = oct_obj.getEventGaussDone(level+2);
+            cudaStream_t oct_str = oct_obj.getStream(level+2);
+
+            cudaEvent_t  upp_ev  = oct_obj.getEventDogDone(level+0);
+            cudaEvent_t  mid_ev  = oct_obj.getEventDogDone(level+1);
+            // cudaEvent_t  low_ev  = oct_obj.getEventDogDone(level+2); - we are in the same stream
 
             int* extrema_counter = &extrema_counters[level];
 
             cudaStreamWaitEvent( oct_str, reset_done_ev, 0 );
-            cudaStreamWaitEvent( oct_str, oct_ev, 0 );
+            cudaStreamWaitEvent( oct_str, upp_ev, 0 );
+            cudaStreamWaitEvent( oct_str, mid_ev, 0 );
+            // cudaStreamWaitEvent( oct_str, low_ev, 0 ); - we are in the same stream
 
             find_extrema_in_dog_v6<HEIGHT>
                 <<<grid,block,0,oct_str>>>
@@ -391,7 +396,7 @@ void Pyramid::find_extrema_v6_sub( )
                   extrema_counter,
                   oct_obj.getExtrema( level ) );
 
-            cudaEvent_t  extrema_done_ev  = oct_obj.getEventExtremaDone(level);
+            cudaEvent_t  extrema_done_ev  = oct_obj.getEventExtremaDone(level+2);
             cudaEventRecord( extrema_done_ev, oct_str );
         }
     }
@@ -402,7 +407,7 @@ void Pyramid::find_extrema_v6_sub( )
 
         int* extrema_counters = oct_obj.getExtremaMgmtD( );
 
-        for( int level=1; level<_levels-2; level++ ) {
+        for( int level=3; level<_levels; level++ ) {
             cudaEvent_t ev  = oct_obj.getEventExtremaDone(level);
             cudaStreamWaitEvent( oct_str_0, ev, 0 );
         }

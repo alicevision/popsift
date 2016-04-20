@@ -397,6 +397,7 @@ void Pyramid::build_v11( Image* base )
 
             cudaStream_t stream = oct_obj.getStream(level);
             cudaEvent_t  ev     = oct_obj.getEventGaussDone(level);
+            cudaEvent_t  dog_ev = oct_obj.getEventDogDone(level);
 
             if( level == 0 )
             {
@@ -441,11 +442,12 @@ void Pyramid::build_v11( Image* base )
 
             if( level > 0 ) {
                 dog_from_blurred( octave, level, stream );
+
+                err = cudaEventRecord( dog_ev, stream );
+                POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
             }
         }
     }
-
-    cudaDeviceSynchronize();
 }
 
 } // namespace popart
