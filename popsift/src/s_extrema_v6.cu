@@ -407,10 +407,10 @@ void Pyramid::find_extrema_v6( )
 #define MANYLY(H) \
     find_extrema_v6_sub<H> ( );
 
-    MANYLY(1)
+    // MANYLY(1)
     // MANYLY(2)
     // MANYLY(3)
-    // MANYLY(4)
+    MANYLY(4)
     // MANYLY(5)
     // MANYLY(6)
     // MANYLY(7)
