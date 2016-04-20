@@ -98,8 +98,13 @@ void Octave::free( )
 
 void Octave::reset_extrema_mgmt( )
 {
+    cudaStream_t stream = _streams[0];
+    cudaEvent_t  ev     = _extrema_done[0];
+
     memset( _h_extrema_mgmt, 0, _levels * sizeof(int) );
-    popcuda_memset_sync( _d_extrema_mgmt, 0, _levels * sizeof(int) );
+    popcuda_memset_async( _d_extrema_mgmt, 0, _levels * sizeof(int), stream );
+
+    cudaEventRecord( ev, stream );
 }
 
 void Octave::readExtremaCount( )

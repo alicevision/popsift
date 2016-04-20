@@ -357,26 +357,28 @@ template<int HEIGHT>
 __host__
 void Pyramid::find_extrema_v6_sub( )
 {
-    cudaDeviceSynchronize();
-
     for( int octave=0; octave<_num_octaves; octave++ ) {
-        int* extrema_counters = _octaves[octave].getExtremaMgmtD( );
+        Octave&      oct_obj = _octaves[octave];
+
+        cudaEvent_t  reset_done_ev  = oct_obj.getEventExtremaDone(0);
+
+        int* extrema_counters = oct_obj.getExtremaMgmtD( );
 
         for( int level=1; level<_levels-2; level++ ) {
-            int cols = _octaves[octave].getWidth();
-            int rows = _octaves[octave].getHeight();
+            int cols = oct_obj.getWidth();
+            int rows = oct_obj.getHeight();
 
             dim3 block( 32, HEIGHT );
             dim3 grid;
             grid.x  = grid_divide( cols, block.x );
             grid.y  = grid_divide( rows, block.y );
 
-            Octave&      oct_obj = _octaves[octave];
             cudaStream_t oct_str = oct_obj.getStream(level);
-            cudaEvent_t  oct_ev  = oct_obj.getEventGaussDone(level+1);
+            cudaEvent_t  oct_ev  = oct_obj.getEventGaussDone(level+2);
 
             int* extrema_counter = &extrema_counters[level];
 
+            cudaStreamWaitEvent( oct_str, reset_done_ev, 0 );
             cudaStreamWaitEvent( oct_str, oct_ev, 0 );
 
             find_extrema_in_dog_v6<HEIGHT>
@@ -387,7 +389,7 @@ void Pyramid::find_extrema_v6_sub( )
                   rows,
                   _levels,
                   extrema_counter,
-                  _octaves[octave].getExtrema( level ) );
+                  oct_obj.getExtrema( level ) );
 
             cudaEvent_t  extrema_done_ev  = oct_obj.getEventExtremaDone(level);
             cudaEventRecord( extrema_done_ev, oct_str );
