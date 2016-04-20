@@ -49,6 +49,7 @@ class Octave
          */
         int*         _h_extrema_mgmt; // host side info
         int*         _d_extrema_mgmt; // device side info
+        int*         _d_extrema_num_blocks;
         Extremum**   _h_extrema;
         Extremum**   _d_extrema;
         Descriptor** _d_desc;
@@ -123,6 +124,10 @@ class Octave
 
         inline int* getExtremaMgmtD( ) {
             return _d_extrema_mgmt;
+        }
+
+        inline int* getNumberOfBlocks( ) {
+            return _d_extrema_num_blocks;
         }
 
         inline Extremum* getExtrema( uint32_t level ) {

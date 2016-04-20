@@ -318,7 +318,9 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
                              int                 height,
                              const uint32_t      maxlevel,
                              int*                extrema_counter,
-                             Extremum*           d_extrema )
+                             Extremum*           d_extrema,
+                             int*                d_number_of_blocks,
+                             int                 number_of_blocks )
 {
     Extremum ec;
 
@@ -329,26 +331,17 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
     if( indicator && write_index < d_max_extrema ) {
         d_extrema[write_index] = ec;
     }
-}
 
-
-__global__
-void reset_extrema_count_v6( int* extrema_counter )
-{
-    *extrema_counter = 0;
-}
-
-__global__
-void fix_extrema_count_v6( int* extrema_counters, int levels )
-{
-    for( int i=0; i<levels; i++ )
-    {
-        int ct = extrema_counters[i];
-        ct     = min( ct, d_max_extrema );
-        extrema_counters[i] = ct;
-        printf("Number of extrema at level %d: %d\n", i, ct );
+    __threadfence(); 
+    if( threadIdx.x == 0 && threadIdx.y == 0 ) {
+        int ct = atomicAdd( d_number_of_blocks, 1 );
+        if( ct >= number_of_blocks-1 ) {
+            int num_ext = atomicMin( extrema_counter, d_max_extrema );
+            // printf("counted to %d, num extrema %d\n", ct, num_ext );
+        }
     }
 }
+
 
 /*************************************************************
  * V6: host side
@@ -362,7 +355,8 @@ void Pyramid::find_extrema_v6_sub( )
 
         cudaEvent_t  reset_done_ev  = oct_obj.getEventExtremaDone(0);
 
-        int* extrema_counters = oct_obj.getExtremaMgmtD( );
+        int*  extrema_counters   = oct_obj.getExtremaMgmtD( );
+        int*  extrema_num_blocks = oct_obj.getNumberOfBlocks( );
 
         for( int level=1; level<_levels-2; level++ ) {
             int cols = oct_obj.getWidth();
@@ -379,7 +373,8 @@ void Pyramid::find_extrema_v6_sub( )
             cudaEvent_t  mid_ev  = oct_obj.getEventDogDone(level+1);
             // cudaEvent_t  low_ev  = oct_obj.getEventDogDone(level+2); - we are in the same stream
 
-            int* extrema_counter = &extrema_counters[level];
+            int*  extrema_counter = &extrema_counters[level];
+            int*  num_blocks      = &extrema_num_blocks[level];
 
             cudaStreamWaitEvent( oct_str, reset_done_ev, 0 );
             cudaStreamWaitEvent( oct_str, upp_ev, 0 );
@@ -388,36 +383,19 @@ void Pyramid::find_extrema_v6_sub( )
 
             find_extrema_in_dog_v6<HEIGHT>
                 <<<grid,block,0,oct_str>>>
-                ( _octaves[octave].getDogTexture( ),
+                ( oct_obj.getDogTexture( ),
                   level,
                   cols,
                   rows,
                   _levels,
                   extrema_counter,
-                  oct_obj.getExtrema( level ) );
+                  oct_obj.getExtrema( level ),
+                  num_blocks,
+                  grid.x * grid.y );
 
             cudaEvent_t  extrema_done_ev  = oct_obj.getEventExtremaDone(level+2);
             cudaEventRecord( extrema_done_ev, oct_str );
         }
-    }
-
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        Octave&      oct_obj   = _octaves[octave];
-        cudaStream_t oct_str_0 = oct_obj.getStream(0);
-
-        int* extrema_counters = oct_obj.getExtremaMgmtD( );
-
-        for( int level=3; level<_levels; level++ ) {
-            cudaEvent_t ev  = oct_obj.getEventExtremaDone(level);
-            cudaStreamWaitEvent( oct_str_0, ev, 0 );
-        }
-
-        fix_extrema_count_v6
-            <<<1,1,0,oct_str_0>>>
-            ( extrema_counters, _levels );
-
-        cudaEvent_t  extrema_done_ev  = oct_obj.getEventExtremaDone(0);
-        cudaEventRecord( extrema_done_ev, oct_str_0 );
     }
 
     cudaDeviceSynchronize();
