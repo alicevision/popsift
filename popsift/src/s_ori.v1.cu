@@ -175,7 +175,7 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
 
             /* find if a peak */
             if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
-                int idx = mgmt->atomicAddCounter( 1 );
+                int idx = atomicAdd( &mgmt->_counter, 1 );
                 if( idx >= d_max_orientations ) break;
 
                 float th = compute_angle(bin, hc, hn, hp);
@@ -238,7 +238,7 @@ void orientation_starter_v1( Extremum* extremum,
 
     dim3 block;
     dim3 grid;
-    grid.x  = mgmt->getCounter();
+    grid.x  = mgmt->_counter;
     block.x = ORI_V1_NUM_THREADS;
 
     if( grid.x != 0 ) {

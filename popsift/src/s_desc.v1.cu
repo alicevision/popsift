@@ -198,7 +198,7 @@ __global__ void descriptor_starter( int                level,
 
     dim3 block;
     dim3 grid;
-    grid.x  = mgmt->getCounter();
+    grid.x  = mgmt->_counter;
 
     if( grid.x == 0 ) return;
 

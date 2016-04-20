@@ -9,7 +9,7 @@ int h_max_orientations = 0;
 __device__ __constant__ int d_max_extrema;
 __device__ __constant__ int d_max_orientations;
 
-void ExtremaMgmt::init( int max_extrema )
+void init_extrema_limits( int max_extrema )
 {
     cudaError_t err;
 
@@ -26,19 +26,6 @@ void ExtremaMgmt::init( int max_extrema )
                               cudaMemcpyHostToDevice );
     POP_CUDA_FATAL_TEST( err, "Failed to upload h_max_orientations to device: " );
 }
-
-void ExtremaMgmt::reset( )
-{
-    _counter = 0;
-}
-
-__device__
-int ExtremaMgmt::atomicAddCounter( int ct )
-{
-    int idx = atomicAdd( &_counter, ct );
-    return idx;
-}
-
 
 } // namespace iopart
 

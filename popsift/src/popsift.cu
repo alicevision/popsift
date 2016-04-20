@@ -14,7 +14,7 @@ PopSift::PopSift( const popart::Config& config )
     const bool vlfeat_mode = ( config.sift_mode == popart::Config::VLFeat );
     popart::init_filter( _config.sigma, _config.levels, vlfeat_mode );
     popart::init_sigma(  _config.sigma, _config.levels, _config._threshold, _config._edge_limit );
-    popart::ExtremaMgmt::init( 10000 );
+    popart::init_extrema_limits( 10000 );
 }
 
 PopSift::~PopSift()

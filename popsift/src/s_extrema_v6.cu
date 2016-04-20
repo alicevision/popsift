@@ -26,7 +26,7 @@ inline uint32_t extrema_count( int indicator, ExtremaMgmt* mgmt )
     if( threadIdx.x == 0 ) {
         // atomicAdd returns the old value, we consider this the based
         // index for this thread's write operation
-        write_index = mgmt->atomicAddCounter( ct );
+        write_index = atomicAdd( &mgmt->_counter, ct );
     }
     // broadcast from thread 0 to all threads in warp
     write_index = __shfl( write_index, 0 );
@@ -338,7 +338,7 @@ void reset_extrema_count_v6( ExtremaMgmt* mgmt_array, uint32_t mgmt_level )
 {
     ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
 
-    mgmt->resetCounter();
+    mgmt->_counter = 0;
 }
 
 __global__
@@ -346,9 +346,9 @@ void fix_extrema_count_v6( ExtremaMgmt* mgmt_array, uint32_t mgmt_level )
 {
     ExtremaMgmt* mgmt = &mgmt_array[mgmt_level];
 
-    mgmt->clampCounter1();
+    int ct = atomicMin( &mgmt->_counter, d_max_extrema );
 
-    printf("Number of extrema: %d\n", mgmt->getCounter() );
+    printf("Number of extrema: %d\n", ct );
 }
 
 /*************************************************************

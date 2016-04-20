@@ -134,7 +134,7 @@ int Octave::getExtremaCount( ) const
 {
     int ct = 0;
     for( uint32_t i=1; i<_levels-1; i++ ) {
-        ct += _h_extrema_mgmt[i].getCounter();
+        ct += _h_extrema_mgmt[i]._counter;
     }
     return ct;
 }
@@ -143,13 +143,13 @@ int Octave::getExtremaCount( uint32_t level ) const
 {
     if( level < 1 )         return 0;
     if( level > _levels-2 ) return 0;
-    return _h_extrema_mgmt[level].getCounter();
+    return _h_extrema_mgmt[level]._counter;
 }
 
 void Octave::downloadDescriptor( )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
-        int sz = _h_extrema_mgmt[l].getCounter();
+        int sz = _h_extrema_mgmt[l]._counter;
         if( sz != 0 ) {
             if( _h_extrema[l] == 0 ) continue;
 
@@ -177,7 +177,7 @@ void Octave::writeDescriptor( ostream& ostr, float downsampling_factor )
         Extremum* cand = _h_extrema[l];
 
         Descriptor* desc = _h_desc[l];
-        int sz = _h_extrema_mgmt[l].getCounter();
+        int sz = _h_extrema_mgmt[l]._counter;
         for( int s=0; s<sz; s++ ) {
             const float reduce = downsampling_factor;
 
@@ -550,9 +550,7 @@ void Octave::free_dog_tex( )
 void Octave::alloc_extrema_mgmt( )
 {
     _h_extrema_mgmt = popart::cuda::malloc_hstT<ExtremaMgmt>( _levels, __FILE__, __LINE__ );
-    for( uint32_t i=0; i<_levels; i++ ) {
-        _h_extrema_mgmt[i].reset();
-    }
+    memset( _h_extrema_mgmt, 0, _levels * sizeof(ExtremaMgmt) );
 
     _d_extrema_mgmt = popart::cuda::malloc_devT<ExtremaMgmt>( _levels, __FILE__, __LINE__ );
     popcuda_memcpy_sync( _d_extrema_mgmt,
