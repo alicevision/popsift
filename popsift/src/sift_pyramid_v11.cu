@@ -224,8 +224,8 @@ inline void Pyramid::horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data,
     Octave&      oct_obj   = _octaves[octave];
     cudaStream_t oct_str_0 = oct_obj.getStream(0);
 
-    const int width  = _octaves[octave].getData(0).getWidth();
-    const int height = _octaves[octave].getData(0).getHeight();
+    const int width  = _octaves[octave].getWidth();
+    const int height = _octaves[octave].getHeight();
 
     dim3 block( 128, 1 );
     dim3 grid;
@@ -250,8 +250,8 @@ inline void Pyramid::downscale_from_prev_octave( int octave, int level )
     Octave& prev_oct_obj  = _octaves[octave-1];
     cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( _levels-PREV_LEVEL ), 0 );
 
-    const int width  = _octaves[octave].getData(0).getWidth();
-    const int height = _octaves[octave].getData(0).getHeight();
+    const int width  = _octaves[octave].getWidth();
+    const int height = _octaves[octave].getHeight();
 
     dim3 h_block( 64, 2 );
     dim3 h_grid;
@@ -274,8 +274,8 @@ inline void Pyramid::downscale_from_prev_octave_and_horiz_blur( int octave, int 
     Octave& prev_oct_obj  = _octaves[octave-1];
     cudaStreamWaitEvent( oct_str_0, prev_oct_obj.getEventGaussDone( _levels-PREV_LEVEL ), 0 );
 
-    const int width  = _octaves[octave].getData(0).getWidth();
-    const int height = _octaves[octave].getData(0).getHeight();
+    const int width  = _octaves[octave].getWidth();
+    const int height = _octaves[octave].getHeight();
 
     dim3 h_block( 64, 2 );
     dim3 h_grid;
@@ -295,8 +295,8 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level )
     Octave&      oct_obj   = _octaves[octave];
     cudaStream_t oct_str_0 = oct_obj.getStream(0);
 
-    const int width  = _octaves[octave].getData(0).getWidth();
-    const int height = _octaves[octave].getData(0).getHeight();
+    const int width  = _octaves[octave].getWidth();
+    const int height = _octaves[octave].getHeight();
 
     dim3 block( 128, 1 );
     dim3 grid;
@@ -315,8 +315,8 @@ inline void Pyramid::vert_from_interm( int octave, int level )
     Octave&      oct_obj   = _octaves[octave];
     cudaStream_t oct_str_0 = oct_obj.getStream(0);
 
-    const int width  = _octaves[octave].getData(0).getWidth();
-    const int height = _octaves[octave].getData(0).getHeight();
+    const int width  = _octaves[octave].getWidth();
+    const int height = _octaves[octave].getHeight();
 
     dim3 v_block( 64, 2 );
     dim3 v_grid;
@@ -336,8 +336,8 @@ inline void Pyramid::dog_from_blurred( int octave, int level )
     Octave&      oct_obj   = _octaves[octave];
     cudaStream_t oct_str_0 = oct_obj.getStream(0);
 
-    const int width  = _octaves[octave].getData(0).getWidth();
-    const int height = _octaves[octave].getData(0).getHeight();
+    const int width  = _octaves[octave].getWidth();
+    const int height = _octaves[octave].getHeight();
 
     dim3 block( 128, 2 );
     dim3 grid;
@@ -371,8 +371,8 @@ void Pyramid::build_v11( Image* base )
     for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
         for( uint32_t level=0; level<_levels; level++ ) {
 
-            const int width  = _octaves[octave].getData(0).getWidth();
-            const int height = _octaves[octave].getData(0).getHeight();
+            const int width  = _octaves[octave].getWidth();
+            const int height = _octaves[octave].getHeight();
 
             Octave&      oct_obj   = _octaves[octave];
             cudaStream_t oct_str_0 = oct_obj.getStream(0);

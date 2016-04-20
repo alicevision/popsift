@@ -59,8 +59,24 @@ class Octave
         inline void debugSetOctave( uint32_t o ) { _debug_octave_id = o; }
 
         inline int getLevels() const { return _levels; }
-        inline int getWidth() const  { return _data[0].getWidth(); }
-        inline int getHeight() const { return _data[0].getHeight(); }
+        inline int getWidth() const  {
+#if 1
+            if( _w != _data[0].getWidth() ) {
+                std::cerr << __FILE__ << "," << __LINE__ << ": Programming error, bad width initialization" << std::endl;
+                exit( -1 );
+            }
+#endif
+            return _w;
+        }
+        inline int getHeight() const {
+#if 1
+            if( _h != _data[0].getHeight() ) {
+                std::cerr << __FILE__ << "," << __LINE__ << ": Programming error, bad width initialization" << std::endl;
+                exit( -1 );
+            }
+#endif
+            return _h;
+        }
 
         inline cudaStream_t getStream( uint32_t level ) {
             return _streams[level];

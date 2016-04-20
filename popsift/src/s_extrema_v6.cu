@@ -368,8 +368,9 @@ void Pyramid::find_extrema_v6_sub( )
     for( int octave=0; octave<_num_octaves; octave++ ) {
         int* extrema_counters = _octaves[octave].getExtremaMgmtD( );
         for( int level=1; level<_levels-2; level++ ) {
-            int cols = _octaves[octave].getData(level).getCols();
-            int rows = _octaves[octave].getData(level).getRows();
+            int cols = _octaves[octave].getWidth();
+            int rows = _octaves[octave].getHeight();
+
             dim3 block( 32, HEIGHT );
             dim3 grid;
             grid.x  = grid_divide( cols, block.x );
