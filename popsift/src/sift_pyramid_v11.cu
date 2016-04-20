@@ -333,19 +333,24 @@ inline void Pyramid::vert_from_interm( int octave, int level )
 __host__
 inline void Pyramid::dog_from_blurred( int octave, int level )
 {
-    Octave&      oct_obj   = _octaves[octave];
-    cudaStream_t oct_str_0 = oct_obj.getStream(0);
+    Octave&      oct_obj = _octaves[octave];
+    cudaStream_t oct_str = oct_obj.getStream(level);
+    cudaEvent_t  ev1     = oct_obj.getEventGaussDone( level-1 );
+    cudaEvent_t  ev2     = oct_obj.getEventGaussDone( level );
 
-    const int width  = _octaves[octave].getWidth();
-    const int height = _octaves[octave].getHeight();
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
 
     dim3 block( 128, 2 );
     dim3 grid;
     grid.x = grid_divide( width,  block.x );
     grid.y = grid_divide( height, block.y );
 
+    cudaStreamWaitEvent( oct_str, ev1, 0 );
+    cudaStreamWaitEvent( oct_str, ev2, 0 );
+
     gauss::v11::make_dog
-        <<<grid,block,0,oct_str_0>>>
+        <<<grid,block,0,oct_str>>>
         ( oct_obj._data_tex[level],
           oct_obj._data_tex[level-1],
           oct_obj.getDogSurface( ),
@@ -369,12 +374,13 @@ void Pyramid::build_v11( Image* base )
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
     for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
+        Octave& oct_obj   = _octaves[octave];
+
         for( uint32_t level=0; level<_levels; level++ ) {
 
-            const int width  = _octaves[octave].getWidth();
-            const int height = _octaves[octave].getHeight();
+            const int width  = oct_obj.getWidth();
+            const int height = oct_obj.getHeight();
 
-            Octave&      oct_obj   = _octaves[octave];
             cudaStream_t oct_str_0 = oct_obj.getStream(0);
 
             if( level == 0 )
@@ -415,23 +421,16 @@ void Pyramid::build_v11( Image* base )
                 vert_from_interm( octave, level );
             }
 
+            cudaEventRecord( oct_obj.getEventGaussDone( level ), oct_str_0 );
         }
     }
-    cudaDeviceSynchronize();
+
     for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
         for( uint32_t level=1; level<_levels; level++ ) {
             dog_from_blurred( octave, level );
         }
     }
     cudaDeviceSynchronize();
-    for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
-        for( uint32_t level=0; level<_levels; level++ ) {
-            Octave&      oct_obj   = _octaves[octave];
-            cudaStream_t oct_str_0 = oct_obj.getStream(0);
-
-            cudaEventRecord( oct_obj.getEventGaussDone( level ), oct_str_0 );
-        }
-    }
 }
 
 } // namespace popart
