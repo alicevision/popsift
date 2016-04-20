@@ -598,9 +598,11 @@ void Octave::free_streams( )
 void Octave::alloc_events( )
 {
     _gauss_done   = new cudaEvent_t[_levels];
+    _dog_done     = new cudaEvent_t[_levels];
     _extrema_done = new cudaEvent_t[_levels];
     for( int i=0; i<_levels; i++ ) {
         _gauss_done[i]   = popart::cuda::event_create( __FILE__, __LINE__ );
+        _dog_done[i]     = popart::cuda::event_create( __FILE__, __LINE__ );
         _extrema_done[i] = popart::cuda::event_create( __FILE__, __LINE__ );
     }
 }
@@ -609,10 +611,12 @@ void Octave::free_events( )
 {
     for( int i=0; i<_levels; i++ ) {
         popart::cuda::event_destroy( _gauss_done[i],   __FILE__, __LINE__ );
+        popart::cuda::event_destroy( _dog_done[i],     __FILE__, __LINE__ );
         popart::cuda::event_destroy( _extrema_done[i], __FILE__, __LINE__ );
     }
 
     delete [] _gauss_done;
+    delete [] _dog_done;
     delete [] _extrema_done;
 }
 

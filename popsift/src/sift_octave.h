@@ -32,6 +32,7 @@ class Octave
         // cosnider later whether some of them can be removed
         cudaStream_t* _streams;
         cudaEvent_t*  _gauss_done;
+        cudaEvent_t*  _dog_done;
         cudaEvent_t*  _extrema_done;
 
     public:
@@ -84,6 +85,9 @@ class Octave
         }
         inline cudaEvent_t getEventGaussDone( int level ) {
             return _gauss_done[level];
+        }
+        inline cudaEvent_t getEventDogDone( int level ) {
+            return _dog_done[level];
         }
         inline cudaEvent_t getEventExtremaDone( int level ) {
             return _extrema_done[level];
