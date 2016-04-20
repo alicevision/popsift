@@ -230,7 +230,7 @@ void Pyramid::descriptors_v1( )
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
-        for( int level=1; level<_levels-1; level++ ) {
+        for( int level=1; level<_levels-2; level++ ) {
             cudaStream_t oct_str = oct_obj.getStream(level);
             int* extrema_counters = oct_obj.getExtremaMgmtD();
             int* extrema_counter  = &extrema_counters[level];
@@ -252,7 +252,7 @@ void Pyramid::descriptors_v1( )
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
-        for( int level=1; level<_levels-1; level++ ) {
+        for( int level=1; level<_levels-2; level++ ) {
             cudaStreamSynchronize( oct_obj.getStream(level) );
         }
 
@@ -263,7 +263,7 @@ void Pyramid::descriptors_v1( )
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
-        for( int level=1; level<_levels-1; level++ ) {
+        for( int level=1; level<_levels-2; level++ ) {
             dim3 block;
             dim3 grid;
             grid.x  = oct_obj.getExtremaMgmtH(level);

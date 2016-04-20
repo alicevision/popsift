@@ -250,7 +250,7 @@ void Pyramid::orientation_v1( )
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
-        for( int level=1; level<_levels-1; level++ ) {
+        for( int level=1; level<_levels-2; level++ ) {
             cudaStream_t oct_str = oct_obj.getStream(level);
 
             int* extrema_counters = oct_obj.getExtremaMgmtD( );
@@ -281,14 +281,14 @@ void Pyramid::orientation_v1( )
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
-        for( int level=1; level<_levels-1; level++ ) {
+        for( int level=1; level<_levels-2; level++ ) {
             cudaStreamSynchronize( oct_obj.getStream(level) );
         }
 
         oct_obj.readExtremaCount( );
         cudaDeviceSynchronize( );
 
-        for( int level=1; level<_levels-1; level++ ) {
+        for( int level=1; level<_levels-2; level++ ) {
             cudaStream_t oct_str = oct_obj.getStream(level);
 
             dim3 block;
