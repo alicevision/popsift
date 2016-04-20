@@ -49,7 +49,6 @@ class Octave
         ExtremaMgmt*         _d_extrema_mgmt; // device side info
         Extremum**           _h_extrema;
         Extremum**           _d_extrema;
-        int                  _max_desc;
         Descriptor**         _d_desc;
         Descriptor**         _h_desc;
 
@@ -111,7 +110,6 @@ class Octave
         int getExtremaCount( ) const;
         int getExtremaCount( uint32_t level ) const;
 
-        int getMaxDescriptors() const { return _max_desc; }
         Descriptor* getDescriptors( uint32_t level );
         void        downloadDescriptor( );
         void        writeDescriptor( std::ostream& ostr, float downsampling_factor );
@@ -123,7 +121,6 @@ class Octave
         void alloc( int width,
                     int height,
                     int levels,
-                    int layer_max_extrema,
                     int gauss_group );
         void free();
 
@@ -139,7 +136,7 @@ private:
     void alloc_interm_tex( );
     void alloc_dog_array( );
     void alloc_dog_tex( );
-    void alloc_extrema_mgmt( int layer_max_extrema );
+    void alloc_extrema_mgmt( );
     void alloc_extrema( );
 
     void free_extrema( );

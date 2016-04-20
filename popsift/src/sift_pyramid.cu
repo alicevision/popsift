@@ -146,7 +146,7 @@ Pyramid::Pyramid( Config& config,
         printf("Allocating octave %u with width %u and height %u (%u levels)\n", o, w, h, _levels );
 #endif // (PYRAMID_PRINT_DEBUG==1)
         _octaves[o].debugSetOctave( o );
-        _octaves[o].alloc( w, h, _levels, 10000, _gauss_group );
+        _octaves[o].alloc( w, h, _levels, _gauss_group );
         w = ceilf( w / 2.0f );
         h = ceilf( h / 2.0f );
     }

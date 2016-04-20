@@ -327,7 +327,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
 
     uint32_t write_index = extrema_count<HEIGHT>( indicator, mgmt );
 
-    if( indicator && write_index < mgmt->getExtremaMax() ) {
+    if( indicator && write_index < d_max_extrema ) {
         d_extrema[write_index] = ec;
     }
 }

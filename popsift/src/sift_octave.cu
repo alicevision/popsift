@@ -30,7 +30,7 @@ Octave::Octave( )
 { }
 
 
-void Octave::alloc( int width, int height, int levels, int layer_max_extrema, int gauss_group )
+void Octave::alloc( int width, int height, int levels, int gauss_group )
 {
     _w           = width;
     _h           = height;
@@ -50,7 +50,7 @@ void Octave::alloc( int width, int height, int levels, int layer_max_extrema, in
     alloc_dog_array( );
     alloc_dog_tex( );
 
-    alloc_extrema_mgmt( layer_max_extrema );
+    alloc_extrema_mgmt( );
     alloc_extrema( );
 
     _streams = new cudaStream_t[_levels];
@@ -63,10 +63,8 @@ void Octave::alloc( int width, int height, int levels, int layer_max_extrema, in
     _d_desc = new Descriptor*[_levels];
     _h_desc = new Descriptor*[_levels];
 
-    _max_desc = _h_extrema_mgmt[1].getOrientationMax(); // 1.25 * layer_max_extrema
-
-    for( uint32_t l=0; l<_levels; l++ ) {
-        uint32_t sz = _h_extrema_mgmt[l].getOrientationMax();
+    for( int l=0; l<_levels; l++ ) {
+        int sz = h_max_orientations;
         if( sz == 0 ) {
             _d_desc[l] = 0;
             _h_desc[l] = 0;
@@ -549,13 +547,11 @@ void Octave::free_dog_tex( )
     POP_CUDA_FATAL_TEST( err, "Could not destroy DoG surface: " );
 }
 
-void Octave::alloc_extrema_mgmt( int layer_max_extrema )
+void Octave::alloc_extrema_mgmt( )
 {
     _h_extrema_mgmt = popart::cuda::malloc_hstT<ExtremaMgmt>( _levels, __FILE__, __LINE__ );
-    _h_extrema_mgmt[0].init( 0 );
-    _h_extrema_mgmt[_levels-1].init( 0 );
-    for( uint32_t i=1; i<_levels-1; i++ ) {
-        _h_extrema_mgmt[i].init( layer_max_extrema );
+    for( uint32_t i=0; i<_levels; i++ ) {
+        _h_extrema_mgmt[i].reset();
     }
 
     _d_extrema_mgmt = popart::cuda::malloc_devT<ExtremaMgmt>( _levels, __FILE__, __LINE__ );
@@ -581,7 +577,7 @@ void Octave::alloc_extrema( )
     _d_extrema[0] = 0;
     _d_extrema[_levels-1] = 0;
 
-    int objects_per_level = _h_extrema_mgmt[1].getOrientationMax();
+    int objects_per_level = h_max_orientations;
     int levels            = _levels - 2;
 
     Extremum* d = popart::cuda::malloc_devT<Extremum>( levels * objects_per_level, __FILE__, __LINE__ );

@@ -5,17 +5,21 @@
 
 namespace popart {
 
+extern int h_max_extrema;
+extern int h_max_orientations;
+extern __device__ __constant__ int d_max_extrema;
+extern __device__ __constant__ int d_max_orientations;
+
 class ExtremaMgmt
 {
 public:
-    ExtremaMgmt( );
-    ExtremaMgmt( uint32_t m1 );
+    static void init( int max_extrema );
 
-    void init( uint32_t m1 );
+    void reset( );
 
     __device__
     inline void clampCounter1() {
-        _counter = _counter < _max1 ? _counter : _max1;
+        _counter = _counter < d_max_extrema ? _counter : d_max_extrema;
     }
 
     __host__ __device__
@@ -28,24 +32,11 @@ public:
         return _counter;
     }
 
-    __host__ __device__
-    inline int getExtremaMax() const {
-        return _max1;
-    }
-
-    __host__ __device__
-    inline int getOrientationMax() const {
-        return _max2;
-    }
-
     __device__
     int atomicAddCounter( int ct );
 
 private:
-    uint32_t _counter;
-    uint32_t _max1;    // initial max
-    uint32_t _max2;    // max after finding alternative angles
-                       // Lowe says it happens to 15%, I reserve floor(25%)
+    int _counter;
 };
 
 } // namespace popart

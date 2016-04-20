@@ -176,7 +176,7 @@ void compute_keypoint_orientations_v1( Extremum* extremum,
             /* find if a peak */
             if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
                 int idx = mgmt->atomicAddCounter( 1 );
-                if( idx >= mgmt->getOrientationMax() ) break;
+                if( idx >= d_max_orientations ) break;
 
                 float th = compute_angle(bin, hc, hn, hp);
 
