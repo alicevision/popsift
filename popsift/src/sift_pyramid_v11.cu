@@ -439,14 +439,13 @@ void Pyramid::build_v11( Image* base )
 
             err = cudaEventRecord( ev, stream );
             POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
+
+            if( level > 0 ) {
+                dog_from_blurred( octave, level );
+            }
         }
     }
 
-    for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
-        for( uint32_t level=1; level<_levels; level++ ) {
-            dog_from_blurred( octave, level );
-        }
-    }
     cudaDeviceSynchronize();
 }
 
