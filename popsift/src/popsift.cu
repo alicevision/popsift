@@ -92,6 +92,8 @@ void PopSift::execute( int pipe, imgStream inp )
 
     int octaves = _pipe[pipe]._pyramid->getNumOctaves();
 
+    cudaDeviceSynchronize();
+
     for( int o=0; o<octaves; o++ ) {
         _pipe[pipe]._pyramid->download_descriptors( o );
     }
