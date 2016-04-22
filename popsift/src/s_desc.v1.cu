@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdio.h>
 
 #include "sift_pyramid.h"
 #include "sift_constants.h"
@@ -198,6 +199,8 @@ __global__ void descriptor_starter( int*          extrema_counter,
     grid.x  = *extrema_counter;
 
     if( grid.x == 0 ) return;
+
+    printf("Number of extrema after ori: %d\n", grid.x );
 
     block.x = DESC_NUM_THREADS;
     block.y = 4;
