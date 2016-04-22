@@ -213,13 +213,16 @@ __global__ void descriptor_starter( int*          extrema_counter,
           descs,
           layer );
 
+    // it may be good to start more threads, but this kernel
+    // is too fast to be noticable in profiling
+    grid.x  = grid_divide( *extrema_counter, 32 );
     block.x = 32;
-    block.y = 1;
+    block.y = 32;
     block.z = 1;
 
     normalize_histogram
         <<<grid,block>>>
-        ( descs );
+        ( descs, *extrema_counter );
 #endif // not USE_DYNAMIC_PARALLELISM
 }
 
