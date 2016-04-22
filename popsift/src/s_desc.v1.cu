@@ -268,10 +268,12 @@ void Pyramid::descriptors_v1( )
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
+        int* num_orientations = oct_obj.getExtremaMgmtH();
+
         for( int level=1; level<_levels-2; level++ ) {
             dim3 block;
             dim3 grid;
-            grid.x  = oct_obj.getExtremaMgmtH(level);
+            grid.x  = num_orientations[level];
 
             if( grid.x != 0 ) {
                 block.x = DESC_NUM_THREADS;

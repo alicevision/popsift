@@ -119,8 +119,8 @@ class Octave
             return _data[0].getPitch();
         }
 
-        inline int* getExtremaMgmtH( uint32_t level ) {
-            return &_h_extrema_mgmt[level];
+        inline int* getExtremaMgmtH( ) {
+            return _h_extrema_mgmt;
         }
 
         inline int* getExtremaMgmtD( ) {
