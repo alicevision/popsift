@@ -49,7 +49,8 @@ class Octave
          */
         int*         _h_extrema_mgmt; // host side info
         int*         _d_extrema_mgmt; // device side info
-        int*         _d_extrema_num_blocks;
+        int*         _d_extrema_num_blocks; // build barrier after extrema finding, saves a kernel
+        int*         _d_orientation_num_blocks; // build barrier after orientation finding, saves a kernel
         Extremum**   _h_extrema;
         Extremum**   _d_extrema;
         Descriptor** _d_desc;
@@ -128,6 +129,10 @@ class Octave
 
         inline int* getNumberOfBlocks( ) {
             return _d_extrema_num_blocks;
+        }
+
+        inline int* getNumberOfOriBlocks( ) {
+            return _d_orientation_num_blocks;
         }
 
         inline Extremum* getExtrema( uint32_t level ) {

@@ -104,6 +104,7 @@ void Octave::reset_extrema_mgmt( )
     memset( _h_extrema_mgmt, 0, _levels * sizeof(int) );
     popcuda_memset_async( _d_extrema_mgmt, 0, _levels * sizeof(int), stream );
     popcuda_memset_async( _d_extrema_num_blocks, 0, _levels * sizeof(int), stream );
+    popcuda_memset_async( _d_orientation_num_blocks, 0, _levels * sizeof(int), stream );
 
     cudaEventRecord( ev, stream );
 }
@@ -538,13 +539,15 @@ void Octave::free_dog_tex( )
 
 void Octave::alloc_extrema_mgmt( )
 {
-    _h_extrema_mgmt       = popart::cuda::malloc_hstT<int>( _levels, __FILE__, __LINE__ );
-    _d_extrema_mgmt       = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
-    _d_extrema_num_blocks = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
+    _h_extrema_mgmt           = popart::cuda::malloc_hstT<int>( _levels, __FILE__, __LINE__ );
+    _d_extrema_mgmt           = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
+    _d_extrema_num_blocks     = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
+    _d_orientation_num_blocks = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
 }
 
 void Octave::free_extrema_mgmt( )
 {
+    cudaFree( _d_orientation_num_blocks );
     cudaFree( _d_extrema_num_blocks );
     cudaFree( _d_extrema_mgmt );
     cudaFreeHost( _h_extrema_mgmt );
