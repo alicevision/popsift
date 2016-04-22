@@ -59,6 +59,8 @@ static void usage( const char* argv )
          << "                               Note: indirect-downscale blurs much more than it should" << endl
          << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
          << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
+         << " --bemap-orientation         dual smoothing or orientation histogram instead of" << endl
+         << "                             curve fitting (older code)" << endl
          << endl;
     exit(0);
 }
@@ -84,6 +86,7 @@ static struct option longopts[] = {
     { "indirect-unfiltered", no_argument,            NULL, 1103 },
     { "iu",                  no_argument,            NULL, 1103 },
     { "group-gauss",         required_argument,      NULL, 1104 },
+    { "bemap-orientation",   no_argument,            NULL, 1105 },
 
     { NULL,                  0,                      NULL, 0  }
 };
@@ -113,6 +116,7 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 1102 : config.setScalingMode( popart::Config::IndirectDownscaling ); break;
         case 1103 : config.setScalingMode( popart::Config::IndirectUnfilteredDownscaling ); break;
         case 1104 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
+        case 1105 : config.setBemapOrientation( ); break;
 
         case 1000 : config.setOctaves( strtol( optarg, NULL, 0 ) ); break;
         case 1001 : config.setLevels(  strtol( optarg, NULL, 0 ) ); break;

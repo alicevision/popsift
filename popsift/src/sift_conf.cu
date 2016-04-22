@@ -15,6 +15,7 @@ Config::Config( )
     , scaling_mode( Config::IndirectDownscaling )
     , verbose( false )
     , gauss_group_size( 1 )
+    , bemap_orientation( false )
 { }
 
 void Config::setModeVLFeat( )
@@ -59,6 +60,16 @@ void Config::setGaussGroup( int groupsize )
 int  Config::getGaussGroup( ) const
 {
     return gauss_group_size;
+}
+
+void Config::setBemapOrientation( )
+{
+    bemap_orientation = true;
+}
+
+bool Config::getBemapOrientation( ) const
+{
+    return bemap_orientation;
 }
 
 }; // namespace popart

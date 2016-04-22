@@ -18,6 +18,7 @@ class Pyramid
     int     _gauss_group;
 
     Config::ScalingMode _scaling_mode;
+    bool                _bemap_orientation_mode;
 
 public:
     Pyramid( Config& config,

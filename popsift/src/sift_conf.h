@@ -29,6 +29,9 @@ struct Config
     void setScalingMode( ScalingMode mode = IndirectDownscaling );
     void setVerbose( bool on = true );
 
+    void setBemapOrientation( );
+    bool getBemapOrientation( ) const;
+
     void setGaussGroup( int groupsize );
     int  getGaussGroup( ) const;
 
@@ -82,6 +85,14 @@ struct Config
      * numbers.
      */
     int gauss_group_size;
+
+private:
+    /* The first orientation code was derived from Bemap OpenCL SIFT.
+     * It used double smoothing of the orientation histogram in s_ori.
+     * This has been replaced by direct curve fitting according to Lowe.
+     * Set this to true for old mode.
+     */
+    bool bemap_orientation;
 };
 
 }; // namespace popart

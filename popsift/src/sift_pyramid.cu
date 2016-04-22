@@ -131,6 +131,7 @@ Pyramid::Pyramid( Config& config,
     , _levels( config.levels + 3 )
     , _scaling_mode( config.scaling_mode )
     , _gauss_group( config.gauss_group_size )
+    , _bemap_orientation_mode( config.getBemapOrientation() )
 {
     // cerr << "Entering " << __FUNCTION__ << endl;
 
