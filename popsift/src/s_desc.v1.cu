@@ -246,6 +246,8 @@ void Pyramid::descriptors_v1( )
         }
     }
 
+    cudaDeviceSynchronize();
+
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave& oct_obj = _octaves[octave];
         oct_obj.readExtremaCount( );
