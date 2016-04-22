@@ -195,7 +195,7 @@ __global__ void descriptor_starter( int*          extrema_counter,
 
     if( grid.x == 0 ) return;
 
-    printf("Number of extrema after ori: %d\n", grid.x );
+    // printf("Number of extrema after ori: %d\n", grid.x );
 
     block.x = 32;
     block.y = 4;
