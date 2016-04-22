@@ -422,9 +422,9 @@ void Pyramid::orientation_v1( )
 
 __global__
 void orientation_starter_v1( Extremum*,
-                             ExtremaMgmt*,
-                             uint32_t,
-                             Plane2D_float )
+                             int*,
+                             Plane2D_float,
+                             int* )
 {
     /* dummy to make the linker happy */
 }
@@ -442,28 +442,32 @@ void Pyramid::orientation_v1( )
         oct_obj.readExtremaCount( );
         cudaDeviceSynchronize( );
 
+        int* h_num_extrema = oct_obj.getExtremaMgmtH();
+        int* d_num_extrema = oct_obj.getExtremaMgmtD();
+        int* orientation_num_blocks = oct_obj.getNumberOfOriBlocks( );
+
         for( int level=1; level<_levels-2; level++ ) {
             cudaStream_t oct_str = oct_obj.getStream(level+2);
 
             dim3 block;
             dim3 grid;
-            grid.x  = oct_obj.getExtremaMgmtH(level)->getCounter();
+            grid.x  = h_num_extrema[level];
             block.x = ORI_V1_NUM_THREADS;
             if( grid.x != 0 ) {
                 if( _bemap_orientation_mode ) {
                     compute_keypoint_orientations_v1
                         <<<grid,block,0,oct_str>>>
                         ( oct_obj.getExtrema( level ),
-                          oct_obj.getExtremaMgmtD( ),
-                          level,
+                          &d_num_extrema[level],
                           oct_obj.getData( level ) );
                 } else {
                     compute_keypoint_orientations_v2
                         <<<grid,block,0,oct_str>>>
                         ( oct_obj.getExtrema( level ),
-                          oct_obj.getExtremaMgmtD( ),
-                          level,
-                          oct_obj.getData( level ) );
+                          &d_num_extrema[level],
+                          oct_obj.getData( level ),
+                          &orientation_num_blocks[level],
+                          grid.x * grid.y );
                 }
             }
         }
