@@ -60,8 +60,8 @@ void keypoint_descriptors( Extremum*     cand,
     const int32_t hy = ymax - ymin + 1;
     const int32_t loops = wx * hy;
 
-    float dpt[9];
-    for (int i = 0; i < 9; i++) dpt[i] = 0.0f;
+    float dpt[9] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+    // for (int i = 0; i < 9; i++) dpt[i] = 0.0f;
 
     for(int i = threadIdx.x; i < loops; i+=32)
     {
@@ -125,10 +125,8 @@ void keypoint_descriptors( Extremum*     cand,
 
     Descriptor* desc = &descs[blockIdx.x];
 
-    if( threadIdx.x == 0 ) {
-        for (int i = 0; i < 8; i++) {
-            desc->features[offset+i] = dpt[i];
-        }
+    if( threadIdx.x < 8 ) {
+        desc->features[offset+threadIdx.x] = dpt[threadIdx.x];
     }
 }
 
