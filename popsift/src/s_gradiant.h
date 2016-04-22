@@ -24,8 +24,25 @@ inline void get_gradiant( float&         grad,
     if( x > 0 && x < layer.getCols()-1 && y > 0 && y < layer.getRows()-1 ) {
         float dx = layer.ptr(y)[x+1] - layer.ptr(y)[x-1];
         float dy = layer.ptr(y+1)[x] - layer.ptr(y-1)[x];
-        grad     = __fsqrt_rz(dx*dx + dy*dy);
+        // grad     = __fsqrt_rz(dx*dx + dy*dy);
+        grad     = hypotf( dx, dy );
         theta    = atan2f(dy, dx);
     }
+}
+
+// float2 x=grad, y=theta
+__device__
+inline float2 get_gradiant( uint32_t       x,
+                            uint32_t       y,
+                            popart::Plane2D_float& layer )
+{
+    if( x > 0 && x < layer.getCols()-1 && y > 0 && y < layer.getRows()-1 ) {
+        float dx = layer.ptr(y)[x+1] - layer.ptr(y)[x-1];
+        float dy = layer.ptr(y+1)[x] - layer.ptr(y-1)[x];
+        // grad     = __fsqrt_rz(dx*dx + dy*dy);
+        return make_float2( hypotf( dx, dy ),
+                            atan2f(dy, dx) );
+    }
+    return make_float2( 0.0f, 0.0f );
 }
 
