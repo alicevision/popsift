@@ -332,7 +332,12 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
         d_extrema[write_index] = ec;
     }
 
-    __threadfence(); 
+    // without syncthreads, (0,0) threads may precede some calls to extrema_count()
+    // in non-(0,0) threads and increase barrier count too early
+    __syncthreads();
+
+    // __threadfence(); probably not needed
+
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
         int ct = atomicAdd( d_number_of_blocks, 1 );
         if( ct >= number_of_blocks-1 ) {
