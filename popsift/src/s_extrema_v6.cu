@@ -20,7 +20,7 @@ inline uint32_t extrema_count( int indicator, int* extrema_counter )
 {
     uint32_t mask = __ballot( indicator ); // bitfield of warps with results
 
-    uint32_t ct = __popc( mask );          // horizontal reduce
+    int ct = __popc( mask );          // horizontal reduce
 
     int write_index;
     if( threadIdx.x == 0 ) {
@@ -57,9 +57,9 @@ inline bool is_extremum( cudaTextureObject_t obj,
     uint32_t gt = 0;
     uint32_t lt = 0;
 
-    float val0 = TX( 0, 1, 1 );
-    float val2 = TX( 2, 1, 1 );
-    float val  = TX( 1, 1, 1 );
+    const float val0 = TX( 0, 1, 1 );
+    const float val2 = TX( 2, 1, 1 );
+    const float val  = TX( 1, 1, 1 );
 
     // bit indeces for neighbours:
     //     7 0 1    0x80 0x01 0x02
@@ -140,10 +140,10 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
      * a 1x3x3 area. If the rightmost 2 threads of a warp (x==30 and 3==31)
      * are not extreme w.r.t. to the left slice, 8 fetch operations.
      */
-    int32_t block_x = blockIdx.x * 32;
-    int32_t block_y = blockIdx.y * blockDim.y;
-    int32_t y       = block_y + threadIdx.y;
-    int32_t x       = block_x + threadIdx.x;
+    const int block_x = blockIdx.x * 32;
+    const int block_y = blockIdx.y * blockDim.y;
+    const int y       = block_y + threadIdx.y;
+    const int x       = block_x + threadIdx.x;
 
     // int32_t x0 = x;
     // int32_t x1 = x+1;
@@ -152,7 +152,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     // int32_t y1 = y+1;
     // int32_t y2 = y+2;
 
-    float val = tex2DLayered<float>( dog, x+1, y+1, level );
+    const float val = tex2DLayered<float>( dog, x+1, y+1, level );
 
     if( fabs( val ) < d_threshold ) {
         return false;
@@ -163,33 +163,19 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     }
 
     // based on Bemap
-    float Dx  = 0.0f;
-    float Dy  = 0.0f;
-    float Ds  = 0.0f;
-    float Dxx = 0.0f;
-    float Dyy = 0.0f;
-    float Dss = 0.0f;
-    float Dxy = 0.0f;
-    float Dxs = 0.0f;
-    float Dys = 0.0f;
-    float dx  = 0.0f;
-    float dy  = 0.0f;
-    float ds  = 0.0f;
+    float3 D; // Dx Dy Ds
+    float3 DD; // Dxx Dyy Dss
+    float3 DX; // Dxy Dxs Dys
+    float3 d; // dx dy ds
 
     float v = val;
 
-    int32_t ni = y+1; // y1w;
-    int32_t nj = x+1;
-    int32_t ns = level;
-
-    int32_t tx = 0;
-    int32_t ty = 0;
-    int32_t ts = 0;
+    int3 n = make_int3( x+1, y+1, level ); // nj ni ns
 
     int32_t iter;
 
     /* must be execute at least once */
-    for ( iter = 0; iter < 5; iter++) {
+    for( iter = 0; iter < 5; iter++) {
         const int z = level - 1;
         /* compute gradient */
         const float x2y1z1 = tex2DLayered<float>( dog, x+2, y+1, z+1 );
@@ -198,15 +184,21 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
         const float x1y0z1 = tex2DLayered<float>( dog, x+1, y+0, z+1 );
         const float x1y1z2 = tex2DLayered<float>( dog, x+1, y+1, z+2 );
         const float x1y1z0 = tex2DLayered<float>( dog, x+1, y+1, z+0 );
-        Dx = 0.5 * ( x2y1z1 - x0y1z1 );
-        Dy = 0.5 * ( x1y2z1 - x1y0z1 );
-        Ds = 0.5 * ( x1y1z2 - x1y1z0 );
+        // D.x = 0.5f * ( x2y1z1 - x0y1z1 );
+        // D.y = 0.5f * ( x1y2z1 - x1y0z1 );
+        // D.z = 0.5f * ( x1y1z2 - x1y1z0 );
+        D.x = scalbnf( x2y1z1 - x0y1z1, -1 );
+        D.y = scalbnf( x1y2z1 - x1y0z1, -1 );
+        D.z = scalbnf( x1y1z2 - x1y1z0, -1 );
 
         /* compute Hessian */
         const float x1y1z1 = tex2DLayered<float>( dog, x+1, y+1, z+1 );
-        Dxx = x2y1z1 + x0y1z1 - 2.0 * x1y1z1;
-        Dyy = x1y2z1 + x1y0z1 - 2.0 * x1y1z1;
-        Dss = x1y1z2 + x1y1z0 - 2.0 * x1y1z1;
+        // DD.x = x2y1z1 + x0y1z1 - 2.0f * x1y1z1;
+        // DD.y = x1y2z1 + x1y0z1 - 2.0f * x1y1z1;
+        // DD.z = x1y1z2 + x1y1z0 - 2.0f * x1y1z1;
+        DD.x = x2y1z1 + x0y1z1 - scalbnf( x1y1z1, 1 );
+        DD.y = x1y2z1 + x1y0z1 - scalbnf( x1y1z1, 1 );
+        DD.z = x1y1z2 + x1y1z0 - scalbnf( x1y1z1, 1 );
 
         const float x0y0z1 = tex2DLayered<float>( dog, x+0, y+0, z+1 );
         const float x0y1z0 = tex2DLayered<float>( dog, x+0, y+1, z+0 );
@@ -220,53 +212,56 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
         const float x2y1z0 = tex2DLayered<float>( dog, x+2, y+1, z+0 );
         const float x2y1z2 = tex2DLayered<float>( dog, x+2, y+1, z+2 );
         const float x2y2z1 = tex2DLayered<float>( dog, x+2, y+2, z+1 );
-        Dxy = 0.25f * ( x2y2z1 + x0y0z1 - x0y2z1 - x2y0z1 );
-        Dxs = 0.25f * ( x2y1z2 + x0y1z0 - x0y1z2 - x2y1z0 );
-        Dys = 0.25f * ( x1y2z2 + x1y0z0 - x1y2z0 - x1y0z2 );
+        // DX.x = 0.25f * ( x2y2z1 + x0y0z1 - x0y2z1 - x2y0z1 );
+        // DX.y = 0.25f * ( x2y1z2 + x0y1z0 - x0y1z2 - x2y1z0 );
+        // DX.z = 0.25f * ( x1y2z2 + x1y0z0 - x1y2z0 - x1y0z2 );
+        DX.x = scalbnf( x2y2z1 + x0y0z1 - x0y2z1 - x2y0z1, -2 );
+        DX.y = scalbnf( x2y1z2 + x0y1z0 - x0y1z2 - x2y1z0, -2 );
+        DX.z = scalbnf( x1y2z2 + x1y0z0 - x1y2z0 - x1y0z2, -2 );
 
-        float b[3];
+        float3 b;
         float A[3][3];
 
         /* Solve linear system. */
-        A[0][0] = Dxx;
-        A[1][1] = Dyy;
-        A[2][2] = Dss;
-        A[1][0] = A[0][1] = Dxy;
-        A[2][0] = A[0][2] = Dxs;
-        A[2][1] = A[1][2] = Dys;
+        A[0][0] = DD.x;
+        A[1][1] = DD.y;
+        A[2][2] = DD.z;
+        A[1][0] = A[0][1] = DX.x;
+        A[2][0] = A[0][2] = DX.y;
+        A[2][1] = A[1][2] = DX.z;
 
-        b[0] = -Dx;
-        b[1] = -Dy;
-        b[2] = -Ds;
+        b.x = -D.x;
+        b.y = -D.y;
+        b.z = -D.z;
 
         if( solve( A, b ) == false ) {
-            dx = 0;
-            dy = 0;
-            ds = 0;
+            d.x = 0;
+            d.y = 0;
+            d.z = 0;
             break ;
         }
 
-        dx = b[0];
-        dy = b[1];
-        ds = b[2];
+        d = b;
 
         /* If the translation of the keypoint is big, move the keypoint
          * and re-iterate the computation. Otherwise we are all set.
          */
-        if( fabs(ds) < 0.5f && fabs(dy) < 0.5f && fabs(dx) < 0.5f) break;
+        if( fabs(d.z) < 0.5f && fabs(d.y) < 0.5f && fabs(d.x) < 0.5f) break;
 
-        tx = ((dx >= 0.5f && nj < width-2) ?  1 : 0 )
-             + ((dx <= -0.5f && nj > 1)? -1 : 0 );
+        float3 t;
 
-        ty = ((dy >= 0.5f && ni < height-2)  ?  1 : 0 )
-             + ((dy <= -0.5f && ni > 1) ? -1 : 0 );
+        t.x = ((d.x >= 0.5f && n.x < width-2) ?  1 : 0 )
+             + ((d.x <= -0.5f && n.x > 1)? -1 : 0 );
 
-        ts = ((ds >= 0.5f && ns < maxlevel-1)  ?  1 : 0 )
-             + ((ds <= -0.5f && ns > 1) ? -1 : 0 );
+        t.y = ((d.y >= 0.5f && n.y < height-2)  ?  1 : 0 )
+             + ((d.y <= -0.5f && n.y > 1) ? -1 : 0 );
 
-        ni += ty;
-        nj += tx;
-        ns += ts;
+        t.z = ((d.z >= 0.5f && n.z < maxlevel-1)  ?  1 : 0 )
+             + ((d.z <= -0.5f && n.z > 1) ? -1 : 0 );
+
+        n.x += t.x;
+        n.y += t.y;
+        n.z += t.z;
     } /* go to next iter */
 
     /* ensure convergence of interpolation */
@@ -274,21 +269,23 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
         return false;
     }
 
-    float contr   = v + 0.5f * (Dx * dx + Dy * dy + Ds * ds);
-    float tr      = Dxx + Dyy;
-    float det     = Dxx * Dyy - Dxy * Dxy;
+    // float contr   = v + 0.5f * (D.x * d.x + D.y * d.y + D.z * d.z);
+    float contr   = v + scalbnf( D.x * d.x + D.y * d.y + D.z * d.z , -1 );
+    float tr      = DD.x + DD.y;
+    float det     = DD.x * DD.y - DX.x * DX.x;
     float edgeval = tr * tr / det;
-    float xn      = nj + dx;
-    float yn      = ni + dy;
-    float sn      = ns + ds;
+    float xn      = n.x + d.x;
+    float yn      = n.y + d.y;
+    float sn      = n.z + d.z;
 
     /* negative determinant => curvatures have different signs -> reject it */
-    if (det <= 0.0) {
+    if (det <= 0.0f) {
         return false;
     }
 
     /* accept-reject extremum */
-    if( fabs(contr) < (d_threshold*2.0f) ) {
+    // if( fabs(contr) < (d_threshold*2.0f) )
+    if( fabs(contr) < scalbnf( d_threshold, 1 ) ) {
         return false;
     }
 

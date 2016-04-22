@@ -24,7 +24,7 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
             (di + ORI_NBINS) : 
             ((di >= ORI_NBINS) ? (di - ORI_NBINS) : (di));
 
-    float th = ((M_PI2 * di) / ORI_NBINS) - M_PI;
+    float th = __fdividef( M_PI2 * di, ORI_NBINS ) - M_PI;
     // float th = ((M_PI2 * di) / ORI_NBINS);
     return th;
 }
@@ -57,8 +57,8 @@ void compute_keypoint_orientations_v1( Extremum*     extremum,
     float  sigw = ORI_WINFACTOR * sig;
     int32_t rad  = (int)rintf((3.0f * sigw));
 
-    float factor = -0.5f / (sigw * sigw);
-    int sq_thres  = rad * rad;
+    float factor = __fdividef( -0.5f, (sigw * sigw) );
+    int sq_thres = rad * rad;
     int32_t xmin = max(1,     (int32_t)floor(x - rad));
     int32_t xmax = min(w - 2, (int32_t)floor(x + rad));
     int32_t ymin = max(1,     (int32_t)floor(y - rad));
@@ -86,11 +86,10 @@ void compute_keypoint_orientations_v1( Extremum*     extremum,
 
         int sq_dist  = dx * dx + dy * dy;
         if (sq_dist <= sq_thres) {
-            float weight = grad * exp(sq_dist * factor);
+            float weight = grad * expf(sq_dist * factor);
 
-            // int bidx = (int)rintf(ORI_NBINS * (theta + M_PI) / M_PI2);
-            int bidx = (int)roundf(ORI_NBINS * (theta + M_PI) / M_PI2);
-            // int bidx = (int)roundf(ORI_NBINS * (theta + M_PI) / M_PI2 - 0.5f);
+            int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
+            // int bidx = (int)roundf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
 
             if( bidx > ORI_NBINS ) {
                 printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
@@ -214,7 +213,7 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
     float  sigw = ORI_WINFACTOR * sig;
     int32_t rad  = (int)rintf((3.0f * sigw));
 
-    float factor = -0.5f / (sigw * sigw);
+    float factor = __fdividef( -0.5f, (sigw * sigw) );
     int sq_thres  = rad * rad;
     int32_t xmin = max(1,     (int32_t)floor(x - rad));
     int32_t xmax = min(w - 2, (int32_t)floor(x + rad));
@@ -243,11 +242,10 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
 
         int sq_dist  = dx * dx + dy * dy;
         if (sq_dist <= sq_thres) {
-            float weight = grad * exp(sq_dist * factor);
+            float weight = grad * expf(sq_dist * factor);
 
-            // int bidx = (int)rintf(ORI_NBINS * (theta + M_PI) / M_PI2);
-            int bidx = (int)roundf(ORI_NBINS * (theta + M_PI) / M_PI2);
-            // int bidx = (int)roundf(ORI_NBINS * (theta + M_PI) / M_PI2 - 0.5f);
+            int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
+            // int bidx = (int)roundf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
 
             if( bidx > ORI_NBINS ) {
                 printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
@@ -292,7 +290,7 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
         if( hist[bin] > max( hist[prev], hist[next] ) ) {
             const float num = 3.0f * hist[prev] - 4.0f * hist[bin] + hist[next];
             const float denB = 2.0f * ( hist[prev] - 2.0f * hist[bin] + hist[next] );
-            float newbin = num / denB; // * M_PI/18.0f; // * 10.0f;
+            float newbin = __fdividef( num, denB ); // * M_PI/18.0f; // * 10.0f;
             if( newbin >= 0 && newbin <= 2 ) {
                 xcoord[bin] = prev + newbin;
                 yval[bin]   = -(num*num) / (4.0f * denB) + hist[prev];
@@ -308,7 +306,8 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
             }
         }
     }
-    float th = ((M_PI2 * xcoord[maxbin[0]]) / ORI_NBINS) - M_PI;
+
+    float th = __fdividef(M_PI2 * xcoord[maxbin[0]], ORI_NBINS) - M_PI;
 
     ext->orientation = th;
 
@@ -320,7 +319,7 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
         int idx = atomicAdd( extrema_counter, 1 );
         if( idx >= d_max_orientations ) break;
 
-        float th = ((M_PI2 * xcoord[maxbin[i]]) / ORI_NBINS) - M_PI;
+        float th = __fdividef(M_PI2 * xcoord[maxbin[i]], ORI_NBINS) - M_PI;
 
         ext = &extremum[idx];
         ext->xpos = x;

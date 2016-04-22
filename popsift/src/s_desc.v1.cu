@@ -153,9 +153,12 @@ void normalize_histogram( Descriptor* descs )
     norm += __shfl_down( norm,  4 );
     norm += __shfl_down( norm,  2 );
     norm += __shfl_down( norm,  1 );
-    norm += __shfl     ( norm,  0 );
 
-    norm = 512.0f / norm; /* multiplying with 512 is some scaling by convention */
+    norm = __shfl( norm,  0 );
+
+    /* multiplying with 512 is some scaling by convention */
+    // norm = 512.0f / norm;
+    norm = __frcp_rn( scalbnf( norm, -9 ) );
     descr.x *= norm;
     descr.y *= norm;
     descr.z *= norm;
@@ -175,14 +178,17 @@ void normalize_histogram( Descriptor* descs )
     norm += __shfl_down( norm,  2 );
     norm += __shfl_down( norm,  1 );
 
-    norm = sqrt(norm) + DESC_MIN_FLOAT;
+    if( threadIdx.x == 0 ) {
+        norm = __fsqrt_rn(norm) + DESC_MIN_FLOAT;
+        norm = __frcp_rn(norm); // reciprocal
+    }
 
-    norm += __shfl     ( norm,  0 );
+    norm = __shfl( norm,  0 );
 
-    descr.x /= norm;
-    descr.y /= norm;
-    descr.z /= norm;
-    descr.w /= norm;
+    descr.x *= norm;
+    descr.y *= norm;
+    descr.z *= norm;
+    descr.w *= norm;
 #endif // not DESC_USE_ROOT_SIFT
 
     ptr4[threadIdx.x] = descr;

@@ -6,7 +6,7 @@
 
 #ifdef CLOSED_FORM_SOLVE
 __device__
-inline bool solve( float i[3][3], float b[3] )
+inline bool solve( float i[3][3], float3& b )
 {
     float det0b = - i[1][2] * i[1][2];
     float det0a =   i[1][1] * i[2][2];
@@ -57,13 +57,13 @@ inline bool solve( float i[3][3], float b[3] )
     float vout[3];
     vout[0] = vout[1] = vout[2] = 0;
     for (   int y = 0;  y < 3;  y ++ ) {
-        for ( int x = 0;  x < 3;  x ++ ) {
-            vout[y] += ( i[y][x] * b[x] );
-        }
+        vout[y] += ( i[y][0] * b.x );
+        vout[y] += ( i[y][1] * b.y );
+        vout[y] += ( i[y][2] * b.z );
     }
-    b[0] = vout[0];
-    b[1] = vout[1];
-    b[2] = vout[2];
+    b.x = vout[0];
+    b.y = vout[1];
+    b.z = vout[2];
 
     return true;
 }
