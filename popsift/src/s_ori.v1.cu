@@ -3,6 +3,7 @@
 #include "s_gradiant.h"
 #include "debug_macros.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <inttypes.h>
 
@@ -271,8 +272,15 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
     float xcoord[ORI_NBINS];
     float yval[ORI_NBINS];
 
-    int   maxbin = 0;
-    float y_max = 0;
+    int   maxbin[3];
+    float y_max[3];
+
+    #pragma unroll
+    for( int i=0; i<3; i++ ) {
+        maxbin[i] = 0;
+        y_max[i] = -INFINITY;
+    }
+
     for(int bin = 0; bin < ORI_NBINS; bin++) {
         int prev = bin - 1;
         if( prev < 0 ) prev = ORI_NBINS - 1;
@@ -287,14 +295,18 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
                 xcoord[bin] = prev + newbin;
                 yval[bin]   = -(num*num) / (4.0f * denB) + hist[prev];
 
-                if( yval[bin] > y_max ) {
-                    y_max = yval[bin];
-                    maxbin = bin;
+                if( yval[bin] > y_max[0] ) {
+                    y_max[2]  = y_max[1];
+                    y_max[1]  = y_max[0];
+                    y_max[0]  = yval[bin];
+                    maxbin[2] = maxbin[1];
+                    maxbin[1] = maxbin[0];
+                    maxbin[0] = bin;
                 }
             }
         }
     }
-    float th = ((M_PI2 * xcoord[maxbin]) / ORI_NBINS) - M_PI;
+    float th = ((M_PI2 * xcoord[maxbin[0]]) / ORI_NBINS) - M_PI;
 
     ext->orientation = th;
 }
@@ -334,7 +346,7 @@ void orientation_starter_v2( Extremum*     extremum,
     block.x = ORI_V1_NUM_THREADS;
 
     if( grid.x != 0 ) {
-        compute_keypoint_orientations_v1
+        compute_keypoint_orientations_v2
             <<<grid,block>>>
             ( extremum,
               extrema_counter,
