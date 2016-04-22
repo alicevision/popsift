@@ -4,6 +4,7 @@
 #include "sift_pyramid.h"
 #include "sift_constants.h"
 #include "s_gradiant.h"
+#include "assist.h"
 
 /*************************************************************
  * V1: device side
@@ -134,9 +135,11 @@ void keypoint_descriptors( Extremum*     cand,
 }
 
 __global__
-void normalize_histogram( Descriptor* descs )
+void normalize_histogram( Descriptor* descs, int num_orientations )
 {
-    Descriptor* desc = &descs[blockIdx.x];
+    int offset = ( blockIdx.x < num_orientations ) ? blockIdx.x
+                                                   : num_orientations-1;
+    Descriptor* desc = &descs[offset];
 
     float*  ptr1 = desc->features;
     float4* ptr4 = (float4*)ptr1;
@@ -165,25 +168,17 @@ void normalize_histogram( Descriptor* descs )
     descr.w *= norm;
 #else // not DESC_USE_ROOT_SIFT
     // L2 norm
-    descr.x *= descr.x;
-    descr.y *= descr.y;
-    descr.z *= descr.z;
-    descr.w *= descr.w;
+    __shared__ float normalized_y[32];
 
-    float norm = descr.x + descr.y + descr.z + descr.w;
-
-    norm += __shfl_down( norm, 16 );
-    norm += __shfl_down( norm,  8 );
-    norm += __shfl_down( norm,  4 );
-    norm += __shfl_down( norm,  2 );
-    norm += __shfl_down( norm,  1 );
-
-    if( threadIdx.x == 0 ) {
-        norm = __fsqrt_rn(norm) + DESC_MIN_FLOAT;
-        norm = __frcp_rn(norm); // reciprocal
+    float norm;
+    if( threadIdx.y == 0 ) {
+        // rnormf() is powerful: reciprocal L2 norm of N 
+        // consecutive floats, here N=128
+        norm = rnormf( 128, ptr1 );
+        normalized_y[threadIdx.x] = norm;
     }
-
-    norm = __shfl( norm,  0 );
+    __syncthreads();
+    norm = normalized_y[threadIdx.y];
 
     descr.x *= norm;
     descr.y *= norm;
@@ -292,13 +287,27 @@ void Pyramid::descriptors_v1( )
                       oct_obj.getDescriptors( level ),
                       oct_obj.getData( level ) );
 
+#ifdef USE_DYNAMIC_PARALLELISM
+                grid.x  = grid_divide( num_orientations[level], 1 );
                 block.x = 32;
                 block.y = 1;
                 block.z = 1;
 
                 normalize_histogram
                     <<<grid,block,0,oct_obj.getStream(level+2)>>>
-                    ( oct_obj.getDescriptors( level ) );
+                    ( oct_obj.getDescriptors( level ),
+                      num_orientations[level] );
+#else
+                grid.x  = grid_divide( num_orientations[level], 32 );
+                block.x = 32;
+                block.y = 32;
+                block.z = 1;
+
+                normalize_histogram
+                    <<<grid,block,0,oct_obj.getStream(level+2)>>>
+                    ( oct_obj.getDescriptors( level ),
+                      num_orientations[level] );
+#endif
             }
         }
     }
