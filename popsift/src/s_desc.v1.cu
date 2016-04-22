@@ -63,7 +63,7 @@ void keypoint_descriptors( Extremum*     cand,
     float dpt[9];
     for (int i = 0; i < 9; i++) dpt[i] = 0.0f;
 
-    for(int i = threadIdx.x; i < loops; i+=DESC_NUM_THREADS)
+    for(int i = threadIdx.x; i < loops; i+=32)
     {
         const int ii = i / wx + ymin;
         const int jj = i % wx + xmin;     
@@ -111,13 +111,8 @@ void keypoint_descriptors( Extremum*     cand,
 
     /* reduction here */
     for (int i = 0; i < 8; i++) {
-#if DESC_NUM_THREADS==32
         dpt[i] += __shfl_down( dpt[i], 16 );
-#endif
-#if DESC_NUM_THREADS==32 || DESC_NUM_THREADS==16
         dpt[i] += __shfl_down( dpt[i], 8 );
-#else
-#endif
         dpt[i] += __shfl_down( dpt[i], 4 );
         dpt[i] += __shfl_down( dpt[i], 2 );
         dpt[i] += __shfl_down( dpt[i], 1 );
@@ -206,7 +201,7 @@ __global__ void descriptor_starter( int*          extrema_counter,
 
     printf("Number of extrema after ori: %d\n", grid.x );
 
-    block.x = DESC_NUM_THREADS;
+    block.x = 32;
     block.y = 4;
     block.z = 4;
 
@@ -283,7 +278,7 @@ void Pyramid::descriptors_v1( )
             grid.x  = num_orientations[level];
 
             if( grid.x != 0 ) {
-                block.x = DESC_NUM_THREADS;
+                block.x = 32;
                 block.y = 4;
                 block.z = 4;
 
@@ -293,17 +288,6 @@ void Pyramid::descriptors_v1( )
                       oct_obj.getDescriptors( level ),
                       oct_obj.getData( level ) );
 
-#ifdef USE_DYNAMIC_PARALLELISM
-                grid.x  = grid_divide( num_orientations[level], 1 );
-                block.x = 32;
-                block.y = 1;
-                block.z = 1;
-
-                normalize_histogram
-                    <<<grid,block,0,oct_obj.getStream(level+2)>>>
-                    ( oct_obj.getDescriptors( level ),
-                      num_orientations[level] );
-#else
                 grid.x  = grid_divide( num_orientations[level], 32 );
                 block.x = 32;
                 block.y = 32;
@@ -313,7 +297,6 @@ void Pyramid::descriptors_v1( )
                     <<<grid,block,0,oct_obj.getStream(level+2)>>>
                     ( oct_obj.getDescriptors( level ),
                       num_orientations[level] );
-#endif
             }
         }
     }

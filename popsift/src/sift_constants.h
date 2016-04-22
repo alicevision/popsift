@@ -28,9 +28,6 @@
 #define DESC_BINS        8
 #define DESC_MAGNIFY           3.0f
 // #define DESC_MAGNIFY           6.0f
-#define DESC_NUM_THREADS 32
-// #define DESC_NUM_THREADS 16
-// #define DESC_NUM_THREADS 8
 
 /* Define this to prefer L1 norm in descriptor normalization
  * instead of default L2 norm.
