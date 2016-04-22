@@ -75,11 +75,9 @@ void keypoint_descriptors( Extremum*     cand,
         const float nxn = fabs(nx);
         const float nyn = fabs(ny);
         if (nxn < 1.0f && nyn < 1.0f) {
-            float mod;
-            float th;
-            get_gradiant( mod, th,
-                          jj, ii,
-                          layer );
+            const float2 mod_th = get_gradiant( jj, ii, layer );
+            const float& mod    = mod_th.x;
+            float        th     = mod_th.y;
 
             const float dnx = nx + offsetptx;
             const float dny = ny + offsetpty;
