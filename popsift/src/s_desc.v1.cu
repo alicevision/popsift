@@ -31,10 +31,13 @@ void keypoint_descriptors( Extremum*     cand,
     const float y    = ext->ypos;
     const float sig  = ext->sigma;
     const float ang  = ext->orientation;
-    const float SBP  = fabs(DESC_MAGNIFY * sig);
+    const float SBP  = fabsf(DESC_MAGNIFY * sig);
 
-    const float cos_t = cosf(ang);
-    const float sin_t = sinf(ang);
+    // const float cos_t = cosf(ang);
+    // const float sin_t = sinf(ang);
+    float cos_t;
+    float sin_t;
+    sincosf( ang, &sin_t, &cos_t );
 
     const float csbp  = cos_t * SBP;
     const float ssbp  = sin_t * SBP;
@@ -46,12 +49,12 @@ void keypoint_descriptors( Extremum*     cand,
     const float ptx = csbp * offsetptx - ssbp * offsetpty + x;
     const float pty = csbp * offsetpty + ssbp * offsetptx + y;
 
-    const float bsz = fabs(csbp) + fabs(ssbp);
+    const float bsz = fabsf(csbp) + fabsf(ssbp);
 
-    const int32_t xmin = max(1,          (int32_t)floor(ptx - bsz));
-    const int32_t ymin = max(1,          (int32_t)floor(pty - bsz));
-    const int32_t xmax = min(width - 2,  (int32_t)floor(ptx + bsz));
-    const int32_t ymax = min(height - 2, (int32_t)floor(pty + bsz));
+    const int32_t xmin = max(1,          (int32_t)floorf(ptx - bsz));
+    const int32_t ymin = max(1,          (int32_t)floorf(pty - bsz));
+    const int32_t xmax = min(width - 2,  (int32_t)floorf(ptx + bsz));
+    const int32_t ymax = min(height - 2, (int32_t)floorf(pty + bsz));
 
     const int32_t wx = xmax - xmin + 1;
     const int32_t hy = ymax - ymin + 1;
@@ -90,7 +93,7 @@ void keypoint_descriptors( Extremum*     cand,
             while (th >= M_PI2) th -= M_PI2;
 
             const float   tth  = th * M_4RPI;
-            const int32_t fo0  = (int32_t)floor(tth);
+            const int32_t fo0  = (int32_t)floorf(tth);
             const float   do0  = tth - fo0;             
             const float   wgt1 = 1.0f - do0;
             const float   wgt2 = do0;
