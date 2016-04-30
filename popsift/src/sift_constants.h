@@ -15,7 +15,7 @@
 
 #define M_4RPI               (4.0f / M_PI)
 
-#define DESC_MIN_FLOAT               1E-15
+#define DESC_MIN_FLOAT               1E-15F
 
 #define GAUSS_ALIGN  16
 #define GAUSS_SPAN   8
