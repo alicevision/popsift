@@ -4,11 +4,14 @@
 // #include "s_pyramid.h"
 #include "debug_macros.h"
 
-#define PRINT_GAUSS_FILTER_SYMBOL
+#undef PRINT_GAUSS_FILTER_SYMBOL
 
 using namespace std;
 
 namespace popart {
+
+__device__ __constant__
+float d_gauss_filter_initial_blur[ GAUSS_ALIGN ];
 
 __device__ __constant__
 float d_gauss_filter[ GAUSS_ALIGN * GAUSS_LEVELS ];
@@ -43,7 +46,7 @@ void print_gauss_filter_symbol( int columns )
  * Initialize the Gauss filter table in constant memory
  *************************************************************/
 
-void init_filter( float sigma0, int levels, bool vlfeat_mode )
+void init_filter( float sigma0, int levels, bool vlfeat_mode, bool assume_initial_blur, float initial_blur )
 {
     if( sigma0 > 2.0 )
     {
@@ -60,21 +63,44 @@ void init_filter( float sigma0, int levels, bool vlfeat_mode )
         exit( -__LINE__ );
     }
 
+    float sigma;
+
+    float local_filter_initial_blur[ GAUSS_ALIGN ];
+
+    if( assume_initial_blur ) {
+        sigma = sqrt( sigma0 * sigma0 - initial_blur * initial_blur );
+        printf("Creating table for initial blur %f\n", sigma);
+
+        for( int x = 1; x <= GAUSS_SPAN; x++ ) {
+            const float val = exp( -0.5 * (pow( double(x)/sigma, 2.0) ) );
+            local_filter_initial_blur[x] = val;
+        }
+        local_filter_initial_blur[0] = 1.0;
+    } else {
+        for( int x = 0; x <= GAUSS_SPAN; x++ ) {
+            local_filter_initial_blur[x] = 0;
+        }
+    }
+
     float local_filter_rel[ GAUSS_ALIGN * GAUSS_LEVELS ];
     float local_filter_abs[ GAUSS_ALIGN * GAUSS_LEVELS ];
     // const int W = GAUSS_SPAN; // no filter wider than 25; 32 is just for alignment
     // assert( W % 2 == 1 ); // filters should be symmetric, i.e. odd-sized
     // const double mean = the center value
 
-    float sigma = sigma0;
+    sigma = sigma0;
     if( vlfeat_mode == true ) {
         printf("We are in VLFeat mode\n");
     } else {
         printf("We are in OpenCV mode\n");
+#ifdef PRINT_GAUSS_FILTER_SYMBOL
         printf("sigma is initially sigma0, afterwards the difference between previous 2 sigmas\n");
+#endif
     }
+#ifdef PRINT_GAUSS_FILTER_SYMBOL
     printf( "Sigma values for creating Gauss tables:\n" );
     printf( "sigma for 1 filter is %f\n", sigma );
+#endif
     for( int lvl=0; lvl<GAUSS_LEVELS; lvl++ ) {
         for( int x = 1; x < GAUSS_ALIGN; x++ ) {
             local_filter_rel[lvl * GAUSS_ALIGN + x] = 0.0;
@@ -125,11 +151,19 @@ void init_filter( float sigma0, int levels, bool vlfeat_mode )
             const float sigmaS = sigma0 * pow( 2.0, (float)(lvl+1)/(float)levels );
 
             sigma = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
+#ifdef PRINT_GAUSS_FILTER_SYMBOL
             printf("    sigmaP is %f - sigmaS is %f - sigma is %f\n", sigmaP, sigmaS, sigma );
+#endif
         }
     }
 
     cudaError_t err;
+    err = cudaMemcpyToSymbol( d_gauss_filter_initial_blur,
+                              local_filter_initial_blur,
+                              GAUSS_ALIGN * sizeof(float),
+                              0,
+                              cudaMemcpyHostToDevice );
+    POP_CUDA_FATAL_TEST( err, "cudaMemcpyToSymbol failed for Gauss kernel initialization: " );
     err = cudaMemcpyToSymbol( d_gauss_filter,
                               local_filter_rel,
                               GAUSS_ALIGN * GAUSS_LEVELS * sizeof(float),

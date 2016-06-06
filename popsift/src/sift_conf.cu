@@ -15,6 +15,8 @@ Config::Config( )
     , scaling_mode( Config::IndirectDownscaling )
     , verbose( false )
     , gauss_group_size( 1 )
+    , _assume_initial_blur( false )
+    , _initial_blur( 0.0f )
     , bemap_orientation( false )
 { }
 
@@ -60,6 +62,22 @@ void Config::setGaussGroup( int groupsize )
 int  Config::getGaussGroup( ) const
 {
     return gauss_group_size;
+}
+
+void Config::setInitialBlur( float blur )
+{
+    _assume_initial_blur = true;
+    _initial_blur        = blur;
+}
+
+bool Config::hasInitialBlur( ) const
+{
+    return _assume_initial_blur;
+}
+
+float Config::getInitialBlur( ) const
+{
+    return _initial_blur;
 }
 
 void Config::setBemapOrientation( )

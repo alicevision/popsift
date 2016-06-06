@@ -19,6 +19,8 @@ class Pyramid
 
     Config::ScalingMode _scaling_mode;
     bool                _bemap_orientation_mode;
+    bool                _assume_initial_blur;
+    float               _initial_blur;
 
 public:
     Pyramid( Config& config,
@@ -42,10 +44,12 @@ private:
     void build_v11 ( Image* base );
 
     inline void horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data, int octave, cudaStream_t stream );
+    inline void horiz_from_upscaled_orig_tex_initial_blur( cudaTextureObject_t src_data, cudaStream_t stream );
     inline void downscale_from_prev_octave( int octave, int level, cudaStream_t stream );
     inline void downscale_from_prev_octave_and_horiz_blur( int octave, int level, cudaStream_t stream );
     inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream );
     inline void vert_from_interm( int octave, int level, cudaStream_t stream );
+    inline void vert_from_interm_initial_blur( cudaStream_t stream );
     inline void dog_from_blurred( int octave, int level, cudaStream_t stream );
 
     void reset_extrema_mgmt( );

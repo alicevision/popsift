@@ -47,6 +47,39 @@ void horiz_tex_128x1( cudaTextureObject_t src_data,
     dst_data.ptr(blockIdx.y)[off_x] = out;
 }
 
+__global__
+void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
+                                          Plane2D_float       dst_data )
+{
+    const float dst_w  = dst_data.getWidth();
+    const float dst_h  = dst_data.getHeight();
+    const float read_y = ( blockIdx.y + 0.5f ) / dst_h;
+
+    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if( off_x >= dst_w ) return;
+
+    float out = 0.0f;
+
+    #pragma unroll
+    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
+        const float& g  = popart::d_gauss_filter_initial_blur[offset];
+        const float read_x_l = ( off_x - offset );
+        const float  v1 = tex2D<float>( src_data, ( read_x_l + 0.5f ) / dst_w, read_y );
+        out += ( v1 * g );
+
+        const float read_x_r = ( off_x + offset );
+        const float  v2 = tex2D<float>( src_data, ( read_x_r + 0.5f ) / dst_w, read_y );
+        out += ( v2 * g );
+    }
+    const float& g  = popart::d_gauss_filter_initial_blur[0];
+    const float read_x = off_x;
+    const float v3 = tex2D<float>( src_data, ( read_x + 0.5f ) / dst_w, read_y );
+    out += ( v3 * g );
+
+    dst_data.ptr(blockIdx.y)[off_x] = out;
+}
+
 
 __global__
 void horiz_128x1( cudaTextureObject_t src_data,
@@ -198,6 +231,67 @@ void vert( cudaTextureObject_t src_data,
     dst_data.ptr(idy)[idx] = out;
 }
 
+__global__
+void vert_initial_blur( cudaTextureObject_t src_data,
+                        Plane2D_float       dst_data )
+{
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+
+    int block_x = blockIdx.x * blockDim.x;
+    int block_y = blockIdx.y * blockDim.y;
+    int idx     = threadIdx.x;
+    int idy;
+
+    float g;
+    float val;
+    float out = 0;
+
+#ifdef GAUSS_INTERM_FILTER_MODE_POINT
+    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter_initial_blur[offset];
+
+        idy = threadIdx.y - offset;
+        val = tex2D<float>( src_data, block_x + idx, block_y + idy );
+        out += ( val * g );
+
+        idy = threadIdx.y + offset;
+        val = tex2D<float>( src_data, block_x + idx, block_y + idy );
+        out += ( val * g );
+    }
+
+    g  = popart::d_gauss_filter_initial_blur[0];
+    idy = threadIdx.y;
+    val = tex2D<float>( src_data, block_x + idx, block_y + idy );
+    out += ( val * g );
+#else // not GAUSS_INTERM_FILTER_MODE_POINT
+    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
+        g  = popart::d_gauss_filter_initial_blur[offset];
+
+        idy = threadIdx.y - offset;
+        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
+        out += ( val * g );
+
+        idy = threadIdx.y + offset;
+        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
+        out += ( val * g );
+    }
+
+    g  = popart::d_gauss_filter_initial_blur[0];
+    idy = threadIdx.y;
+    val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
+    out += ( val * g );
+#endif // not GAUSS_INTERM_FILTER_MODE_POINT
+
+    idx = block_x+threadIdx.x;
+    idy = block_y+threadIdx.y;
+
+    if( idx >= dst_w ) return;
+    if( idy >= dst_h ) return;
+
+    dst_data.ptr(idy)[idx] = out;
+}
+
 
 __global__
 void make_dog( cudaTextureObject_t this_data,
@@ -239,6 +333,28 @@ inline void Pyramid::horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data,
         ( src_data,
           oct_obj.getIntermediateData( ),
           0 ); // level is always 0
+}
+
+__host__
+inline void Pyramid::horiz_from_upscaled_orig_tex_initial_blur( cudaTextureObject_t src_data, cudaStream_t stream )
+{
+    Octave&      oct_obj = _octaves[0];
+
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    /* I believe that waiting is not necessary because image is upscaled
+     * in default stream */
+
+    dim3 block( 128, 1 );
+    dim3 grid;
+    grid.x  = grid_divide( width,  128 );
+    grid.y  = height;
+
+    gauss::v11::horiz_tex_128x1_initial_blur
+        <<<grid,block,0,stream>>>
+        ( src_data,
+          oct_obj.getIntermediateData( ) );
 }
 
 #define PREV_LEVEL 3
@@ -341,6 +457,28 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
 }
 
 __host__
+inline void Pyramid::vert_from_interm_initial_blur( cudaStream_t stream )
+{
+    Octave& oct_obj = _octaves[0];
+
+    /* waiting for any events is not necessary, it's in the same stream as horiz
+     */
+
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    dim3 block( 64, 2 );
+    dim3 grid;
+    grid.x = (unsigned int)grid_divide( width,  block.x );
+    grid.y = (unsigned int)grid_divide( height, block.y );
+
+    gauss::v11::vert_initial_blur
+        <<<grid,block,0,stream>>>
+        ( oct_obj._interm_data_tex,
+          oct_obj.getData( 0 ) );
+}
+
+__host__
 inline void Pyramid::dog_from_blurred( int octave, int level, cudaStream_t stream )
 {
     Octave&      oct_obj = _octaves[octave];
@@ -404,8 +542,13 @@ void Pyramid::build_v11( Image* base )
                 if( octave == 0 )
                 {
                     cudaTextureObject_t& tex = base->getUpscaledTexture();
-                    horiz_from_upscaled_orig_tex( tex, octave, stream );
-                    vert_from_interm( octave, level, stream );
+                    if( _assume_initial_blur ) {
+                        horiz_from_upscaled_orig_tex_initial_blur( tex, stream );
+                        vert_from_interm_initial_blur( stream );
+                    } else {
+                        horiz_from_upscaled_orig_tex( tex, octave, stream );
+                        vert_from_interm( octave, level, stream );
+                    }
                 }
                 else 
                 {

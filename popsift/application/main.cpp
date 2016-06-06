@@ -47,6 +47,7 @@ static void usage( const char* argv )
          << " --edge-threshold=<float> or" << endl
          << " --edge-limit=<float>        On-edge threshold" << endl
          << " --downsampling=<float>      Downscale width and height of input by 2^N (default N=-1)" << endl
+         << " --initial-blur=<float>      Assume initial blur, subtract when blurring first time" << endl
          << endl
          << "* Modes *" << endl
          << " --vlfeat-mode               Compute Gauss filter like VLFeat instead of like OpenCV" << endl
@@ -78,6 +79,7 @@ static struct option longopts[] = {
     { "edge-threshold",      required_argument,      NULL, 1004 },
     { "edge-limit",          required_argument,      NULL, 1004 },
     { "sigma",               required_argument,      NULL, 1005 },
+    { "initial-blur",        required_argument,      NULL, 1006 },
 
     { "vlfeat-mode",         no_argument,            NULL, 1100 },
     { "direct-downscale",    no_argument,            NULL, 1101 },
@@ -124,6 +126,7 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 1003 : config.setThreshold(  strtof( optarg, NULL ) ); break;
         case 1004 : config.setEdgeLimit(  strtof( optarg, NULL ) ); break;
         case 1005 : applySigma = true; sigma = strtof( optarg, NULL ); break;
+        case 1006 : config.setInitialBlur( strtof( optarg, NULL ) ); break;
         default   : usage( appName );
         }
     }

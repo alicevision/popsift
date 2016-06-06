@@ -12,8 +12,15 @@ PopSift::PopSift( const popart::Config& config )
     _config.levels = max( 2, config.levels );
 
     const bool vlfeat_mode = ( config.sift_mode == popart::Config::VLFeat );
-    popart::init_filter( _config.sigma, _config.levels, vlfeat_mode );
-    popart::init_sigma(  _config.sigma, _config.levels, _config._threshold, _config._edge_limit );
+    popart::init_filter( _config.sigma,
+                         _config.levels,
+                         vlfeat_mode,
+                         _config.hasInitialBlur(),
+                         _config.getInitialBlur() );
+    popart::init_sigma(  _config.sigma,
+                         _config.levels,
+                         _config._threshold,
+                         _config._edge_limit );
     popart::init_extrema_limits( 10000 );
 }
 

@@ -41,6 +41,10 @@ struct Config
     void setSigma( float v );
     void setEdgeLimit( float v );
     void setThreshold( float v );
+    void setInitialBlur( float blur );
+
+    bool  hasInitialBlur( ) const;
+    float getInitialBlur( ) const;
 
     // determine the image format of the first octave
     // relative to the input image's size (x,y) as follows:
@@ -87,6 +91,13 @@ struct Config
     int gauss_group_size;
 
 private:
+    /* VLFeat code assumes that an initial input image is partially blurred.
+     * This changes the blur computation for the very first level of the first
+     * octave, turning it into a special case.
+     */
+    bool  _assume_initial_blur;
+    float _initial_blur;
+
     /* The first orientation code was derived from Bemap OpenCL SIFT.
      * It used double smoothing of the orientation histogram in s_ori.
      * This has been replaced by direct curve fitting according to Lowe.
