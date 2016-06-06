@@ -145,23 +145,28 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
 
 #ifdef DESC_USE_ROOT_SIFT
     // L1 norm
-    float norm = descr.x + descr.y + descr.z + descr.w;
+    float sum = descr.x + descr.y + descr.z + descr.w;
 
-    norm += __shfl_down( norm, 16 );
-    norm += __shfl_down( norm,  8 );
-    norm += __shfl_down( norm,  4 );
-    norm += __shfl_down( norm,  2 );
-    norm += __shfl_down( norm,  1 );
+    sum += __shfl_down( sum, 16 );
+    sum += __shfl_down( sum,  8 );
+    sum += __shfl_down( sum,  4 );
+    sum += __shfl_down( sum,  2 );
+    sum += __shfl_down( sum,  1 );
 
-    norm = __shfl( norm,  0 );
+    sum = __shfl( sum,  0 );
 
     /* multiplying with 512 is some scaling by convention */
-    // norm = 512.0f / norm;
-    norm = __frcp_rn( scalbnf( norm, -9 ) );
-    descr.x *= norm;
-    descr.y *= norm;
-    descr.z *= norm;
-    descr.w *= norm;
+    // sum = 512.0f / sum;
+    // sum = __frcp_rn( scalbnf( sum, -9 ) );
+    float val;
+    val = 512.0f * __fsqrt_rn( __fdividef( descr.x, sum ) );
+    descr.x = val;
+    val = 512.0f * __fsqrt_rn( __fdividef( descr.y, sum ) );
+    descr.y = val;
+    val = 512.0f * __fsqrt_rn( __fdividef( descr.z, sum ) );
+    descr.z = val;
+    val = 512.0f * __fsqrt_rn( __fdividef( descr.w, sum ) );
+    descr.w = val;
 #else // not DESC_USE_ROOT_SIFT
     // L2 norm
     __shared__ float normalized_y[32];
