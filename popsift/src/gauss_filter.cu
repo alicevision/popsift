@@ -23,6 +23,12 @@ float d_gauss_from_lvl_1[ GAUSS_ALIGN * GAUSS_LEVELS ];
 __global__
 void print_gauss_filter_symbol( int columns )
 {
+    printf("Gauss tables for initial blur\n");
+    for( int x=0; x<columns; x++ ) {
+        printf("%0.3f ", d_gauss_filter_initial_blur[x] );
+    }
+    printf("\n");
+
     printf("Gauss tables with relative differences\n");
     for( int lvl=0; lvl<GAUSS_LEVELS; lvl++ ) {
         for( int x=0; x<columns; x++ ) {
@@ -46,7 +52,7 @@ void print_gauss_filter_symbol( int columns )
  * Initialize the Gauss filter table in constant memory
  *************************************************************/
 
-void init_filter( float sigma0, int levels, bool vlfeat_mode, bool assume_initial_blur, float initial_blur )
+void init_filter( float sigma0, int levels, bool vlfeat_mode, bool assume_initial_blur, float initial_blur, float downsampling_factor )
 {
     if( sigma0 > 2.0 )
     {
@@ -63,19 +69,26 @@ void init_filter( float sigma0, int levels, bool vlfeat_mode, bool assume_initia
         exit( -__LINE__ );
     }
 
+    initial_blur *= pow( 2.0, -1.0f * downsampling_factor );
+
     float sigma;
 
     float local_filter_initial_blur[ GAUSS_ALIGN ];
 
     if( assume_initial_blur ) {
-        sigma = sqrt( sigma0 * sigma0 - initial_blur * initial_blur );
+        sigma = sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) );
         printf("Creating table for initial blur %f\n", sigma);
 
+        double sum = 1.0;
+        local_filter_initial_blur[0] = 1.0;
         for( int x = 1; x <= GAUSS_SPAN; x++ ) {
             const float val = exp( -0.5 * (pow( double(x)/sigma, 2.0) ) );
             local_filter_initial_blur[x] = val;
+            sum += val;
         }
-        local_filter_initial_blur[0] = 1.0;
+        for( int x = 0; x <= GAUSS_SPAN; x++ ) {
+            local_filter_initial_blur[x] /= sum;
+        }
     } else {
         for( int x = 0; x <= GAUSS_SPAN; x++ ) {
             local_filter_initial_blur[x] = 0;

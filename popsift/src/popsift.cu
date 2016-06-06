@@ -16,7 +16,8 @@ PopSift::PopSift( const popart::Config& config )
                          _config.levels,
                          vlfeat_mode,
                          _config.hasInitialBlur(),
-                         _config.getInitialBlur() );
+                         _config.getInitialBlur(),
+                         _config.start_sampling );
     popart::init_sigma(  _config.sigma,
                          _config.levels,
                          _config._threshold,

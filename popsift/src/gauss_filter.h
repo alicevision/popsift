@@ -15,7 +15,8 @@ void init_filter( float sigma0,
                   int   levels,
                   bool  vlfeat_mode,
                   bool  assume_initial_blur,
-                  float initial_blur );
+                  float initial_blur,
+                  float downsampling );
 
 } // namespace popart
 
