@@ -6,6 +6,8 @@
 #include "s_gradiant.h"
 #include "assist.h"
 
+#undef DESCRIPTORS_FROM_UNBLURRED_IMAGE
+
 /*************************************************************
  * V1: device side
  *************************************************************/
@@ -232,6 +234,12 @@ void Pyramid::descriptors_v1( )
         Octave&      oct_obj = _octaves[octave];
 
         for( int level=1; level<_levels-2; level++ ) {
+#ifdef DESCRIPTORS_FROM_UNBLURRED_IMAGE
+            Plane2D_float& data = oct_obj.getData( 0 );
+#else // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
+            Plane2D_float& data = oct_obj.getData( level );
+#endif // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
+
             cudaStream_t oct_str = oct_obj.getStream(level+2);
             int* extrema_counters = oct_obj.getExtremaMgmtD();
             int* extrema_counter  = &extrema_counters[level];
@@ -240,7 +248,7 @@ void Pyramid::descriptors_v1( )
                 ( extrema_counter,
                   oct_obj.getExtrema( level ),
                   oct_obj.getDescriptors( level ),
-                  oct_obj.getData( level ) );
+                  data );
         }
     }
 
@@ -278,11 +286,17 @@ void Pyramid::descriptors_v1( )
                 block.y = 4;
                 block.z = 4;
 
+#ifdef DESCRIPTORS_FROM_UNBLURRED_IMAGE
+                Plane2D_float& data = oct_obj.getData( 0 );
+#else // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
+                Plane2D_float& data = oct_obj.getData( level );
+#endif // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
+
                 keypoint_descriptors
                     <<<grid,block,0,oct_obj.getStream(level+2)>>>
                     ( oct_obj.getExtrema( level ),
                       oct_obj.getDescriptors( level ),
-                      oct_obj.getData( level ) );
+                      data );
 
                 grid.x  = grid_divide( num_orientations[level], 32 );
                 block.x = 32;
