@@ -48,8 +48,12 @@ IF(CUDA_FOUND)
   # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;per-thread")
   # print local memory usage per kernel: -Xptxas;-v
   # CUDA >= 7.5: -Xptxas;--warn-on-local-memory-usage;-Xptxas;--warn-on-spills
-  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;--warn-on-local-memory-usage")
-  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;--warn-on-spills")
+  message(STATUS "CUDA Version is ${CUDA_VERSION}")
+  if(CUDA_VERSION>=7.5)
+    set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;--warn-on-local-memory-usage")
+    set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;--warn-on-spills")
+  else(CUDA_VERSION>=7.5)
+  endif(CUDA_VERSION>=7.5)
 
   # library required for CUDA dynamic parallelism, forgotten by CMake 3.4
   cuda_find_library_local_first(CUDA_CUDADEVRT_LIBRARY cudadevrt "\"cudadevrt\" library")
