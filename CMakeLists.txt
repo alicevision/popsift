@@ -63,5 +63,13 @@ ELSE(CUDA_FOUND)
   message( FATAL_ERROR "Could not find CUDA >= 7.0" )
 ENDIF(CUDA_FOUND)
 
+# find_package(LibAV COMPONENTS REQUIRED avcodec avresample swscale avutil)
+find_package(LibAV COMPONENTS REQUIRED avformat)
+if(LIBAV_FOUND)
+  include_directories( ${LIBAV_INCLUDE_DIRS} )
+else(LIBAV_FOUND)
+  message( FATAL_ERROR "Could not find libav" )
+endif(LIBAV_FOUND)
+
 add_subdirectory(popsift)
 
