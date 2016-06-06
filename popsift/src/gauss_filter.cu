@@ -4,7 +4,7 @@
 // #include "s_pyramid.h"
 #include "debug_macros.h"
 
-#undef PRINT_GAUSS_FILTER_SYMBOL
+#define PRINT_GAUSS_FILTER_SYMBOL
 
 using namespace std;
 
@@ -67,6 +67,14 @@ void init_filter( float sigma0, int levels, bool vlfeat_mode )
     // const double mean = the center value
 
     float sigma = sigma0;
+    if( vlfeat_mode == true ) {
+        printf("We are in VLFeat mode\n");
+    } else {
+        printf("We are in OpenCV mode\n");
+        printf("sigma is initially sigma0, afterwards the difference between previous 2 sigmas\n");
+    }
+    printf( "Sigma values for creating Gauss tables:\n" );
+    printf( "sigma for 1 filter is %f\n", sigma );
     for( int lvl=0; lvl<GAUSS_LEVELS; lvl++ ) {
         for( int x = 1; x < GAUSS_ALIGN; x++ ) {
             local_filter_rel[lvl * GAUSS_ALIGN + x] = 0.0;
@@ -117,6 +125,7 @@ void init_filter( float sigma0, int levels, bool vlfeat_mode )
             const float sigmaS = sigma0 * pow( 2.0, (float)(lvl+1)/(float)levels );
 
             sigma = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
+            printf("    sigmaP is %f - sigmaS is %f - sigma is %f\n", sigmaP, sigmaS, sigma );
         }
     }
 
