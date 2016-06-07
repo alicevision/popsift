@@ -71,5 +71,5 @@ else(LIBAV_FOUND)
   message( FATAL_ERROR "Could not find libav" )
 endif(LIBAV_FOUND)
 
-add_subdirectory(popsift)
+add_subdirectory(src)
 
