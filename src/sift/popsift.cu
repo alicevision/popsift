@@ -3,6 +3,8 @@
 #include "gauss_filter.h"
 #include "write_plane_2d.h"
 #include "sift_extrema_mgmt.h"
+#include "c_util_img.h"
+#include "sift_pyramid.h"
 
 using namespace std;
 
@@ -81,8 +83,10 @@ void PopSift::uninit( int pipe )
     delete _pipe[pipe]._pyramid;
 }
 
-void PopSift::execute( int pipe, imgStream inp )
+void PopSift::execute( int pipe, const imgStream* inpPtr )
 {
+    const imgStream& inp = *inpPtr;
+
     if( pipe < 0 && pipe >= MAX_PIPES ) return;
 
     cudaEvent_t start, end;

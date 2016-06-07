@@ -681,5 +681,25 @@ void Octave::free_events( )
     delete [] _extrema_done;
 }
 
+void Octave::downloadToVector(uint32_t level, std::vector<Extremum> &candidates, std::vector<Descriptor> &descriptors)
+{
+
+    readExtremaCount( ); // CHECK
+    cudaDeviceSynchronize( );
+    uint32_t ct = getExtremaCount( level );
+    if( ct > 0 ) {
+        candidates.resize(ct);        
+        popcuda_memcpy_sync( &candidates[0],
+                            _d_extrema[level],
+                            ct * sizeof(Extremum),
+                            cudaMemcpyDeviceToHost );
+        descriptors.resize(ct);        
+        popcuda_memcpy_sync( &descriptors[0],
+                        _d_desc[level],
+                        ct * sizeof(Descriptor),
+                        cudaMemcpyDeviceToHost );
+    }
+}
+
 } // namespace popart
 

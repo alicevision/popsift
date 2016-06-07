@@ -102,7 +102,7 @@ Image::~Image( )
     _input_image_h   .freeHost( popart::CudaAllocated );
 }
 
-void Image::load( imgStream inp )
+void Image::load( const imgStream& inp )
 {
     memcpy( _input_image_h.data, inp.data_r, _w*_h );
     _input_image_h.memcpyToDevice( _input_image_d );

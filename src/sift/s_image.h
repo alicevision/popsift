@@ -14,7 +14,7 @@ struct Image
     ~Image( );
 
     /** Load a new image, copy to device and upscale */
-    void load( imgStream inp );
+    void load( const imgStream& inp );
 
     void debug_out( );
     void test_last_error( const char* file, int line );

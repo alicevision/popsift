@@ -14,6 +14,7 @@
 #include "popsift.h"
 #include "sift_conf.h"
 #include "device_prop.h"
+#include "c_util_img.h"
 
 using namespace std;
 
@@ -180,7 +181,7 @@ int main(int argc, char **argv)
     PopSift PopSift( config );
 
     PopSift.init( 0, inp.width, inp.height );
-    PopSift.execute( 0, inp );
+    PopSift.execute( 0, &inp );
     PopSift.uninit( 0 );
     return 0;
 }

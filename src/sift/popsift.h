@@ -2,14 +2,19 @@
 
 #include <cuda_runtime.h>
 
-#include "c_util_img.h"
-#include "sift_pyramid.h"
 #include "sift_conf.h"
 
 #define MAX_PIPES 3
 
 
 /* user parameters */
+namespace popart
+{
+    class Image;
+    class Pyramid;
+};
+
+class imgStream;
 
 class PopSift
 {
@@ -30,7 +35,12 @@ public:
 public:
     bool init( int pipe, int w, int h );
 
-    void execute( int pipe, imgStream _inp );
+    void execute( int pipe, const imgStream* _inp );
+
+    inline popart::Pyramid& pyramid(int pipe)
+    {
+      return *_pipe[pipe]._pyramid;
+    }
 
     void uninit( int pipe );
 

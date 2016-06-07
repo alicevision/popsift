@@ -6,6 +6,7 @@
 #include "sift_conf.h"
 #include "sift_extremum.h"
 #include "sift_extrema_mgmt.h"
+#include <vector>
 
 namespace popart {
 
@@ -166,7 +167,10 @@ class Octave
          * debug:
          * download a level and write to disk
          */
-        void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
+         void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
+
+         void downloadToVector(uint32_t level, std::vector<Extremum> &candidates, std::vector<Descriptor> &descriptors);
+
 private:
     void alloc_data_planes( );
     void alloc_data_tex( );
