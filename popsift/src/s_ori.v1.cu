@@ -111,83 +111,80 @@ void compute_keypoint_orientations_v1( Extremum*     extremum,
     }
 
 
-        if(threadIdx.x != 0) return;
+    if(threadIdx.x != 0) return;
 
-        for (int iter = 0; iter < 2; iter++) {
-            float first = hist[0];
-            float prev = hist[(ORI_NBINS - 1)];
+    for( int iter = 0; iter < 2; iter++ ) {
+        float first = hist[0];
+        float prev = hist[(ORI_NBINS - 1)];
 
-            int bin;
-            //0,35
-            for (bin = 0; bin < ORI_NBINS - 1; bin++) {
-                float temp = hist[bin];
-                hist[bin] = 0.25f * prev + 0.5f * hist[bin] + 0.25f * hist[bin + 1];
-                prev = temp;
-            }
-
-            hist[bin] = 0.25f * prev + 0.5f * hist[bin] + 0.25f * first;
-            //z vprintf("val: %f, indx: %d\n", hist[bin], bin);
+        int bin;
+        //0,35
+        for( bin = 0; bin < ORI_NBINS - 1; bin++ ) {
+            float temp = hist[bin];
+            hist[bin] = 0.25f * prev + 0.5f * hist[bin] + 0.25f * hist[bin + 1];
+            prev = temp;
         }
+
+        hist[bin] = 0.25f * prev + 0.5f * hist[bin] + 0.25f * first;
+        //z vprintf("val: %f, indx: %d\n", hist[bin], bin);
+    }
 	
-        /* find histogram maximum */
-        float maxh = NINF;
-        int binh = 0;
-        for (int bin = 0; bin < ORI_NBINS; bin++) {
-            // maxh = fmaxf(maxh, hist[bin]);
-            if (hist[bin] > maxh) {
-                maxh = hist[bin];
-                binh = bin;
-            }
+    /* find histogram maximum */
+    float maxh = NINF;
+    int binh = 0;
+    for (int bin = 0; bin < ORI_NBINS; bin++) {
+        // maxh = fmaxf(maxh, hist[bin]);
+        if (hist[bin] > maxh) {
+            maxh = hist[bin];
+            binh = bin;
         }
+    }
 
-        {
-            float hc = hist[binh];
-            float hn = hist[((binh + 1 + ORI_NBINS) % ORI_NBINS)];
-            float hp = hist[((binh - 1 + ORI_NBINS) % ORI_NBINS)];
-            float th = compute_angle(binh, hc, hn, hp);
+    {
+        float hc = hist[binh];
+        float hn = hist[((binh + 1 + ORI_NBINS) % ORI_NBINS)];
+        float hp = hist[((binh - 1 + ORI_NBINS) % ORI_NBINS)];
+        float th = compute_angle(binh, hc, hn, hp);
 
-            if( isnan(th) ) {
-                printf("NAN value in compute_angle\n");
-            }
-
-            ext->orientation = th;
 #ifdef DEBUG_SEARCH_FOR_NANS
         if( isnan(th) ) {
             ext->invalid |= ANGLE_IS_NAN;
         }
 #endif // DEBUG_SEARCH_FOR_NANS
 
-        /* find other peaks, boundary of 80% of max */
-        int nangles = 1;
+        ext->orientation = th;
+    }
 
-        for (int numloops = 1; numloops < ORI_NBINS; numloops++) {
-            int bin = (binh + numloops) % ORI_NBINS;
+    /* find other peaks, boundary of 80% of max */
+    int nangles = 1;
 
-            float hc = hist[bin];
-            float hn = hist[((bin + 1 + ORI_NBINS) % ORI_NBINS)];
-            float hp = hist[((bin - 1 + ORI_NBINS) % ORI_NBINS)];
+    for (int numloops = 1; numloops < ORI_NBINS; numloops++) {
+        int bin = (binh + numloops) % ORI_NBINS;
 
-            /* find if a peak */
-            if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
-                int idx = atomicAdd( extrema_counter, 1 );
-                if( idx >= d_max_orientations ) break;
+        float hc = hist[bin];
+        float hn = hist[((bin + 1 + ORI_NBINS) % ORI_NBINS)];
+        float hp = hist[((bin - 1 + ORI_NBINS) % ORI_NBINS)];
 
-                float th = compute_angle(bin, hc, hn, hp);
+        /* find if a peak */
+        if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
+            int idx = atomicAdd( extrema_counter, 1 );
+            if( idx >= d_max_orientations ) break;
 
-                ext = &extremum[idx];
-                ext->xpos = x;
-                ext->ypos = y;
-                ext->sigma = sig;
-                ext->orientation = th;
+            float th = compute_angle(bin, hc, hn, hp);
 
-                nangles++;
-                if (nangles > 2) break;
-            }
+            ext = &extremum[idx];
+            ext->xpos = x;
+            ext->ypos = y;
+            ext->sigma = sig;
             ext->orientation = th;
 #ifdef DEBUG_SEARCH_FOR_NANS
             ext->invalid = 0;
 #endif // DEBUG_SEARCH_FOR_NANS
+
+            nangles++;
+            if (nangles > 2) break;
         }
+    }
 }
 
 /*
