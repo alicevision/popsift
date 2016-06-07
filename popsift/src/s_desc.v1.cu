@@ -15,6 +15,27 @@
 using namespace popart;
 using namespace std;
 
+#ifdef DEBUG_SEARCH_FOR_NANS
+__global__
+void pre_desc_validate_data_layer( int octave, int level, Plane2D_float layer )
+{
+    const int width  = layer.getWidth();
+    const int height = layer.getHeight();
+    for( int y=0; y<height; y++ ) {
+        for( int x=0; x<width; x++ ) {
+            if( isnan( layer.ptr(y)[x] ) ) {
+                printf( "PRE DESC: Found a NAN value in blur layer octave %d level %d at (%d,%d)\n", octave, level, x,y );
+                return;
+            }
+            if( isinf( layer.ptr(y)[x] ) ) {
+                printf( "PRE DESC: Found an INF value in blur layer octave %d level %d at (%d,%d)\n", octave, level, x,y );
+                return;
+            }
+        }
+    }
+}
+#endif // DEBUG_SEARCH_FOR_NANS
+
 __global__
 void keypoint_descriptors( Extremum*     cand,
                            Descriptor*   descs,
@@ -29,11 +50,24 @@ void keypoint_descriptors( Extremum*     cand,
 
     Extremum* ext = &cand[blockIdx.x];
 
+#ifdef DEBUG_SEARCH_FOR_NANS
+    if( ext->invalid ) return;
+#endif // DEBUG_SEARCH_FOR_NANS
+
     const float x    = ext->xpos;
     const float y    = ext->ypos;
     const float sig  = ext->sigma;
     const float ang  = ext->orientation;
     const float SBP  = fabsf(DESC_MAGNIFY * sig);
+
+    if( SBP == 0 ) {
+#ifdef DEBUG_SEARCH_FOR_NANS
+        if( threadIdx.x == 0 ) {
+            ext->invalid |= SIGMA_NULL;
+        }
+#endif // DEBUG_SEARCH_FOR_NANS
+        return;
+    }
 
     // const float cos_t = cosf(ang);
     // const float sin_t = sinf(ang);
@@ -67,6 +101,12 @@ void keypoint_descriptors( Extremum*     cand,
 
     for(int i = threadIdx.x; i < loops; i+=32)
     {
+#ifdef DEBUG_SEARCH_FOR_NANS
+        if( wx + ymin == 0 ) {
+            ext->invalid |= DESC_WINDOW_EMPTY;
+        }
+#endif // DEBUG_SEARCH_FOR_NANS
+
         const int ii = i / wx + ymin;
         const int jj = i % wx + xmin;     
 
@@ -78,6 +118,14 @@ void keypoint_descriptors( Extremum*     cand,
         const float nyn = fabs(ny);
         if (nxn < 1.0f && nyn < 1.0f) {
             const float2 mod_th = get_gradiant( jj, ii, layer );
+#ifdef DEBUG_SEARCH_FOR_NANS
+            if( mod_th.x == HUGE_VALF || isnan(mod_th.x) ) {
+                ext->invalid |= HYPOT_OUT_OF_RANGE;
+            }
+            if( isnan(mod_th.y) ) {
+                ext->invalid |= ATAN_OUT_OF_RANGE;
+            }
+#endif // DEBUG_SEARCH_FOR_NANS
             const float& mod    = mod_th.x;
             float        th     = mod_th.y;
 
@@ -127,6 +175,12 @@ void keypoint_descriptors( Extremum*     cand,
 
     if( threadIdx.x < 8 ) {
         desc->features[offset+threadIdx.x] = dpt[threadIdx.x];
+#ifdef DEBUG_SEARCH_FOR_NANS
+        if( isnan( dpt[threadIdx.x] ) || isinf( dpt[threadIdx.x] ) ) {
+            if( not ext->invalid )
+                ext->invalid |= NAN_SOURCE_UNKNOWN;
+        }
+#endif // DEBUG_SEARCH_FOR_NANS
     }
 }
 
@@ -239,13 +293,24 @@ void Pyramid::descriptors_v1( )
         Octave&      oct_obj = _octaves[octave];
 
         for( int level=1; level<_levels-2; level++ ) {
+            cudaStream_t oct_str = oct_obj.getStream(level+2);
+
 #ifdef DESCRIPTORS_FROM_UNBLURRED_IMAGE
             Plane2D_float& data = oct_obj.getData( 0 );
+#ifdef DEBUG_SEARCH_FOR_NANS
+            pre_desc_validate_data_layer
+                <<<1,1,0,oct_str>>>
+                ( octave, 0, data );
+#endif
 #else // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
             Plane2D_float& data = oct_obj.getData( level );
+#ifdef DEBUG_SEARCH_FOR_NANS
+            pre_desc_validate_data_layer
+                <<<1,1,0,oct_str>>>
+                ( octave, level, data );
+#endif
 #endif // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
 
-            cudaStream_t oct_str = oct_obj.getStream(level+2);
             int* extrema_counters = oct_obj.getExtremaMgmtD();
             int* extrema_counter  = &extrema_counters[level];
             descriptor_starter

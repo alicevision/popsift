@@ -1,4 +1,5 @@
 #include "sift_pyramid.h"
+#include "sift_constants.h"
 #include "s_sigma.h"
 #include "s_solve.h"
 #include "debug_macros.h"
@@ -127,6 +128,9 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     ec.ypos    = 0;
     ec.sigma   = 0;
     ec.orientation = 0;
+#ifdef DEBUG_SEARCH_FOR_NANS
+    ec.invalid = 0;
+#endif // DEBUG_SEARCH_FOR_NANS
 
     /*
      * First consideration: extrema cannot be found on any outermost edge,

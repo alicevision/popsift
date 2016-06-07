@@ -1,7 +1,9 @@
 #pragma once
 
+#include <stdio.h>
 #include <inttypes.h>
 #include "plane_2d.h"
+#include "sift_constants.h"
 
 /*
  * The Bemap code has a massive overhead by computing grad and
@@ -40,6 +42,29 @@ inline float2 get_gradiant( uint32_t       x,
         float dx = layer.ptr(y)[x+1] - layer.ptr(y)[x-1];
         float dy = layer.ptr(y+1)[x] - layer.ptr(y-1)[x];
         // grad     = __fsqrt_rz(dx*dx + dy*dy);
+#ifdef DEBUG_SEARCH_FOR_NANS
+        if( isnan(dx) ) {
+            printf("dx is NAN in get_gradient\n");
+            if( isnan( layer.ptr(y)[x+1] ) ) {
+                printf("layer[%d](%d) is NAN\n", y, x+1 );
+            }
+            if( isnan( layer.ptr(y)[x-1] ) ) {
+                printf("layer[%d](%d) is NAN\n", y, x-1 );
+            }
+        }
+        if( isnan(dy) ) {
+            printf("dy is NAN in get_gradient\n");
+            if( isnan( layer.ptr(y)[x+1] ) ) {
+                printf("layer[%d](%d) is NAN\n", y+1, x );
+            }
+            if( isnan( layer.ptr(y)[x-1] ) ) {
+                printf("layer[%d](%d) is NAN\n", y-1, x );
+            }
+        }
+        if( isinf(dx) || isinf(dy) ) {
+            printf("dx or dy are INF in get_gradient\n");
+        }
+#endif // DEBUG_SEARCH_FOR_NANS
         return make_float2( hypotf( dx, dy ),
                             atan2f(dy, dx) );
     }

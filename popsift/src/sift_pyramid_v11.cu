@@ -1,15 +1,39 @@
 #include "sift_pyramid.h"
+#include "sift_constants.h"
 #include "gauss_filter.h"
 #include "debug_macros.h"
 #include "assist.h"
 
 #include <iostream>
+#include <stdio.h>
 
 /*************************************************************
  * V11: device side
  *************************************************************/
 
 namespace popart {
+
+#ifdef DEBUG_SEARCH_FOR_NANS
+__global__
+void post_gauss_validate_data_layer( int octave, int level, Plane2D_float layer )
+{
+    const int width  = layer.getWidth();
+    const int height = layer.getHeight();
+    for( int y=0; y<height; y++ ) {
+        for( int x=0; x<width; x++ ) {
+            if( isnan( layer.ptr(y)[x] ) ) {
+                printf( "POST GAUSS: Found a NAN value in blur layer octave %d level %d at (%d,%d)\n", octave, level, x,y );
+                return;
+            }
+            if( isinf( layer.ptr(y)[x] ) ) {
+                printf( "POST GAUSS: Found an INF value in blur layer octave %d level %d at (%d,%d)\n", octave, level, x,y );
+                return;
+            }
+        }
+    }
+}
+#endif // DEBUG_SEARCH_FOR_NANS
+
 namespace gauss {
 namespace v11 {
 
@@ -44,6 +68,10 @@ void horiz_tex_128x1( cudaTextureObject_t src_data,
     const float v3 = tex2D<float>( src_data, ( read_x + 0.5f ) / dst_w, read_y );
     out += ( v3 * g );
 
+#ifdef DEBUG_SEARCH_FOR_NANS
+    if( isnan( out ) ) printf( "horiz_tex_128x1 yielded NAN\n" );
+    if( isinf( out ) ) printf( "horiz_tex_128x1 yielded INF\n" );
+#endif // DEBUG_SEARCH_FOR_NANS
     dst_data.ptr(blockIdx.y)[off_x] = out;
 }
 
@@ -77,6 +105,10 @@ void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
     const float v3 = tex2D<float>( src_data, ( read_x + 0.5f ) / dst_w, read_y );
     out += ( v3 * g );
 
+#ifdef DEBUG_SEARCH_FOR_NANS
+    if( isnan( out ) ) printf( "horiz_tex_128x1_initial_blur yielded NAN\n" );
+    if( isinf( out ) ) printf( "horiz_tex_128x1_initial_blur yielded INF\n" );
+#endif // DEBUG_SEARCH_FOR_NANS
     dst_data.ptr(blockIdx.y)[off_x] = out;
 }
 
@@ -107,6 +139,10 @@ void horiz_128x1( cudaTextureObject_t src_data,
     const float v3 = tex2D<float>( src_data, off_x+0.5f, blockIdx.y+0.5f );
     out += ( v3 * g );
 
+#ifdef DEBUG_SEARCH_FOR_NANS
+    if( isnan( out ) ) printf( "horiz_128x1 yielded NAN\n" );
+    if( isinf( out ) ) printf( "horiz_128x1 yielded INF\n" );
+#endif // DEBUG_SEARCH_FOR_NANS
     dst_data.ptr(blockIdx.y)[off_x] = out;
 }
 
@@ -124,6 +160,10 @@ void get_by_2( cudaTextureObject_t src_data,
     if( idy >= dst_h ) return;
 
     const float val = tex2D<float>( src_data, 2.0f * idx + 1.0f, 2.0f * idy + 1.0f );
+#ifdef DEBUG_SEARCH_FOR_NANS
+    if( isnan( val ) ) printf( "get_by_2 yielded NAN\n" );
+    if( isinf( val ) ) printf( "get_by_2 yielded INF\n" );
+#endif // DEBUG_SEARCH_FOR_NANS
     dst_data.ptr(idy)[idx] = val;
 }
 
@@ -166,6 +206,10 @@ void horiz_by_2( cudaTextureObject_t src_data,
     if( idx >= dst_w ) return;
     if( idy >= dst_h ) return;
 
+#ifdef DEBUG_SEARCH_FOR_NANS
+    if( isnan( out ) ) printf( "horiz_by_2 yielded NAN\n" );
+    if( isinf( out ) ) printf( "horiz_by_2 yielded INF\n" );
+#endif // DEBUG_SEARCH_FOR_NANS
     dst_data.ptr(idy)[idx] = out;
 }
 
@@ -228,6 +272,10 @@ void vert( cudaTextureObject_t src_data,
     if( idx >= dst_w ) return;
     if( idy >= dst_h ) return;
 
+#ifdef DEBUG_SEARCH_FOR_NANS
+    if( isnan( out ) ) printf( "vert yielded NAN at (%d,%d)\n", idx, idy );
+    if( isinf( out ) ) printf( "vert yielded INF at (%d,%d)\n", idx, idy );
+#endif // DEBUG_SEARCH_FOR_NANS
     dst_data.ptr(idy)[idx] = out;
 }
 
@@ -289,6 +337,10 @@ void vert_initial_blur( cudaTextureObject_t src_data,
     if( idx >= dst_w ) return;
     if( idy >= dst_h ) return;
 
+#ifdef DEBUG_SEARCH_FOR_NANS
+    if( isnan( out ) ) printf( "vert_initial_blur yielded NAN\n" );
+    if( isinf( out ) ) printf( "vert_initial_blur yielded INF\n" );
+#endif // DEBUG_SEARCH_FOR_NANS
     dst_data.ptr(idy)[idx] = out;
 }
 
@@ -529,7 +581,6 @@ void Pyramid::build_v11( Image* base )
         Octave& oct_obj   = _octaves[octave];
 
         for( uint32_t level=0; level<_levels; level++ ) {
-
             const int width  = oct_obj.getWidth();
             const int height = oct_obj.getHeight();
 
@@ -589,6 +640,11 @@ void Pyramid::build_v11( Image* base )
                 err = cudaEventRecord( dog_ev, stream );
                 POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
             }
+#ifdef DEBUG_SEARCH_FOR_NANS
+            post_gauss_validate_data_layer
+                <<<1,1,0,stream>>>
+                ( octave, level, oct_obj.getData( level ) );
+#endif // DEBUG_SEARCH_FOR_NANS
         }
     }
 }
