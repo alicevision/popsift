@@ -52,41 +52,41 @@ mkdir 1
 mv dir-* 1/
 cat 1/dir-desc/* > img1_popSIFT.txt
 
-# echo ./sift_v4 $PARAMS $LOG $IMAGE2
-# ./sift_v4 $PARAMS $LOG $IMAGE2
-# mkdir 2
-# mv dir-* 2/
-# cat 2/dir-desc/* > img2_popSIFT.txt
+echo ./sift_v4 $PARAMS $LOG $IMAGE2
+./sift_v4 $PARAMS $LOG $IMAGE2
+mkdir 2
+mv dir-* 2/
+cat 2/dir-desc/* > img2_popSIFT.txt
 
-# echo ./sift_v4 $PARAMS $LOG $IMAGE3
-# ./sift_v4 $PARAMS $LOG $IMAGE3
-# mkdir 3
-# mv dir-* 3/
-# cat 3/dir-desc/* > img3_popSIFT.txt
+echo ./sift_v4 $PARAMS $LOG $IMAGE3
+./sift_v4 $PARAMS $LOG $IMAGE3
+mkdir 3
+mv dir-* 3/
+cat 3/dir-desc/* > img3_popSIFT.txt
 
-# echo ./sift_v4 $PARAMS $LOG $IMAGE4
-# ./sift_v4 $PARAMS $LOG $IMAGE4
-# mkdir 4
-# mv dir-* 4/
-# cat 4/dir-desc/* > img4_popSIFT.txt
+echo ./sift_v4 $PARAMS $LOG $IMAGE4
+./sift_v4 $PARAMS $LOG $IMAGE4
+mkdir 4
+mv dir-* 4/
+cat 4/dir-desc/* > img4_popSIFT.txt
 
-# echo ./sift_v4 $PARAMS $LOG $IMAGE5
-# ./sift_v4 $PARAMS $LOG $IMAGE5
-# mkdir 5
-# mv dir-* 5/
-# cat 5/dir-desc/* > img5_popSIFT.txt
+echo ./sift_v4 $PARAMS $LOG $IMAGE5
+./sift_v4 $PARAMS $LOG $IMAGE5
+mkdir 5
+mv dir-* 5/
+cat 5/dir-desc/* > img5_popSIFT.txt
 
-# echo ./sift_v4 $PARAMS $LOG $IMAGE6
-# ./sift_v4 $PARAMS $LOG $IMAGE6
-# mkdir 6
-# mv dir-* 6/
-# cat 6/dir-desc/* > img6_popSIFT.txt
+echo ./sift_v4 $PARAMS $LOG $IMAGE6
+./sift_v4 $PARAMS $LOG $IMAGE6
+mkdir 6
+mv dir-* 6/
+cat 6/dir-desc/* > img6_popSIFT.txt
 
-# echo ./sift_v4 $PARAMS $LOG $IMAGE7
-# ./sift_v4 $PARAMS $LOG $IMAGE7
-# mkdir 7
-# mv dir-* 7/
-# cat 7/dir-desc/* > img7_popSIFT.txt
+echo ./sift_v4 $PARAMS $LOG $IMAGE7
+./sift_v4 $PARAMS $LOG $IMAGE7
+mkdir 7
+mv dir-* 7/
+cat 7/dir-desc/* > img7_popSIFT.txt
 
 zip -r descriptors.zip img* ?/dir-desc/desc-pyramid-o-*
 
