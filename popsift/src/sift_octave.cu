@@ -450,6 +450,11 @@ void Octave::free_data_tex( )
 
 void Octave::alloc_interm_plane( )
 {
+#if 0
+    /*
+     * no longer meaningful, and leads to bugs
+     */
+
     /* Usually we alloc only one plane's worth of floats.
      * When we group gauss filters, we need #groupsize intermediate
      * planes. For efficiency, we use only a single allocation,
@@ -458,6 +463,8 @@ void Octave::alloc_interm_plane( )
      * We give this buffer 4 rows.
      */
     _intermediate_data.allocDev( _w, _gauss_group * ( _h + 4 ) );
+#endif
+    _intermediate_data.allocDev( _w, _h );
 }
 
 void Octave::free_interm_plane( )
