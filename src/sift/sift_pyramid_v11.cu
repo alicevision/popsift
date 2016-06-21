@@ -380,7 +380,7 @@ void make_dog( cudaTextureObject_t this_data,
 
     const float b = tex2D<float>( this_data, idx, idy );
     const float a = tex2D<float>( top_data, idx, idy );
-    const float c = a - b; // c = fabs( a - b );
+    const float c = b - a; // c = fabs( a - b );
 
     surf2DLayeredwrite( c, dog_data, idx*4, idy, level, cudaBoundaryModeZero );
 }
