@@ -5,12 +5,6 @@
 #include <fstream>
 #include <limits>
 
-// #include "debug_macros.h"
-// #include "align_macro.h"
-// #include "assist.h"
-// #include <stdio.h>
-// #include <assert.h>
-
 using namespace std;
 
 namespace popart {
@@ -31,17 +25,17 @@ void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
 }
 
 __host__
-void write_plane2Dunscaled( const char* filename, bool onDevice, Plane2D_float& f )
+void write_plane2Dunscaled( const char* filename, bool onDevice, Plane2D_float& f, int offset )
 {
     if( onDevice ) {
         // cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
         Plane2D_float g;
         g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
         g.memcpyFromDevice( f );
-        write_plane2Dunscaled( filename, g );
+        write_plane2Dunscaled( filename, g, offset );
         g.freeHost( CudaAllocated );
     } else {
-        write_plane2Dunscaled( filename, f );
+        write_plane2Dunscaled( filename, f, offset );
     }
 }
 
@@ -106,12 +100,12 @@ void write_plane2D( const char* filename, Plane2D_float& f )
 }
 
 __host__
-void write_plane2Dunscaled( const char* filename, Plane2D_float& f )
+void write_plane2Dunscaled( const char* filename, Plane2D_float& f, int offset )
 {
     int rows = f.getRows();
     int cols = f.getCols();
 
-    float* c = new float[rows * cols];
+    int* c = new int[rows * cols];
     for( int y=0; y<rows; y++ ) {
         for( int x=0; x<cols; x++ ) {
             float v = f.ptr(y)[x];
@@ -120,15 +114,15 @@ void write_plane2Dunscaled( const char* filename, Plane2D_float& f )
     }
 
     ofstream of( filename );
-    of << "nonsense" << endl
+    of << "P2" << endl
        << cols << " " << rows << endl
-       << "maxint" << endl;
-    float* cx = c;
+       << "255" << endl;
+    int* cx = c;
     for( int row=0; row<rows; row++ ) {
         for( int col=0; col<cols; col++ ) {
-            float val = *cx;
+            int val = *cx;
             cx++;
-            of << setprecision(2) << val << " ";
+            of << val+offset << " ";
         }
         of << endl;
     }
