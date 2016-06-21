@@ -4,14 +4,26 @@
 #include <iostream>
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
 
 /* GRAYSCALE */
-// #define R_RATE (uint32_t)(0.298912F * 0x1000000)
-// #define G_RATE (uint32_t)(0.586611F * 0x1000000)
-// #define B_RATE (uint32_t)(0.114478F * 0x1000000)
+#define RGB2GRAY_IN_INT
+
+#ifdef RGB2GRAY_IN_INT
+// #define RATE_SHIFT 24
+// #define R_RATE (uint32_t)(0.298912F * (float)(1<<RATE_SHIFT))
+// #define G_RATE (uint32_t)(0.586611F * (float)(1<<RATE_SHIFT))
+// #define B_RATE (uint32_t)(0.114478F * (float)(1<<RATE_SHIFT))
+// the following are OpenCV's numbers
+#define RATE_SHIFT 14
+#define R_RATE (uint32_t)4899
+#define G_RATE (uint32_t)9617
+#define B_RATE (uint32_t)1868
+#else
 #define R_RATE 0.298912f
 #define G_RATE 0.586611f
 #define B_RATE 0.114478f
+#endif
 
 using namespace std;
 
@@ -339,14 +351,22 @@ void read_gray(std::string & filename, imgStream & buffer)
 
         pixel_uc *src = reinterpret_cast < pixel_uc * >(buffer);
         for( int i=0; i<width * height; i++ ) {
-            float r = *src; src++;
+#ifdef RGB2GRAY_IN_INT
+            uint32_t r = *src; src++;
+            uint32_t g = *src; src++;
+            uint32_t b = *src; src++;
+            uint32_t res = ( ( R_RATE*r+G_RATE*g+B_RATE*b ) >> RATE_SHIFT );
+            ptr_r[i] = (unsigned char)res;
+#else // RGB2GRAY_IN_INT
+            float r =(*src; src++;
             float g = *src; src++;
             float b = *src; src++;
             ptr_r[i] = (unsigned char)( R_RATE*r+G_RATE*g+B_RATE*b );
-            // uint32_t r = (*src) << 24; src++;
-            // uint32_t g = (*src) << 24; src++;
-            // uint32_t b = (*src) << 24; src++;
-            // ptr_r[i] = ( R_RATE*r+G_RATE*g+B_RATE*b ) >> 24;
+#endif // RGB2GRAY_IN_INT
+    // cerr << "(" << i%width << "," << i/width << ") -> R " << r << " G " << g << " B " << b << " -> " << (int)ptr_r[i] << endl;
+// if( i == 19*width+3 ) {
+    // cerr << "(3,19) -> R " << r << " G " << g << " B " << b << " -> " << (int)ptr_r[i] << endl;
+// }
         }
       } else {
         std::cerr << "ERROR: Unknown parsing mode\n" << std::endl;
