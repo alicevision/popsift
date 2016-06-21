@@ -104,6 +104,19 @@ Image::~Image( )
 
 void Image::load( const imgStream& inp )
 {
+#if 1
+    ofstream of( "color-conv.pgm" );
+    of << "P2" << endl
+       << _w << " " << _h << endl
+       << "255" << endl;
+    for( int h=0; h<_h; h++ ) {
+        for( int w=0; w<_w; w++ ) {
+            int val = inp.data_r[h*_w+w];
+            of << val << " ";
+        }
+        of << endl;
+    }
+#endif
     memcpy( _input_image_h.data, inp.data_r, _w*_h );
     _input_image_h.memcpyToDevice( _input_image_d );
     upscale_v5( _input_image_tex );
