@@ -84,7 +84,7 @@ void init_filter( float sigma0, int levels, bool vlfeat_mode, bool assume_initia
         for( int x = 1; x <= GAUSS_SPAN; x++ ) {
             const float val = exp( -0.5 * (pow( double(x)/sigma, 2.0) ) );
             local_filter_initial_blur[x] = val;
-            sum += val;
+            sum += 2.0f * val;
         }
         for( int x = 0; x <= GAUSS_SPAN; x++ ) {
             local_filter_initial_blur[x] /= sum;
