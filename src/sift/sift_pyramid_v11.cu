@@ -3,6 +3,7 @@
 #include "gauss_filter.h"
 #include "debug_macros.h"
 #include "assist.h"
+#include "clamp.h"
 
 #include <iostream>
 #include <stdio.h>
@@ -164,6 +165,29 @@ void get_by_2( cudaTextureObject_t src_data,
     if( isnan( val ) ) printf( "get_by_2 yielded NAN\n" );
     if( isinf( val ) ) printf( "get_by_2 yielded INF\n" );
 #endif // DEBUG_SEARCH_FOR_NANS
+    dst_data.ptr(idy)[idx] = val;
+}
+
+__global__
+void get_by_2_opencv( Plane2D_float src_data,
+                      Plane2D_float       dst_data,
+                      int level )
+{
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
+
+    const int dst_w = dst_data.getWidth();
+    const int dst_h = dst_data.getHeight();
+    if( idx >= dst_w ) return;
+    if( idy >= dst_h ) return;
+
+    const int src_w = src_data.getWidth();
+    const int src_h = src_data.getHeight();
+    const int read_x = clamp( idx << 1, 0, src_w );
+    const int read_y = clamp( idy << 1, 0, src_h );
+
+    const float val = src_data.ptr(read_y)[read_x];
+
     dst_data.ptr(idy)[idx] = val;
 }
 
@@ -430,11 +454,19 @@ inline void Pyramid::downscale_from_prev_octave( int octave, int level, cudaStre
     h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
     h_grid.y = (unsigned int)grid_divide( height, h_block.y );
 
+#ifdef USE_OPENCV_INTERPRETATION
+    gauss::v11::get_by_2_opencv
+        <<<h_grid,h_block,0,stream>>>
+        ( prev_oct_obj.getData( _levels-PREV_LEVEL ),
+          oct_obj.getData( level ),
+          level );
+#else // not USE_OPENCV_INTERPRETATION
     gauss::v11::get_by_2
         <<<h_grid,h_block,0,stream>>>
         ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
           oct_obj.getData( level ),
           level );
+#endif // not USE_OPENCV_INTERPRETATION
 }
 
 __host__
