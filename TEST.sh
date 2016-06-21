@@ -27,7 +27,9 @@
 # PARAMS="--octaves=3 --levels=3 --sigma=1.6 --threshold=0.00001 --edge-threshold=5.0"
 # PARAMS=
 
-IMAGE1=../sample/boat/img1.ppm
+IMAGE1=/local/home/griff/GIT/github/openmvg/src/openMVG_Samples/imageData/StanfordMobileVisualSearch/Ace_0s.ppm
+
+# IMAGE1=../sample/boat/img1.ppm
 IMAGE2=../sample/boat/img2.ppm
 IMAGE3=../sample/boat/img3.ppm
 IMAGE4=../sample/boat/img4.ppm
@@ -39,9 +41,10 @@ IMAGE7=../sample/level1.ppm
 # PARAMS="--indirect-unfiltered --octaves=4 --threshold=0.1 --edge-threshold=10.0" # finds 4 points
 # PARAMS="--indirect-unfiltered --threshold=0.04 --edge-threshold=10.0" # finds 4 points
 # PARAMS="--downsampling=0 --octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0"
-# PARAMS="--downsampling=0 --octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+# PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0"
 # PARAMS="--vlfeat-mode --sigma=0.82 --octaves=1 --levels=1 --downsampling=0 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
-PARAMS="--sigma=1.6 --octaves=4 --levels=3 --downsampling=0 --indirect-unfiltered --threshold=0.0 --edge-threshold=10.0"
+# PARAMS="--sigma=1.6 --octaves=4 --levels=3 --downsampling=0 --indirect-unfiltered --threshold=0.0 --edge-threshold=10.0"
 LOG=--log
 # LOG=
 rm -rf 1 2 3 4 5 6 7 dir-*
@@ -51,6 +54,8 @@ echo ./sift_v4 $PARAMS $LOG $IMAGE1
 mkdir 1
 mv dir-* 1/
 cat 1/dir-desc/* > img1_popSIFT.txt
+
+exit 0
 
 echo ./sift_v4 $PARAMS $LOG $IMAGE2
 ./sift_v4 $PARAMS $LOG $IMAGE2
