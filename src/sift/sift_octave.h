@@ -140,6 +140,10 @@ class Octave
             return _d_extrema[level];
         }
 
+        inline Extremum* getExtremaH( uint32_t level ) {
+            return _h_extrema[level];
+        }
+
         // void resetExtremaCount( );
         void readExtremaCount( );
         int getExtremaCount( ) const;

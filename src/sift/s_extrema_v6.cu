@@ -407,6 +407,31 @@ void Pyramid::find_extrema_v6_sub( )
         }
     }
 
+#if 0
+    // HARSH DEBUDDING - FOR COMPARING WITH OPENCV RESULTS
+    cudaDeviceSynchronize();
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        Octave&      oct_obj = _octaves[octave];
+        oct_obj.readExtremaCount();
+    }
+    cudaDeviceSynchronize();
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        Octave&      oct_obj = _octaves[octave];
+        oct_obj.downloadDescriptor();
+    }
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        Octave&      oct_obj = _octaves[octave];
+        for( int lvl=0; lvl<_levels; lvl++ ) {
+            int num = oct_obj.getExtremaCount(lvl);
+            for( int n=0; n<num; n++ ) {
+                cerr << "x:" << oct_obj.getExtremaH(lvl)[n].xpos
+                     << " y:" << oct_obj.getExtremaH(lvl)[n].ypos
+                     << " o:" << octave
+                     << " l:" << lvl << endl;
+            }
+        }
+    }
+#endif
     // cudaDeviceSynchronize();
 }
 
