@@ -347,7 +347,7 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
 
             ostringstream ostr2;
             ostr2 << "dir-dog-txt/d-" << basename << "-o-" << octave << "-l-" << l << ".txt";
-            popart::write_plane2Dunscaled( ostr2.str().c_str(), true, p );
+            popart::write_plane2Dunscaled( ostr2.str().c_str(), true, p, 127 );
         }
 
         POP_CUDA_FREE_HOST( array );
