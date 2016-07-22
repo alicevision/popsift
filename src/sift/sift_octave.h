@@ -151,7 +151,7 @@ class Octave
 
         Descriptor* getDescriptors( uint32_t level );
         void        downloadDescriptor( );
-        void        writeDescriptor( std::ostream& ostr, float downsampling_factor );
+        void        writeDescriptor( std::ostream& ostr, float downsampling_factor, bool really );
 
         /**
          * alloc() - allocates all GPU memories for one octave

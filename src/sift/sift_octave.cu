@@ -159,13 +159,12 @@ void Octave::downloadDescriptor( )
     cudaDeviceSynchronize( );
 }
 
-void Octave::writeDescriptor( ostream& ostr, float downsampling_factor )
+void Octave::writeDescriptor( ostream& ostr, float downsampling_factor, bool really )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
         if( _h_extrema[l] == 0 ) continue;
 
         Extremum* cand = _h_extrema[l];
-
 
         Descriptor* desc = _h_desc[l];
 
@@ -173,16 +172,38 @@ void Octave::writeDescriptor( ostream& ostr, float downsampling_factor )
         for( int s=0; s<sz; s++ ) {
             const float reduce = downsampling_factor;
 
+            float ori = cand[s].orientation;
+            ori = ori / M_PI2 * 360;
+            if( ori < 0 ) ori += 360;
+            // ori = 360.0f - ( ori / M_PI2 * 360 );
+            // if( ori > 360.0f ) ori -= 360.0f;
+
+#if 0
             ostr << setprecision(5)
                  << ( cand[s].xpos - 0.0f ) * pow( 2.0, _debug_octave_id + reduce ) << " "
                  << ( cand[s].ypos - 0.0f ) * pow( 2.0, _debug_octave_id + reduce ) << " "
-                 << cand[s].sigma * pow( 2.0, _debug_octave_id + reduce ) << " "
-                 << cand[s].orientation << " ";
+                 << 2 * cand[s].sigma * pow( 2.0, _debug_octave_id + reduce ) << " "
+                 << ori << " "
+                 << "ori grid from (" << cand[s].grid_x_min << "," << cand[s].grid_y_min << ") to (" << cand[s].grid_x_max << "," << cand[s].grid_y_max << ") "
+                 << endl;
             for( int i=0; i<128; i++ ) {
-                }
-                ostr << setprecision(3) << desc[s].features[i] << " ";
+                ostr << fixed << setw(4) << setprecision(0) << desc[s].features[i] << " ";
+                if( i%8==7) ostr << endl;
             }
             ostr << endl;
+#else
+            ostr << setprecision(5)
+                 << ( cand[s].xpos - 0.0f ) * pow( 2.0, _debug_octave_id + reduce ) << " "
+                 << ( cand[s].ypos - 0.0f ) * pow( 2.0, _debug_octave_id + reduce ) << " "
+                 << 2 * cand[s].sigma * pow( 2.0, _debug_octave_id + reduce ) << " "
+                 << ori << " ";
+            if( really ) {
+                for( int i=0; i<128; i++ ) {
+                    ostr << desc[s].features[i] << " ";
+                }
+            }
+            ostr << endl;
+#endif
         }
     }
 }

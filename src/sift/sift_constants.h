@@ -55,4 +55,5 @@
  */
 #define USE_OPENCV_INTERPRETATION
 
+#define DEBUG_ORI_GRID
 

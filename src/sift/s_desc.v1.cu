@@ -62,6 +62,12 @@ void keypoint_descriptors( Extremum*     cand,
     const int32_t ymin = max(1,          (int32_t)floorf(pty - bsz));
     const int32_t xmax = min(width - 2,  (int32_t)floorf(ptx + bsz));
     const int32_t ymax = min(height - 2, (int32_t)floorf(pty + bsz));
+#ifdef DEBUG_ORI_GRID
+    ext->grid_x_min = (int)floorf(ptx - bsz);
+    ext->grid_y_min = (int)floorf(pty - bsz);
+    ext->grid_x_max = (int)floorf(ptx + bsz);
+    ext->grid_y_max = (int)floorf(pty + bsz);
+#endif // DEBUG_ORI_GRID
 
     const int32_t wx = xmax - xmin + 1;
     const int32_t hy = ymax - ymin + 1;
@@ -72,7 +78,6 @@ void keypoint_descriptors( Extremum*     cand,
 
     for(int i = threadIdx.x; i < loops; i+=32)
     {
-
         const int ii = i / wx + ymin;
         const int jj = i % wx + xmin;     
 

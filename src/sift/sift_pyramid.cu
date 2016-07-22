@@ -116,7 +116,15 @@ void Pyramid::save_descriptors( const char* basename, uint32_t octave, int downs
     ostringstream ostr;
     ostr << "dir-desc/desc-" << basename << "-o-" << octave << ".txt";
     ofstream of( ostr.str().c_str() );
-    _octaves[octave].writeDescriptor( of, downscale_factor );
+    _octaves[octave].writeDescriptor( of, downscale_factor, true );
+
+    if (stat("dir-fpt", &st) == -1) {
+        mkdir("dir-fpt", 0700);
+    }
+    ostringstream ostr2;
+    ostr2 << "dir-fpt/desc-" << basename << "-o-" << octave << ".txt";
+    ofstream of2( ostr2.str().c_str() );
+    _octaves[octave].writeDescriptor( of2, downscale_factor, false );
 }
 
 /*************************************************************
