@@ -175,8 +175,10 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
     int32_t iter;
 
+#define MAX_ITERATIONS 5
+
     /* must be execute at least once */
-    for( iter = 0; iter < 5; iter++) {
+    for( iter = 0; iter < MAX_ITERATIONS; iter++) {
         const int z = level - 1;
         /* compute gradient */
         const float x2y1z1 = tex2DLayered<float>( dog, x+2, y+1, z+1 );
@@ -266,7 +268,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     } /* go to next iter */
 
     /* ensure convergence of interpolation */
-    if (iter >= 5) {
+    if (iter >= MAX_ITERATIONS) {
         return false;
     }
 
