@@ -166,24 +166,6 @@ void Octave::writeDescriptor( ostream& ostr, float downsampling_factor )
 
         Extremum* cand = _h_extrema[l];
 
-#ifdef DEBUG_SEARCH_FOR_NANS
-        if( cand->invalid ) {
-            static int debug_invalid = 0;
-            debug_invalid++;
-            cerr << "Invalid descriptor no " << debug_invalid << endl;
-            cerr << "    ";
-            if( cand->invalid & ANGLE_IS_NAN ) cerr << "ANGLE_IS_NAN ";
-            if( cand->invalid & ZERO_HISTOGRAM ) cerr << "ZERO_HISTOGRAM ";
-            if( cand->invalid & SIGMA_NULL ) cerr << "SIGMA_NULL ";
-            if( cand->invalid & DESC_WINDOW_EMPTY ) cerr << "DESC_WINDOW_EMPTY ";
-            if( cand->invalid & HYPOT_OUT_OF_RANGE ) cerr << "HYPOT_OUT_OF_RANGE ";
-            if( cand->invalid & ATAN_OUT_OF_RANGE ) cerr << "ATAN_OUT_OF_RANGE ";
-            if( cand->invalid & NAN_SOURCE_UNKNOWN ) cerr << "NAN_SOURCE_UNKNOWN ";
-            cerr << endl;
-
-            return;
-        }
-#endif // DEBUG_SEARCH_FOR_NANS
 
         Descriptor* desc = _h_desc[l];
 
@@ -197,14 +179,7 @@ void Octave::writeDescriptor( ostream& ostr, float downsampling_factor )
                  << cand[s].sigma * pow( 2.0, _debug_octave_id + reduce ) << " "
                  << cand[s].orientation << " ";
             for( int i=0; i<128; i++ ) {
-#ifdef DEBUG_SEARCH_FOR_NANS
-                if( isnan( desc[s].features[i] ) ) {
-                    static int debug_num_nan = 0;
-                    debug_num_nan++;
-                    cerr << "Writing NAN no " << debug_num_nan << endl;
-                    break;
                 }
-#endif // DEBUG_SEARCH_FOR_NANS
                 ostr << setprecision(3) << desc[s].features[i] << " ";
             }
             ostr << endl;
@@ -355,20 +330,6 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
 #endif
 }
 
-#ifdef DEBUG_SEARCH_FOR_NANS
-__global__
-void init_plane2d_to_nan( Plane2D_float layer )
-{
-    const int width  = layer.getWidth();
-    const int height = layer.getHeight();
-    for( int y=0; y<height; y++ ) {
-        for( int x=0; x<width; x++ ) {
-            layer.ptr(y)[x] = __int_as_float(0x7fffffff);
-        }
-    }
-}
-#endif // DEBUG_SEARCH_FOR_NANS
-
 void Octave::alloc_data_planes( )
 {
     cudaError_t err;
@@ -384,11 +345,6 @@ void Octave::alloc_data_planes( )
                                   _h,
                                   (float*)( (intptr_t)ptr + i*(pitch*_h) ),
                                   pitch );
-#ifdef DEBUG_SEARCH_FOR_NANS
-        init_plane2d_to_nan
-            <<<1,1>>>
-            ( _data[i] );
-#endif // DEBUG_SEARCH_FOR_NANS
     }
 }
 

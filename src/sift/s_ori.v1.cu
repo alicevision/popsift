@@ -146,12 +146,6 @@ void compute_keypoint_orientations_v1( Extremum*     extremum,
         float hp = hist[((binh - 1 + ORI_NBINS) % ORI_NBINS)];
         float th = compute_angle(binh, hc, hn, hp);
 
-#ifdef DEBUG_SEARCH_FOR_NANS
-        if( isnan(th) ) {
-            ext->invalid |= ANGLE_IS_NAN;
-        }
-#endif // DEBUG_SEARCH_FOR_NANS
-
         ext->orientation = th;
     }
 
@@ -177,9 +171,6 @@ void compute_keypoint_orientations_v1( Extremum*     extremum,
             ext->ypos = y;
             ext->sigma = sig;
             ext->orientation = th;
-#ifdef DEBUG_SEARCH_FOR_NANS
-            ext->invalid = 0;
-#endif // DEBUG_SEARCH_FOR_NANS
 
             nangles++;
             if (nangles > 2) break;
@@ -199,9 +190,6 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
                                        int*          d_number_of_blocks,
                                        int           number_of_blocks )
 {
-#ifdef DEBUG_SEARCH_FOR_NANS
-    int debug_invalid = 0;
-#endif // DEBUG_SEARCH_FOR_NANS
 
     uint32_t w   = layer.getWidth();
     uint32_t h   = layer.getHeight();
@@ -299,9 +287,6 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
         if( hist[bin] > max( hist[prev], hist[next] ) ) {
             const float num = 3.0f * hist[prev] - 4.0f * hist[bin] + hist[next];
             const float denB = 2.0f * ( hist[prev] - 2.0f * hist[bin] + hist[next] );
-#ifdef DEBUG_SEARCH_FOR_NANS
-            if( denB == 0 ) debug_invalid = ZERO_HISTOGRAM;
-#endif // DEBUG_SEARCH_FOR_NANS
 
             float newbin = __fdividef( num, denB ); // * M_PI/18.0f; // * 10.0f;
             if( newbin >= 0 && newbin <= 2 ) {
@@ -323,9 +308,6 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
     float th = __fdividef(M_PI2 * xcoord[maxbin[0]], ORI_NBINS) - M_PI;
 
     ext->orientation = th;
-#ifdef DEBUG_SEARCH_FOR_NANS
-    ext->invalid     = debug_invalid;
-#endif // DEBUG_SEARCH_FOR_NANS
 
     for( int i=1; i<=2; i++ ) {
         if( y_max[i] < -1000.0f ) break; // this is a random number: no orientation can be this small
@@ -342,9 +324,6 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
         ext->ypos = y;
         ext->sigma = sig;
         ext->orientation = th;
-#ifdef DEBUG_SEARCH_FOR_NANS
-        ext->invalid = debug_invalid;
-#endif // DEBUG_SEARCH_FOR_NANS
     }
 
     __syncthreads();
