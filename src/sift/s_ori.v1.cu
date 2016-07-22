@@ -9,6 +9,20 @@
 
 using namespace popart;
 
+// Lowe wants at most 3 orientations at every extremum,
+// VLFeat uses at most 4, OpenCV all it can find
+#undef  LOWE_ORIENTATION_MAX
+
+#undef  V2_WITH_BEMAP_SMOOTHING
+#undef  V2_WITH_VLFEAT_SMOOTHING
+#define V2_WITH_OPENCV_SMOOTHING
+
+#ifdef LOWE_ORIENTATION_MAX
+#define ORIENTATION_MAX_COUNT 3
+#else
+#define ORIENTATION_MAX_COUNT 4
+#endif
+
 /*************************************************************
  * V1: device side
  *************************************************************/
@@ -173,7 +187,13 @@ void compute_keypoint_orientations_v1( Extremum*     extremum,
             ext->orientation = th;
 
             nangles++;
+#ifdef LOWE_ORIENTATION_MAX
+            // Lowe wants at most 3 orientations at every extremum
             if (nangles > 2) break;
+#else // LOWE_ORIENTATION_MAX
+            // OpenCV and VLFeat allow 4 orientations at every extremum
+            if (nangles > 3) break;
+#endif // LOWE_ORIENTATION_MAX
         }
     }
 }
@@ -190,7 +210,6 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
                                        int*          d_number_of_blocks,
                                        int           number_of_blocks )
 {
-
     uint32_t w   = layer.getWidth();
     uint32_t h   = layer.getHeight();
 
@@ -212,6 +231,7 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
 
     float factor = __fdividef( -0.5f, (sigw * sigw) );
     int sq_thres  = rad * rad;
+
     int32_t xmin = max(1,     (int32_t)floor(x - rad));
     int32_t xmax = min(w - 2, (int32_t)floor(x + rad));
     int32_t ymin = max(1,     (int32_t)floor(y - rad));
@@ -269,20 +289,69 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
     float xcoord[ORI_NBINS];
     float yval[ORI_NBINS];
 
-    int   maxbin[3];
-    float y_max[3];
+    int   maxbin[ORIENTATION_MAX_COUNT];
+    float y_max[ORIENTATION_MAX_COUNT];
 
     #pragma unroll
-    for( int i=0; i<3; i++ ) {
+    for( int i=0; i<ORIENTATION_MAX_COUNT; i++ ) {
         maxbin[i] = 0;
         y_max[i] = -INFINITY;
     }
 
+#ifdef V2_WITH_BEMAP_SMOOTHING
     for(int bin = 0; bin < ORI_NBINS; bin++) {
-        int prev = bin - 1;
-        if( prev < 0 ) prev = ORI_NBINS - 1;
-        int next = bin + 1;
-        if( next == ORI_NBINS ) next = 0;
+        int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
+        int next = bin == ORI_NBINS-1 ? 0 : bin+1;
+        xcoord[bin] = ( hist[prev] + 2.0f * hist[bin] + hist[next] ) / 4.0f;
+    }
+    for(int bin = 0; bin < ORI_NBINS; bin++) {
+        int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
+        int next = bin == ORI_NBINS-1 ? 0 : bin+1;
+        hist[bin] = ( xcoord[prev] + 2.0f * xcoord[bin] + xcoord[next] ) / 4.0f;
+    }
+#endif // V2_WITH_BEMAP_SMOOTHING
+
+#ifdef V2_WITH_VLFEAT_SMOOTHING
+    for( int i=0; i<3; i++ ) {
+        for(int bin = 0; bin < ORI_NBINS; bin++) {
+            int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
+            int next = bin == ORI_NBINS-1 ? 0 : bin+1;
+            xcoord[bin] = ( hist[prev] + hist[bin] + hist[next] ) / 3.0f;
+        }
+        for(int bin = 0; bin < ORI_NBINS; bin++) {
+            int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
+            int next = bin == ORI_NBINS-1 ? 0 : bin+1;
+            hist[bin] = ( xcoord[prev] + xcoord[bin] + xcoord[next] ) / 3.0f;
+        }
+    }
+#endif // V2_WITH_VLFEAT_SMOOTHING
+
+#ifdef V2_WITH_OPENCV_SMOOTHING
+    for(int bin = 0; bin < ORI_NBINS; bin++) {
+        int prev2 = bin - 2;
+        int prev1 = bin - 1;
+        int next1 = bin + 1;
+        int next2 = bin + 2;
+        if( prev2 < 0 )          prev2 += ORI_NBINS;
+        if( prev1 < 0 )          prev1 += ORI_NBINS;
+        if( next1 >= ORI_NBINS ) next1 -= ORI_NBINS;
+        if( next2 >= ORI_NBINS ) next2 -= ORI_NBINS;
+        xcoord[bin] = (   hist[prev2] + hist[next2]
+                      + ( hist[prev1] + hist[next1] ) * 4.0f
+                      +   hist[bin] * 6.0f ) / 16.0f;
+    }
+    for(int bin = 0; bin < ORI_NBINS; bin++) {
+        hist[bin] = xcoord[bin];
+    }
+#endif // V2_WITH_OPENCV_SMOOTHING
+
+    for(int bin = 0; bin < ORI_NBINS; bin++) {
+        // int prev = bin - 1;
+        // if( prev < 0 ) prev = ORI_NBINS - 1;
+        // int next = bin + 1;
+        // if( next == ORI_NBINS ) next = 0;
+        int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
+        int next = bin == ORI_NBINS-1 ? 0 : bin+1;
 
         if( hist[bin] > max( hist[prev], hist[next] ) ) {
             const float num = 3.0f * hist[prev] - 4.0f * hist[bin] + hist[next];
@@ -293,6 +362,7 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
                 xcoord[bin] = prev + newbin;
                 yval[bin]   = -(num*num) / (4.0f * denB) + hist[prev];
 
+#ifdef LOWE_ORIENTATION_MAX
                 if( yval[bin] > y_max[0] ) {
                     y_max[2]  = y_max[1];
                     y_max[1]  = y_max[0];
@@ -300,7 +370,42 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
                     maxbin[2] = maxbin[1];
                     maxbin[1] = maxbin[0];
                     maxbin[0] = bin;
+                } else if( yval[bin] > y_max[1] ) {
+                    y_max[2]  = y_max[1];
+                    y_max[1]  = yval[bin];
+                    maxbin[2] = maxbin[1];
+                    maxbin[1] = bin;
+                } else if( yval[bin] > y_max[2] ) {
+                    y_max[2]  = yval[bin];
+                    maxbin[2] = bin;
                 }
+#else // LOWE_ORIENTATION_MAX
+                if( yval[bin] > y_max[0] ) {
+                    y_max[3]  = y_max[2];
+                    y_max[2]  = y_max[1];
+                    y_max[1]  = y_max[0];
+                    y_max[0]  = yval[bin];
+                    maxbin[3] = maxbin[2];
+                    maxbin[2] = maxbin[1];
+                    maxbin[1] = maxbin[0];
+                    maxbin[0] = bin;
+                } else if( yval[bin] > y_max[1] ) {
+                    y_max[3]  = y_max[2];
+                    y_max[2]  = y_max[1];
+                    y_max[1]  = yval[bin];
+                    maxbin[3] = maxbin[2];
+                    maxbin[2] = maxbin[1];
+                    maxbin[1] = bin;
+                } else if( yval[bin] > y_max[2] ) {
+                    y_max[3]  = y_max[2];
+                    y_max[2]  = yval[bin];
+                    maxbin[3] = maxbin[2];
+                    maxbin[2] = bin;
+                } else if( yval[bin] > y_max[3] ) {
+                    y_max[3]  = yval[bin];
+                    maxbin[3] = bin;
+                }
+#endif // LOWE_ORIENTATION_MAX
             }
         }
     }
@@ -309,7 +414,7 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
 
     ext->orientation = th;
 
-    for( int i=1; i<=2; i++ ) {
+    for( int i=1; i<ORIENTATION_MAX_COUNT; i++ ) {
         if( y_max[i] < -1000.0f ) break; // this is a random number: no orientation can be this small
 
         if( y_max[i] < 0.8f * y_max[0] ) break;
