@@ -22,7 +22,7 @@ PopSift::PopSift( const popart::Config& config )
                          _config.start_sampling );
     popart::init_sigma(  _config.sigma,
                          _config.levels,
-                         _config._threshold,
+                         _config.getPeakThreshold(),
                          _config._edge_limit );
     popart::init_extrema_limits( 10000 );
 }

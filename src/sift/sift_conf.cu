@@ -18,7 +18,8 @@ Config::Config( )
     , _assume_initial_blur( false )
     , _initial_blur( 0.0f )
     , bemap_orientation( false )
-{ }
+{
+}
 
 void Config::setModeVLFeat( )
 {
@@ -89,6 +90,12 @@ bool Config::getBemapOrientation( ) const
 {
     return bemap_orientation;
 }
+
+float Config::getPeakThreshold() const
+{
+    return ( _threshold * 0.5f * 255.0f / levels );
+}
+
 
 }; // namespace popart
 

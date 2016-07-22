@@ -46,6 +46,10 @@ struct Config
     bool  hasInitialBlur( ) const;
     float getInitialBlur( ) const;
 
+    // computes the actual peak threshold depending on the threshold
+    // parameter and the non-augmented number of levels
+    float getPeakThreshold() const;
+
     // determine the image format of the first octave
     // relative to the input image's size (x,y) as follows:
     // (x / 2^start_sampling, y / 2^start_sampling )
@@ -58,6 +62,11 @@ struct Config
     // The number of levels per octave. This is actually the
     // number of inner DoG levels where we can search for
     // feature points. The number of ...
+    //
+    // This is the non-augmented number of levels, meaning
+    // the this is not the number of gauss-filtered picture
+    // layers (which is levels+3), but the number of DoG
+    // layers in which we can search for extrema.
     int      levels;
     float    sigma;
 
@@ -65,6 +74,7 @@ struct Config
     // default edge_limit 10.0f from Bemap
     float    _edge_limit;
 
+private:
     // default threshold 0.0 default of vlFeat
     // default threshold 5.0 / 256.0
     // default threshold 15.0 / 256.0 - it seems our DoG is really small ???
@@ -73,6 +83,7 @@ struct Config
     //                   from Bemap -> 1.69 (makes no sense)
     float    _threshold;
 
+public:
     // default SiftMode::OpenCV
     SiftMode sift_mode;
 
