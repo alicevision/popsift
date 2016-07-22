@@ -71,8 +71,12 @@ inline bool solve( float i[3][3], float3& b )
 #else // not CLOSED_FORM_SOLVE
 
 __device__
-inline bool solve( float A[3][3], float b[3] )
+inline bool solve( float A[3][3], float3& b_in )
 {
+    float b[3];
+    b[0] = b_in.x;
+    b[1] = b_in.y;
+    b[2] = b_in.z;
     // Gauss elimination
     for( int j = 0 ; j < 3 ; j++ ) {
             // look for leading pivot
@@ -126,6 +130,9 @@ inline bool solve( float A[3][3], float b[3] )
             b[ii] -= x * A[i][ii];
         }
     }
+    b_in.x = b[0];
+    b_in.y = b[1];
+    b_in.z = b[2];
     return true;
 }
 #endif // not CLOSED_FORM_SOLVE
