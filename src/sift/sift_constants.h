@@ -32,7 +32,7 @@
 /* Define this to prefer L1 norm in descriptor normalization
  * instead of default L2 norm.
  */
-#define DESC_USE_ROOT_SIFT
+#undef DESC_USE_ROOT_SIFT
 
 /* CUDA Dynamic Parallelism does not work with all devices.
  * Try to maintain the possibility to compile without this.

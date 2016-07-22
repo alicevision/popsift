@@ -15,7 +15,6 @@
 using namespace popart;
 using namespace std;
 
-
 __global__
 void keypoint_descriptors( Extremum*     cand,
                            Descriptor*   descs,
@@ -144,8 +143,15 @@ void keypoint_descriptors( Extremum*     cand,
 __global__
 void normalize_histogram( Descriptor* descs, int num_orientations )
 {
-    int offset = ( blockIdx.x < num_orientations ) ? blockIdx.x
-                                                   : num_orientations-1;
+    int offset = blockIdx.x * 32 + threadIdx.y;
+
+    // all of these threads are useless
+    if( blockIdx.x * 32 >= num_orientations ) return;
+
+    bool ignoreme = ( offset >= num_orientations );
+
+    offset = ( offset < num_orientations ) ? offset
+                                           : num_orientations-1;
     Descriptor* desc = &descs[offset];
 
     float*  ptr1 = desc->features;
@@ -155,7 +161,7 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     descr = ptr4[threadIdx.x];
 
 #ifdef DESC_USE_ROOT_SIFT
-    // L1 norm
+    // root sift normalization
     float sum = descr.x + descr.y + descr.z + descr.w;
 
     sum += __shfl_down( sum, 16 );
@@ -178,27 +184,68 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     descr.z = val;
     val = 512.0f * __fsqrt_rn( __fdividef( descr.w, sum ) );
     descr.w = val;
+
 #else // not DESC_USE_ROOT_SIFT
-    // L2 norm
-    __shared__ float normalized_y[32];
+    // OpenCV normalization
 
     float norm;
-    if( threadIdx.y == 0 ) {
-        // rnormf() is powerful: reciprocal L2 norm of N 
-        // consecutive floats, here N=128
-        norm = rnormf( 128, ptr1 );
-        normalized_y[threadIdx.x] = norm;
-    }
-    __syncthreads();
-    norm = normalized_y[threadIdx.y];
 
-    descr.x *= norm;
-    descr.y *= norm;
-    descr.z *= norm;
-    descr.w *= norm;
+#if 1
+    norm = descr.x * descr.x
+         + descr.y * descr.y
+         + descr.z * descr.z
+         + descr.w * descr.w;
+    norm += __shfl_down( norm, 16 );
+    norm += __shfl_down( norm,  8 );
+    norm += __shfl_down( norm,  4 );
+    norm += __shfl_down( norm,  2 );
+    norm += __shfl_down( norm,  1 );
+    if( threadIdx.x == 0 ) {
+        norm = __fsqrt_rn( norm );
+    }
+#else
+    if( threadIdx.x == 0 ) {
+        norm = normf( 128, ptr1 );
+    }
+#endif
+    norm = __shfl( norm,  0 );
+
+    descr.x = min( descr.x, 0.2f*norm );
+    descr.y = min( descr.y, 0.2f*norm );
+    descr.z = min( descr.z, 0.2f*norm );
+    descr.w = min( descr.w, 0.2f*norm );
+
+#if 1
+    norm = descr.x * descr.x
+         + descr.y * descr.y
+         + descr.z * descr.z
+         + descr.w * descr.w;
+    norm += __shfl_down( norm, 16 );
+    norm += __shfl_down( norm,  8 );
+    norm += __shfl_down( norm,  4 );
+    norm += __shfl_down( norm,  2 );
+    norm += __shfl_down( norm,  1 );
+    if( threadIdx.x == 0 ) {
+        norm = __fsqrt_rn( norm );
+        norm = __fdividef( 512.0f, norm );
+    }
+#else
+    if( threadIdx.x == 0 ) {
+        norm = 512.0f * rnormf( 128, ptr1 );
+    }
+#endif
+    norm = __shfl( norm,  0 );
+
+    descr.x = descr.x * norm;
+    descr.y = descr.y * norm;
+    descr.z = descr.z * norm;
+    descr.w = descr.w * norm;
+
 #endif // not DESC_USE_ROOT_SIFT
 
-    ptr4[threadIdx.x] = descr;
+    if( not ignoreme ) {
+        ptr4[threadIdx.x] = descr;
+    }
 }
 
 __global__ void descriptor_starter( int*          extrema_counter,
@@ -227,6 +274,7 @@ __global__ void descriptor_starter( int*          extrema_counter,
 
     // it may be good to start more threads, but this kernel
     // is too fast to be noticable in profiling
+
     grid.x  = grid_divide( *extrema_counter, 32 );
     block.x = 32;
     block.y = 32;
