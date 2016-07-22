@@ -288,7 +288,8 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
     /* accept-reject extremum */
     // if( fabs(contr) < (d_threshold*2.0f) )
-    if( fabs(contr) < scalbnf( d_threshold, 1 ) ) {
+    if( fabs(contr) < scalbnf( d_threshold, 1 ) )
+    {
         return false;
     }
 
@@ -299,7 +300,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
     ec.xpos    = xn;
     ec.ypos    = yn;
-    ec.sigma   = d_sigma0 * pow(d_sigma_k, sn) * 2;
+    ec.sigma   = d_sigma0 * pow(d_sigma_k, sn); // * 2;
         // const float sigma_k = powf(2.0f, 1.0f / levels );
 
     // key_candidate->sigma = sigma0 * pow(sigma_k, sn);
