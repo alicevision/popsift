@@ -120,7 +120,7 @@ void PopSift::execute( int pipe, const imgStream* inpPtr )
 
     bool log_to_file = ( _config.log_mode == popart::Config::All );
     if( log_to_file ) {
-        popart::write_plane2D( "upscaled-input-image.pgm",
+        popart::write_plane2Dunscaled( "upscaled-input-image.pgm",
                                true, // is stored on device
                                _pipe[pipe]._inputImage->getUpscaledImage() );
 

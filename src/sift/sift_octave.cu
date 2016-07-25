@@ -236,8 +236,15 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
 
         ostringstream ostr;
         ostr << "dir-octave/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
-        // cerr << "Writing " << ostr.str() << endl;
-        popart::write_plane2D( ostr.str().c_str(), true, getData(level) );
+        popart::write_plane2Dunscaled( ostr.str().c_str(), true, getData(level) );
+
+        if (stat("dir-octave-dump", &st) == -1) {
+            mkdir("dir-octave-dump", 0700);
+        }
+
+        ostringstream ostr2;
+        ostr2 << "dir-octave-dump/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
+        popart::dump_plane2Dfloat( ostr2.str().c_str(), true, getData(level) );
 
         if( level == 0 ) {
             int width  = getData(level).getWidth();
@@ -322,6 +329,10 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
             mkdir("dir-dog-txt", 0700);
         }
 
+        if (stat("dir-dog-dump", &st) == -1) {
+            mkdir("dir-dog-dump", 0700);
+        }
+
         float* array;
         POP_CUDA_MALLOC_HOST( &array, width * height * (_levels-1) * sizeof(float) );
 
@@ -341,9 +352,13 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
             // cerr << "Writing " << ostr.str() << endl;
             popart::write_plane2D( ostr.str().c_str(), true, p );
 
-            ostringstream ostr2;
-            ostr2 << "dir-dog-txt/d-" << basename << "-o-" << octave << "-l-" << l << ".txt";
-            popart::write_plane2Dunscaled( ostr2.str().c_str(), true, p, 127 );
+            ostringstream pstr;
+            pstr << "dir-dog-txt/d-" << basename << "-o-" << octave << "-l-" << l << ".txt";
+            popart::write_plane2Dunscaled( pstr.str().c_str(), true, p, 127 );
+
+            ostringstream qstr;
+            qstr << "dir-dog-dump/d-" << basename << "-o-" << octave << "-l-" << l << ".txt";
+            popart::dump_plane2Dfloat( qstr.str().c_str(), true, p );
         }
 
         POP_CUDA_FREE_HOST( array );

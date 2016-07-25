@@ -118,6 +118,7 @@ inline bool is_extremum( cudaTextureObject_t obj,
 
 __device__
 bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
+                                 int                 debug_octave,
                                  int                 level,
                                  int                 width,
                                  int                 height,
@@ -243,6 +244,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
             d.z = 0;
             break ;
         }
+        // printf( "moving (%d,%d) by l: %f (%f,%f)\n", x+1, y+1, d.z, d.x, d.y );
 
         d = b;
 
@@ -269,6 +271,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
     /* ensure convergence of interpolation */
     if (iter >= MAX_ITERATIONS) {
+        // printf("Found an extremum at %d %d (o=%d) - rejected in refinement, was moved to l:%d (%d,%d)\n", x+1, y+1, debug_octave, n.z, n.x, n.y );
         return false;
     }
 
@@ -283,6 +286,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
     /* negative determinant => curvatures have different signs -> reject it */
     if (det <= 0.0f) {
+        // printf("Found an extremum at %d %d (o=%d) - negative determinant\n", x+1, y+1, debug_octave );
         return false;
     }
 
@@ -290,13 +294,16 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     // if( fabs(contr) < (d_threshold*2.0f) )
     if( fabs(contr) < scalbnf( d_threshold, 1 ) )
     {
+        // printf("Found an extremum at %d %d (o=%d) - 2nd peak tresh failed\n", x+1, y+1, debug_octave );
         return false;
     }
 
     /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
     if( edgeval >= (d_edge_limit+1.0f)*(d_edge_limit+1.0f)/d_edge_limit ) {
+        // printf("Found an extremum at %d %d (o=%d) - edge tresh failed\n", x+1, y+1, debug_octave );
         return false;
     }
+    // printf("Found an extremum at %d %d (o=%d)\n", x+1, y+1, debug_octave );
 
     ec.xpos    = xn;
     ec.ypos    = yn;
@@ -316,6 +323,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 template<int HEIGHT>
 __global__
 void find_extrema_in_dog_v6( cudaTextureObject_t dog,
+                             int                 debug_octave,
                              int                 level,
                              int                 width,
                              int                 height,
@@ -327,7 +335,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
 {
     Extremum ec;
 
-    bool indicator = find_extrema_in_dog_v6_sub( dog, level, width, height, maxlevel, ec );
+    bool indicator = find_extrema_in_dog_v6_sub( dog, debug_octave, level, width, height, maxlevel, ec );
 
     uint32_t write_index = extrema_count<HEIGHT>( indicator, extrema_counter );
 
@@ -393,6 +401,7 @@ void Pyramid::find_extrema_v6_sub( )
             find_extrema_in_dog_v6<HEIGHT>
                 <<<grid,block,0,oct_str>>>
                 ( oct_obj.getDogTexture( ),
+                  octave,
                   level,
                   cols,
                   rows,
