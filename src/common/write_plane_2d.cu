@@ -74,7 +74,7 @@ void write_plane2D( const char* filename, Plane2D_float& f )
     }
 #if 1
     ofstream of( filename );
-    of << "P2" << endl
+    of << "P2" << endl 
        << cols << " " << rows << endl
        << "255" << endl;
     unsigned char* cx = c;
@@ -129,6 +129,42 @@ void write_plane2Dunscaled( const char* filename, Plane2D_float& f, int offset )
     delete [] c;
 
     // cerr << "Leave " << __FUNCTION__ << endl;
+}
+
+__host__
+void dump_plane2Dfloat( const char* filename, bool onDevice, Plane2D_float& f )
+{
+    if( onDevice ) {
+        // cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
+        Plane2D_float g;
+        g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
+        g.memcpyFromDevice( f );
+        dump_plane2Dfloat( filename, g );
+        g.freeHost( CudaAllocated );
+    } else {
+        dump_plane2Dfloat( filename, f );
+    }
+}
+
+__host__
+void dump_plane2Dfloat( const char* filename, Plane2D_float& f )
+{
+    int rows = f.getRows();
+    int cols = f.getCols();
+
+    float* c = new float[rows * cols];
+    for( int y=0; y<rows; y++ ) {
+        for( int x=0; x<cols; x++ ) {
+            float v = f.ptr(y)[x];
+            c[y*cols+x] = v;
+        }
+    }
+
+    ofstream of( filename );
+    of << "floats" << endl
+       << cols << " " << rows << endl;
+    of.write( (char*)c, rows*cols*sizeof(float) );
+    delete [] c;
 }
 
 } // namespace popart
