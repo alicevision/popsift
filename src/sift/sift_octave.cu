@@ -10,6 +10,7 @@
 #include "sift_octave.h"
 
 // #define PYRAMID_PRINT_DEBUG 0
+#undef PRINT_WITH_ORIENTATION
 
 using namespace std;
 
@@ -172,38 +173,34 @@ void Octave::writeDescriptor( ostream& ostr, float downsampling_factor, bool rea
         for( int s=0; s<sz; s++ ) {
             const float reduce = downsampling_factor;
 
+            float xpos  = cand[s].xpos * pow( 2.0, _debug_octave_id + reduce );
+            float ypos  = cand[s].ypos * pow( 2.0, _debug_octave_id + reduce );
+            float sigma = cand[s].sigma * pow( 2.0, _debug_octave_id + reduce );
             float ori = cand[s].orientation;
             ori = ori / M_PI2 * 360;
             if( ori < 0 ) ori += 360;
             // ori = 360.0f - ( ori / M_PI2 * 360 );
             // if( ori > 360.0f ) ori -= 360.0f;
 
-#if 0
+#ifdef PRINT_WITH_ORIENTATION
             ostr << setprecision(5)
-                 << ( cand[s].xpos - 0.0f ) * pow( 2.0, _debug_octave_id + reduce ) << " "
-                 << ( cand[s].ypos - 0.0f ) * pow( 2.0, _debug_octave_id + reduce ) << " "
-                 << 2 * cand[s].sigma * pow( 2.0, _debug_octave_id + reduce ) << " "
-                 << ori << " "
-                 << "ori grid from (" << cand[s].grid_x_min << "," << cand[s].grid_y_min << ") to (" << cand[s].grid_x_max << "," << cand[s].grid_y_max << ") "
-                 << endl;
-            for( int i=0; i<128; i++ ) {
-                ostr << fixed << setw(4) << setprecision(0) << desc[s].features[i] << " ";
-                if( i%8==7) ostr << endl;
-            }
-            ostr << endl;
+                 << xpos << " "
+                 << ypos << " "
+                 << sigma << " "
+                 << ori << " ";
 #else
             ostr << setprecision(5)
-                 << ( cand[s].xpos - 0.0f ) * pow( 2.0, _debug_octave_id + reduce ) << " "
-                 << ( cand[s].ypos - 0.0f ) * pow( 2.0, _debug_octave_id + reduce ) << " "
-                 << 2 * cand[s].sigma * pow( 2.0, _debug_octave_id + reduce ) << " "
-                 << ori << " ";
+                 << xpos << " " << ypos << " "
+                 << 1.0f / ( sigma * sigma )
+                 << " 0 "
+                 << 1.0f / ( sigma * sigma ) << " ";
+#endif
             if( really ) {
                 for( int i=0; i<128; i++ ) {
                     ostr << desc[s].features[i] << " ";
                 }
             }
             ostr << endl;
-#endif
         }
     }
 }
