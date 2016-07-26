@@ -139,7 +139,7 @@ void get_by_2( cudaTextureObject_t src_data,
 
 __global__
 void get_by_2_opencv( Plane2D_float src_data,
-                      Plane2D_float       dst_data,
+                      Plane2D_float dst_data,
                       int level )
 {
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;

@@ -100,14 +100,14 @@ void PopSift::execute( int pipe, const imgStream* inpPtr )
 
     _pipe[pipe]._inputImage->load( _config, inp );
 
-    _pipe[pipe]._pyramid->find_extrema( _pipe[pipe]._inputImage );
+    _pipe[pipe]._pyramid->find_extrema( _config, _pipe[pipe]._inputImage );
 
     int octaves = _pipe[pipe]._pyramid->getNumOctaves();
 
     cudaDeviceSynchronize();
 
     for( int o=0; o<octaves; o++ ) {
-        _pipe[pipe]._pyramid->download_descriptors( o );
+        _pipe[pipe]._pyramid->download_descriptors( _config, o );
     }
 
     cudaDeviceSynchronize();
@@ -132,7 +132,7 @@ void PopSift::execute( int pipe, const imgStream* inpPtr )
             }
         }
         for( int o=0; o<octaves; o++ ) {
-            _pipe[pipe]._pyramid->save_descriptors( "pyramid", o, _config.start_sampling );
+            _pipe[pipe]._pyramid->save_descriptors( _config, "pyramid", o );
         }
     }
 }

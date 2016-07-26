@@ -137,7 +137,7 @@ int Octave::getExtremaCount( uint32_t level ) const
     return _h_extrema_mgmt[level];
 }
 
-void Octave::downloadDescriptor( )
+void Octave::downloadDescriptor( const Config& conf )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
         int sz = _h_extrema_mgmt[l];
@@ -160,7 +160,7 @@ void Octave::downloadDescriptor( )
     cudaDeviceSynchronize( );
 }
 
-void Octave::writeDescriptor( ostream& ostr, float downsampling_factor, bool really )
+void Octave::writeDescriptor( const Config& conf, ostream& ostr, bool really )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
         if( _h_extrema[l] == 0 ) continue;
@@ -171,7 +171,7 @@ void Octave::writeDescriptor( ostream& ostr, float downsampling_factor, bool rea
 
         int sz = _h_extrema_mgmt[l];
         for( int s=0; s<sz; s++ ) {
-            const float reduce = downsampling_factor;
+            const float reduce = conf.start_sampling;
 
             float xpos  = cand[s].xpos * pow( 2.0, _debug_octave_id + reduce );
             float ypos  = cand[s].ypos * pow( 2.0, _debug_octave_id + reduce );

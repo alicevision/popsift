@@ -120,16 +120,27 @@ void Image::upscale_v5( const Config& conf, cudaTextureObject_t & tex )
     int gridy = grid_divide( this->_upscaled_image_d.getRows(), block.y );
     dim3 grid( gridx, gridy );
 
-    if( conf.isVLFeatMode() ) {
-        p_upscale_5_vlfeat
+    switch( conf.getSiftMode() )
+    {
+    case Config::VLFeat :
+        p_upscale_vlfeat
             <<<grid,block>>>
             ( this->_upscaled_image_d,
               tex );
-    } else {
-        p_upscale_5_opencv
+        break;
+    case Config::OpenCV :
+        p_upscale_opencv
             <<<grid,block>>>
             ( this->_upscaled_image_d,
               tex );
+        break;
+    case Config::PopSift :
+    default :
+        p_upscale_popsift
+            <<<grid,block>>>
+            ( this->_upscaled_image_d,
+              tex );
+        break;
     }
 
     test_last_error( __FILE__,  __LINE__ );

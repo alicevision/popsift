@@ -150,8 +150,8 @@ class Octave
         int getExtremaCount( uint32_t level ) const;
 
         Descriptor* getDescriptors( uint32_t level );
-        void        downloadDescriptor( );
-        void        writeDescriptor( std::ostream& ostr, float downsampling_factor, bool really );
+        void        downloadDescriptor( const Config& conf );
+        void        writeDescriptor( const Config& conf, std::ostream& ostr, bool really );
 
         /**
          * alloc() - allocates all GPU memories for one octave

@@ -29,12 +29,12 @@ public:
              int     h );
     ~Pyramid( );
 
-    void find_extrema( Image* base );
+    void find_extrema( const Config& conf, Image* base );
 
     void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
 
-    void download_descriptors( uint32_t octave );
-    void save_descriptors( const char* basename, uint32_t octave, int downscale_factor );
+    void download_descriptors( const Config& conf, uint32_t octave );
+    void save_descriptors( const Config& conf, const char* basename, uint32_t octave );
 
 
     inline int getNumOctaves() const { return _num_octaves; }
@@ -53,10 +53,10 @@ private:
     inline void dog_from_blurred( int octave, int level, cudaStream_t stream );
 
     void reset_extrema_mgmt( );
-    void find_extrema_v6( );
+    void find_extrema_v6( const Config& conf );
 
     template<int HEIGHT>
-    void find_extrema_v6_sub( );
+    void find_extrema_v6_sub( const Config& conf );
 
     void orientation_v1( );
 

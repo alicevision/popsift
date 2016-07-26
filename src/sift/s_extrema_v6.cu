@@ -378,7 +378,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
  *************************************************************/
 template<int HEIGHT>
 __host__
-void Pyramid::find_extrema_v6_sub( )
+void Pyramid::find_extrema_v6_sub( const Config& conf )
 {
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
@@ -411,18 +411,51 @@ void Pyramid::find_extrema_v6_sub( )
             cudaStreamWaitEvent( oct_str, mid_ev, 0 );
             // cudaStreamWaitEvent( oct_str, low_ev, 0 ); - we are in the same stream
 
-            find_extrema_in_dog_v6<HEIGHT>
-                <<<grid,block,0,oct_str>>>
-                ( oct_obj.getDogTexture( ),
-                  octave,
-                  level,
-                  cols,
-                  rows,
-                  _levels,
-                  extrema_counter,
-                  oct_obj.getExtrema( level ),
-                  num_blocks,
-                  grid.x * grid.y );
+            switch( conf.getSiftMode() )
+            {
+            case Config::VLFeat :
+                find_extrema_in_dog_v6<HEIGHT,Config::VLFeat>
+                    <<<grid,block,0,oct_str>>>
+                    ( oct_obj.getDogTexture( ),
+                      octave,
+                      level,
+                      cols,
+                      rows,
+                      _levels,
+                      extrema_counter,
+                      oct_obj.getExtrema( level ),
+                      num_blocks,
+                      grid.x * grid.y );
+                break;
+            case Config::OpenCV :
+                find_extrema_in_dog_v6<HEIGHT,Config::OpenCV>
+                    <<<grid,block,0,oct_str>>>
+                    ( oct_obj.getDogTexture( ),
+                      octave,
+                      level,
+                      cols,
+                      rows,
+                      _levels,
+                      extrema_counter,
+                      oct_obj.getExtrema( level ),
+                      num_blocks,
+                      grid.x * grid.y );
+                break;
+            default :
+                find_extrema_in_dog_v6<HEIGHT,Config::PopSift>
+                    <<<grid,block,0,oct_str>>>
+                    ( oct_obj.getDogTexture( ),
+                      octave,
+                      level,
+                      cols,
+                      rows,
+                      _levels,
+                      extrema_counter,
+                      oct_obj.getExtrema( level ),
+                      num_blocks,
+                      grid.x * grid.y );
+                break;
+            }
 
             cudaEvent_t  extrema_done_ev  = oct_obj.getEventExtremaDone(level+2);
             cudaEventRecord( extrema_done_ev, oct_str );
@@ -458,10 +491,10 @@ void Pyramid::find_extrema_v6_sub( )
 }
 
 __host__
-void Pyramid::find_extrema_v6( )
+void Pyramid::find_extrema_v6( const Config& conf )
 {
 #define MANYLY(H) \
-    find_extrema_v6_sub<H> ( );
+    find_extrema_v6_sub<H> ( conf );
 
     // MANYLY(1)
     // MANYLY(2)

@@ -8,9 +8,10 @@ struct Config
     Config( );
 
     enum SiftMode {
+        PopSift,
         OpenCV,
         VLFeat,
-        Default = OpenCV
+        Default = PopSift
     };
 
     enum LogMode {
@@ -24,8 +25,7 @@ struct Config
         IndirectUnfilteredDownscaling
     };
 
-    void setModeVLFeat(); //  side-effect sigma = 0.82f
-    void setModeOpenCV( ); // side-effect sigma = 1.6f
+    void setMode( SiftMode m );
     void setLogMode( LogMode mode = All );
     void setScalingMode( ScalingMode mode = IndirectDownscaling );
     void setVerbose( bool on = true );
@@ -55,8 +55,8 @@ struct Config
     // print Gauss spans and tables?
     bool ifPrintGaussTables() const;
 
-    // is the SiftMode VLFeat ?
-    bool isVLFeatMode() const;
+    // get the SIFT mode for more detailed sub-modes
+    SiftMode getSiftMode() const;
 
     // determine the image format of the first octave
     // relative to the input image's size (x,y) as follows:
@@ -107,8 +107,8 @@ public:
     int gauss_group_size;
 
 private:
-    /* Modes are default, OpenCV and VLFeat.
-     * Default is currently identical to OpenCV.
+    /* Modes are PopSift, OpenCV and VLFeat.
+     * Default is currently identical to PopSift.
      */
     SiftMode _sift_mode;
 

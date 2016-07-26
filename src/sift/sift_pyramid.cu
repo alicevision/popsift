@@ -102,12 +102,12 @@ void Pyramid::download_and_save_array( const char* basename, uint32_t octave, ui
     }
 }
 
-void Pyramid::download_descriptors( uint32_t octave )
+void Pyramid::download_descriptors( const Config& conf, uint32_t octave )
 {
-    _octaves[octave].downloadDescriptor( );
+    _octaves[octave].downloadDescriptor( conf );
 }
 
-void Pyramid::save_descriptors( const char* basename, uint32_t octave, int downscale_factor )
+void Pyramid::save_descriptors( const Config& conf, const char* basename, uint32_t octave )
 {
     struct stat st = {0};
     if (stat("dir-desc", &st) == -1) {
@@ -116,7 +116,7 @@ void Pyramid::save_descriptors( const char* basename, uint32_t octave, int downs
     ostringstream ostr;
     ostr << "dir-desc/desc-" << basename << "-o-" << octave << ".txt";
     ofstream of( ostr.str().c_str() );
-    _octaves[octave].writeDescriptor( of, downscale_factor, true );
+    _octaves[octave].writeDescriptor( conf, of, true );
 
     if (stat("dir-fpt", &st) == -1) {
         mkdir("dir-fpt", 0700);
@@ -124,7 +124,7 @@ void Pyramid::save_descriptors( const char* basename, uint32_t octave, int downs
     ostringstream ostr2;
     ostr2 << "dir-fpt/desc-" << basename << "-o-" << octave << ".txt";
     ofstream of2( ostr2.str().c_str() );
-    _octaves[octave].writeDescriptor( of2, downscale_factor, false );
+    _octaves[octave].writeDescriptor( conf, of2, false );
 }
 
 /*************************************************************
@@ -176,13 +176,13 @@ Pyramid::~Pyramid( )
  * Build the pyramid in all levels, one octave
  *************************************************************/
 
-void Pyramid::find_extrema( Image* base )
+void Pyramid::find_extrema( const Config& conf, Image* base )
 {
     reset_extrema_mgmt( );
 
     build_v11( base );
 
-    find_extrema_v6( );
+    find_extrema_v6( conf );
 
     orientation_v1();
 

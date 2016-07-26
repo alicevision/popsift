@@ -51,8 +51,17 @@ static void usage( const char* argv )
          << " --initial-blur=<float>      Assume initial blur, subtract when blurring first time" << endl
          << endl
          << "* Modes *" << endl
-         << " --vlfeat-mode               During the initial upscale, shift pixels by 1 for VLFeat" << endl
-         << "                             insteat of 0.5 for OpenCV" << endl
+         << " --vlfeat-mode               During the initial upscale, shift pixels by 1." << endl
+         << "                             That creates a sharper upscaled image. " << endl
+         << "                             In extrema refinement, steps up to 0.6, levels remain unchanged," << endl
+         << "                             do not reject points when reaching max iterations." << endl
+         << " --opencv-mode               During the initial upscale, shift pixels by 0.5." << endl
+         << "                             In extrema refinement, steps up to 0.5," << endl
+         << "                             reject points when reaching max iterations." << endl
+         << " --popsift-mode (default)    During the initial upscale, shift pixels by 1." << endl
+         << "                             In extrema refinement, steps up to 0.6," << endl
+         << "                             do not reject points when reaching max iterations." << endl
+         << "                             Shift feature coords octave 0 back to original pos." << endl
          << " --direct-downscale / --dd     Direct each octave from upscaled orig instead of blurred level" << endl
          << " --indirect-unfiltered / --iu  Downscaling from level-3, without applying Gaussian blur" << endl
          << " --indirect-downscale          Downscaling from level-3 and applying Gaussian blur" << endl
@@ -84,13 +93,15 @@ static struct option longopts[] = {
     { "initial-blur",        required_argument,      NULL, 1006 },
 
     { "vlfeat-mode",         no_argument,            NULL, 1100 },
-    { "direct-downscale",    no_argument,            NULL, 1101 },
-    { "dd",                  no_argument,            NULL, 1101 },
-    { "indirect-downscale",  no_argument,            NULL, 1102 },
-    { "indirect-unfiltered", no_argument,            NULL, 1103 },
-    { "iu",                  no_argument,            NULL, 1103 },
-    { "group-gauss",         required_argument,      NULL, 1104 },
-    { "bemap-orientation",   no_argument,            NULL, 1105 },
+    { "opencv-mode",         no_argument,            NULL, 1101 },
+    { "popsift-mode",        no_argument,            NULL, 1102 },
+    { "direct-downscale",    no_argument,            NULL, 1103 },
+    { "dd",                  no_argument,            NULL, 1103 },
+    { "indirect-downscale",  no_argument,            NULL, 1104 },
+    { "indirect-unfiltered", no_argument,            NULL, 1105 },
+    { "iu",                  no_argument,            NULL, 1105 },
+    { "group-gauss",         required_argument,      NULL, 1106 },
+    { "bemap-orientation",   no_argument,            NULL, 1107 },
 
     { "print-gauss-tables",  no_argument,            NULL, 1200 },
 
@@ -125,12 +136,14 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 1005 : applySigma = true; sigma = strtof( optarg, NULL ); break;
         case 1006 : config.setInitialBlur( strtof( optarg, NULL ) ); break;
 
-        case 1100 : config.setModeVLFeat( ); break;
-        case 1101 : config.setScalingMode( popart::Config::DirectDownscaling ); break;
-        case 1102 : config.setScalingMode( popart::Config::IndirectDownscaling ); break;
-        case 1103 : config.setScalingMode( popart::Config::IndirectUnfilteredDownscaling ); break;
-        case 1104 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
-        case 1105 : config.setBemapOrientation( ); break;
+        case 1100 : config.setMode( popart::Config::VLFeat ); break;
+        case 1101 : config.setMode( popart::Config::OpenCV ); break;
+        case 1102 : config.setMode( popart::Config::PopSift ); break;
+        case 1103 : config.setScalingMode( popart::Config::DirectDownscaling ); break;
+        case 1104 : config.setScalingMode( popart::Config::IndirectDownscaling ); break;
+        case 1105 : config.setScalingMode( popart::Config::IndirectUnfilteredDownscaling ); break;
+        case 1106 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
+        case 1107 : config.setBemapOrientation( ); break;
 
         case 1200 : config.setPrintGaussTables( ); break;
         default   : usage( appName );
