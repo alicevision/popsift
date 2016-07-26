@@ -120,6 +120,120 @@ inline bool is_extremum( cudaTextureObject_t obj,
     return true;
 }
 
+template<int sift_mode>
+class ModeFunctions
+{
+public:
+    inline __device__
+    bool first_contrast_ok( const float val ) const;
+
+    inline __device__
+    bool refine( const float3& d, int3& n, const int width, const int height, const int maxlevel );
+};
+
+template<>
+class ModeFunctions<Config::VLFeat>
+{
+public:
+    inline __device__
+    bool first_contrast_ok( const float val ) const
+    {
+        return ( fabs( val ) >= 0.8 * 2.0 * d_threshold );
+    }
+
+    inline __device__
+    bool refine( const float3& d, int3& n, const int width, const int height, const int maxlevel )
+    {
+        float3 t;
+
+        t.x = ((d.x >= 0.6f && n.x < width-2) ?  1 : 0 )
+            + ((d.x <= -0.6f && n.x > 1)? -1 : 0 );
+
+        t.y = ((d.y >= 0.6f && n.y < height-2)  ?  1 : 0 )
+            + ((d.y <= -0.6f && n.y > 1) ? -1 : 0 );
+
+        // t.z = ((d.z >= 0.6f && n.z < maxlevel-1)  ?  1 : 0 )
+            // + ((d.z <= -0.6f && n.z > 1) ? -1 : 0 );
+
+        if( t.x == 0 && t.y == 0 ) return false;
+
+        n.x += t.x;
+        n.y += t.y;
+        // n.z += t.z; - VLFeat is not changing levels !!!
+
+        return true;
+    }
+};
+
+template<>
+class ModeFunctions<Config::OpenCV>
+{
+public:
+    inline __device__
+    bool first_contrast_ok( const float val ) const
+    {
+        return ( fabs( val ) >= d_threshold );
+    }
+
+    inline __device__
+    bool refine( const float3& d, int3& n, const int width, const int height, const int maxlevel )
+    {
+        float3 t;
+
+        t.x = ((d.x >= 0.5f && n.x < width-2) ?  1 : 0 )
+            + ((d.x <= -0.5f && n.x > 1)? -1 : 0 );
+
+        t.y = ((d.y >= 0.5f && n.y < height-2)  ?  1 : 0 )
+            + ((d.y <= -0.5f && n.y > 1) ? -1 : 0 );
+
+        t.z = ((d.z >= 0.5f && n.z < maxlevel-1)  ?  1 : 0 )
+            + ((d.z <= -0.5f && n.z > 1) ? -1 : 0 );
+
+        if( t.x == 0 && t.y == 0 && t.z == 0 ) return false;
+
+        n.x += t.x;
+        n.y += t.y;
+        n.z += t.z;
+
+        return true;
+    }
+};
+
+template<>
+class ModeFunctions<Config::PopSift>
+{
+public:
+    inline __device__
+    bool first_contrast_ok( const float val ) const
+    {
+        return ( fabs( val ) >= 1.6 * d_threshold );
+    }
+
+    inline __device__
+    bool refine( float3& d, int3& n, int width, int height, int maxlevel )
+    {
+        float3 t;
+
+        t.x = ((d.x >= 0.6f && n.x < width-2) ?  1 : 0 )
+            + ((d.x <= -0.6f && n.x > 1)? -1 : 0 );
+
+        t.y = ((d.y >= 0.6f && n.y < height-2)  ?  1 : 0 )
+            + ((d.y <= -0.6f && n.y > 1) ? -1 : 0 );
+
+        t.z = ((d.z >= 0.6f && n.z < maxlevel-1)  ?  1 : 0 )
+            + ((d.z <= -0.6f && n.z > 1) ? -1 : 0 );
+
+        if( t.x == 0 && t.y == 0 && t.z == 0 ) return false;
+
+        n.x += t.x;
+        n.y += t.y;
+        n.z += t.z;
+
+        return true;
+    }
+};
+
+template<int sift_mode>
 __device__
 bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
                                  int                 debug_octave,
@@ -160,11 +274,8 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
     const float val = tex2DLayered<float>( dog, x+1, y+1, level );
 
-#ifdef VLFEAT_LIKE_THRESHOLD
-    if( fabs( val ) < 0.8 * 2.0 * d_threshold ) return false;
-#else // VLFEAT_LIKE_THRESHOLD
-    if( fabs( val ) < d_threshold ) return false;
-#endif // VLFEAT_LIKE_THRESHOLD
+    ModeFunctions<sift_mode> f;
+    if( not f.first_contrast_ok( val ) ) return false;
 
     if( not is_extremum( dog, x, y, level-1 ) ) {
         return false;
@@ -257,31 +368,26 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
         /* If the translation of the keypoint is big, move the keypoint
          * and re-iterate the computation. Otherwise we are all set.
          */
-        if( fabs(d.z) < 0.5f && fabs(d.y) < 0.5f && fabs(d.x) < 0.5f) break;
+        const bool retval = f.refine( d, n, width, height, maxlevel );
 
-        float3 t;
-
-        t.x = ((d.x >= 0.5f && n.x < width-2) ?  1 : 0 )
-             + ((d.x <= -0.5f && n.x > 1)? -1 : 0 );
-
-        t.y = ((d.y >= 0.5f && n.y < height-2)  ?  1 : 0 )
-             + ((d.y <= -0.5f && n.y > 1) ? -1 : 0 );
-
-        t.z = ((d.z >= 0.5f && n.z < maxlevel-1)  ?  1 : 0 )
-             + ((d.z <= -0.5f && n.z > 1) ? -1 : 0 );
-
-        n.x += t.x;
-        n.y += t.y;
-        n.z += t.z;
+        if( not retval ) break;
     } /* go to next iter */
 
-    /* ensure convergence of interpolation */
-    if (iter >= MAX_ITERATIONS) {
 #ifdef PRINT_EXTREMA_DEBUG_INFO
-        printf("Found an extremum at %d %d (o=%d) - rejected in refinement, was moved to l:%d (%d,%d)\n", x+1, y+1, debug_octave, n.z, n.x, n.y );
-#endif // PRINT_EXTREMA_DEBUG_INFO
+    if (iter >= MAX_ITERATIONS) {
+        if( sift_mode == Config::OpenCV ) {
+            printf("Found an extremum at %d %d (o=%d,l=%d) - rejected in refinement, was moved to l:%d (%d,%d)\n", x+1, y+1, debug_octave, level, n.z, n.x, n.y );
+            return false;
+        } else {
+            printf("Found an extremum at %d %d (o=%d,l=%d) - refined to (%d,%d) (o=%d,l=%d)\n", x+1, y+1, debug_octave, level, n.x, n.y, debug_octave, n.z );
+        }
+    }
+#else // PRINT_EXTREMA_DEBUG_INFO
+    /* ensure convergence of interpolation */
+    if( sift_mode == Config::OpenCV && iter >= MAX_ITERATIONS) {
         return false;
     }
+#endif // PRINT_EXTREMA_DEBUG_INFO
 
     // float contr   = v + 0.5f * (D.x * d.x + D.y * d.y + D.z * d.z);
     float contr   = v + scalbnf( D.x * d.x + D.y * d.y + D.z * d.z , -1 );
@@ -295,7 +401,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     /* negative determinant => curvatures have different signs -> reject it */
     if (det <= 0.0f) {
 #ifdef PRINT_EXTREMA_DEBUG_INFO
-        printf("Found an extremum at %d %d (o=%d) - negative determinant\n", x+1, y+1, debug_octave );
+        printf("Found an extremum at %d %d (o=%d,l=%d) - negative determinant\n", x+1, y+1, debug_octave, level );
 #endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
@@ -305,7 +411,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     if( fabs(contr) < scalbnf( d_threshold, 1 ) )
     {
 #ifdef PRINT_EXTREMA_DEBUG_INFO
-        printf("Found an extremum at %d %d (o=%d) - 2nd peak tresh failed\n", x+1, y+1, debug_octave );
+        printf("Found an extremum at %d %d (o=%d,l=%d) - 2nd peak tresh failed\n", x+1, y+1, debug_octave, level );
 #endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
@@ -313,7 +419,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
     if( edgeval >= (d_edge_limit+1.0f)*(d_edge_limit+1.0f)/d_edge_limit ) {
 #ifdef PRINT_EXTREMA_DEBUG_INFO
-        printf("Found an extremum at %d %d (o=%d) - edge tresh failed\n", x+1, y+1, debug_octave );
+        printf("Found an extremum at %d %d (o=%d,l=%d) - edge tresh failed\n", x+1, y+1, debug_octave, level );
 #endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
@@ -323,7 +429,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     ec.sigma   = d_sigma0 * pow(d_sigma_k, sn); // * 2;
         // const float sigma_k = powf(2.0f, 1.0f / levels );
 #ifdef PRINT_EXTREMA_DEBUG_INFO
-    printf("Found an extremum at %d %d (o=%d)     -> x:%.1f y:%.1f z:%.1f\n", x+1, y+1, debug_octave, xn, yn, sn );
+    printf("Found an extremum at %d %d (o=%d,l=%d)     -> x:%.1f y:%.1f z:%.1f\n", x+1, y+1, debug_octave, level, xn, yn, sn );
 #endif // PRINT_EXTREMA_DEBUG_INFO
 
     ec.orientation = 0;
@@ -333,7 +439,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
 
 
-template<int HEIGHT>
+template<int HEIGHT, int vlfeat_mode>
 __global__
 void find_extrema_in_dog_v6( cudaTextureObject_t dog,
                              int                 debug_octave,
@@ -348,7 +454,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
 {
     Extremum ec;
 
-    bool indicator = find_extrema_in_dog_v6_sub( dog, debug_octave, level, width, height, maxlevel, ec );
+    bool indicator = find_extrema_in_dog_v6_sub<vlfeat_mode>( dog, debug_octave, level, width, height, maxlevel, ec );
 
     uint32_t write_index = extrema_count<HEIGHT>( indicator, extrema_counter );
 
