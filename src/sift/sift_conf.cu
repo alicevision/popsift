@@ -17,7 +17,8 @@ Config::Config( )
     , gauss_group_size( 1 )
     , _assume_initial_blur( false )
     , _initial_blur( 0.0f )
-    , bemap_orientation( false )
+    , _bemap_orientation( false )
+    , _print_gauss_tables( false )
 {
 }
 
@@ -54,6 +55,13 @@ void Config::setLevels( int v ) { levels = v; }
 void Config::setSigma( float v ) { sigma = v; }
 void Config::setEdgeLimit( float v ) { _edge_limit = v; }
 void Config::setThreshold( float v ) { _threshold = v; }
+void Config::setPrintGaussTables() { _print_gauss_tables = true; }
+
+void Config::setInitialBlur( float blur )
+{
+    _assume_initial_blur = true;
+    _initial_blur        = blur;
+}
 
 void Config::setGaussGroup( int groupsize )
 {
@@ -63,12 +71,6 @@ void Config::setGaussGroup( int groupsize )
 int  Config::getGaussGroup( ) const
 {
     return gauss_group_size;
-}
-
-void Config::setInitialBlur( float blur )
-{
-    _assume_initial_blur = true;
-    _initial_blur        = blur;
 }
 
 bool Config::hasInitialBlur( ) const
@@ -83,17 +85,22 @@ float Config::getInitialBlur( ) const
 
 void Config::setBemapOrientation( )
 {
-    bemap_orientation = true;
+    _bemap_orientation = true;
 }
 
 bool Config::getBemapOrientation( ) const
 {
-    return bemap_orientation;
+    return _bemap_orientation;
 }
 
 float Config::getPeakThreshold() const
 {
     return ( _threshold * 0.5f * 255.0f / levels );
+}
+
+bool Config::ifPrintGaussTables() const
+{
+    return _print_gauss_tables;
 }
 
 

@@ -8,6 +8,8 @@
 #include <iostream>
 #include <stdio.h>
 
+#define PREV_LEVEL 3
+
 /*************************************************************
  * V11: device side
  *************************************************************/
@@ -17,6 +19,38 @@ namespace popart {
 namespace gauss {
 namespace v11 {
 
+namespace absoluteLinearTex {
+__global__
+void horiz_128x1( cudaTextureObject_t src_data,
+                  Plane2D_float       dst_data,
+                  int                 level )
+{
+    const int dst_w = dst_data.getWidth();
+
+    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if( off_x >= dst_w ) return;
+
+    float out = 0.0f;
+
+    #pragma unroll
+    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
+        const float& g  = popart::d_gauss.filter[level*GAUSS_ALIGN + offset];
+        const float  v1 = tex2D<float>( src_data, off_x - offset + 0.5f, blockIdx.y + 0.5f );
+        out += ( v1 * g );
+
+        const float  v2 = tex2D<float>( src_data, off_x + offset + 0.5f, blockIdx.y + 0.5f );
+        out += ( v2 * g );
+    }
+    const float& g  = popart::d_gauss.filter[level*GAUSS_ALIGN];
+    const float v3 = tex2D<float>( src_data, off_x+0.5f, blockIdx.y+0.5f );
+    out += ( v3 * g );
+
+    dst_data.ptr(blockIdx.y)[off_x] = out;
+}
+} // namespace absoluteLinearTex
+
+namespace normalizedTex {
 __global__
 void horiz_tex_128x1( cudaTextureObject_t src_data,
                       Plane2D_float       dst_data,
@@ -33,8 +67,8 @@ void horiz_tex_128x1( cudaTextureObject_t src_data,
     float out = 0.0f;
 
     #pragma unroll
-    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
-        const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
+    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
+        const float& g  = popart::d_gauss.filter[level*GAUSS_ALIGN + offset];
         const float read_x_l = ( off_x - offset );
         const float  v1 = tex2D<float>( src_data, ( read_x_l + 0.5f ) / dst_w, read_y );
         out += ( v1 * g );
@@ -43,17 +77,18 @@ void horiz_tex_128x1( cudaTextureObject_t src_data,
         const float  v2 = tex2D<float>( src_data, ( read_x_r + 0.5f ) / dst_w, read_y );
         out += ( v2 * g );
     }
-    const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
+    const float& g  = popart::d_gauss.filter[level*GAUSS_ALIGN];
     const float read_x = off_x;
     const float v3 = tex2D<float>( src_data, ( read_x + 0.5f ) / dst_w, read_y );
     out += ( v3 * g );
 
     dst_data.ptr(blockIdx.y)[off_x] = out;
 }
+} // namespace normalizedTex
 
 __global__
 void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
-                                          Plane2D_float       dst_data )
+                                   Plane2D_float       dst_data )
 {
     const float dst_w  = dst_data.getWidth();
     const float dst_h  = dst_data.getHeight();
@@ -66,8 +101,8 @@ void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
     float out = 0.0f;
 
     #pragma unroll
-    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
-        const float& g  = popart::d_gauss_filter_initial_blur[offset];
+    for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
+        const float& g  = popart::d_gauss.filter_initial_blur[offset];
         const float read_x_l = ( off_x - offset );
         const float  v1 = tex2D<float>( src_data, ( read_x_l + 0.5f ) / dst_w, read_y );
         out += ( v1 * g );
@@ -76,7 +111,7 @@ void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
         const float  v2 = tex2D<float>( src_data, ( read_x_r + 0.5f ) / dst_w, read_y );
         out += ( v2 * g );
     }
-    const float& g  = popart::d_gauss_filter_initial_blur[0];
+    const float& g  = popart::d_gauss.filter_initial_blur[0];
     const float read_x = off_x;
     const float v3 = tex2D<float>( src_data, ( read_x + 0.5f ) / dst_w, read_y );
     out += ( v3 * g );
@@ -84,35 +119,6 @@ void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
     dst_data.ptr(blockIdx.y)[off_x] = out;
 }
 
-
-__global__
-void horiz_128x1( cudaTextureObject_t src_data,
-                  Plane2D_float       dst_data,
-                  int                 level )
-{
-    const int dst_w = dst_data.getWidth();
-
-    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if( off_x >= dst_w ) return;
-
-    float out = 0.0f;
-
-    #pragma unroll
-    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
-        const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
-        const float  v1 = tex2D<float>( src_data, off_x - offset + 0.5f, blockIdx.y + 0.5f );
-        out += ( v1 * g );
-
-        const float  v2 = tex2D<float>( src_data, off_x + offset + 0.5f, blockIdx.y + 0.5f );
-        out += ( v2 * g );
-    }
-    const float& g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
-    const float v3 = tex2D<float>( src_data, off_x+0.5f, blockIdx.y+0.5f );
-    out += ( v3 * g );
-
-    dst_data.ptr(blockIdx.y)[off_x] = out;
-}
 
 __global__
 void get_by_2( cudaTextureObject_t src_data,
@@ -168,8 +174,8 @@ void horiz_by_2( cudaTextureObject_t src_data,
     float val;
     float out = 0;
 
-    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
+    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
+        g  = popart::d_gauss.filter[level*GAUSS_ALIGN + offset];
 
         idx = threadIdx.x - offset;
         // add +1.0f because we must shift by 0.5 pixels upscaled by 2 in the previous octave
@@ -181,7 +187,7 @@ void horiz_by_2( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
+    g  = popart::d_gauss.filter[level*GAUSS_ALIGN];
     idx = threadIdx.x;
     val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0f, 2 * ( block_y + idy ) + 1.0f );
     out += ( val * g );
@@ -214,8 +220,8 @@ void vert( cudaTextureObject_t src_data,
     float out = 0;
 
 #ifdef GAUSS_INTERM_FILTER_MODE_POINT
-    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
+    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
+        g  = popart::d_gauss.filter[level*GAUSS_ALIGN + offset];
 
         idy = threadIdx.y - offset;
         val = tex2D<float>( src_data, block_x + idx, block_y + idy );
@@ -226,13 +232,13 @@ void vert( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
+    g  = popart::d_gauss.filter[level*GAUSS_ALIGN];
     idy = threadIdx.y;
     val = tex2D<float>( src_data, block_x + idx, block_y + idy );
     out += ( val * g );
 #else // not GAUSS_INTERM_FILTER_MODE_POINT
-    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter[level*GAUSS_ALIGN + offset];
+    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
+        g  = popart::d_gauss.filter[level*GAUSS_ALIGN + offset];
 
         idy = threadIdx.y - offset;
         val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
@@ -243,7 +249,7 @@ void vert( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popart::d_gauss_filter[level*GAUSS_ALIGN];
+    g  = popart::d_gauss.filter[level*GAUSS_ALIGN];
     idy = threadIdx.y;
     val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
     out += ( val * g );
@@ -275,8 +281,8 @@ void vert_initial_blur( cudaTextureObject_t src_data,
     float out = 0;
 
 #ifdef GAUSS_INTERM_FILTER_MODE_POINT
-    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter_initial_blur[offset];
+    for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
+        g  = popart::d_gauss.filter_initial_blur[offset];
 
         idy = threadIdx.y - offset;
         val = tex2D<float>( src_data, block_x + idx, block_y + idy );
@@ -287,13 +293,13 @@ void vert_initial_blur( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popart::d_gauss_filter_initial_blur[0];
+    g  = popart::d_gauss.filter_initial_blur[0];
     idy = threadIdx.y;
     val = tex2D<float>( src_data, block_x + idx, block_y + idy );
     out += ( val * g );
 #else // not GAUSS_INTERM_FILTER_MODE_POINT
-    for( int offset = GAUSS_SPAN; offset>0; offset-- ) {
-        g  = popart::d_gauss_filter_initial_blur[offset];
+    for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
+        g  = popart::d_gauss.filter_initial_blur[offset];
 
         idy = threadIdx.y - offset;
         val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
@@ -304,7 +310,7 @@ void vert_initial_blur( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popart::d_gauss_filter_initial_blur[0];
+    g  = popart::d_gauss.filter_initial_blur[0];
     idy = threadIdx.y;
     val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
     out += ( val * g );
@@ -379,7 +385,7 @@ inline void Pyramid::horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data,
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
 
-    gauss::v11::horiz_tex_128x1
+    gauss::v11::normalizedTex::horiz_tex_128x1
         <<<grid,block,0,stream>>>
         ( src_data,
           oct_obj.getIntermediateData( ),
@@ -402,14 +408,13 @@ inline void Pyramid::horiz_from_upscaled_orig_tex_initial_blur( cudaTextureObjec
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
 
+
     gauss::v11::horiz_tex_128x1_initial_blur
         <<<grid,block,0,stream>>>
         ( src_data,
           oct_obj.getIntermediateData( ) );
 }
 
-#define PREV_LEVEL 3
-// #define PREV_LEVEL 5
 
 __host__
 inline void Pyramid::downscale_from_prev_octave( int octave, int level, cudaStream_t stream )
@@ -485,7 +490,8 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t 
     dim3 grid;
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
-    gauss::v11::horiz_128x1
+
+    gauss::v11::absoluteLinearTex::horiz_128x1
         <<<grid,block,0,stream>>>
         ( oct_obj._data_tex[ level-1 ],
           oct_obj.getIntermediateData( ),

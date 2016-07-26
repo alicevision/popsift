@@ -27,10 +27,10 @@
 # PARAMS="--octaves=3 --levels=3 --sigma=1.6 --threshold=0.00001 --edge-threshold=5.0"
 # PARAMS=
 
-# IMAGE1=/local/home/griff/GIT/github/openmvg/src/openMVG_Samples/imageData/StanfordMobileVisualSearch/Ace_40p_gray.pgm
+IMAGE1=/local/home/griff/GIT/github/openmvg/src/openMVG_Samples/imageData/StanfordMobileVisualSearch/Ace_40p_gray.pgm
 # IMAGE1=/local/home/griff/GIT/github/openmvg/build/gray.pgm
 
-IMAGE1=../sample/boat/img1.ppm
+# IMAGE1=../sample/boat/img1.ppm
 IMAGE2=../sample/boat/img2.ppm
 IMAGE3=../sample/boat/img3.ppm
 IMAGE4=../sample/boat/img4.ppm
@@ -42,6 +42,7 @@ IMAGE6=../sample/boat/img6.ppm
 # PARAMS="--indirect-unfiltered --octaves=4 --threshold=0.1 --edge-threshold=10.0" # finds 4 points
 # PARAMS="--indirect-unfiltered --threshold=0.04 --edge-threshold=10.0" # finds 4 points
 # PARAMS="--downsampling=0 --octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0"
+# PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --print-gauss-tables"
 PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 # PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --bemap-orientation"
 # PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0"
@@ -53,7 +54,8 @@ rm -rf outputs
 
 mkdir -p outputs/popsift
 
-for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 ; do
+# for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 ; do
+for i in $IMAGE1 ; do
   if [ -f "$i" ] ; then
     outname=`basename --suffix=.ppm $i`
     echo ./sift_v4 $PARAMS $LOG $i

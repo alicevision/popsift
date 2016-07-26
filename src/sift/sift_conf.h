@@ -42,6 +42,7 @@ struct Config
     void setEdgeLimit( float v );
     void setThreshold( float v );
     void setInitialBlur( float blur );
+    void setPrintGaussTables( );
 
     bool  hasInitialBlur( ) const;
     float getInitialBlur( ) const;
@@ -49,6 +50,9 @@ struct Config
     // computes the actual peak threshold depending on the threshold
     // parameter and the non-augmented number of levels
     float getPeakThreshold() const;
+
+    // print Gauss spans and tables?
+    bool ifPrintGaussTables() const;
 
     // determine the image format of the first octave
     // relative to the input image's size (x,y) as follows:
@@ -114,7 +118,12 @@ private:
      * This has been replaced by direct curve fitting according to Lowe.
      * Set this to true for old mode.
      */
-    bool bemap_orientation;
+    bool _bemap_orientation;
+
+    /* Call the debug functions in gauss_filter.cu to print Gauss
+     * filter width and Gauss tables in use.
+     */
+    bool _print_gauss_tables;
 };
 
 }; // namespace popart

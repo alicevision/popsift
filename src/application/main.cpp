@@ -63,6 +63,9 @@ static void usage( const char* argv )
          << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
          << " --bemap-orientation         dual smoothing or orientation histogram instead of" << endl
          << "                             curve fitting (older code)" << endl
+         << endl
+         << "* Informational *" << endl
+         << " --print-gauss-tables        A debug output printing Gauss filter size and tables" << endl
          << endl;
     exit(0);
 }
@@ -91,6 +94,8 @@ static struct option longopts[] = {
     { "group-gauss",         required_argument,      NULL, 1104 },
     { "bemap-orientation",   no_argument,            NULL, 1105 },
 
+    { "print-gauss-tables",  no_argument,            NULL, 1200 },
+
     { NULL,                  0,                      NULL, 0  }
 };
 
@@ -114,13 +119,6 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 'l' : config.setLogMode( popart::Config::All ); break;
         case 'p' : print_info = true; break;
 
-        case 1100 : config.setModeVLFeat( ); break;
-        case 1101 : config.setScalingMode( popart::Config::DirectDownscaling ); break;
-        case 1102 : config.setScalingMode( popart::Config::IndirectDownscaling ); break;
-        case 1103 : config.setScalingMode( popart::Config::IndirectUnfilteredDownscaling ); break;
-        case 1104 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
-        case 1105 : config.setBemapOrientation( ); break;
-
         case 1000 : config.setOctaves( strtol( optarg, NULL, 0 ) ); break;
         case 1001 : config.setLevels(  strtol( optarg, NULL, 0 ) ); break;
         case 1002 : config.setDownsampling( strtof( optarg, NULL ) ); break;
@@ -128,6 +126,15 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 1004 : config.setEdgeLimit(  strtof( optarg, NULL ) ); break;
         case 1005 : applySigma = true; sigma = strtof( optarg, NULL ); break;
         case 1006 : config.setInitialBlur( strtof( optarg, NULL ) ); break;
+
+        case 1100 : config.setModeVLFeat( ); break;
+        case 1101 : config.setScalingMode( popart::Config::DirectDownscaling ); break;
+        case 1102 : config.setScalingMode( popart::Config::IndirectDownscaling ); break;
+        case 1103 : config.setScalingMode( popart::Config::IndirectUnfilteredDownscaling ); break;
+        case 1104 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
+        case 1105 : config.setBemapOrientation( ); break;
+
+        case 1200 : config.setPrintGaussTables( ); break;
         default   : usage( appName );
         }
     }
