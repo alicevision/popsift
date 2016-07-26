@@ -8,6 +8,7 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 
+#define VLFEAT_LIKE_THRESHOLD
 namespace popart{
 
 /*************************************************************
@@ -156,9 +157,11 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
     const float val = tex2DLayered<float>( dog, x+1, y+1, level );
 
-    if( fabs( val ) < d_threshold ) {
-        return false;
-    }
+#ifdef VLFEAT_LIKE_THRESHOLD
+    if( fabs( val ) < 0.8 * 2.0 * d_threshold ) return false;
+#else // VLFEAT_LIKE_THRESHOLD
+    if( fabs( val ) < d_threshold ) return false;
+#endif // VLFEAT_LIKE_THRESHOLD
 
     if( not is_extremum( dog, x, y, level-1 ) ) {
         return false;
