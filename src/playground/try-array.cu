@@ -1,5 +1,6 @@
 #include <cuda_runtime.h>
 #include <iostream>
+#include <stdio.h>
 
 #define WITH_SURFACE
 
