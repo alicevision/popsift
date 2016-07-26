@@ -54,13 +54,16 @@ static void usage( const char* argv )
          << " --vlfeat-mode               During the initial upscale, shift pixels by 1." << endl
          << "                             That creates a sharper upscaled image. " << endl
          << "                             In extrema refinement, steps up to 0.6, levels remain unchanged," << endl
-         << "                             do not reject points when reaching max iterations." << endl
+         << "                             do not reject points when reaching max iterations," << endl
+         << "                             first contrast threshold is .8 * peak thresh." << endl
          << " --opencv-mode               During the initial upscale, shift pixels by 0.5." << endl
          << "                             In extrema refinement, steps up to 0.5," << endl
-         << "                             reject points when reaching max iterations." << endl
+         << "                             reject points when reaching max iterations," << endl
+         << "                             first contrast threshold is floor(.5 * peak thresh)." << endl
          << " --popsift-mode (default)    During the initial upscale, shift pixels by 1." << endl
          << "                             In extrema refinement, steps up to 0.6," << endl
-         << "                             do not reject points when reaching max iterations." << endl
+         << "                             do not reject points when reaching max iterations," << endl
+         << "                             first contrast threshold is .8 * peak thresh." << endl
          << "                             Shift feature coords octave 0 back to original pos." << endl
          << " --direct-downscale / --dd     Direct each octave from upscaled orig instead of blurred level" << endl
          << " --indirect-unfiltered / --iu  Downscaling from level-3, without applying Gaussian blur" << endl
