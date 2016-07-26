@@ -158,6 +158,21 @@ void Octave::downloadDescriptor( const Config& conf )
     }
 
     cudaDeviceSynchronize( );
+
+    if( conf.getSiftMode() == Config::PopSift ) {
+        if( _debug_octave_id == 0 ) {
+            if( conf.start_sampling == -1 ) {
+                for( int lvl=0; lvl<_levels; lvl++ ) {
+                    for( int i=0; i<_h_extrema_mgmt[lvl]; i++ ) {
+                        _h_extrema[lvl][i].xpos += 0.5f;
+                        _h_extrema[lvl][i].ypos += 0.5f;
+                    }
+                }
+            } else {
+                cerr << "Note " << __func__ << ": Upscale pixel shift compensation for upscaled image not implemented" << endl;
+            }
+        }
+    }
 }
 
 void Octave::writeDescriptor( const Config& conf, ostream& ostr, bool really )
