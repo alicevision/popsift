@@ -13,35 +13,40 @@ using namespace std;
 namespace popart {
 
 __global__
-void p_upscale_5_opencv( Plane2D_float dst, cudaTextureObject_t src )
+void p_upscale_opencv( Plane2D_float dst, cudaTextureObject_t src )
 {
     int idx  = blockIdx.x * blockDim.x + threadIdx.x;
     int idy  = blockIdx.y * blockDim.y + threadIdx.y;
     if( idx >= dst.getCols() ) return;
     if( idy >= dst.getRows() ) return;
-    // const float src_x = (float(idx))/float(dst.getCols());
-    // const float src_y = (float(idy))/float(dst.getRows());
     const float src_x = (float(idx)+0.5f)/float(dst.getCols());
     const float src_y = (float(idy)+0.5f)/float(dst.getRows());
-    // const float src_x = (float(idx)-0.5f)/float(dst.getCols());
-    // const float src_y = (float(idy)-0.5f)/float(dst.getRows());
     float d = tex2D<float>( src, src_x, src_y );
     dst.ptr(idy)[idx] = d * 255.0f;
 }
 
 __global__
-void p_upscale_5_vlfeat( Plane2D_float dst, cudaTextureObject_t src )
+void p_upscale_vlfeat( Plane2D_float dst, cudaTextureObject_t src )
 {
     int idx  = blockIdx.x * blockDim.x + threadIdx.x;
     int idy  = blockIdx.y * blockDim.y + threadIdx.y;
     if( idx >= dst.getCols() ) return;
     if( idy >= dst.getRows() ) return;
-    // const float src_x = (float(idx))/float(dst.getCols());
-    // const float src_y = (float(idy))/float(dst.getRows());
     const float src_x = (float(idx)+1.0f)/float(dst.getCols());
     const float src_y = (float(idy)+1.0f)/float(dst.getRows());
-    // const float src_x = (float(idx)-0.5f)/float(dst.getCols());
-    // const float src_y = (float(idy)-0.5f)/float(dst.getRows());
+    float d = tex2D<float>( src, src_x, src_y );
+    dst.ptr(idy)[idx] = d * 255.0f;
+}
+
+__global__
+void p_upscale_popsift( Plane2D_float dst, cudaTextureObject_t src )
+{
+    int idx  = blockIdx.x * blockDim.x + threadIdx.x;
+    int idy  = blockIdx.y * blockDim.y + threadIdx.y;
+    if( idx >= dst.getCols() ) return;
+    if( idy >= dst.getRows() ) return;
+    const float src_x = (float(idx)+1.0f)/float(dst.getCols());
+    const float src_y = (float(idy)+1.0f)/float(dst.getRows());
     float d = tex2D<float>( src, src_x, src_y );
     dst.ptr(idy)[idx] = d * 255.0f;
 }
