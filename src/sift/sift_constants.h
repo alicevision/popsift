@@ -38,13 +38,6 @@
  */
 #define USE_DYNAMIC_PARALLELISM
 
-/* Intermediate texture can be compiled with filter modes
- * point and linear (interpolation). Linear is very powerful
- * when combined with the idea of using the interpolation
- * engine to combined 2 Gauss operations.
- * However, that is not done yet.
- */
-#define GAUSS_INTERM_FILTER_MODE_POINT
 
 /*
  * USE_OPENCV_INTERPRETATION
