@@ -13,9 +13,15 @@ void usage( const char* cmd, string info )
          << endl
          << "Usage: " << cmd << " <infile1> <infile2>" << endl
          << "    take two files containing a structured float dump of an image and print the pixel-by-pixel differences" << endl
+         << endl
          << "     : " << cmd << " --show <infile2>" << endl
          << "    dump the float values of a structured float dump of an image" << endl
+         << endl
          << "     : " << cmd << " --ext <infile1> <infile2> <infile3>" << endl
+         << "    take 3 images and find if a pixel in the middle one is extrema for its neighbourhood" << endl
+         << endl
+         << "     : " << cmd << " --conv-pgm <infile> <outfile>" << endl
+         << "    take an input image and write the int-converted values to an ASCII PGM file" << endl
          << endl;
     exit( -1 );
 }
@@ -142,6 +148,50 @@ void findext( const char* f0, const char* f1, const char* f2 )
     }
 }
 
+void convpgm( const char* in_f, const char* out_f )
+{
+    int cols, rows;
+    float* data;
+
+    data = read_header( in_f, cols, rows );
+
+    FILE* out = fopen( out_f, "w" );
+    if( not out ) {
+        fprintf( stderr, "Couldn't open %s for writing\n", out_f );
+        perror(":");
+        exit( -1 );
+    }
+
+#if 0
+    int minval = 0;
+    int maxval = 0;
+    for( int row=0; row<rows; row++ ) {
+        for( int col=0; col<cols; col++ ) {
+            int val = (int)data[row*cols+col];
+            minval = min( minval, val );
+            maxval = max( maxval, val );
+        }
+    }
+#endif
+
+    fprintf( out, "P2\n"
+                  "%d %d\n"
+                  "%d\n",
+                  rows, cols,
+                  255 );
+                  // maxval - minval );
+    for( int row=0; row<rows; row++ ) {
+        for( int col=0; col<cols; col++ ) {
+            int val = (int)data[row*cols+col];
+            // fprintf( out, "%d ", val - minval );
+            fprintf( out, "%d ", val );
+        }
+        fprintf( out, "\n" );
+    }
+
+    fclose( out );
+}
+
 int main( int argc, char*argv[] )
 {
     if( argc < 3 ) {
@@ -151,6 +201,12 @@ int main( int argc, char*argv[] )
     if( string(argv[1]) == "--show" ) {
         if( argc != 3 ) usage( argv[0], "Wrong parameter count" );
         showfile( argv[2] );
+        exit( 0 );
+    }
+
+    if( string(argv[1]) == "--conv-pgm" ) {
+        if( argc != 4 ) usage( argv[0], "Wrong parameter count" );
+        convpgm( argv[2], argv[3] );
         exit( 0 );
     }
 
@@ -169,6 +225,15 @@ int main( int argc, char*argv[] )
 
     float* data2 = read_header( argv[2], cols_2, rows_2 );
     if( not data2 ) exit( -1 );
+
+    if( cols_1 != cols_2 || rows_1 != rows_2 ) {
+        fprintf( stderr, "Image dumps must be for same size\n"
+                         "    size %d X %d for %s\n"
+                         "    size %d X %d for %s\n",
+                         cols_1, rows_1, argv[1],
+                         cols_2, rows_2, argv[2] );
+        exit( -1 );
+    }
 
     float maxdiff = 0;
     for( int i=0; i<rows_1; i++ ) {
