@@ -102,7 +102,7 @@ Image::~Image( )
     _input_image_h   .freeHost( popart::CudaAllocated );
 }
 
-void Image::load( const imgStream& inp )
+void Image::load( const Config& conf, const imgStream& inp )
 {
 #if 1
     ofstream of( "color-conv.pgm" );
@@ -119,7 +119,7 @@ void Image::load( const imgStream& inp )
 #endif
     memcpy( _input_image_h.data, inp.data_r, _w*_h );
     _input_image_h.memcpyToDevice( _input_image_d );
-    upscale_v5( _input_image_tex );
+    upscale_v5( conf, _input_image_tex );
 }
 
 } // namespace popart

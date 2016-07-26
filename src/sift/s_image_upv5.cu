@@ -13,7 +13,7 @@ using namespace std;
 namespace popart {
 
 __global__
-void p_upscale_5( Plane2D_float dst, cudaTextureObject_t src )
+void p_upscale_5_opencv( Plane2D_float dst, cudaTextureObject_t src )
 {
     int idx  = blockIdx.x * blockDim.x + threadIdx.x;
     int idy  = blockIdx.y * blockDim.y + threadIdx.y;
@@ -23,6 +23,23 @@ void p_upscale_5( Plane2D_float dst, cudaTextureObject_t src )
     // const float src_y = (float(idy))/float(dst.getRows());
     const float src_x = (float(idx)+0.5f)/float(dst.getCols());
     const float src_y = (float(idy)+0.5f)/float(dst.getRows());
+    // const float src_x = (float(idx)-0.5f)/float(dst.getCols());
+    // const float src_y = (float(idy)-0.5f)/float(dst.getRows());
+    float d = tex2D<float>( src, src_x, src_y );
+    dst.ptr(idy)[idx] = d * 255.0f;
+}
+
+__global__
+void p_upscale_5_vlfeat( Plane2D_float dst, cudaTextureObject_t src )
+{
+    int idx  = blockIdx.x * blockDim.x + threadIdx.x;
+    int idy  = blockIdx.y * blockDim.y + threadIdx.y;
+    if( idx >= dst.getCols() ) return;
+    if( idy >= dst.getRows() ) return;
+    // const float src_x = (float(idx))/float(dst.getCols());
+    // const float src_y = (float(idy))/float(dst.getRows());
+    const float src_x = (float(idx)+1.0f)/float(dst.getCols());
+    const float src_y = (float(idy)+1.0f)/float(dst.getRows());
     // const float src_x = (float(idx)-0.5f)/float(dst.getCols());
     // const float src_y = (float(idy)-0.5f)/float(dst.getRows());
     float d = tex2D<float>( src, src_x, src_y );
@@ -43,7 +60,7 @@ int condition[][2] = {
     { 32, 32 },
     { 0, 0 } };
 __host__
-void Image::upscale_v5( cudaTextureObject_t & tex )
+void Image::upscale_v5( const Config& conf, cudaTextureObject_t & tex )
 {
     std::map<float,string> logtimes;
 
@@ -64,7 +81,11 @@ void Image::upscale_v5( cudaTextureObject_t & tex )
             dim3 grid( gridx, gridy );
             dim3 block( blockx, blocky );
 
-            p_upscale_5<<<grid,block>>> ( this->_upscaled_image_d, tex );
+            if( conf.isVLFeatMode() ) {
+                p_upscale_5_vlfeat<<<grid,block>>> ( this->_upscaled_image_d, tex );
+            } else {
+                p_upscale_5_opencv<<<grid,block>>> ( this->_upscaled_image_d, tex );
+            }
         }
         cudaEventRecord( stop, 0 );
         cudaDeviceSynchronize( );
@@ -92,17 +113,24 @@ void Image::upscale_v5( cudaTextureObject_t & tex )
 }
 #else // not FIND_BLOCK_SIZE
 __host__
-void Image::upscale_v5( cudaTextureObject_t & tex )
+void Image::upscale_v5( const Config& conf, cudaTextureObject_t & tex )
 {
     dim3 block( 64, 2 );
     int gridx = grid_divide( this->_upscaled_image_d.getCols(), block.x );
     int gridy = grid_divide( this->_upscaled_image_d.getRows(), block.y );
     dim3 grid( gridx, gridy );
 
-    p_upscale_5
-        <<<grid,block>>>
-        ( this->_upscaled_image_d,
-          tex );
+    if( conf.isVLFeatMode() ) {
+        p_upscale_5_vlfeat
+            <<<grid,block>>>
+            ( this->_upscaled_image_d,
+              tex );
+    } else {
+        p_upscale_5_opencv
+            <<<grid,block>>>
+            ( this->_upscaled_image_d,
+              tex );
+    }
 
     test_last_error( __FILE__,  __LINE__ );
 }

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "c_util_img.h"
 #include "plane_2d.h"
+#include "sift_conf.h"
 
 namespace popart {
 
@@ -14,7 +15,7 @@ struct Image
     ~Image( );
 
     /** Load a new image, copy to device and upscale */
-    void load( const imgStream& inp );
+    void load( const Config& conf, const imgStream& inp );
 
     void debug_out( );
     void test_last_error( const char* file, int line );
@@ -28,7 +29,7 @@ struct Image
     }
 
 private:
-    void upscale_v5( cudaTextureObject_t & tex );
+    void upscale_v5( const Config& conf, cudaTextureObject_t & tex );
 
     int _w;
     int _h;

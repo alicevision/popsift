@@ -51,10 +51,8 @@ static void usage( const char* argv )
          << " --initial-blur=<float>      Assume initial blur, subtract when blurring first time" << endl
          << endl
          << "* Modes *" << endl
-         << " --vlfeat-mode               Compute Gauss filter like VLFeat instead of like OpenCV" << endl
-         << "                             Default filtering mode is \"indirect filtered\", which means" << endl
-         << "                             that level-3 of an octave is downscaled and Gaussian blur" << endl
-         << "                             is applied to get level 0 of the new octave." << endl
+         << " --vlfeat-mode               During the initial upscale, shift pixels by 1 for VLFeat" << endl
+         << "                             insteat of 0.5 for OpenCV" << endl
          << " --direct-downscale / --dd     Direct each octave from upscaled orig instead of blurred level" << endl
          << " --indirect-unfiltered / --iu  Downscaling from level-3, without applying Gaussian blur" << endl
          << " --indirect-downscale          Downscaling from level-3 and applying Gaussian blur" << endl

@@ -66,9 +66,6 @@ void print_gauss_filter_symbol( int columns )
 void init_filter( const Config& conf,
                   float         sigma0,
                   int           levels,
-                  bool          vlfeat_mode,
-                  // bool          assume_initial_blur,
-                  // float         initial_blur,
                   float         downsampling_factor )
 {
     if( sigma0 > 2.0 )

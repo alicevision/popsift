@@ -317,14 +317,14 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 #endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
-#ifdef PRINT_EXTREMA_DEBUG_INFO
-    printf("Found an extremum at %d %d (o=%d)\n", x+1, y+1, debug_octave );
-#endif // PRINT_EXTREMA_DEBUG_INFO
 
     ec.xpos    = xn;
     ec.ypos    = yn;
     ec.sigma   = d_sigma0 * pow(d_sigma_k, sn); // * 2;
         // const float sigma_k = powf(2.0f, 1.0f / levels );
+#ifdef PRINT_EXTREMA_DEBUG_INFO
+    printf("Found an extremum at %d %d (o=%d)     -> x:%.1f y:%.1f z:%.1f\n", x+1, y+1, debug_octave, xn, yn, sn );
+#endif // PRINT_EXTREMA_DEBUG_INFO
 
     ec.orientation = 0;
 

@@ -9,7 +9,8 @@ struct Config
 
     enum SiftMode {
         OpenCV,
-        VLFeat
+        VLFeat,
+        Default = OpenCV
     };
 
     enum LogMode {
@@ -54,6 +55,9 @@ struct Config
     // print Gauss spans and tables?
     bool ifPrintGaussTables() const;
 
+    // is the SiftMode VLFeat ?
+    bool isVLFeatMode() const;
+
     // determine the image format of the first octave
     // relative to the input image's size (x,y) as follows:
     // (x / 2^start_sampling, y / 2^start_sampling )
@@ -88,9 +92,6 @@ private:
     float    _threshold;
 
 public:
-    // default SiftMode::OpenCV
-    SiftMode sift_mode;
-
     // default LogMode::None
     LogMode  log_mode;
 
@@ -106,6 +107,11 @@ public:
     int gauss_group_size;
 
 private:
+    /* Modes are default, OpenCV and VLFeat.
+     * Default is currently identical to OpenCV.
+     */
+    SiftMode _sift_mode;
+
     /* VLFeat code assumes that an initial input image is partially blurred.
      * This changes the blur computation for the very first level of the first
      * octave, turning it into a special case.

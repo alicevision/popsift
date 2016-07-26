@@ -10,7 +10,7 @@ Config::Config( )
     , sigma( 1.6f )
     , _edge_limit( 10.0f )
     , _threshold( 10.0f / 256.0f )
-    , sift_mode( Config::OpenCV )
+    , _sift_mode( Config::OpenCV )
     , log_mode( Config::None )
     , scaling_mode( Config::IndirectDownscaling )
     , verbose( false )
@@ -24,14 +24,14 @@ Config::Config( )
 
 void Config::setModeVLFeat( )
 {
-    sift_mode = Config::VLFeat;
-    sigma     = 0.82f;
+    _sift_mode = Config::VLFeat;
+    // sigma     = 0.82f;
 }
 
 void Config::setModeOpenCV( )
 {
-    sift_mode = Config::OpenCV;
-    sigma     = 1.6f;
+    _sift_mode = Config::OpenCV;
+    // sigma     = 1.6f;
 }
 
 void Config::setVerbose( bool on )
@@ -101,6 +101,11 @@ float Config::getPeakThreshold() const
 bool Config::ifPrintGaussTables() const
 {
     return _print_gauss_tables;
+}
+
+bool Config::isVLFeatMode() const
+{
+    return ( _sift_mode == Config::VLFeat );
 }
 
 

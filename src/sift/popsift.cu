@@ -13,11 +13,10 @@ PopSift::PopSift( const popart::Config& config )
 {
     _config.levels = max( 2, config.levels );
 
-    const bool vlfeat_mode = ( config.sift_mode == popart::Config::VLFeat );
     popart::init_filter( _config,
                          _config.sigma,
                          _config.levels,
-                         vlfeat_mode,
+                         // vlfeat_mode,
                          // _config.hasInitialBlur(),
                          // _config.getInitialBlur(),
                          _config.start_sampling );
@@ -99,7 +98,7 @@ void PopSift::execute( int pipe, const imgStream* inpPtr )
     assert( inp.data_g == 0 );
     assert( inp.data_b == 0 );
 
-    _pipe[pipe]._inputImage->load( inp );
+    _pipe[pipe]._inputImage->load( _config, inp );
 
     _pipe[pipe]._pyramid->find_extrema( _pipe[pipe]._inputImage );
 
