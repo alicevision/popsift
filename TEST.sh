@@ -36,6 +36,7 @@ IMAGE3=../sample/boat/img3.ppm
 IMAGE4=../sample/boat/img4.ppm
 IMAGE5=../sample/boat/img5.ppm
 IMAGE6=../sample/boat/img6.ppm
+
 # IMAGE7=../sample/level1.ppm
 # PARAMS="--sigma=0.82 --octaves=3 --threshold=0.1 --edge-threshold=10.0 --vlfeat-mode" # finds 4 points
 # PARAMS="--downsampling=0 --octaves=3 --sigma=0.82  --threshold=0.1 --edge-threshold=10.0 --vlfeat-mode" # finds 4 points
@@ -43,7 +44,8 @@ IMAGE6=../sample/boat/img6.ppm
 # PARAMS="--indirect-unfiltered --threshold=0.04 --edge-threshold=10.0" # finds 4 points
 # PARAMS="--downsampling=0 --octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0"
 # PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --print-gauss-tables"
-PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+# PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+PARAMS="--vlfeat-mode --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 # PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --bemap-orientation"
 # PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0"
 # PARAMS="--vlfeat-mode --sigma=0.82 --octaves=1 --levels=1 --downsampling=0 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
@@ -54,10 +56,11 @@ rm -rf outputs
 
 mkdir -p outputs/popsift
 
-# for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 ; do
 for i in $IMAGE1 ; do
+# for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 ; do
   if [ -f "$i" ] ; then
-    outname=`basename --suffix=.ppm $i`
+    # outname=`basename --suffix=.ppm $i`
+    outname=`basename --suffix=.pgm $i`
     echo ./sift_v4 $PARAMS $LOG $i
     ./sift_v4 $PARAMS $LOG $i
     mkdir -p outputs/${outname}
