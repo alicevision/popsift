@@ -9,6 +9,9 @@
 #include <stdio.h>
 
 #define VLFEAT_LIKE_THRESHOLD
+
+#define PRINT_EXTREMA_DEBUG_INFO
+
 namespace popart{
 
 /*************************************************************
@@ -274,7 +277,9 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
     /* ensure convergence of interpolation */
     if (iter >= MAX_ITERATIONS) {
-        // printf("Found an extremum at %d %d (o=%d) - rejected in refinement, was moved to l:%d (%d,%d)\n", x+1, y+1, debug_octave, n.z, n.x, n.y );
+#ifdef PRINT_EXTREMA_DEBUG_INFO
+        printf("Found an extremum at %d %d (o=%d) - rejected in refinement, was moved to l:%d (%d,%d)\n", x+1, y+1, debug_octave, n.z, n.x, n.y );
+#endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
 
@@ -289,7 +294,9 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
     /* negative determinant => curvatures have different signs -> reject it */
     if (det <= 0.0f) {
-        // printf("Found an extremum at %d %d (o=%d) - negative determinant\n", x+1, y+1, debug_octave );
+#ifdef PRINT_EXTREMA_DEBUG_INFO
+        printf("Found an extremum at %d %d (o=%d) - negative determinant\n", x+1, y+1, debug_octave );
+#endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
 
@@ -297,25 +304,28 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     // if( fabs(contr) < (d_threshold*2.0f) )
     if( fabs(contr) < scalbnf( d_threshold, 1 ) )
     {
-        // printf("Found an extremum at %d %d (o=%d) - 2nd peak tresh failed\n", x+1, y+1, debug_octave );
+#ifdef PRINT_EXTREMA_DEBUG_INFO
+        printf("Found an extremum at %d %d (o=%d) - 2nd peak tresh failed\n", x+1, y+1, debug_octave );
+#endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
 
     /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
     if( edgeval >= (d_edge_limit+1.0f)*(d_edge_limit+1.0f)/d_edge_limit ) {
-        // printf("Found an extremum at %d %d (o=%d) - edge tresh failed\n", x+1, y+1, debug_octave );
+#ifdef PRINT_EXTREMA_DEBUG_INFO
+        printf("Found an extremum at %d %d (o=%d) - edge tresh failed\n", x+1, y+1, debug_octave );
+#endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
-    // printf("Found an extremum at %d %d (o=%d)\n", x+1, y+1, debug_octave );
+#ifdef PRINT_EXTREMA_DEBUG_INFO
+    printf("Found an extremum at %d %d (o=%d)\n", x+1, y+1, debug_octave );
+#endif // PRINT_EXTREMA_DEBUG_INFO
 
     ec.xpos    = xn;
     ec.ypos    = yn;
     ec.sigma   = d_sigma0 * pow(d_sigma_k, sn); // * 2;
         // const float sigma_k = powf(2.0f, 1.0f / levels );
 
-    // key_candidate->sigma = sigma0 * pow(sigma_k, sn);
-    // ec.value   = 0;
-    // ec.edge    = 0;
     ec.orientation = 0;
 
     return true;
