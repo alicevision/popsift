@@ -240,7 +240,7 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
         }
 
         ostringstream ostr2;
-        ostr2 << "dir-octave-dump/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
+        ostr2 << "dir-octave-dump/" << basename << "-o-" << octave << "-l-" << level << ".dump";
         popart::dump_plane2Dfloat( ostr2.str().c_str(), true, getData(level) );
 
         if( level == 0 ) {
@@ -354,7 +354,7 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
             popart::write_plane2Dunscaled( pstr.str().c_str(), true, p, 127 );
 
             ostringstream qstr;
-            qstr << "dir-dog-dump/d-" << basename << "-o-" << octave << "-l-" << l << ".txt";
+            qstr << "dir-dog-dump/d-" << basename << "-o-" << octave << "-l-" << l << ".dump";
             popart::dump_plane2Dfloat( qstr.str().c_str(), true, p );
         }
 
