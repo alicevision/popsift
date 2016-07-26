@@ -172,7 +172,7 @@ public:
     inline __device__
     bool first_contrast_ok( const float val ) const
     {
-        return ( fabs( val ) >= d_threshold );
+        return ( fabs( val ) >= floorf( d_threshold ) );
     }
 
     inline __device__
