@@ -8,9 +8,7 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-#define VLFEAT_LIKE_THRESHOLD
-
-#define PRINT_EXTREMA_DEBUG_INFO
+#undef PRINT_EXTREMA_DEBUG_INFO
 
 namespace popart{
 
