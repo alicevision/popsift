@@ -12,6 +12,8 @@
 // #define PYRAMID_PRINT_DEBUG 0
 #undef PRINT_WITH_ORIENTATION
 
+#undef POPSIFT_SHIFTS_OCTAVE_0_KEYPOINTS
+
 using namespace std;
 
 namespace popart {
@@ -159,6 +161,7 @@ void Octave::downloadDescriptor( const Config& conf )
 
     cudaDeviceSynchronize( );
 
+#ifdef POPSIFT_SHIFTS_OCTAVE_0_KEYPOINTS
     if( conf.getSiftMode() == Config::PopSift ) {
         if( _debug_octave_id == 0 ) {
             if( conf.start_sampling == -1 ) {
@@ -173,6 +176,7 @@ void Octave::downloadDescriptor( const Config& conf )
             }
         }
     }
+#endif // POPSIFT_SHIFTS_OCTAVE_0_KEYPOINTS
 }
 
 void Octave::writeDescriptor( const Config& conf, ostream& ostr, bool really )
