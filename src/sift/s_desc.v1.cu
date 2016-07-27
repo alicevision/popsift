@@ -93,14 +93,14 @@ void keypoint_descriptors( Extremum*     cand,
 
             const float dnx = nx + offsetptx;
             const float dny = ny + offsetpty;
-            const float ww  = __expf(-0.125f * (dnx*dnx + dny*dny));
+            const float ww  = __expf(-0.125f * (dnx*dnx + dny*dny)); // speedup !
             const float wx  = 1.0f - nxn;
             const float wy  = 1.0f - nyn;
             const float wgt = ww * wx * wy * mod;
 
             th -= ang;
-            while (th < 0.0f) th += M_PI2;
-            while (th >= M_PI2) th -= M_PI2;
+            th += ( th <  0.0f  ? M_PI2 : 0.0f ); //  if (th <  0.0f ) th += M_PI2;
+            th -= ( th >= M_PI2 ? M_PI2 : 0.0f ); //  if (th >= M_PI2) th -= M_PI2;
 
             const float   tth  = th * M_4RPI;
             const int32_t fo0  = (int32_t)floorf(tth);

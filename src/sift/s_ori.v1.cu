@@ -410,7 +410,10 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
         }
     }
 
-    float th = __fdividef(M_PI2 * xcoord[maxbin[0]], ORI_NBINS) - M_PI;
+    float chosen_bin = xcoord[maxbin[0]];
+    // if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
+    chosen_bin -= ( chosen_bin >= ORI_NBINS ? float(ORI_NBINS) : 0.0f );
+    float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
 
     ext->orientation = th;
 
@@ -422,7 +425,9 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
         int idx = atomicAdd( extrema_counter, 1 );
         if( idx >= d_max_orientations ) break;
 
-        float th = __fdividef(M_PI2 * xcoord[maxbin[i]], ORI_NBINS) - M_PI;
+        float chosen_bin = xcoord[maxbin[i]];
+        chosen_bin -= ( chosen_bin >= ORI_NBINS ? float(ORI_NBINS) : 0.0f );
+        float th = __fdividef(M_PI2 * chosen_bin, ORI_NBINS) - M_PI;
 
         ext = &extremum[idx];
         ext->xpos = x;
