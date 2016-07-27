@@ -1,12 +1,12 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <stdio.h>
 
 #define CLOSED_FORM_SOLVE
 
-#ifdef CLOSED_FORM_SOLVE
 __device__
-inline bool solve( float i[3][3], float3& b )
+inline bool solve_closed_form( float i[3][3], float3& b )
 {
     float det0b = - i[1][2] * i[1][2];
     float det0a =   i[1][1] * i[2][2];
@@ -68,10 +68,8 @@ inline bool solve( float i[3][3], float3& b )
     return true;
 }
 
-#else // not CLOSED_FORM_SOLVE
-
 __device__
-inline bool solve( float A[3][3], float3& b_in )
+inline bool solve_iterative( float A[3][3], float3& b_in )
 {
     float b[3];
     b[0] = b_in.x;
@@ -135,5 +133,14 @@ inline bool solve( float A[3][3], float3& b_in )
     b_in.z = b[2];
     return true;
 }
-#endif // not CLOSED_FORM_SOLVE
+
+__device__
+inline bool solve( float i[3][3], float3& b )
+{
+#ifdef CLOSED_FORM_SOLVE
+    return solve_closed_form( i, b );
+#else
+    return solve_iterative( i, b );
+#endif
+}
 
