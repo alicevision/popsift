@@ -110,7 +110,9 @@ void init_filter( const Config& conf,
         const float initial_blur = conf.getInitialBlur() * pow( 2.0, -1.0f * downsampling_factor );
 
         h_gauss.initial_sigma = sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) );
-        h_gauss.initial_span  = GaussInfo::vlFeatSpan( h_gauss.initial_sigma );
+        h_gauss.initial_span  = ( conf.getSiftMode() == Config::OpenCV )
+                              ? GaussInfo::openCVSpan( h_gauss.initial_sigma )
+                              : GaussInfo::vlFeatSpan( h_gauss.initial_sigma );
 
         h_gauss.computeInitialBlurTable( h_gauss.initial_span, h_gauss.initial_sigma );
 
@@ -132,7 +134,9 @@ void init_filter( const Config& conf,
         const float sigmaS = sigma0 * pow( 2.0, (float)(lvl  )/(float)levels );
 
         h_gauss.sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
-        h_gauss.span[lvl]  = GaussInfo::vlFeatSpan( h_gauss.sigma[lvl] );
+        h_gauss.span[lvl]  = ( conf.getSiftMode() == Config::OpenCV )
+                           ? GaussInfo::openCVSpan( h_gauss.sigma[lvl] )
+                           : GaussInfo::vlFeatSpan( h_gauss.sigma[lvl] );
         h_gauss.computeBlurTable( lvl, h_gauss.span[lvl], h_gauss.sigma[lvl] );
 
         if( conf.ifPrintGaussTables() ) {
@@ -143,8 +147,9 @@ void init_filter( const Config& conf,
 #ifdef SUPPORT_ABSOLUTE_SIGMA
     for( int lvl=0; lvl<GAUSS_LEVELS; lvl++ ) {
         h_gauss.abs_sigma[lvl] = sigma0 * pow( 2.0, (float)(lvl)/(float)levels );
-        h_gauss.abs_span[lvl]  = GaussInfo::vlFeatSpan( absSigma );
-
+        h_gauss.abs_span[lvl]  = ( conf.getSiftMode() == Config::OpenCV )
+                               ? GaussInfo::openCVSpan( absSigma )
+                               : GaussInfo::vlFeatSpan( absSigma );
         h_gauss.computeBlurTable( lvl, h_gauss.span[lvl], h_gauss.sigma[lvl] );
     }
 #endif // SUPPORT_ABSOLUTE_SIGMA
@@ -230,6 +235,16 @@ int GaussInfo::vlFeatSpan( float sigma )
          * In our case, we look at the half-sided filter including the center value.
          */
     return min<int>( ceilf( 4.0f * sigma ) + 1, GAUSS_ALIGN - 1 );
+}
+
+__host__
+int GaussInfo::openCVSpan( float sigma )
+{
+    int span = round( 2.0f * 3.0f * sigma + 1.0f );
+    // span = span | 1;   // don't make odd like original code, because
+    span >>= 1;           // we divide by two anyway
+    span  += 1;           // add the center node
+    return min<int>( span, GAUSS_ALIGN - 1 );
 }
 
 } // namespace popart

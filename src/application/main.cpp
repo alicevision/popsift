@@ -60,6 +60,7 @@ static void usage( const char* argv )
          << "                             In extrema refinement, steps up to 0.5," << endl
          << "                             reject points when reaching max iterations," << endl
          << "                             first contrast threshold is floor(.5 * peak thresh)." << endl
+         << "                             Computed filter width are lower than VLFeat/PopSift" << endl
          << " --popsift-mode (default)    During the initial upscale, shift pixels by 1." << endl
          << "                             In extrema refinement, steps up to 0.6," << endl
          << "                             do not reject points when reaching max iterations," << endl

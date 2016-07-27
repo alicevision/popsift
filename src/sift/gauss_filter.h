@@ -59,6 +59,9 @@ struct GaussInfo
 
     __host__
     static int vlFeatSpan( float sigma );
+
+    __host__
+    static int openCVSpan( float sigma );
 };
 
 extern __device__ __constant__ GaussInfo d_gauss;
