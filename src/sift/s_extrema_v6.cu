@@ -396,6 +396,13 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     float yn      = n.y + d.y;
     float sn      = n.z + d.z;
 
+    if( sift_mode == Config::PopSift && iter >= MAX_ITERATIONS && ( sn<0 || sn>maxlevel) ) {
+#ifdef PRINT_EXTREMA_DEBUG_INFO
+        printf("Found an extremum at %d %d (o=%d,l=%d) - rejected in refinement, was moved to l:%d (%d,%d)\n", x+1, y+1, debug_octave, level, n.z, n.x, n.y );
+#endif
+        return false;
+    }
+
     /* negative determinant => curvatures have different signs -> reject it */
     if (det <= 0.0f) {
 #ifdef PRINT_EXTREMA_DEBUG_INFO
