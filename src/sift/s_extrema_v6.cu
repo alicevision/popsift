@@ -485,7 +485,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
         /* If the translation of the keypoint is big, move the keypoint
          * and re-iterate the computation. Otherwise we are all set.
          */
-        const bool retval = f.refine( d, n, width, height, maxlevel, iter==MAX_ITERATIONS );
+        const int retval = f.refine( d, n, width, height, maxlevel, iter==MAX_ITERATIONS );
 
         if( retval == -1 ) {
 #ifdef PRINT_EXTREMA_DEBUG_INFO
