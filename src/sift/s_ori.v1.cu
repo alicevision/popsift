@@ -8,6 +8,7 @@
 #include <inttypes.h>
 
 using namespace popart;
+using namespace std;
 
 // Lowe wants at most 3 orientations at every extremum,
 // VLFeat uses at most 4, OpenCV all it can find
@@ -294,7 +295,7 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
 
     #pragma unroll
     for( int i=0; i<ORIENTATION_MAX_COUNT; i++ ) {
-        maxbin[i] = 0;
+        maxbin[i] = -1;
         y_max[i] = -INFINITY;
     }
 
@@ -411,8 +412,8 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
     }
 
     float chosen_bin = xcoord[maxbin[0]];
-    // if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
-    chosen_bin -= ( chosen_bin >= ORI_NBINS ? float(ORI_NBINS) : 0.0f );
+    if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
+
     float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
 
     ext->orientation = th;
@@ -426,7 +427,7 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
         if( idx >= d_max_orientations ) break;
 
         float chosen_bin = xcoord[maxbin[i]];
-        chosen_bin -= ( chosen_bin >= ORI_NBINS ? float(ORI_NBINS) : 0.0f );
+        if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
         float th = __fdividef(M_PI2 * chosen_bin, ORI_NBINS) - M_PI;
 
         ext = &extremum[idx];
