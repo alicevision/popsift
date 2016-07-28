@@ -10,13 +10,6 @@ struct Extremum
     float ypos;
     float sigma; // scale;
     float orientation;
-
-#ifdef DEBUG_ORI_GRID
-    int grid_x_min;
-    int grid_y_min;
-    int grid_x_max;
-    int grid_y_max;
-#endif // DEBUG_ORI_GRID
 };
 
 struct Descriptor
