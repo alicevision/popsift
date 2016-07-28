@@ -10,6 +10,8 @@
 
 #undef PRINT_EXTREMA_DEBUG_INFO
 
+#undef DEBUG_MEGA_LOOP
+
 namespace popart{
 
 /*************************************************************
@@ -158,7 +160,7 @@ public:
         // Either we return 1, and n has not been modified.
         // Or we quit the loop by exceeding the limit, and reject the point anyway.
 
-        float3 t = make_float3( fabsf(d.x), fabsf(d.y), fabsf(d.z) );
+        const float3 t = make_float3( fabsf(d.x), fabsf(d.y), fabsf(d.z) );
 
         if( t.x < 0.5f && t.y < 0.5f && t.z < 0.5f ) {
             // return false, quit the loop, success
@@ -516,7 +518,6 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
         }
     }
 
-
     const float xn      = n.x + d.x;
     const float yn      = n.y + d.y;
     const float sn      = n.z + d.z;
@@ -574,23 +575,20 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
 
 // #ifdef DEBUG_MEGA_LOOP
-    // float sigw = 3.0f * ec.sigma;
-    // int   rad  = (int)rintf((3.0f * sigw));
-
-    // if( sn < -1 ) {
-        // printf("o/l=%d/%d pos=(%0.1f, %0.1f, %0.1f) n.z=%d d.z=%0.2f det=%0.2f scale=%0.2f pixel radius=%d conv=%s\n", debug_octave, level, ec.xpos, ec.ypos, sn, n.z, d.z, det, ec.sigma, rad, debug_converged ? "yes" : "no" );
-    // } else if( sn > maxlevel ) {
-        // printf("o/l=%d/%d pos=(%0.1f, %0.1f, %0.1f) n.z=%d d.z=%0.2f det=%0.2f scale=%0.2f pixel radius=%d conv=%s\n", debug_octave, level, ec.xpos, ec.ypos, sn, n.z, d.z, det, ec.sigma, rad, debug_converged ? "yes" : "no" );
-    // } else if( sn > maxlevel-1 ) {
-        // printf("o/l=%d/%d pos=(%0.1f, %0.1f, %0.1f) n.z=%d d.z=%0.2f det=%0.2f scale=%0.2f pixel radius=%d conv=%s\n", debug_octave, level, ec.xpos, ec.ypos, sn, n.z, d.z, det, ec.sigma, rad, debug_converged ? "yes" : "no" );
-    // } else if( not debug_converged ) {
-        // printf("o/l=%d/%d pos=(%0.1f, %0.1f, %0.1f) n.z=%d d.z=%0.2f det=%0.2f scale=%0.2f pixel radius=%d conv=%s\n", debug_octave, level, ec.xpos, ec.ypos, sn, n.z, d.z, det, ec.sigma, rad, debug_converged ? "yes" : "no" );
-    // }
+//     float sigw = 3.0f * ec.sigma;
+//     int   rad  = (int)rintf((3.0f * sigw));
+// 
+//     if( sn < -1 ) {
+//         printf("o/l=%d/%d pos=(%0.1f, %0.1f, %0.1f) n.z=%d d.z=%0.2f det=%0.2f scale=%0.2f pixel radius=%d\n", debug_octave, level, ec.xpos, ec.ypos, sn, n.z, d.z, det, ec.sigma, rad );
+//     } else if( sn > maxlevel ) {
+//         printf("o/l=%d/%d pos=(%0.1f, %0.1f, %0.1f) n.z=%d d.z=%0.2f det=%0.2f scale=%0.2f pixel radius=%d\n", debug_octave, level, ec.xpos, ec.ypos, sn, n.z, d.z, det, ec.sigma, rad );
+//     } else if( sn > maxlevel-1 ) {
+//         printf("o/l=%d/%d pos=(%0.1f, %0.1f, %0.1f) n.z=%d d.z=%0.2f det=%0.2f scale=%0.2f pixel radius=%d\n", debug_octave, level, ec.xpos, ec.ypos, sn, n.z, d.z, det, ec.sigma, rad );
+//     }
 // #endif // DEBUG_MEGA_LOOP
 
-
 #ifdef PRINT_EXTREMA_DEBUG_INFO
-    printf("Found an extremum at %d %d (o=%d,l=%d)     -> x:%.8f y:%.8f z:%.8f sigma:%0.8f\n", x, y, debug_octave, level, xn, yn, sn, ec.sigma );
+    printf("Found an extremum at %d %d (o=%d,l=%d)     -> x:%.1f y:%.1f z:%.1f sigma:%0.1f\n", x, y, debug_octave, level, xn, yn, sn, ec.sigma );
 #endif // PRINT_EXTREMA_DEBUG_INFO
 
     ec.orientation = 0;
