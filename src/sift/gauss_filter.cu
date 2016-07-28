@@ -240,7 +240,7 @@ int GaussInfo::vlFeatSpan( float sigma )
 __host__
 int GaussInfo::openCVSpan( float sigma )
 {
-    int span = round( 2.0f * 3.0f * sigma + 1.0f );
+    int span = int( roundf( 2.0f * 4.0f * sigma + 1.0f ) ) | 1;
     // span = span | 1;   // don't make odd like original code, because
     span >>= 1;           // we divide by two anyway
     span  += 1;           // add the center node
