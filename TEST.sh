@@ -14,9 +14,6 @@ IMAGE6=../sample/boat/img6.ppm
 # For testing edge effects on a tiny hand-crafted image
 # IMAGE1=../sample/box-6x6.pgm
 
-# For debugging an unexplained speed bottleneck in orientation
-IMAGE1=../sample/boat/img4.ppm
-
 # For running with default parameters, assuming an unblurred input image
 # PARAMS=
 
@@ -24,24 +21,25 @@ IMAGE1=../sample/boat/img4.ppm
 # PARAMS="--indirect-unfiltered --threshold=0.04 --edge-threshold=10.0" # finds 4 points
 # PARAMS="--downsampling=0 --octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0"
 # PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --print-gauss-tables"
-PARAMS="--popsift-mode --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+# PARAMS="--popsift-mode --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 # PARAMS="--vlfeat-mode --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
-# PARAMS="--opencv-mode --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+PARAMS="--opencv-mode --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 # PARAMS="--popsift-mode --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
 # PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --bemap-orientation"
 # PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0"
 # PARAMS="--vlfeat-mode --sigma=0.82 --octaves=1 --levels=1 --downsampling=0 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 # PARAMS="--sigma=1.6 --octaves=4 --levels=3 --downsampling=0 --indirect-unfiltered --threshold=0.0 --edge-threshold=10.0"
+# PARAMS="--popsift-mode --downsampling=0 --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 
-# LOG=--log
-LOG=
+LOG=--log
+# LOG=
 
 rm -rf outputs
 
 mkdir -p outputs/popsift
 
-for i in $IMAGE1 ; do
-# for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 ; do
+# for i in $IMAGE1 ; do
+for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 ; do
   if [ -f "$i" ] ; then
     outname=`basename --suffix=.ppm $i`
     # outname=`basename --suffix=.pgm $i`
