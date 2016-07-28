@@ -144,11 +144,11 @@ public:
     {
         float3 t;
 
-        t.x = ((d.x >= 0.6f && n.x < width-2) ?  1 : 0 )
-            + ((d.x <= -0.6f && n.x > 1)? -1 : 0 );
+        t.x = ((d.x >= 0.6f && n.x < width-2) ?  1.0f : 0.0f )
+            + ((d.x <= -0.6f && n.x > 1)? -1.0f : 0.0f );
 
-        t.y = ((d.y >= 0.6f && n.y < height-2)  ?  1 : 0 )
-            + ((d.y <= -0.6f && n.y > 1) ? -1 : 0 );
+        t.y = ((d.y >= 0.6f && n.y < height-2)  ?  1.0f : 0.0f )
+            + ((d.y <= -0.6f && n.y > 1) ? -1.0f : 0.0f );
 
         // t.z = ((d.z >= 0.6f && n.z < maxlevel-1)  ?  1 : 0 )
             // + ((d.z <= -0.6f && n.z > 1) ? -1 : 0 );
@@ -178,14 +178,14 @@ public:
     {
         float3 t;
 
-        t.x = ((d.x >= 0.5f && n.x < width-2) ?  1 : 0 )
-            + ((d.x <= -0.5f && n.x > 1)? -1 : 0 );
+        t.x = ((d.x >= 0.5f && n.x < width-2) ?  1.0f : 0.0f )
+            + ((d.x <= -0.5f && n.x > 1)? -1.0f : 0.0f );
 
-        t.y = ((d.y >= 0.5f && n.y < height-2)  ?  1 : 0 )
-            + ((d.y <= -0.5f && n.y > 1) ? -1 : 0 );
+        t.y = ((d.y >= 0.5f && n.y < height-2)  ?  1.0f : 0.0f )
+            + ((d.y <= -0.5f && n.y > 1) ? -1.0f : 0.0f );
 
-        t.z = ((d.z >= 0.5f && n.z < maxlevel-1)  ?  1 : 0 )
-            + ((d.z <= -0.5f && n.z > 1) ? -1 : 0 );
+        t.z = ((d.z >= 0.5f && n.z < maxlevel-1)  ?  1.0f : 0.0f )
+            + ((d.z <= -0.5f && n.z > 1) ? -1.0f : 0.0f );
 
         if( t.x == 0 && t.y == 0 && t.z == 0 ) return false;
 
@@ -212,14 +212,14 @@ public:
     {
         float3 t;
 
-        t.x = ((d.x >= 0.6f && n.x < width-2) ?  1 : 0 )
-            + ((d.x <= -0.6f && n.x > 1)? -1 : 0 );
+        t.x = ((d.x >= 0.6f && n.x < width-2) ?  1.0f : 0.0f )
+            + ((d.x <= -0.6f && n.x > 1)? -1.0f : 0.0f );
 
-        t.y = ((d.y >= 0.6f && n.y < height-2)  ?  1 : 0 )
-            + ((d.y <= -0.6f && n.y > 1) ? -1 : 0 );
+        t.y = ((d.y >= 0.6f && n.y < height-2)  ?  1.0f : 0.0f )
+            + ((d.y <= -0.6f && n.y > 1) ? -1.0f : 0.0f );
 
-        t.z = ((d.z >= 0.6f && n.z < maxlevel-1)  ?  1 : 0 )
-            + ((d.z <= -0.6f && n.z > 1) ? -1 : 0 );
+        t.z = ((d.z >= 0.6f && n.z < maxlevel-1)  ?  1.0f : 0.0f )
+            + ((d.z <= -0.6f && n.z > 1) ? -1.0f : 0.0f );
 
         if( t.x == 0 && t.y == 0 && t.z == 0 ) return false;
 
