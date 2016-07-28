@@ -122,7 +122,9 @@ void init_filter( const Config& conf,
     }
 
     h_gauss.sigma[0] = sigma0;
-    h_gauss.span[0]  = GaussInfo::vlFeatSpan( sigma0 );
+    h_gauss.span[0]  = ( conf.getSiftMode() == Config::OpenCV )
+                     ? GaussInfo::openCVSpan( sigma0 )
+                     : GaussInfo::vlFeatSpan( sigma0 );
     h_gauss.computeBlurTable( 0, h_gauss.span[0], h_gauss.sigma[0] );
     if( conf.ifPrintGaussTables() ) {
         printf("    Sigma for level 0: %2.6f = sigma0(%2.6f)\n", h_gauss.sigma[0], sigma0 );
