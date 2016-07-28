@@ -497,6 +497,8 @@ void orientation_starter_v2( Extremum*     extremum,
 __host__
 void Pyramid::orientation_v1( )
 {
+    cerr << "Calling ori with dynamic parallelism" << endl;
+
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
@@ -541,6 +543,8 @@ void orientation_starter_v1( Extremum*,
 __host__
 void Pyramid::orientation_v1( )
 {
+    cerr << "Calling ori with -no- dynamic parallelism" << endl;
+
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
