@@ -8,6 +8,9 @@
 
 #undef DESCRIPTORS_FROM_UNBLURRED_IMAGE
 
+// override global setting
+// #undef USE_DYNAMIC_PARALLELISM
+
 /*************************************************************
  * V1: device side
  *************************************************************/
@@ -20,8 +23,8 @@ void keypoint_descriptors( Extremum*     cand,
                            Descriptor*   descs,
                            Plane2D_float layer )
 {
-    const uint32_t width  = layer.getWidth();
-    const uint32_t height = layer.getHeight();
+    const int width  = layer.getWidth();
+    const int height = layer.getHeight();
 
     // int bidx = blockIdx.x & 0xf; // lower 4 bits of block ID
     const int ix   = threadIdx.y; // bidx & 0x3;       // lower 2 bits of block ID
@@ -43,7 +46,7 @@ void keypoint_descriptors( Extremum*     cand,
     // const float sin_t = sinf(ang);
     float cos_t;
     float sin_t;
-    sincosf( ang, &sin_t, &cos_t );
+    __sincosf( ang, &sin_t, &cos_t );
 
     const float csbp  = cos_t * SBP;
     const float ssbp  = sin_t * SBP;
@@ -52,34 +55,38 @@ void keypoint_descriptors( Extremum*     cand,
 
     const float offsetptx = ix - 1.5f;
     const float offsetpty = iy - 1.5f;
-    const float ptx = csbp * offsetptx - ssbp * offsetpty + x;
-    const float pty = csbp * offsetpty + ssbp * offsetptx + y;
+
+    // The following 2 lines were the primary bottleneck of this kernel
+    // const float ptx = csbp * offsetptx - ssbp * offsetpty + x;
+    // const float pty = csbp * offsetpty + ssbp * offsetptx + y;
+    const float ptx = fmaf( csbp, offsetptx, - fmaf( ssbp, offsetpty, x ) );
+    const float pty = fmaf( csbp, offsetpty,   fmaf( ssbp, offsetptx, y ) );
 
     const float bsz = fabsf(csbp) + fabsf(ssbp);
 
-    const int32_t xmin = max(1,          (int32_t)floorf(ptx - bsz));
-    const int32_t ymin = max(1,          (int32_t)floorf(pty - bsz));
-    const int32_t xmax = min(width - 2,  (int32_t)floorf(ptx + bsz));
-    const int32_t ymax = min(height - 2, (int32_t)floorf(pty + bsz));
+    const int xmin = max(1,          (int)floorf(ptx - bsz));
+    const int ymin = max(1,          (int)floorf(pty - bsz));
+    const int xmax = min(width - 2,  (int)floorf(ptx + bsz));
+    const int ymax = min(height - 2, (int)floorf(pty + bsz));
 
-    const int32_t wx = xmax - xmin + 1;
-    const int32_t hy = ymax - ymin + 1;
-    const int32_t loops = wx * hy;
+    const int wx = xmax - xmin + 1;
+    const int hy = ymax - ymin + 1;
+    const int loops = wx * hy;
 
     float dpt[9] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
     // for (int i = 0; i < 9; i++) dpt[i] = 0.0f;
 
-    for(int i = threadIdx.x; i < loops; i+=32)
+    for( int i = threadIdx.x; i < loops; i+=blockDim.x )
     {
         const int ii = i / wx + ymin;
         const int jj = i % wx + xmin;     
 
         const float dx = jj - ptx;
         const float dy = ii - pty;
-        const float nx = crsbp * dx + srsbp * dy;
-        const float ny = crsbp * dy - srsbp * dx;
-        const float nxn = fabs(nx);
-        const float nyn = fabs(ny);
+        const float nx = fmaf( crsbp, dx,  srsbp * dy ); // crsbp * dx + srsbp * dy;
+        const float ny = fmaf( crsbp, dy, -srsbp * dx ); // crsbp * dy - srsbp * dx;
+        const float nxn = fabsf(nx);
+        const float nyn = fabsf(ny);
         if (nxn < 1.0f && nyn < 1.0f) {
             const float2 mod_th = get_gradiant( jj, ii, layer );
             const float& mod    = mod_th.x;
@@ -87,7 +94,8 @@ void keypoint_descriptors( Extremum*     cand,
 
             const float dnx = nx + offsetptx;
             const float dny = ny + offsetpty;
-            const float ww  = __expf(-0.125f * (dnx*dnx + dny*dny)); // speedup !
+            const float ww  = __expf( -scalbnf(dnx*dnx + dny*dny, -3)); // speedup !
+            // const float ww  = __expf(-0.125f * (dnx*dnx + dny*dny)); // speedup !
             const float wx  = 1.0f - nxn;
             const float wy  = 1.0f - nyn;
             const float wgt = ww * wx * wy * mod;
@@ -96,20 +104,22 @@ void keypoint_descriptors( Extremum*     cand,
             th += ( th <  0.0f  ? M_PI2 : 0.0f ); //  if (th <  0.0f ) th += M_PI2;
             th -= ( th >= M_PI2 ? M_PI2 : 0.0f ); //  if (th >= M_PI2) th -= M_PI2;
 
-            const float   tth  = th * M_4RPI;
-            const int32_t fo0  = (int32_t)floorf(tth);
-            const float   do0  = tth - fo0;             
-            const float   wgt1 = 1.0f - do0;
-            const float   wgt2 = do0;
+            const float tth  = __fmul_ru( th, M_4RPI ); // th * M_4RPI;
+            const int   fo0  = (int)floorf(tth);
+            const float do0  = tth - fo0;             
+            const float wgt1 = 1.0f - do0;
+            const float wgt2 = do0;
 
             int fo  = fo0 % DESC_BINS;
-            if(fo < 8) {
-                dpt[fo]   += (wgt1*wgt);
-                dpt[fo+1] += (wgt2*wgt);
-            }
+            // if(fo < 8) {
+                // maf: multiply-add
+                // _ru - round to positive infinity equiv to froundf since always >=0
+            dpt[fo]   = __fmaf_ru( wgt1, wgt, dpt[fo] );   // dpt[fo]   += (wgt1*wgt);
+            dpt[fo+1] = __fmaf_ru( wgt2, wgt, dpt[fo+1] ); // dpt[fo+1] += (wgt2*wgt);
+            // }
         }
+        __syncthreads();
     }
-    __syncthreads();
 
     dpt[0] += dpt[8];
 
@@ -125,7 +135,7 @@ void keypoint_descriptors( Extremum*     cand,
 
     // int hid    = blockIdx.x % 16;
     // int offset = hid*8;
-    uint32_t offset = ( ( threadIdx.z << 2 ) + threadIdx.y ) * 8;
+    int offset = ( ( ( threadIdx.z << 2 ) + threadIdx.y ) << 3 ); // ( ( threadIdx.z * 4 ) + threadIdx.y ) * 8;
 
     Descriptor* desc = &descs[blockIdx.x];
 
