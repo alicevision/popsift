@@ -4,6 +4,8 @@ add_executable( compare-float-dump compare-float-dump.cc )
 
 cuda_add_executable( try-shfl try-shfl.cu )
 
+cuda_add_executable( try-prefix-sum try-prefix-sum.cu )
+
 # cuda_add_executable( try-array try-array.cu )
 # nvcc -g -G -o try-array try-array.cu
 
