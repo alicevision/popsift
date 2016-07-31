@@ -10,19 +10,8 @@
 using namespace popart;
 using namespace std;
 
-// Lowe wants at most 3 orientations at every extremum,
-// VLFeat uses at most 4, OpenCV all it can find
-#undef  LOWE_ORIENTATION_MAX
-
-#undef V2_WITH_BEMAP_SMOOTHING
-#define V2_WITH_VLFEAT_SMOOTHING
-#undef V2_WITH_OPENCV_SMOOTHING
-
-#ifdef LOWE_ORIENTATION_MAX
-#define ORIENTATION_MAX_COUNT 3
-#else
-#define ORIENTATION_MAX_COUNT 4
-#endif
+#undef V2_WITH_VLFEAT_SMOOTHING
+#define V2_WITH_OPENCV_SMOOTHING
 
 /*************************************************************
  * V1: device side
