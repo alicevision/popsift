@@ -59,8 +59,8 @@ void keypoint_descriptors( Extremum*     cand,
     // The following 2 lines were the primary bottleneck of this kernel
     // const float ptx = csbp * offsetptx - ssbp * offsetpty + x;
     // const float pty = csbp * offsetpty + ssbp * offsetptx + y;
-    const float ptx = fmaf( csbp, offsetptx, - fmaf( ssbp, offsetpty, x ) );
-    const float pty = fmaf( csbp, offsetpty,   fmaf( ssbp, offsetptx, y ) );
+    const float ptx = fmaf( csbp, offsetptx, fmaf( -ssbp, offsetpty, x ) );
+    const float pty = fmaf( csbp, offsetpty, fmaf(  ssbp, offsetptx, y ) );
 
     const float bsz = fabsf(csbp) + fabsf(ssbp);
 
