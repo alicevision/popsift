@@ -40,6 +40,8 @@ public:
     inline int getNumOctaves() const { return _num_octaves; }
     inline int getNumLevels()  const { return _levels; }
 
+    inline Octave & getOctave(const int o){ return _octaves[o]; }
+
 private:
     void build_v11 ( Image* base );
 
