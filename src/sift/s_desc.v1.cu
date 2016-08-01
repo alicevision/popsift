@@ -192,9 +192,28 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
 #else // not DESC_USE_ROOT_SIFT
     // OpenCV normalization
 
+#undef HAVE_NORMF
+
+#ifdef HAVE_NORMF
     float norm;
 
-#if 1
+    if( threadIdx.x == 0 ) {
+        norm = normf( 128, ptr1 );
+    }
+
+    norm = __shfl( norm,  0 );
+
+    descr.x = min( descr.x, 0.2f*norm );
+    descr.y = min( descr.y, 0.2f*norm );
+    descr.z = min( descr.z, 0.2f*norm );
+    descr.w = min( descr.w, 0.2f*norm );
+
+    if( threadIdx.x == 0 ) {
+        norm = 512.0f * rnormf( 128, ptr1 );
+    }
+#else
+    float norm;
+
     norm = descr.x * descr.x
          + descr.y * descr.y
          + descr.z * descr.z
@@ -207,11 +226,6 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     if( threadIdx.x == 0 ) {
         norm = __fsqrt_rn( norm );
     }
-#else
-    if( threadIdx.x == 0 ) {
-        norm = normf( 128, ptr1 );
-    }
-#endif
     norm = __shfl( norm,  0 );
 
     descr.x = min( descr.x, 0.2f*norm );
@@ -219,7 +233,6 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     descr.z = min( descr.z, 0.2f*norm );
     descr.w = min( descr.w, 0.2f*norm );
 
-#if 1
     norm = descr.x * descr.x
          + descr.y * descr.y
          + descr.z * descr.z
@@ -232,10 +245,6 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     if( threadIdx.x == 0 ) {
         norm = __fsqrt_rn( norm );
         norm = __fdividef( 512.0f, norm );
-    }
-#else
-    if( threadIdx.x == 0 ) {
-        norm = 512.0f * rnormf( 128, ptr1 );
     }
 #endif
     norm = __shfl( norm,  0 );
