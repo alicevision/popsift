@@ -37,10 +37,13 @@ namespace Comment {
     inline std::istream& operator>>(std::istream& is, _comment & manip) {
         char c;
         char b[1024];
-        is >> c;
-        if (c != '#')
-            return is.putback(c);
-        is.getline(b, 1024);
+        while( is.good() )
+        {
+            is >> c;
+            if (c != '#')
+                return is.putback(c);
+            is.getline(b, 1024);
+        }
         return is;
     }
 }
