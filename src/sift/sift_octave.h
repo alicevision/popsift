@@ -48,10 +48,20 @@ class Octave
          * must be handled per scale (level) of an octave.
          * There: one set of extrema per octave and level.
          */
-        int*         _h_extrema_mgmt; // host side info
-        int*         _d_extrema_mgmt; // device side info
+        int*         _h_extrema_counter; // host side info
+        int*         _d_extrema_counter; // device side info
         int*         _d_extrema_num_blocks; // build barrier after extrema finding, saves a kernel
+
+        /* An extrema can have several orientations. Extending
+         * the number of extrema is expensive, so we sum up the
+         * number of orientations and store them in the featvec
+         * counters.
+         */
+        int*         _h_featvec_counter;
+        int*         _d_featvec_counter;
+#if 0
         int*         _d_orientation_num_blocks; // build barrier after orientation finding, saves a kernel
+#endif
         Extremum**   _h_extrema;
         Extremum**   _d_extrema;
         Descriptor** _d_desc;
@@ -120,21 +130,20 @@ class Octave
             return _data[0].getPitch();
         }
 
-        inline int* getExtremaMgmtH( ) {
-            return _h_extrema_mgmt;
-        }
-
-        inline int* getExtremaMgmtD( ) {
-            return _d_extrema_mgmt;
-        }
+        inline int* getExtremaMgmtH( ) { return _h_extrema_counter; }
+        inline int* getExtremaMgmtD( ) { return _d_extrema_counter; }
+        inline int* getFeatVecCounterH( ) { return _h_featvec_counter; }
+        inline int* getFeatVecCounterD( ) { return _d_featvec_counter; }
 
         inline int* getNumberOfBlocks( ) {
             return _d_extrema_num_blocks;
         }
 
+#if 0
         inline int* getNumberOfOriBlocks( ) {
             return _d_orientation_num_blocks;
         }
+#endif
 
         inline Extremum* getExtrema( uint32_t level ) {
             return _d_extrema[level];

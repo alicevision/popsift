@@ -9,10 +9,7 @@
 #include "write_plane_2d.h"
 #include "sift_octave.h"
 
-// #define PYRAMID_PRINT_DEBUG 0
 #undef PRINT_WITH_ORIENTATION
-
-#undef POPSIFT_SHIFTS_OCTAVE_0_KEYPOINTS
 
 using namespace std;
 
@@ -24,8 +21,10 @@ namespace popart {
 
 Octave::Octave( )
     : _data(0)
-    , _h_extrema_mgmt(0)
-    , _d_extrema_mgmt(0)
+    , _h_extrema_counter(0)
+    , _d_extrema_counter(0)
+    , _h_featvec_counter(0)
+    , _d_featvec_counter(0)
     , _h_extrema(0)
     , _d_extrema(0)
     , _d_desc(0)
@@ -39,10 +38,6 @@ void Octave::alloc( int width, int height, int levels, int gauss_group )
     _h           = height;
     _levels      = levels;
     _gauss_group = gauss_group;
-
-#if (PYRAMID_PRINT_DEBUG==1)
-    printf("    correcting to width %u, height %u\n", _width, _height );
-#endif // (PYRAMID_PRINT_DEBUG==1)
 
     alloc_data_planes( );
     alloc_data_tex( );
@@ -104,20 +99,29 @@ void Octave::reset_extrema_mgmt( )
     cudaStream_t stream = _streams[0];
     cudaEvent_t  ev     = _extrema_done[0];
 
-    memset( _h_extrema_mgmt, 0, _levels * sizeof(int) );
-    popcuda_memset_async( _d_extrema_mgmt, 0, _levels * sizeof(int), stream );
+    memset( _h_extrema_counter, 0, _levels * sizeof(int) );
+    popcuda_memset_async( _d_extrema_counter, 0, _levels * sizeof(int), stream );
     popcuda_memset_async( _d_extrema_num_blocks, 0, _levels * sizeof(int), stream );
+#if 0
     popcuda_memset_async( _d_orientation_num_blocks, 0, _levels * sizeof(int), stream );
+#endif
 
     cudaEventRecord( ev, stream );
 }
 
 void Octave::readExtremaCount( )
 {
-    assert( _h_extrema_mgmt );
-    assert( _d_extrema_mgmt );
-    popcuda_memcpy_async( _h_extrema_mgmt,
-                          _d_extrema_mgmt,
+    assert( _h_extrema_counter );
+    assert( _d_extrema_counter );
+    assert( _h_featvec_counter );
+    assert( _d_featvec_counter );
+    popcuda_memcpy_async( _h_extrema_counter,
+                          _d_extrema_counter,
+                          _levels * sizeof(int),
+                          cudaMemcpyDeviceToHost,
+                          _streams[0] );
+    popcuda_memcpy_async( _h_featvec_counter,
+                          _d_featvec_counter,
                           _levels * sizeof(int),
                           cudaMemcpyDeviceToHost,
                           _streams[0] );
@@ -127,7 +131,7 @@ int Octave::getExtremaCount( ) const
 {
     int ct = 0;
     for( uint32_t i=1; i<_levels-1; i++ ) {
-        ct += _h_extrema_mgmt[i];
+        ct += _h_extrema_counter[i];
     }
     return ct;
 }
@@ -136,51 +140,33 @@ int Octave::getExtremaCount( uint32_t level ) const
 {
     if( level < 1 )         return 0;
     if( level > _levels-2 ) return 0;
-    return _h_extrema_mgmt[level];
+    return _h_extrema_counter[level];
 }
 
 void Octave::downloadDescriptor( const Config& conf )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
-        int sz = _h_extrema_mgmt[l];
+        int sz = _h_extrema_counter[l];
         if( sz != 0 ) {
             if( _h_extrema[l] == 0 ) continue;
 
-            int num_desc = sz; // temporary until counters are split
-
-            if( num_desc > 0 ) {
-                popcuda_memcpy_async( _h_desc[l],
-                                      _d_desc[l],
-                                      num_desc * sizeof(Descriptor),
-                                      cudaMemcpyDeviceToHost,
-                                      0 );
-            }
             popcuda_memcpy_async( _h_extrema[l],
                                   _d_extrema[l],
                                   sz * sizeof(Extremum),
                                   cudaMemcpyDeviceToHost,
                                   0 );
         }
+        sz = _h_featvec_counter[l];
+        if( sz != 0 ) {
+            popcuda_memcpy_async( _h_desc[l],
+                                  _d_desc[l],
+                                  sz * sizeof(Descriptor),
+                                  cudaMemcpyDeviceToHost,
+                                  0 );
+        }
     }
 
     cudaDeviceSynchronize( );
-
-#ifdef POPSIFT_SHIFTS_OCTAVE_0_KEYPOINTS
-    if( conf.getSiftMode() == Config::PopSift ) {
-        if( _debug_octave_id == 0 ) {
-            if( conf.start_sampling == -1 ) {
-                for( int lvl=0; lvl<_levels; lvl++ ) {
-                    for( int i=0; i<_h_extrema_mgmt[lvl]; i++ ) {
-                        _h_extrema[lvl][i].xpos += 0.5f;
-                        _h_extrema[lvl][i].ypos += 0.5f;
-                    }
-                }
-            } else {
-                cerr << "Note " << __func__ << ": Upscale pixel shift compensation for upscaled image not implemented" << endl;
-            }
-        }
-    }
-#endif // POPSIFT_SHIFTS_OCTAVE_0_KEYPOINTS
 }
 
 void Octave::writeDescriptor( const Config& conf, ostream& ostr, bool really )
@@ -192,7 +178,7 @@ void Octave::writeDescriptor( const Config& conf, ostream& ostr, bool really )
 
         Descriptor* desc = _h_desc[l];
 
-        int sz = _h_extrema_mgmt[l];
+        int sz = _h_extrema_counter[l];
         for( int s=0; s<sz; s++ ) {
             for( int ori=0; ori<cand[s].num_ori; ori++ ) {
                 const float up_fac = conf.getUpscaleFactor();
@@ -462,20 +448,6 @@ void Octave::free_data_tex( )
 
 void Octave::alloc_interm_plane( )
 {
-#if 0
-    /*
-     * no longer meaningful, and leads to bugs
-     */
-
-    /* Usually we alloc only one plane's worth of floats.
-     * When we group gauss filters, we need #groupsize intermediate
-     * planes. For efficiency, we use only a single allocation,
-     * but if we use interpolation, we should better have a buffer
-     * filled with zeros between the sections of the plane.
-     * We give this buffer 4 rows.
-     */
-    _intermediate_data.allocDev( _w, _gauss_group * ( _h + 4 ) );
-#endif
     _intermediate_data.allocDev( _w, _h );
 }
 
@@ -511,7 +483,6 @@ void Octave::alloc_interm_tex( )
     interm_data_res_desc.res.pitch2D.pitchInBytes = _intermediate_data.step;
     interm_data_res_desc.res.pitch2D.width        = _intermediate_data.getCols();
     interm_data_res_desc.res.pitch2D.height       = _intermediate_data.getRows();
-    // cerr << "Allocating texture for octave " << _debug_octave_id << " with width " << interm_data_res_desc.res.pitch2D.width << " height " << interm_data_res_desc.res.pitch2D.height << endl;
 
     err = cudaCreateTextureObject( &_interm_data_tex,
                                    &interm_data_res_desc,
@@ -576,15 +547,6 @@ void Octave::alloc_dog_tex( )
     dog_tex_desc.readMode         = cudaReadModeElementType; // read as float
     dog_tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
 
-    // cudaResourceView dog_tex_view;
-    // memset( &dog_tex_view, 0, sizeof(cudaResourceView) );
-    // dog_tex_view.format     = cudaResViewFormatFloat1;
-    // dog_tex_view.width      = width;
-    // dog_tex_view.height     = height;
-    // dog_tex_view.depth      = 1;
-    // dog_tex_view.firstLayer = 0;
-    // dog_tex_view.lastLayer  = _levels - 1;
-
     err = cudaCreateTextureObject( &_dog_3d_tex, &dog_res_desc, &dog_tex_desc, 0 );
     POP_CUDA_FATAL_TEST( err, "Could not create DoG texture: " );
 }
@@ -602,18 +564,26 @@ void Octave::free_dog_tex( )
 
 void Octave::alloc_extrema_mgmt( )
 {
-    _h_extrema_mgmt           = popart::cuda::malloc_hstT<int>( _levels, __FILE__, __LINE__ );
-    _d_extrema_mgmt           = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
+    _h_extrema_counter        = popart::cuda::malloc_hstT<int>( _levels, __FILE__, __LINE__ );
+    _d_extrema_counter        = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
     _d_extrema_num_blocks     = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
+    _h_featvec_counter        = popart::cuda::malloc_hstT<int>( _levels, __FILE__, __LINE__ );
+    _d_featvec_counter        = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
+#if 0
     _d_orientation_num_blocks = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
+#endif
 }
 
 void Octave::free_extrema_mgmt( )
 {
+#if 0
     cudaFree( _d_orientation_num_blocks );
+#endif
     cudaFree( _d_extrema_num_blocks );
-    cudaFree( _d_extrema_mgmt );
-    cudaFreeHost( _h_extrema_mgmt );
+    cudaFree( _d_extrema_counter );
+    cudaFreeHost( _h_extrema_counter );
+    cudaFree( _d_featvec_counter );
+    cudaFreeHost( _h_featvec_counter );
 }
 
 void Octave::alloc_extrema( )

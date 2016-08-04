@@ -185,9 +185,7 @@ void compute_keypoint_orientations_v1( Extremum*     extremum,
 __global__
 void compute_keypoint_orientations_v2( Extremum*     extremum,
                                        int*          extrema_counter,
-                                       Plane2D_float layer,
-                                       int*          d_number_of_blocks,
-                                       int           number_of_blocks )
+                                       Plane2D_float layer )
 {
     uint32_t w   = layer.getWidth();
     uint32_t h   = layer.getHeight();
@@ -427,8 +425,7 @@ void orientation_starter_v1( Extremum*     extremum,
 __global__
 void orientation_starter_v2( Extremum*     extremum,
                              int*          extrema_counter,
-                             Plane2D_float layer,
-                             int*          d_number_of_blocks )
+                             Plane2D_float layer )
 {
     dim3 block;
     dim3 grid;
@@ -440,9 +437,7 @@ void orientation_starter_v2( Extremum*     extremum,
             <<<grid,block>>>
             ( extremum,
               extrema_counter,
-              layer,
-              d_number_of_blocks,
-              grid.x * grid.y );
+              layer );
     }
 }
 
@@ -454,7 +449,7 @@ void Pyramid::orientation_v1( )
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
-        int*  orientation_num_blocks = oct_obj.getNumberOfOriBlocks( );
+        // int*  orientation_num_blocks = oct_obj.getNumberOfOriBlocks( );
 
         for( int level=1; level<_levels-2; level++ ) {
             cudaStream_t oct_str = oct_obj.getStream(level+2);
@@ -468,14 +463,11 @@ void Pyramid::orientation_v1( )
                       extrema_counter,
                       oct_obj.getData( level ) );
             }  else {
-                int*  num_blocks = &orientation_num_blocks[level];
-
                 orientation_starter_v2
                     <<<1,1,0,oct_str>>>
                     ( oct_obj.getExtrema( level ),
                       extrema_counter,
-                      oct_obj.getData( level ),
-                      num_blocks );
+                      oct_obj.getData( level ) );
             }
         }
     }
