@@ -84,7 +84,7 @@ IMAGE48=../sample/big_set/trees/img4.ppm
 # PARAMS="--sigma=1.6 --octaves=4 --levels=3 --downsampling=0 --indirect-unfiltered --threshold=0.0 --edge-threshold=10.0"
 # PARAMS="--popsift-mode --downsampling=0 --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 
-PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+# PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 # PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
 
 # MODE=--popsift-mode
@@ -94,9 +94,9 @@ MODE=--opencv-mode
 LOG=--log
 # LOG=
 
-# SUFFIX=
+SUFFIX=
 # SUFFIX=-vlfeat
-SUFFIX=-opencv
+# SUFFIX=-opencv
 
 #################### PARAMETERS ####################
 
