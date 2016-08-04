@@ -17,7 +17,8 @@
 
 #define DESC_MIN_FLOAT               1E-15F
 
-#define GAUSS_ALIGN  16
+// #define GAUSS_ALIGN  16
+#define GAUSS_ALIGN  32
 #define GAUSS_LEVELS 12
 
 #define ORI_V1_NUM_THREADS 16

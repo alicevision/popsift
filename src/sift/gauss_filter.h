@@ -3,12 +3,14 @@
 #include "sift_constants.h"
 #include "sift_conf.h"
 
-#undef SUPPORT_ABSOLUTE_SIGMA
+#define SUPPORT_ABSOLUTE_SIGMA
 
 namespace popart {
 
 struct GaussInfo
 {
+    int required_filter_stages;
+
     /* If initial blur is used, then this is the 1D Gauss table
      * for blurring the remaining amount up to the blur value
      * of sigma0
@@ -22,11 +24,14 @@ struct GaussInfo
 
 #ifdef SUPPORT_ABSOLUTE_SIGMA
     /* An experimental 1D Gauss table. The idea is to blur
-     * directly from the initial image. This is not compatible
-     * with initial blur, and it is currently not fully implemented,
-     * either.
+     * directly level 1. Level 1 is more suitable than level 0
+     * because level 0 has special handling in octave 0.
+     * For ease of use, level 0 exists in the table but is
+     * initialized to 0.
      */
     float from_lvl_1[ GAUSS_ALIGN * GAUSS_LEVELS ];
+
+    float abs_sigma[ GAUSS_LEVELS ];
 #endif // SUPPORT_ABSOLUTE_SIGMA
 
     /* The sigma used to generate the Gauss table for each level.
@@ -44,6 +49,12 @@ struct GaussInfo
      */
     int span[ GAUSS_LEVELS ];
 
+#ifdef SUPPORT_ABSOLUTE_SIGMA
+    /* Equivalent to span for from_lvl_1 tables.
+     */
+    int   abs_span[ GAUSS_LEVELS ];
+#endif // SUPPORT_ABSOLUTE_SIGMA
+
     /* The span of the table that is generated for initial blur.
      */
     int initial_span;
@@ -56,6 +67,9 @@ struct GaussInfo
 
     __host__
     void computeBlurTable( int level, int span, float sigma );
+
+    __host__
+    void computeAbsBlurTable( int level, int span, float sigma );
 
     __host__
     static int vlFeatSpan( float sigma );

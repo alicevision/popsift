@@ -32,7 +32,7 @@ void print_gauss_filter_symbol( int columns )
 
     printf("    relative sigma\n");
 
-    for( int lvl=0; lvl<GAUSS_LEVELS; lvl++ ) {
+    for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
         span = d_gauss.span[lvl] + d_gauss.span[lvl] - 1;
 
         printf("      %d %d %2.6f: ", lvl, span, d_gauss.sigma[lvl] );
@@ -49,11 +49,19 @@ void print_gauss_filter_symbol( int columns )
 
 #ifdef SUPPORT_ABSOLUTE_SIGMA
     printf("    absolute filters\n");
-    for( int lvl=0; lvl<GAUSS_LEVELS; lvl++ ) {
-        for( int x=0; x<columns; x++ ) {
-            printf("%0.3f ", d_gauss.from_lvl_1[lvl*GAUSS_ALIGN+x] );
+
+    for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
+        span = d_gauss.abs_span[lvl] + d_gauss.abs_span[lvl] - 1;
+
+        printf("      %d %d %2.6f: ", lvl, span, d_gauss.abs_sigma[lvl] );
+        int m = min( d_gauss.abs_span[lvl], columns );
+        for( int x=0; x<m; x++ ) {
+            printf("%0.8f ", d_gauss.from_lvl_1[lvl*GAUSS_ALIGN+x] );
         }
-        printf("\n");
+        if( m < d_gauss.abs_span[lvl] )
+            printf("...\n");
+        else
+            printf("\n");
     }
     printf("\n");
 #endif
@@ -103,6 +111,8 @@ void init_filter( const Config& conf,
 
     h_gauss.clearTables();
 
+    h_gauss.required_filter_stages = levels + 3;
+
     // float local_filter_initial_blur[ GAUSS_ALIGN ];
 
     if( conf.hasInitialBlur() ) {
@@ -129,8 +139,7 @@ void init_filter( const Config& conf,
         printf("    Sigma for level 0: %2.6f = sigma0(%2.6f)\n", h_gauss.sigma[0], sigma0 );
     }
 
-    for( int lvl=1; lvl<GAUSS_LEVELS; lvl++ ) {
-        // OpenCV sigma computation
+    for( int lvl=1; lvl<h_gauss.required_filter_stages; lvl++ ) {
         const float sigmaP = sigma0 * pow( 2.0, (float)(lvl-1)/(float)levels );
         const float sigmaS = sigma0 * pow( 2.0, (float)(lvl  )/(float)levels );
 
@@ -146,12 +155,16 @@ void init_filter( const Config& conf,
     }
 
 #ifdef SUPPORT_ABSOLUTE_SIGMA
-    for( int lvl=0; lvl<GAUSS_LEVELS; lvl++ ) {
-        h_gauss.abs_sigma[lvl] = sigma0 * pow( 2.0, (float)(lvl)/(float)levels );
+    for( int lvl=1; lvl<h_gauss.required_filter_stages; lvl++ ) {
+        const float sigmaP = sigma0;
+        const float sigmaS = sigma0 * pow( 2.0, (float)(lvl)/(float)levels );
+
+        h_gauss.abs_sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
+        h_gauss.from_lvl_1[lvl] = sigma0 * pow( 2.0, (float)(lvl)/(float)levels );
         h_gauss.abs_span[lvl]  = ( conf.getSiftMode() == Config::OpenCV )
-                               ? GaussInfo::openCVSpan( absSigma )
-                               : GaussInfo::vlFeatSpan( absSigma );
-        h_gauss.computeBlurTable( lvl, h_gauss.span[lvl], h_gauss.sigma[lvl] );
+                               ? GaussInfo::openCVSpan( h_gauss.abs_sigma[lvl] )
+                               : GaussInfo::vlFeatSpan( h_gauss.abs_sigma[lvl] );
+        h_gauss.computeAbsBlurTable( lvl, h_gauss.span[lvl], h_gauss.abs_sigma[lvl] );
     }
 #endif // SUPPORT_ABSOLUTE_SIGMA
 
@@ -226,6 +239,21 @@ void GaussInfo::computeBlurTable( int level, int span, float sigma )
     }
     for( int x = 0; x < span; x++ ) {
         filter[level*GAUSS_ALIGN + x] /= sum;
+    }
+}
+
+__host__
+void GaussInfo::computeAbsBlurTable( int level, int span, float sigma )
+{
+    double sum = 1.0;
+    from_lvl_1[level*GAUSS_ALIGN + 0] = 1.0;
+    for( int x = 1; x < span; x++ ) {
+        const float val = exp( -0.5 * (pow( double(x)/sigma, 2.0) ) );
+        from_lvl_1[level*GAUSS_ALIGN + x] = val;
+        sum += 2.0f * val;
+    }
+    for( int x = 0; x < span; x++ ) {
+        from_lvl_1[level*GAUSS_ALIGN + x] /= sum;
     }
 }
 
