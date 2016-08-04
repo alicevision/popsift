@@ -20,17 +20,11 @@ struct Image
     void debug_out( );
     void test_last_error( const char* file, int line );
 
-    inline Plane2D_float& getUpscaledImage() {
-        return _upscaled_image_d;
-    }
-
-    inline cudaTextureObject_t& getUpscaledTexture() {
-        return _upscaled_image_tex;
+    inline cudaTextureObject_t& getInputTexture() {
+        return _input_image_tex;
     }
 
 private:
-    void upscale_v5( const Config& conf, cudaTextureObject_t & tex );
-
     int _w;
     int _h;
 
@@ -41,18 +35,10 @@ private:
     /* 2D plane holding input image on device for upscaling */
     Plane2D_uint8 _input_image_d;
 
-    /** 2D plane holding upscaled image, allocated on device */
-    Plane2D_float _upscaled_image_d;
-
     /* Texture information for input image on device */
     cudaTextureObject_t _input_image_tex;
     cudaTextureDesc     _input_image_texDesc;
     cudaResourceDesc    _input_image_resDesc;
-
-    /* Texture information for upscaled image on device */
-    cudaTextureObject_t _upscaled_image_tex;
-    cudaTextureDesc     _upscaled_image_texDesc;
-    cudaResourceDesc    _upscaled_image_resDesc;
 };
 
 } // namespace popart

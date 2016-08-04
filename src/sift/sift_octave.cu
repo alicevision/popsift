@@ -421,7 +421,6 @@ void Octave::alloc_data_tex( )
     data_tex_desc.addressMode[1]   = cudaAddressModeClamp;
     data_tex_desc.addressMode[2]   = cudaAddressModeClamp;
     data_tex_desc.readMode         = cudaReadModeElementType; // read as float
-    // data_tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
     data_tex_desc.filterMode       = cudaFilterModeLinear; // bilinear interpolation
 
     memset( &data_res_desc, 0, sizeof(cudaResourceDesc) );
@@ -484,34 +483,34 @@ void Octave::alloc_interm_tex( )
 {
     cudaError_t err;
 
-    cudaTextureDesc      data_tex_desc;
-    cudaResourceDesc     data_res_desc;
+    cudaTextureDesc      interm_data_tex_desc;
+    cudaResourceDesc     interm_data_res_desc;
 
-    memset( &data_tex_desc, 0, sizeof(cudaTextureDesc) );
-    data_tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
-    data_tex_desc.addressMode[0]   = cudaAddressModeClamp;
-    data_tex_desc.addressMode[1]   = cudaAddressModeClamp;
-    data_tex_desc.addressMode[2]   = cudaAddressModeClamp;
-    data_tex_desc.readMode         = cudaReadModeElementType; // read as float
-    data_tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
+    memset( &interm_data_tex_desc, 0, sizeof(cudaTextureDesc) );
+    interm_data_tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
+    interm_data_tex_desc.addressMode[0]   = cudaAddressModeClamp;
+    interm_data_tex_desc.addressMode[1]   = cudaAddressModeClamp;
+    interm_data_tex_desc.addressMode[2]   = cudaAddressModeClamp;
+    interm_data_tex_desc.readMode         = cudaReadModeElementType; // read as float
+    interm_data_tex_desc.filterMode       = cudaFilterModePoint;
 
-    memset( &data_res_desc, 0, sizeof(cudaResourceDesc) );
-    data_res_desc.resType                  = cudaResourceTypePitch2D;
-    data_res_desc.res.pitch2D.desc.f       = cudaChannelFormatKindFloat;
-    data_res_desc.res.pitch2D.desc.x       = 32;
-    data_res_desc.res.pitch2D.desc.y       = 0;
-    data_res_desc.res.pitch2D.desc.z       = 0;
-    data_res_desc.res.pitch2D.desc.w       = 0;
+    memset( &interm_data_res_desc, 0, sizeof(cudaResourceDesc) );
+    interm_data_res_desc.resType                  = cudaResourceTypePitch2D;
+    interm_data_res_desc.res.pitch2D.desc.f       = cudaChannelFormatKindFloat;
+    interm_data_res_desc.res.pitch2D.desc.x       = 32;
+    interm_data_res_desc.res.pitch2D.desc.y       = 0;
+    interm_data_res_desc.res.pitch2D.desc.z       = 0;
+    interm_data_res_desc.res.pitch2D.desc.w       = 0;
 
-    data_res_desc.res.pitch2D.devPtr       = _intermediate_data.data;
-    data_res_desc.res.pitch2D.pitchInBytes = _intermediate_data.step;
-    data_res_desc.res.pitch2D.width        = _intermediate_data.getCols();
-    data_res_desc.res.pitch2D.height       = _intermediate_data.getRows();
-    // cerr << "Allocating texture for octave " << _debug_octave_id << " with width " << data_res_desc.res.pitch2D.width << " height " << data_res_desc.res.pitch2D.height << endl;
+    interm_data_res_desc.res.pitch2D.devPtr       = _intermediate_data.data;
+    interm_data_res_desc.res.pitch2D.pitchInBytes = _intermediate_data.step;
+    interm_data_res_desc.res.pitch2D.width        = _intermediate_data.getCols();
+    interm_data_res_desc.res.pitch2D.height       = _intermediate_data.getRows();
+    // cerr << "Allocating texture for octave " << _debug_octave_id << " with width " << interm_data_res_desc.res.pitch2D.width << " height " << interm_data_res_desc.res.pitch2D.height << endl;
 
     err = cudaCreateTextureObject( &_interm_data_tex,
-                                   &data_res_desc,
-                                   &data_tex_desc, 0 );
+                                   &interm_data_res_desc,
+                                   &interm_data_tex_desc, 0 );
     POP_CUDA_FATAL_TEST( err, "Could not create texture object: " );
 }
 

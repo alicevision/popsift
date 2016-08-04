@@ -1,3 +1,4 @@
+#if 0
 #include "s_image.h"
 #include "clamp.h"
 #include "assist.h"
@@ -154,3 +155,4 @@ void Image::upscale_v5( const Config& conf, cudaTextureObject_t & tex )
 
 } // namespace popart
 
+#endif

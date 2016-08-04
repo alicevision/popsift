@@ -50,15 +50,14 @@ void horiz_128x1( cudaTextureObject_t src_data,
 }
 } // namespace absoluteLinearTex
 
-namespace normalizedTex {
 __global__
 void horiz_tex_128x1( cudaTextureObject_t src_data,
                       Plane2D_float       dst_data,
-                      int                 level )
+                      float               shift )
 {
     const float dst_w  = dst_data.getWidth();
     const float dst_h  = dst_data.getHeight();
-    const float read_y = ( blockIdx.y + 0.5f ) / dst_h;
+    const float read_y = ( blockIdx.y + shift ) / dst_h;
 
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -67,32 +66,32 @@ void horiz_tex_128x1( cudaTextureObject_t src_data,
     float out = 0.0f;
 
     #pragma unroll
-    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
-        const float& g  = popart::d_gauss.filter[level*GAUSS_ALIGN + offset];
+    for( int offset = d_gauss.span[0]; offset>0; offset-- ) {
+        const float& g  = popart::d_gauss.filter[0*GAUSS_ALIGN + offset];
         const float read_x_l = ( off_x - offset );
-        const float  v1 = tex2D<float>( src_data, ( read_x_l + 0.5f ) / dst_w, read_y );
+        const float  v1 = tex2D<float>( src_data, ( read_x_l + shift ) / dst_w, read_y );
         out += ( v1 * g );
 
         const float read_x_r = ( off_x + offset );
-        const float  v2 = tex2D<float>( src_data, ( read_x_r + 0.5f ) / dst_w, read_y );
+        const float  v2 = tex2D<float>( src_data, ( read_x_r + shift ) / dst_w, read_y );
         out += ( v2 * g );
     }
-    const float& g  = popart::d_gauss.filter[level*GAUSS_ALIGN];
+    const float& g  = popart::d_gauss.filter[0*GAUSS_ALIGN];
     const float read_x = off_x;
-    const float v3 = tex2D<float>( src_data, ( read_x + 0.5f ) / dst_w, read_y );
+    const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
     out += ( v3 * g );
 
-    dst_data.ptr(blockIdx.y)[off_x] = out;
+    dst_data.ptr(blockIdx.y)[off_x] = scalbnf( out, 8 );
 }
-} // namespace normalizedTex
 
 __global__
 void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
-                                   Plane2D_float       dst_data )
+                                   Plane2D_float       dst_data,
+                                   float               shift )
 {
     const float dst_w  = dst_data.getWidth();
     const float dst_h  = dst_data.getHeight();
-    const float read_y = ( blockIdx.y + 0.5f ) / dst_h;
+    const float read_y = ( blockIdx.y + shift ) / dst_h;
 
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -104,26 +103,26 @@ void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
     for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
         const float& g  = popart::d_gauss.filter_initial_blur[offset];
         const float read_x_l = ( off_x - offset );
-        const float  v1 = tex2D<float>( src_data, ( read_x_l + 0.5f ) / dst_w, read_y );
+        const float  v1 = tex2D<float>( src_data, ( read_x_l + shift ) / dst_w, read_y );
         out += ( v1 * g );
 
         const float read_x_r = ( off_x + offset );
-        const float  v2 = tex2D<float>( src_data, ( read_x_r + 0.5f ) / dst_w, read_y );
+        const float  v2 = tex2D<float>( src_data, ( read_x_r + shift ) / dst_w, read_y );
         out += ( v2 * g );
     }
     const float& g  = popart::d_gauss.filter_initial_blur[0];
     const float read_x = off_x;
-    const float v3 = tex2D<float>( src_data, ( read_x + 0.5f ) / dst_w, read_y );
+    const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
     out += ( v3 * g );
 
-    dst_data.ptr(blockIdx.y)[off_x] = out;
+    dst_data.ptr(blockIdx.y)[off_x] = scalbnf( out, 8 );
 }
 
 
 __global__
-void get_by_2( cudaTextureObject_t src_data,
-               Plane2D_float       dst_data,
-               int level )
+void get_by_2_interpolate( cudaTextureObject_t src_data,
+                           Plane2D_float       dst_data,
+                           int                 level )
 {
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -138,9 +137,9 @@ void get_by_2( cudaTextureObject_t src_data,
 }
 
 __global__
-void get_by_2_opencv( Plane2D_float src_data,
-                      Plane2D_float dst_data,
-                      int level )
+void get_by_2_pick_every_second( Plane2D_float src_data,
+                                 Plane2D_float dst_data,
+                                 int           level )
 {
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -158,48 +157,6 @@ void get_by_2_opencv( Plane2D_float src_data,
     const float val = src_data.ptr(read_y)[read_x];
 
     dst_data.ptr(idy)[idx] = val;
-}
-
-__global__
-void horiz_by_2( cudaTextureObject_t src_data,
-                 Plane2D_float       dst_data,
-                 int level )
-{
-    int block_x = blockIdx.x * blockDim.x;
-    int block_y = blockIdx.y * blockDim.y;
-    int idx;
-    int idy     = threadIdx.y;
-
-    float g;
-    float val;
-    float out = 0;
-
-    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
-        g  = popart::d_gauss.filter[level*GAUSS_ALIGN + offset];
-
-        idx = threadIdx.x - offset;
-        // add +1.0f because we must shift by 0.5 pixels upscaled by 2 in the previous octave
-        val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0f, 2 * ( block_y + idy ) + 1.0f );
-        out += ( val * g );
-
-        idx = threadIdx.x + offset;
-        val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0f, 2 * ( block_y + idy ) + 1.0f );
-        out += ( val * g );
-    }
-
-    g  = popart::d_gauss.filter[level*GAUSS_ALIGN];
-    idx = threadIdx.x;
-    val = tex2D<float>( src_data, 2 * ( block_x + idx ) + 1.0f, 2 * ( block_y + idy ) + 1.0f );
-    out += ( val * g );
-
-    idx = block_x+threadIdx.x;
-    idy = block_y+threadIdx.y;
-    const int dst_w = dst_data.getWidth();
-    const int dst_h = dst_data.getHeight();
-    if( idx >= dst_w ) return;
-    if( idy >= dst_h ) return;
-
-    dst_data.ptr(idy)[idx] = out;
 }
 
 __global__
@@ -370,7 +327,7 @@ void make_dog( cudaTextureObject_t this_data,
 } // namespace v11
 
 __host__
-inline void Pyramid::horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data, int octave, cudaStream_t stream )
+inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode, bool initial_blur )
 {
     Octave&      oct_obj = _octaves[octave];
 
@@ -385,39 +342,43 @@ inline void Pyramid::horiz_from_upscaled_orig_tex( cudaTextureObject_t src_data,
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
 
-    gauss::v11::normalizedTex::horiz_tex_128x1
-        <<<grid,block,0,stream>>>
-        ( src_data,
-          oct_obj.getIntermediateData( ),
-          0 ); // level is always 0
+    float shift = 0.5f;
+
+    switch( mode )
+    {
+    case Config::PopSift :
+    case Config::VLFeat :
+        if( conf.start_sampling == -1.0f ) shift = 1.0f;
+        else if( conf.start_sampling == 0.0f ) shift = 0.5f;
+        else {
+            cerr << "Not verified yet" << endl;
+            exit( -1 );
+        }
+        break;
+    case Config::OpenCV :
+        break;
+    default :
+        cerr << "Invalid sift mode" << endl;
+        exit( -1 );
+    }
+
+    if( initial_blur )
+        gauss::v11::horiz_tex_128x1_initial_blur
+            <<<grid,block,0,stream>>>
+            ( base->getInputTexture(),
+              oct_obj.getIntermediateData( ),
+              shift );
+    else
+        gauss::v11::horiz_tex_128x1
+            <<<grid,block,0,stream>>>
+            ( base->getInputTexture(),
+              oct_obj.getIntermediateData( ),
+              shift );
 }
 
-__host__
-inline void Pyramid::horiz_from_upscaled_orig_tex_initial_blur( cudaTextureObject_t src_data, cudaStream_t stream )
-{
-    Octave&      oct_obj = _octaves[0];
-
-    const int width  = oct_obj.getWidth();
-    const int height = oct_obj.getHeight();
-
-    /* I believe that waiting is not necessary because image is upscaled
-     * in default stream */
-
-    dim3 block( 128, 1 );
-    dim3 grid;
-    grid.x  = grid_divide( width,  128 );
-    grid.y  = height;
-
-
-    gauss::v11::horiz_tex_128x1_initial_blur
-        <<<grid,block,0,stream>>>
-        ( src_data,
-          oct_obj.getIntermediateData( ) );
-}
-
 
 __host__
-inline void Pyramid::downscale_from_prev_octave( int octave, int level, cudaStream_t stream )
+inline void Pyramid::downscale_from_prev_octave( int octave, int level, cudaStream_t stream, Config::SiftMode mode )
 {
     Octave&      oct_obj = _octaves[octave];
     Octave& prev_oct_obj = _octaves[octave-1];
@@ -434,44 +395,26 @@ inline void Pyramid::downscale_from_prev_octave( int octave, int level, cudaStre
     h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
     h_grid.y = (unsigned int)grid_divide( height, h_block.y );
 
-#ifdef USE_OPENCV_INTERPRETATION
-    gauss::v11::get_by_2_opencv
-        <<<h_grid,h_block,0,stream>>>
-        ( prev_oct_obj.getData( _levels-PREV_LEVEL ),
-          oct_obj.getData( level ),
-          level );
-#else // not USE_OPENCV_INTERPRETATION
-    gauss::v11::get_by_2
-        <<<h_grid,h_block,0,stream>>>
-        ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
-          oct_obj.getData( level ),
-          level );
-#endif // not USE_OPENCV_INTERPRETATION
-}
-
-__host__
-inline void Pyramid::downscale_from_prev_octave_and_horiz_blur( int octave, int level, cudaStream_t stream )
-{
-    Octave&      oct_obj  = _octaves[octave];
-    Octave& prev_oct_obj  = _octaves[octave-1];
-
-    const int width  = oct_obj.getWidth();
-    const int height = oct_obj.getHeight();
-
-    /* Necessary to wait for a lower level in the previous octave */
-    cudaEvent_t ev = prev_oct_obj.getEventGaussDone( _levels-PREV_LEVEL );
-    cudaStreamWaitEvent( stream, ev, 0 );
-
-    dim3 h_block( 64, 2 );
-    dim3 h_grid;
-    h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
-    h_grid.y = (unsigned int)grid_divide( height, h_block.y );
-
-    gauss::v11::horiz_by_2
-        <<<h_grid,h_block,0,stream>>>
-        ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
-          oct_obj.getIntermediateData( ),
-          level );
+    switch( mode )
+    {
+    case Config::OpenCV :
+        gauss::v11::get_by_2_interpolate
+            <<<h_grid,h_block,0,stream>>>
+            ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
+              oct_obj.getData( level ),
+              level );
+        break;
+    case Config::PopSift :
+    case Config::VLFeat :
+        gauss::v11::get_by_2_pick_every_second
+            <<<h_grid,h_block,0,stream>>>
+            ( prev_oct_obj.getData( _levels-PREV_LEVEL ),
+              oct_obj.getData( level ),
+              level );
+        break;
+    default :
+        break;
+    }
 }
 
 __host__
@@ -499,7 +442,7 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t 
 }
 
 __host__
-inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t stream )
+inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t stream, bool initial_blur )
 {
     Octave& oct_obj = _octaves[octave];
 
@@ -514,33 +457,17 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
     grid.x = (unsigned int)grid_divide( width,  block.x );
     grid.y = (unsigned int)grid_divide( height, block.y );
 
-    gauss::v11::vert
-        <<<grid,block,0,stream>>>
-        ( oct_obj._interm_data_tex,
-          oct_obj.getData( level ),
-          level );
-}
-
-__host__
-inline void Pyramid::vert_from_interm_initial_blur( cudaStream_t stream )
-{
-    Octave& oct_obj = _octaves[0];
-
-    /* waiting for any events is not necessary, it's in the same stream as horiz
-     */
-
-    const int width  = oct_obj.getWidth();
-    const int height = oct_obj.getHeight();
-
-    dim3 block( 64, 2 );
-    dim3 grid;
-    grid.x = (unsigned int)grid_divide( width,  block.x );
-    grid.y = (unsigned int)grid_divide( height, block.y );
-
-    gauss::v11::vert_initial_blur
-        <<<grid,block,0,stream>>>
-        ( oct_obj._interm_data_tex,
-          oct_obj.getData( 0 ) );
+    if( initial_blur )
+        gauss::v11::vert_initial_blur
+            <<<grid,block,0,stream>>>
+            ( oct_obj._interm_data_tex,
+              oct_obj.getData( 0 ) );
+    else
+        gauss::v11::vert
+            <<<grid,block,0,stream>>>
+            ( oct_obj._interm_data_tex,
+              oct_obj.getData( level ),
+              level );
 }
 
 __host__
@@ -583,7 +510,7 @@ inline void Pyramid::dog_from_blurred( int octave, int level, cudaStream_t strea
  * V11: host side
  *************************************************************/
 __host__
-void Pyramid::build_v11( Image* base )
+void Pyramid::build_v11( const Config& conf, Image* base )
 {
     cudaError_t err;
 
@@ -598,6 +525,15 @@ void Pyramid::build_v11( Image* base )
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
     cudaDeviceSynchronize();
+
+#if 0
+    gauss::v11::print_points
+        <<<1,1>>>
+        ( base->getUpscaledTexture(),
+          base->getInputTexture(),
+          _octaves[0].getData(0) );
+#endif
+
 
     for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
         Octave& oct_obj   = _octaves[octave];
@@ -614,14 +550,8 @@ void Pyramid::build_v11( Image* base )
             {
                 if( octave == 0 )
                 {
-                    cudaTextureObject_t& tex = base->getUpscaledTexture();
-                    if( _assume_initial_blur ) {
-                        horiz_from_upscaled_orig_tex_initial_blur( tex, stream );
-                        vert_from_interm_initial_blur( stream );
-                    } else {
-                        horiz_from_upscaled_orig_tex( tex, octave, stream );
-                        vert_from_interm( octave, level, stream );
-                    }
+                    horiz_from_input_image( conf, base, 0, stream, conf.getSiftMode(), _assume_initial_blur );
+                    vert_from_interm( octave, level, stream, _assume_initial_blur );
                 }
                 else 
                 {
@@ -629,17 +559,12 @@ void Pyramid::build_v11( Image* base )
                     {
                     case Config::DirectDownscaling :
                         {
-                            cudaTextureObject_t& tex = base->getUpscaledTexture();
-                            horiz_from_upscaled_orig_tex( tex, octave, stream );
-                            vert_from_interm( octave, level, stream );
+                            horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode(), false );
+                            vert_from_interm( octave, level, stream, false );
                         }
                         break;
                     case Config::IndirectUnfilteredDownscaling :
-                        downscale_from_prev_octave( octave, level, stream );
-                        break;
-                    case Config::IndirectDownscaling :
-                        downscale_from_prev_octave_and_horiz_blur( octave, level, stream );
-                        vert_from_interm( octave, level, stream );
+                        downscale_from_prev_octave( octave, level, stream, conf.getSiftMode() );
                         break;
                     default :
                         cerr << __FILE__ << ":" << __LINE__ << ": unknown scaling mode" << endl;
@@ -650,7 +575,7 @@ void Pyramid::build_v11( Image* base )
             else
             {
                 horiz_from_prev_level( octave, level, stream );
-                vert_from_interm( octave, level, stream );
+                vert_from_interm( octave, level, stream, false );
             }
 
             err = cudaEventRecord( ev, stream );

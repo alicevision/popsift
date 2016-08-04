@@ -180,7 +180,7 @@ void Pyramid::find_extrema( const Config& conf, Image* base )
 {
     reset_extrema_mgmt( );
 
-    build_v11( base );
+    build_v11( conf, base );
 
     find_extrema_v6( conf );
 

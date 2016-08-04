@@ -38,12 +38,3 @@
  */
 #define USE_DYNAMIC_PARALLELISM
 
-
-/*
- * USE_OPENCV_INTERPRETATION
- * - RGB conversion relies on integer arithmetic
- * - resize function is nearest neighbour instead of interpolation
- * - we modified the clamping behaviour in OpenCV to something that CUDA can do
- */
-#define USE_OPENCV_INTERPRETATION
-
