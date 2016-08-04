@@ -599,7 +599,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 template<int HEIGHT, int vlfeat_mode>
 __global__
 void find_extrema_in_dog_v6( cudaTextureObject_t dog,
-                             int                 debug_octave,
+                             int                 octave,
                              int                 level,
                              int                 width,
                              int                 height,
@@ -611,7 +611,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
 {
     Extremum ec;
 
-    bool indicator = find_extrema_in_dog_v6_sub<vlfeat_mode>( dog, debug_octave, level, width, height, maxlevel, ec );
+    bool indicator = find_extrema_in_dog_v6_sub<vlfeat_mode>( dog, octave, level, width, height, maxlevel, ec );
 
     uint32_t write_index = extrema_count<HEIGHT>( indicator, extrema_counter );
 
