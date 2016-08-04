@@ -72,7 +72,7 @@ Image::~Image( )
 
 void Image::load( const Config& conf, const imgStream& inp )
 {
-#if 1
+#if 0
     ofstream of( "color-conv.pgm" );
     of << "P2" << endl
        << _w << " " << _h << endl

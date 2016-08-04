@@ -92,6 +92,7 @@ void PopSift::execute( int pipe, const imgStream* inpPtr )
     cudaEvent_t start, end;
     cudaEventCreate( &start );
     cudaEventCreate( &end );
+
     cudaDeviceSynchronize();
     cudaEventRecord( start, 0 );
 

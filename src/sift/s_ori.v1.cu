@@ -445,7 +445,6 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
             int num_ext = atomicMin( extrema_counter, d_max_orientations );
         }
     }
-
 }
 
 /*************************************************************
