@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# IMAGE1=/local/home/griff/GIT/github/openmvg/src/openMVG_Samples/imageData/StanfordMobileVisualSearch/Ace_40p_gray.pgm
+IMAGE1=/local/home/griff/GIT/github/openmvg/src/openMVG_Samples/imageData/StanfordMobileVisualSearch/Ace_40p_gray.pgm
 # IMAGE1=/local/home/griff/GIT/github/openmvg/build/gray.pgm
 
 # For a package to compare with OpenCV and VLFeat
@@ -11,7 +11,7 @@
 # IMAGE5=../sample/boat/img5.ppm
 # IMAGE6=../sample/boat/img6.ppm
 
-IMAGE1=../sample/big_set/boat/img3.ppm
+# IMAGE1=../sample/big_set/boat/img3.ppm
 IMAGE2=../sample/big_set/boat/img6.ppm
 IMAGE3=../sample/big_set/boat/img2.ppm
 IMAGE4=../sample/big_set/boat/img1.ppm
@@ -60,11 +60,16 @@ IMAGE46=../sample/big_set/trees/img1.ppm
 IMAGE47=../sample/big_set/trees/img5.ppm
 IMAGE48=../sample/big_set/trees/img4.ppm
 
-IMAGE1=../sample/big_set/leuven/img6.ppm
+# IMAGE1=../sample/big_set/leuven/img6.ppm
 
 # For testing edge effects on a tiny hand-crafted image
 # IMAGE1=../sample/box-6x6.pgm
+# IMAGE1=../sample/line-20x20.pgm
 
+
+#
+#################### PARAMETERS ####################
+#
 # For running with default parameters, assuming an unblurred input image
 # PARAMS=
 
@@ -72,46 +77,58 @@ IMAGE1=../sample/big_set/leuven/img6.ppm
 # PARAMS="--indirect-unfiltered --threshold=0.04 --edge-threshold=10.0" # finds 4 points
 # PARAMS="--downsampling=0 --octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0"
 # PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --print-gauss-tables"
-# PARAMS="--popsift-mode --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
-# PARAMS="--vlfeat-mode --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
-# PARAMS="--opencv-mode --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
-PARAMS="--popsift-mode --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
+# PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+# PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
 # PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --bemap-orientation"
-# PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0"
 # PARAMS="--vlfeat-mode --sigma=0.82 --octaves=1 --levels=1 --downsampling=0 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 # PARAMS="--sigma=1.6 --octaves=4 --levels=3 --downsampling=0 --indirect-unfiltered --threshold=0.0 --edge-threshold=10.0"
 # PARAMS="--popsift-mode --downsampling=0 --octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 
+PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+# PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
+
+# MODE=--popsift-mode
+# MODE=--vlfeat-mode
+MODE=--opencv-mode
+
 LOG=--log
 # LOG=
+
+# SUFFIX=
+# SUFFIX=-vlfeat
+SUFFIX=-opencv
+
+#################### PARAMETERS ####################
 
 rm -rf outputs
 
 mkdir -p outputs/popsift
 
-# for i in $IMAGE1 ; do
+for i in $IMAGE1 ; do
 # for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 ; do
-for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 $IMAGE7 $IMAGE8 $IMAGE9 $IMAGE10 $IMAGE11 $IMAGE12 $IMAGE13 $IMAGE14 $IMAGE15 $IMAGE16 $IMAGE17 $IMAGE18 $IMAGE19 $IMAGE20 $IMAGE21 $IMAGE22 $IMAGE23 $IMAGE24 $IMAGE25 $IMAGE26 $IMAGE27 $IMAGE28 $IMAGE29 $IMAGE30 $IMAGE31 $IMAGE32 $IMAGE33 $IMAGE34 $IMAGE35 $IMAGE36 $IMAGE37 $IMAGE38 $IMAGE39 $IMAGE40 $IMAGE41 $IMAGE42 $IMAGE43 $IMAGE44 $IMAGE45 $IMAGE46 $IMAGE47 $IMAGE48 ; do
+# for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 $IMAGE7 $IMAGE8 $IMAGE9 $IMAGE10 $IMAGE11 $IMAGE12 $IMAGE13 $IMAGE14 $IMAGE15 $IMAGE16 $IMAGE17 $IMAGE18 $IMAGE19 $IMAGE20 $IMAGE21 $IMAGE22 $IMAGE23 $IMAGE24 $IMAGE25 $IMAGE26 $IMAGE27 $IMAGE28 $IMAGE29 $IMAGE30 $IMAGE31 $IMAGE32 $IMAGE33 $IMAGE34 $IMAGE35 $IMAGE36 $IMAGE37 $IMAGE38 $IMAGE39 $IMAGE40 $IMAGE41 $IMAGE42 $IMAGE43 $IMAGE44 $IMAGE45 $IMAGE46 $IMAGE47 $IMAGE48 ; do
   if [ -f "$i" ] ; then
     Dirname=`dirname $i`
     Dirname=`basename ${Dirname}`
-    outname=`basename --suffix=.ppm $i`
-    # outname=`basename --suffix=.pgm $i`
-    echo ./sift_v4 $PARAMS $LOG $i
-    ./sift_v4 $PARAMS $LOG $i
+    # outname=`basename --suffix=.ppm $i`
+    outname=`basename --suffix=.pgm $i`
+    dir1st=outputs/${Dirname}/${outname}
+    dir2nd=outputs/${Dirname}/popsift${SUFFIX}
+    echo ./sift_v4 $MODE $PARAMS $LOG $i
+    ./sift_v4 $MODE $PARAMS $LOG $i
     if [ ! -z "$LOG" ] ; then
-      echo "mkdir -p outputs/${Dirname}/${outname}"
-      mkdir -p outputs/${Dirname}/${outname}
-      mv dir-* outputs/${Dirname}/${outname}/
-      mkdir -p outputs/${Dirname}/popsift
-      echo "128" > outputs/${Dirname}/popsift/${outname}.sift
-      wc -l  outputs/${Dirname}/${outname}/dir-desc/* | tail -1 | awk '{print $1;}' >> outputs/${Dirname}/popsift/${outname}.sift
-      cat  outputs/${Dirname}/${outname}/dir-desc/* >> outputs/${Dirname}/popsift/${outname}.sift
+      echo "mkdir -p ${dir1st}"
+      mkdir -p ${dir1st}
+      mv dir-* ${dir1st}
+      mkdir -p ${dir2nd}
+      echo "128" > ${dir2nd}/${outname}.sift
+      wc -l  ${dir1st}/dir-desc/* | tail -1 | awk '{print $1;}' >> ${dir2nd}/${outname}.sift
+      cat  ${dir1st}/dir-desc/* >> ${dir2nd}/${outname}.sift
       echo " "
     fi
   fi
   if [ ! -z "$LOG" ] ; then
-    ( cd outputs; zip -r popsift.zip ${Dirname}/popsift )
+    ( cd outputs; zip -r popsift${SUFFIX}.zip ${Dirname}/popsift${SUFFIX} )
   fi
 done
 
