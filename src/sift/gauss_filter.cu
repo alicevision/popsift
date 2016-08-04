@@ -65,8 +65,7 @@ void print_gauss_filter_symbol( int columns )
 
 void init_filter( const Config& conf,
                   float         sigma0,
-                  int           levels,
-                  float         downsampling_factor )
+                  int           levels )
 {
     if( sigma0 > 2.0 )
     {
@@ -85,17 +84,17 @@ void init_filter( const Config& conf,
 
     if( conf.ifPrintGaussTables() ) {
         printf( "\n"
-                "Downsampling factor: %f (i.e. original image is scaled by a factor of %f)\n"
+                "Upscaling factor: %f (i.e. original image is scaled by a factor of %f)\n"
                 "\n"
                 "Sigma computations\n"
                 "    Initial sigma is %f\n"
                 "    Input blurriness is assumed to be %f (scaled to %f)\n"
                 ,
-                downsampling_factor,
-                pow( 2.0, -1.0f * downsampling_factor ),
+                conf.getUpscaleFactor(),
+                pow( 2.0, conf.getUpscaleFactor() ),
                 sigma0,
                 conf.getInitialBlur(),
-                conf.getInitialBlur() * pow( 2.0, -1.0f * downsampling_factor )
+                conf.getInitialBlur() * pow( 2.0, conf.getUpscaleFactor() )
                 );
         // printf("sigma is initially sigma0, afterwards the difference between previous 2 sigmas\n");
     }
@@ -107,7 +106,7 @@ void init_filter( const Config& conf,
     // float local_filter_initial_blur[ GAUSS_ALIGN ];
 
     if( conf.hasInitialBlur() ) {
-        const float initial_blur = conf.getInitialBlur() * pow( 2.0, -1.0f * downsampling_factor );
+        const float initial_blur = conf.getInitialBlur() * pow( 2.0, conf.getUpscaleFactor() );
 
         h_gauss.initial_sigma = sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) );
         h_gauss.initial_span  = ( conf.getSiftMode() == Config::OpenCV )

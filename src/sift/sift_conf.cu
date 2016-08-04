@@ -4,7 +4,7 @@ namespace popart
 {
 
 Config::Config( )
-    : start_sampling( -1 )
+    : _upscale_factor( 1.0f )
     , octaves( -1 )
     , levels( 3 )
     , sigma( 1.6f )
@@ -42,7 +42,7 @@ void Config::setScalingMode( ScalingMode mode )
     scaling_mode = mode;
 }
 
-void Config::setDownsampling( float v ) { start_sampling = v; }
+void Config::setDownsampling( float v ) { _upscale_factor = -v; }
 void Config::setOctaves( int v ) { octaves = v; }
 void Config::setLevels( int v ) { levels = v; }
 void Config::setSigma( float v ) { sigma = v; }

@@ -190,11 +190,11 @@ void Octave::writeDescriptor( const Config& conf, ostream& ostr, bool really )
 
         int sz = _h_extrema_mgmt[l];
         for( int s=0; s<sz; s++ ) {
-            const float reduce = conf.start_sampling;
+            const float up_fac = conf.getUpscaleFactor();
 
-            float xpos  = cand[s].xpos * pow( 2.0, _debug_octave_id + reduce );
-            float ypos  = cand[s].ypos * pow( 2.0, _debug_octave_id + reduce );
-            float sigma = cand[s].sigma * pow( 2.0, _debug_octave_id + reduce );
+            float xpos  = cand[s].xpos * pow( 2.0, _debug_octave_id - up_fac );
+            float ypos  = cand[s].ypos * pow( 2.0, _debug_octave_id - up_fac );
+            float sigma = cand[s].sigma * pow( 2.0, _debug_octave_id - up_fac );
             float ori = cand[s].orientation;
             ori = ori / M_PI2 * 360;
             if( ori < 0 ) ori += 360;

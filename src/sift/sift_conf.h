@@ -57,11 +57,6 @@ struct Config
     // get the SIFT mode for more detailed sub-modes
     SiftMode getSiftMode() const;
 
-    // determine the image format of the first octave
-    // relative to the input image's size (x,y) as follows:
-    // (x / 2^start_sampling, y / 2^start_sampling )
-    float    start_sampling;
-
     // The number of octaves is chosen freely. If not specified,
     // it is: log_2( min(x,y) ) - 3 - start_sampling
     int      octaves;
@@ -81,6 +76,13 @@ struct Config
     // default edge_limit 10.0f from Bemap
     float    _edge_limit;
 
+    /* The input image is stretched by 2^upscale_factor
+     * before processing. The factor 1 is default.
+     */
+    float getUpscaleFactor( ) const {
+        return _upscale_factor;
+    }
+
 private:
     // default threshold 0.0 default of vlFeat
     // default threshold 5.0 / 256.0
@@ -89,6 +91,11 @@ private:
     // default threshold 0.04 / (_levels-3.0) / 2.0f * 255
     //                   from Bemap -> 1.69 (makes no sense)
     float    _threshold;
+
+    // determine the image format of the first octave
+    // relative to the input image's size (x,y) as follows:
+    // (x / 2^start_sampling, y / 2^start_sampling )
+    float    _upscale_factor;
 
 public:
     // default LogMode::None

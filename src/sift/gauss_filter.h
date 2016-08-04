@@ -66,11 +66,9 @@ struct GaussInfo
 
 extern __device__ __constant__ GaussInfo d_gauss;
 
-// void init_filter( float sigma0, int levels, bool vlfeat_mode );
 void init_filter( const Config& conf,
                   float         sigma0,
-                  int           levels,
-                  float         downsampling );
+                  int           levels );
 
 } // namespace popart
 

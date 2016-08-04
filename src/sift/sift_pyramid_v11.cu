@@ -346,18 +346,20 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, in
 
     float shift = 0.5f;
 
-    switch( mode )
-    {
-    case Config::PopSift :
-    case Config::VLFeat :
+    if( octave == 0 ) {
+        switch( mode )
         {
-            float upsampling = -conf.start_sampling;
-            shift = 0.5f * powf( 2.0f, upsampling );
+        case Config::PopSift :
+        case Config::VLFeat :
+            shift = 0.5f * powf( 2.0f, conf.getUpscaleFactor() );
+            break;
+        case Config::OpenCV :
+        default :
+            break;
         }
-        break;
-    case Config::OpenCV :
-    default :
-        break;
+    } else {
+        // This code is only called for direct downscaling from the original image
+        shift = 0.5f;
     }
 
     if( initial_blur )
@@ -522,15 +524,6 @@ void Pyramid::build_v11( const Config& conf, Image* base )
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
     cudaDeviceSynchronize();
-
-#if 0
-    gauss::v11::print_points
-        <<<1,1>>>
-        ( base->getUpscaledTexture(),
-          base->getInputTexture(),
-          _octaves[0].getData(0) );
-#endif
-
 
     for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
         Octave& oct_obj   = _octaves[octave];

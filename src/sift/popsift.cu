@@ -15,11 +15,7 @@ PopSift::PopSift( const popart::Config& config )
 
     popart::init_filter( _config,
                          _config.sigma,
-                         _config.levels,
-                         // vlfeat_mode,
-                         // _config.hasInitialBlur(),
-                         // _config.getInitialBlur(),
-                         _config.start_sampling );
+                         _config.levels );
     popart::init_sigma(  _config.sigma,
                          _config.levels,
                          _config.getPeakThreshold(),
@@ -46,7 +42,8 @@ bool PopSift::init( int pipe, int w, int h )
      * up= 0 -> scale factor=1
      * up= 1 -> scale factor=0.5
      */
-    float scaleFactor = 1.0 / pow( 2.0, _config.start_sampling );
+    float upscaleFactor = _config.getUpscaleFactor();
+    float scaleFactor = 1.0f / powf( 2.0f, -upscaleFactor );
 
     if( _config.octaves < 0 ) {
         int oct = _config.octaves;
@@ -58,11 +55,8 @@ bool PopSift::init( int pipe, int w, int h )
     _pipe[pipe]._inputImage = new popart::Image( w, h );
     _pipe[pipe]._pyramid = new popart::Pyramid( _config,
                                                 _pipe[pipe]._inputImage,
-                                                // octaves,
-                                                // _config.levels,
                                                 ceilf( w * scaleFactor ),
                                                 ceilf( h * scaleFactor ) );
-                                                // _config.scaling_mode );
 
     cudaDeviceSynchronize();
     cudaEventRecord( end, 0 );
