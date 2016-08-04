@@ -164,6 +164,7 @@ void keypoint_descriptors( Extremum*     cand,
                                   cand,
                                   descs,
                                   layer );
+        __syncthreads();
     }
 }
 
@@ -285,6 +286,7 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
 }
 
 __global__ void descriptor_starter( int*          extrema_counter,
+                                    int*          featvec_counter,
                                     Extremum*     extrema,
                                     Descriptor*   descs,
                                     Plane2D_float layer )
@@ -311,14 +313,14 @@ __global__ void descriptor_starter( int*          extrema_counter,
     // it may be good to start more threads, but this kernel
     // is too fast to be noticable in profiling
 
-    grid.x  = grid_divide( *extrema_counter, 32 );
+    grid.x  = grid_divide( *featvec_counter, 32 );
     block.x = 32;
     block.y = 32;
     block.z = 1;
 
     normalize_histogram
         <<<grid,block>>>
-        ( descs, *extrema_counter );
+        ( descs, *featvec_counter );
 #endif // not USE_DYNAMIC_PARALLELISM
 }
 
@@ -344,9 +346,12 @@ void Pyramid::descriptors_v1( )
 
             int* extrema_counters = oct_obj.getExtremaCounterD();
             int* extrema_counter  = &extrema_counters[level];
+            int* featvec_counters = oct_obj.getFeatVecCounterD();
+            int* featvec_counter  = &featvec_counters[level];
             descriptor_starter
                 <<<1,1,0,oct_str>>>
                 ( extrema_counter,
+                  featvec_counter,
                   oct_obj.getExtrema( level ),
                   oct_obj.getDescriptors( level ),
                   data );
