@@ -1,6 +1,7 @@
 #include "sift_pyramid.h"
 #include "sift_constants.h"
 #include "s_gradiant.h"
+#include "excl_blk_prefix_sum.h"
 #include "debug_macros.h"
 
 #include <math.h>
@@ -254,23 +255,62 @@ void compute_keypoint_orientations( Extremum*     extremum,
     ext->num_ori = angles;
 }
 
+class ExtremaRead
+{
+    const Extremum* const _oris;
+public:
+    inline __device__
+    ExtremaRead( const Extremum* const d_oris ) : _oris( d_oris ) { }
+
+    inline __device__
+    int operator()( int n ) const { return _oris[n].num_ori; }
+};
+
+class ExtremaWrt
+{
+    Extremum* _oris;
+public:
+    inline __device__
+    ExtremaWrt( Extremum* d_oris ) : _oris( d_oris ) { }
+
+    inline __device__
+    int& operator()( int n ) const { return _oris[n].idx_ori; }
+};
+
+class ExtremaTot
+{
+    int* _extrema_counter;
+public:
+    inline __device__
+    ExtremaTot( int* extrema_counter ) : _extrema_counter( extrema_counter ) { }
+
+    inline __device__
+    int& operator()() { return *_extrema_counter; }
+};
 
 __global__
-void orientation_starter_v1( Extremum*     extremum,
-                             int*          extrema_counter,
-                             Plane2D_float layer )
+void ori_prefix_sum( int*      extrema_counter,
+                     int*      featvec_counter,
+                     Extremum* extremum )
 {
-    dim3 block;
-    dim3 grid;
-    grid.x  = *extrema_counter;
-    block.x = ORI_V1_NUM_THREADS;
+    if( threadIdx.x == 0 && threadIdx.y == 0 ) {
+        printf("Enter %s, %d extrema\n", __func__, *extrema_counter );
+    }
+    __syncthreads();
 
-    if( grid.x != 0 ) {
-        compute_keypoint_orientations_v1
-            <<<grid,block>>>
-            ( extremum,
-              extrema_counter,
-              layer );
+    ExtremaRead r( extremum );
+    ExtremaWrt  w( extremum );
+    ExtremaTot  t( featvec_counter );
+    ExclusivePrefixSum<ExtremaRead,ExtremaWrt,ExtremaTot>( *extrema_counter, r, w, t );
+
+    __syncthreads();
+
+    if( threadIdx.x == 0 && threadIdx.y == 0 ) {
+        *featvec_counter = min( *featvec_counter, d_max_orientations );
+    }
+
+    if( threadIdx.x == 0 && threadIdx.y == 0 ) {
+        printf("Leave %s, %d extrema -> %d oris\n", __func__, *extrema_counter, *featvec_counter );
     }
 }
 
@@ -280,8 +320,9 @@ void orientation_starter_v1( Extremum*     extremum,
  *************************************************************/
 
 __global__
-void orientation_starter_v2( Extremum*     extremum,
+void orientation_starter( Extremum*     extremum,
                              int*          extrema_counter,
+                             int*          featvec_counter,
                              Plane2D_float layer )
 {
 #ifdef USE_DYNAMIC_PARALLELISM // defined in_s_pyramid.h
@@ -291,11 +332,20 @@ void orientation_starter_v2( Extremum*     extremum,
     block.x = ORI_V1_NUM_THREADS;
 
     if( grid.x != 0 ) {
-        compute_keypoint_orientations_v2
+        compute_keypoint_orientations
             <<<grid,block>>>
             ( extremum,
               extrema_counter,
               layer );
+
+        block.x = 32;
+        block.y = 32;
+        grid.x  = 1;
+        ori_prefix_sum
+            <<<grid,block>>>
+            ( extrema_counter,
+              featvec_counter,
+              extremum );
     }
 #endif // USE_DYNAMIC_PARALLELISM
 }
@@ -316,11 +366,14 @@ void Pyramid::orientation_v1( )
 
             int* extrema_counters = oct_obj.getExtremaCounterD( );
             int* extrema_counter  = &extrema_counters[level];
-                orientation_starter_v2
-                    <<<1,1,0,oct_str>>>
-                    ( oct_obj.getExtrema( level ),
-                      extrema_counter,
-                      oct_obj.getData( level ) );
+            int* featvec_counters = oct_obj.getFeatVecCounterD( );
+            int* featvec_counter  = &featvec_counters[level];
+            orientation_starter
+                <<<1,1,0,oct_str>>>
+                ( oct_obj.getExtrema( level ),
+                  extrema_counter,
+                  featvec_counter,
+                  oct_obj.getData( level ) );
         }
     }
 }
@@ -344,6 +397,7 @@ void Pyramid::orientation_v1( )
 
         int* h_num_extrema = oct_obj.getExtremaMgmtH();
         int* d_num_extrema = oct_obj.getExtremaMgmtD();
+        int* d_num_featvec = oct_obj.getFeatVecMgmtD();
         int* orientation_num_blocks = oct_obj.getNumberOfOriBlocks( );
 
         for( int level=1; level<_levels-2; level++ ) {
@@ -354,13 +408,22 @@ void Pyramid::orientation_v1( )
             grid.x  = h_num_extrema[level];
             block.x = ORI_V1_NUM_THREADS;
             if( grid.x != 0 ) {
-                    compute_keypoint_orientations_v2
-                        <<<grid,block,0,oct_str>>>
-                        ( oct_obj.getExtrema( level ),
-                          &d_num_extrema[level],
-                          oct_obj.getData( level ),
-                          &orientation_num_blocks[level],
-                          grid.x * grid.y );
+                compute_keypoint_orientations
+                    <<<grid,block,0,oct_str>>>
+                    ( oct_obj.getExtrema( level ),
+                      &d_num_extrema[level],
+                      oct_obj.getData( level ),
+                      &orientation_num_blocks[level],
+                      grid.x * grid.y );
+
+                block.x = 32;
+                block.y = 32;
+                grid.x  = 1;
+                ori_prefix_sum
+                    <<<grid,block,0,oct_str>>>
+                    ( &d_num_extrema[level],
+                      &d_num_featvec[level],
+                      oct_obj.getExtrema( level ) );
             }
         }
     }
