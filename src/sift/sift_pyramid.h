@@ -18,7 +18,6 @@ class Pyramid
     int     _gauss_group;
 
     Config::ScalingMode _scaling_mode;
-    bool                _bemap_orientation_mode;
     bool                _assume_initial_blur;
     float               _initial_blur;
 

@@ -70,8 +70,6 @@ static void usage( const char* argv )
          << "                             Does not work yet" << endl
          << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
          << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
-         << " --bemap-orientation         dual smoothing or orientation histogram instead of" << endl
-         << "                             curve fitting (older code)" << endl
          << endl
          << "* Informational *" << endl
          << " --print-gauss-tables        A debug output printing Gauss filter size and tables" << endl
@@ -98,8 +96,7 @@ static struct option longopts[] = {
     { "opencv-mode",         no_argument,            NULL, 1101 },
     { "popsift-mode",        no_argument,            NULL, 1102 },
     { "test-direct-scaling", no_argument,            NULL, 1103 },
-    { "group-gauss",         required_argument,      NULL, 1105 },
-    { "bemap-orientation",   no_argument,            NULL, 1106 },
+    { "group-gauss",         required_argument,      NULL, 1104 },
 
     { "print-gauss-tables",  no_argument,            NULL, 1200 },
 
@@ -138,8 +135,7 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 1101 : config.setMode( popart::Config::OpenCV ); break;
         case 1102 : config.setMode( popart::Config::PopSift ); break;
         case 1103 : config.setScalingMode( popart::Config::ScaleDirect ); break;
-        case 1105 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
-        case 1106 : config.setBemapOrientation( ); break;
+        case 1104 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
 
         case 1200 : config.setPrintGaussTables( ); break;
         default   : usage( appName );

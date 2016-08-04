@@ -29,9 +29,6 @@ struct Config
     void setScalingMode( ScalingMode mode = ScaleDefault );
     void setVerbose( bool on = true );
 
-    void setBemapOrientation( );
-    bool getBemapOrientation( ) const;
-
     void setGaussGroup( int groupsize );
     int  getGaussGroup( ) const;
 
@@ -124,13 +121,6 @@ private:
      */
     bool  _assume_initial_blur;
     float _initial_blur;
-
-    /* The first orientation code was derived from Bemap OpenCL SIFT.
-     * It used double smoothing of the orientation histogram in s_ori.
-     * This has been replaced by direct curve fitting according to Lowe.
-     * Set this to true for old mode.
-     */
-    bool _bemap_orientation;
 
     /* Call the debug functions in gauss_filter.cu to print Gauss
      * filter width and Gauss tables in use.

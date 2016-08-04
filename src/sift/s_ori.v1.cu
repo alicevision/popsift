@@ -36,154 +36,10 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
 /*
  * Compute the keypoint orientations for each extremum
  * using 16 threads for each of them.
- */
-__global__
-void compute_keypoint_orientations_v1( Extremum*     extremum,
-                                       int*          extrema_counter,
-                                       Plane2D_float layer )
-{
-    uint32_t w   = layer.getWidth();
-    uint32_t h   = layer.getHeight();
-
-    // if( threadIdx.y >= mgmt->getCounter() ) return;
-
-    Extremum* ext = &extremum[blockIdx.x];
-
-    float hist[ORI_NBINS];
-    for (int i = 0; i < ORI_NBINS; i++) hist[i] = 0.0f;
-
-    /* keypoint fractional geometry */
-    const float x    = ext->xpos;
-    const float y    = ext->ypos;
-    const float sig  = ext->sigma;
-
-    /* orientation histogram radius */
-    float  sigw = ORI_WINFACTOR * sig;
-    int32_t rad  = (int)rintf((3.0f * sigw));
-
-    float factor = __fdividef( -0.5f, (sigw * sigw) );
-    int sq_thres = rad * rad;
-    int32_t xmin = max(1,     (int32_t)floor(x - rad));
-    int32_t xmax = min(w - 2, (int32_t)floor(x + rad));
-    int32_t ymin = max(1,     (int32_t)floor(y - rad));
-    int32_t ymax = min(h - 2, (int32_t)floor(y + rad));
-
-    int wx = xmax - xmin + 1;
-    int hy = ymax - ymin + 1;
-    int loops = wx * hy;
-
-    for(int i = threadIdx.x; i < loops; i+=ORI_V1_NUM_THREADS)
-    {
-        int yy = i / wx + ymin;
-        int xx = i % wx + xmin;
-
-        float grad;
-        float theta;
-        get_gradiant( grad,
-                      theta,
-                      xx,
-                      yy,
-                      layer );
-
-        float dx = xx - x;
-        float dy = yy - y;
-
-        int sq_dist  = dx * dx + dy * dy;
-        if (sq_dist <= sq_thres) {
-            float weight = grad * expf(sq_dist * factor);
-
-            int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
-            // int bidx = (int)roundf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
-
-            if( bidx > ORI_NBINS ) {
-                printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
-            }
-
-            bidx = (bidx == ORI_NBINS) ? 0 : bidx;
-
-            hist[bidx] += weight;
-        }
-    }
-
-    /* reduction here */
-    for (int i = 0; i < ORI_NBINS; i++) {
-        hist[i] += __shfl_down( hist[i], 8 );
-        hist[i] += __shfl_down( hist[i], 4 );
-        hist[i] += __shfl_down( hist[i], 2 );
-        hist[i] += __shfl_down( hist[i], 1 );
-        hist[i]  = __shfl( hist[i], 0 );
-    }
-
-
-    if(threadIdx.x != 0) return;
-
-    for( int iter = 0; iter < 2; iter++ ) {
-        float first = hist[0];
-        float prev = hist[(ORI_NBINS - 1)];
-
-        int bin;
-        //0,35
-        for( bin = 0; bin < ORI_NBINS - 1; bin++ ) {
-            float temp = hist[bin];
-            hist[bin] = 0.25f * prev + 0.5f * hist[bin] + 0.25f * hist[bin + 1];
-            prev = temp;
-        }
-
-        hist[bin] = 0.25f * prev + 0.5f * hist[bin] + 0.25f * first;
-        //z vprintf("val: %f, indx: %d\n", hist[bin], bin);
-    }
-	
-    /* find histogram maximum */
-    float maxh = NINF;
-    int binh = 0;
-    for (int bin = 0; bin < ORI_NBINS; bin++) {
-        // maxh = fmaxf(maxh, hist[bin]);
-        if (hist[bin] > maxh) {
-            maxh = hist[bin];
-            binh = bin;
-        }
-    }
-
-    {
-        float hc = hist[binh];
-        float hn = hist[((binh + 1 + ORI_NBINS) % ORI_NBINS)];
-        float hp = hist[((binh - 1 + ORI_NBINS) % ORI_NBINS)];
-        float th = compute_angle(binh, hc, hn, hp);
-
-        ext->orientation[0] = th;
-    }
-
-    /* find other peaks, boundary of 80% of max */
-    int nangles = 1;
-
-    for (int numloops = 1; numloops < ORI_NBINS; numloops++) {
-        int bin = (binh + numloops) % ORI_NBINS;
-
-        float hc = hist[bin];
-        float hn = hist[((bin + 1 + ORI_NBINS) % ORI_NBINS)];
-        float hp = hist[((bin - 1 + ORI_NBINS) % ORI_NBINS)];
-
-        if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
-            float th = compute_angle(bin, hc, hn, hp);
-
-            ext->orientation[nangles] = th;
-
-            nangles++;
-
-            if( nangles == ORIENTATION_MAX_COUNT ) break;
-        }
-    }
-
-    ext->num_ori = nangles;
-}
-
-/*
- * Compute the keypoint orientations for each extremum
- * using 16 threads for each of them.
  * direct curve fitting approach
  */
 __global__
-void compute_keypoint_orientations_v2( Extremum*     extremum,
+void compute_keypoint_orientations( Extremum*     extremum,
                                        int*          extrema_counter,
                                        Plane2D_float layer )
 {
@@ -398,10 +254,6 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
     ext->num_ori = angles;
 }
 
-/*************************************************************
- * V4: host side
- *************************************************************/
-#ifdef USE_DYNAMIC_PARALLELISM // defined in_s_pyramid.h
 
 __global__
 void orientation_starter_v1( Extremum*     extremum,
@@ -422,11 +274,17 @@ void orientation_starter_v1( Extremum*     extremum,
     }
 }
 
+
+/*************************************************************
+ * V4: host side
+ *************************************************************/
+
 __global__
 void orientation_starter_v2( Extremum*     extremum,
                              int*          extrema_counter,
                              Plane2D_float layer )
 {
+#ifdef USE_DYNAMIC_PARALLELISM // defined in_s_pyramid.h
     dim3 block;
     dim3 grid;
     grid.x  = *extrema_counter;
@@ -439,8 +297,10 @@ void orientation_starter_v2( Extremum*     extremum,
               extrema_counter,
               layer );
     }
+#endif // USE_DYNAMIC_PARALLELISM
 }
 
+#ifdef USE_DYNAMIC_PARALLELISM // defined in_s_pyramid.h
 __host__
 void Pyramid::orientation_v1( )
 {
@@ -456,33 +316,16 @@ void Pyramid::orientation_v1( )
 
             int* extrema_counters = oct_obj.getExtremaCounterD( );
             int* extrema_counter  = &extrema_counters[level];
-            if( _bemap_orientation_mode ) {
-                orientation_starter_v1
-                    <<<1,1,0,oct_str>>>
-                    ( oct_obj.getExtrema( level ),
-                      extrema_counter,
-                      oct_obj.getData( level ) );
-            }  else {
                 orientation_starter_v2
                     <<<1,1,0,oct_str>>>
                     ( oct_obj.getExtrema( level ),
                       extrema_counter,
                       oct_obj.getData( level ) );
-            }
         }
     }
 }
 
 #else // not USE_DYNAMIC_PARALLELISM
-
-__global__
-void orientation_starter_v1( Extremum*,
-                             int*,
-                             Plane2D_float,
-                             int* )
-{
-    /* dummy to make the linker happy */
-}
 
 __host__
 void Pyramid::orientation_v1( )
@@ -511,13 +354,6 @@ void Pyramid::orientation_v1( )
             grid.x  = h_num_extrema[level];
             block.x = ORI_V1_NUM_THREADS;
             if( grid.x != 0 ) {
-                if( _bemap_orientation_mode ) {
-                    compute_keypoint_orientations_v1
-                        <<<grid,block,0,oct_str>>>
-                        ( oct_obj.getExtrema( level ),
-                          &d_num_extrema[level],
-                          oct_obj.getData( level ) );
-                } else {
                     compute_keypoint_orientations_v2
                         <<<grid,block,0,oct_str>>>
                         ( oct_obj.getExtrema( level ),
@@ -525,7 +361,6 @@ void Pyramid::orientation_v1( )
                           oct_obj.getData( level ),
                           &orientation_num_blocks[level],
                           grid.x * grid.y );
-                }
             }
         }
     }

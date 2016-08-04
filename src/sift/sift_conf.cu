@@ -17,7 +17,6 @@ Config::Config( )
     , gauss_group_size( 1 )
     , _assume_initial_blur( false )
     , _initial_blur( 0.0f )
-    , _bemap_orientation( false )
     , _print_gauss_tables( false )
 {
 }
@@ -74,16 +73,6 @@ bool Config::hasInitialBlur( ) const
 float Config::getInitialBlur( ) const
 {
     return _initial_blur;
-}
-
-void Config::setBemapOrientation( )
-{
-    _bemap_orientation = true;
-}
-
-bool Config::getBemapOrientation( ) const
-{
-    return _bemap_orientation;
 }
 
 float Config::getPeakThreshold() const
