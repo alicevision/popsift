@@ -1,22 +1,22 @@
 #!/bin/bash
 
-IMAGE1=/local/home/griff/GIT/github/openmvg/src/openMVG_Samples/imageData/StanfordMobileVisualSearch/Ace_40p_gray.pgm
+# IMAGE1=/local/home/griff/GIT/github/openmvg/src/openMVG_Samples/imageData/StanfordMobileVisualSearch/Ace_40p_gray.pgm
 # IMAGE1=/local/home/griff/GIT/github/openmvg/build/gray.pgm
 
 # For a package to compare with OpenCV and VLFeat
-# IMAGE1=../sample/boat/img1.ppm
-# IMAGE2=../sample/boat/img2.ppm
-# IMAGE3=../sample/boat/img3.ppm
-# IMAGE4=../sample/boat/img4.ppm
-# IMAGE5=../sample/boat/img5.ppm
-# IMAGE6=../sample/boat/img6.ppm
+IMAGE1=../sample/boat/img1.ppm
+IMAGE2=../sample/boat/img2.ppm
+IMAGE3=../sample/boat/img3.ppm
+IMAGE4=../sample/boat/img4.ppm
+IMAGE5=../sample/boat/img5.ppm
+IMAGE6=../sample/boat/img6.ppm
 
 # IMAGE1=../sample/big_set/boat/img3.ppm
-IMAGE2=../sample/big_set/boat/img6.ppm
-IMAGE3=../sample/big_set/boat/img2.ppm
-IMAGE4=../sample/big_set/boat/img1.ppm
-IMAGE5=../sample/big_set/boat/img5.ppm
-IMAGE6=../sample/big_set/boat/img4.ppm
+# IMAGE2=../sample/big_set/boat/img6.ppm
+# IMAGE3=../sample/big_set/boat/img2.ppm
+# IMAGE4=../sample/big_set/boat/img1.ppm
+# IMAGE5=../sample/big_set/boat/img5.ppm
+# IMAGE6=../sample/big_set/boat/img4.ppm
 IMAGE7=../sample/big_set/bark/img3.ppm
 IMAGE8=../sample/big_set/bark/img6.ppm
 IMAGE9=../sample/big_set/bark/img2.ppm
@@ -76,19 +76,18 @@ IMAGE48=../sample/big_set/trees/img4.ppm
 # PARAMS="--indirect-unfiltered --octaves=4 --threshold=0.1 --edge-threshold=10.0"
 # PARAMS="--indirect-unfiltered --threshold=0.04 --edge-threshold=10.0" # finds 4 points
 # PARAMS="--downsampling=0 --octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0"
-# PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --print-gauss-tables"
+PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --print-gauss-tables"
 # PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 # PARAMS="--octaves=8 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
 # PARAMS="--octaves=4 --indirect-unfiltered --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --bemap-orientation"
 # PARAMS="--sigma=1.6 --octaves=4 --levels=3 --downsampling=0 --indirect-unfiltered --threshold=0.0 --edge-threshold=10.0"
 
-
 MODE=--popsift-mode
 # MODE=--vlfeat-mode
 # MODE=--opencv-mode
 
-LOG=--log
-# LOG=
+# LOG=--log
+LOG=
 
 SUFFIX=
 # SUFFIX=-popsift
@@ -107,8 +106,8 @@ for i in $IMAGE1 ; do
   if [ -f "$i" ] ; then
     Dirname=`dirname $i`
     Dirname=`basename ${Dirname}`
-    # outname=`basename --suffix=.ppm $i`
-    outname=`basename --suffix=.pgm $i`
+    outname=`basename --suffix=.ppm $i`
+    # outname=`basename --suffix=.pgm $i`
     dir1st=outputs/${Dirname}/${outname}
     dir2nd=outputs/${Dirname}/popsift${SUFFIX}
     echo ./sift_v4 $MODE $PARAMS $LOG $i
