@@ -631,6 +631,12 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
     }
 }
 
+__global__
+void print_extrema_counter( int octave, int level, int* extrema_counter )
+{
+    printf("o/l %d/%d found %d extrema\n", octave, level, *extrema_counter );
+}
+
 
 /*************************************************************
  * V6: host side
@@ -715,6 +721,8 @@ void Pyramid::find_extrema_v6_sub( const Config& conf )
                       grid.x * grid.y );
                 break;
             }
+
+            print_extrema_counter<<<1,1,0,oct_str>>>( octave, level, extrema_counter );
 
             cudaEvent_t  extrema_done_ev  = oct_obj.getEventExtremaDone(level+2);
             cudaEventRecord( extrema_done_ev, oct_str );
