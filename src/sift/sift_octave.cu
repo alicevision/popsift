@@ -102,6 +102,7 @@ void Octave::reset_extrema_mgmt( )
     memset( _h_extrema_counter, 0, _levels * sizeof(int) );
     popcuda_memset_async( _d_extrema_counter, 0, _levels * sizeof(int), stream );
     popcuda_memset_async( _d_extrema_num_blocks, 0, _levels * sizeof(int), stream );
+    popcuda_memset_async( _d_featvec_counter, 0, _levels * sizeof(int), stream );
 #if 0
     popcuda_memset_async( _d_orientation_num_blocks, 0, _levels * sizeof(int), stream );
 #endif
