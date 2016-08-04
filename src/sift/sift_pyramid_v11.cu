@@ -81,7 +81,8 @@ void horiz_tex_128x1( cudaTextureObject_t src_data,
     const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
     out += ( v3 * g );
 
-    dst_data.ptr(blockIdx.y)[off_x] = scalbnf( out, 8 );
+    dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f; // scalbnf( out, 8 );
+    // dst_data.ptr(blockIdx.y)[off_x] = scalbnf( out, 8 );
 }
 
 __global__
@@ -115,7 +116,8 @@ void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
     const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
     out += ( v3 * g );
 
-    dst_data.ptr(blockIdx.y)[off_x] = scalbnf( out, 8 );
+    dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f; // scalbnf( out, 8 );
+    // dst_data.ptr(blockIdx.y)[off_x] = scalbnf( out, 8 );
 }
 
 
@@ -348,18 +350,14 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, in
     {
     case Config::PopSift :
     case Config::VLFeat :
-        if( conf.start_sampling == -1.0f ) shift = 1.0f;
-        else if( conf.start_sampling == 0.0f ) shift = 0.5f;
-        else {
-            cerr << "Not verified yet" << endl;
-            exit( -1 );
+        {
+            float upsampling = -conf.start_sampling;
+            shift = 0.5f * powf( 2.0f, upsampling );
         }
         break;
     case Config::OpenCV :
-        break;
     default :
-        cerr << "Invalid sift mode" << endl;
-        exit( -1 );
+        break;
     }
 
     if( initial_blur )
