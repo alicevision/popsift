@@ -293,11 +293,6 @@ void ori_prefix_sum( int*      extrema_counter,
                      int*      featvec_counter,
                      Extremum* extremum )
 {
-    if( threadIdx.x == 0 && threadIdx.y == 0 ) {
-        printf("Enter %s, %d extrema\n", __func__, *extrema_counter );
-    }
-    __syncthreads();
-
     ExtremaRead r( extremum );
     ExtremaWrt  w( extremum );
     ExtremaTot  t( featvec_counter );
@@ -307,19 +302,10 @@ void ori_prefix_sum( int*      extrema_counter,
 
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
         *featvec_counter = min( *featvec_counter, d_max_orientations );
-    }
 
-    if( threadIdx.x == 0 && threadIdx.y == 0 ) {
-        printf("Leave %s, %d extrema -> %d oris\n", __func__, *extrema_counter, *featvec_counter );
+        // printf("Leave %s, %d extrema -> %d oris\n", __func__, *extrema_counter, *featvec_counter );
     }
 }
-
-__global__
-void print_ori_counter( int octave, int level, int* extrema_counter, int* featvec_counter )
-{
-    printf("o/l %d/%d found %d extrema %d orientations\n", octave, level, *extrema_counter, *featvec_counter );
-}
-
 
 /*************************************************************
  * V4: host side
@@ -380,9 +366,6 @@ void Pyramid::orientation_v1( )
                   extrema_counter,
                   featvec_counter,
                   oct_obj.getData( level ) );
-
-            print_ori_counter<<<1,1,0,oct_str>>>
-                ( octave, level, extrema_counter, featvec_counter );
         }
     }
 }
@@ -434,9 +417,6 @@ void Pyramid::orientation_v1( )
                       &d_num_featvec[level],
                       oct_obj.getExtrema( level ) );
             }
-
-            print_ori_counter<<<1,1,0,oct_str>>>
-                ( octave, level, &d_num_extrema[level], &d_num_featvec[level] );
         }
     }
 }
