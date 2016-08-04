@@ -146,11 +146,15 @@ void Octave::downloadDescriptor( const Config& conf )
         if( sz != 0 ) {
             if( _h_extrema[l] == 0 ) continue;
 
-            popcuda_memcpy_async( _h_desc[l],
-                                  _d_desc[l],
-                                  sz * sizeof(Descriptor),
-                                  cudaMemcpyDeviceToHost,
-                                  0 );
+            int num_desc = sz; // temporary until counters are split
+
+            if( num_desc > 0 ) {
+                popcuda_memcpy_async( _h_desc[l],
+                                      _d_desc[l],
+                                      num_desc * sizeof(Descriptor),
+                                      cudaMemcpyDeviceToHost,
+                                      0 );
+            }
             popcuda_memcpy_async( _h_extrema[l],
                                   _d_extrema[l],
                                   sz * sizeof(Extremum),
