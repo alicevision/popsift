@@ -77,8 +77,8 @@ IMAGE48=../sample/big_set/trees/img4.ppm
 # PARAMS="--threshold=0.04 --edge-threshold=10.0" # finds 4 points
 # PARAMS="--downsampling=0 --octaves=4 --threshold=0.04 --edge-threshold=10.0"
 # PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --print-gauss-tables"
-PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
-# PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
+# PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
 # PARAMS="--octaves=4 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --bemap-orientation"
 # PARAMS="--sigma=1.6 --octaves=4 --levels=3 --downsampling=0 --threshold=0.0 --edge-threshold=10.0"
 
