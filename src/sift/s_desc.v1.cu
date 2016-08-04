@@ -342,7 +342,7 @@ void Pyramid::descriptors_v1( )
             Plane2D_float& data = oct_obj.getData( level );
 #endif // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
 
-            int* extrema_counters = oct_obj.getExtremaMgmtD();
+            int* extrema_counters = oct_obj.getExtremaCounterD();
             int* extrema_counter  = &extrema_counters[level];
             descriptor_starter
                 <<<1,1,0,oct_str>>>
@@ -375,12 +375,13 @@ void Pyramid::descriptors_v1( )
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
-        int* num_orientations = oct_obj.getExtremaMgmtH();
+        int* extrema_counters = oct_obj.getExtremaCounterH();
+        int* featvec_counters = oct_obj.getFeatVecCounterH();
 
         for( int level=1; level<_levels-2; level++ ) {
             dim3 block;
             dim3 grid;
-            grid.x  = num_orientations[level];
+            grid.x  = extrema_counters[level];
 
             if( grid.x != 0 ) {
                 block.x = 32;
@@ -399,7 +400,7 @@ void Pyramid::descriptors_v1( )
                       oct_obj.getDescriptors( level ),
                       data );
 
-                grid.x  = grid_divide( num_orientations[level], 32 );
+                grid.x  = grid_divide( featvec_counters[level], 32 );
                 block.x = 32;
                 block.y = 32;
                 block.z = 1;
@@ -407,7 +408,7 @@ void Pyramid::descriptors_v1( )
                 normalize_histogram
                     <<<grid,block,0,oct_obj.getStream(level+2)>>>
                     ( oct_obj.getDescriptors( level ),
-                      num_orientations[level] );
+                      featvec_counters[level] );
             }
         }
     }

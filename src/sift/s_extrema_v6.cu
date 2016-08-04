@@ -644,7 +644,7 @@ void Pyramid::find_extrema_v6_sub( const Config& conf )
 
         cudaEvent_t  reset_done_ev  = oct_obj.getEventExtremaDone(0);
 
-        int*  extrema_counters   = oct_obj.getExtremaMgmtD( );
+        int*  extrema_counters   = oct_obj.getExtremaCounterD( );
         int*  extrema_num_blocks = oct_obj.getNumberOfBlocks( );
 
         for( int level=1; level<_levels-2; level++ ) {

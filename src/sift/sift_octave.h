@@ -130,8 +130,8 @@ class Octave
             return _data[0].getPitch();
         }
 
-        inline int* getExtremaMgmtH( ) { return _h_extrema_counter; }
-        inline int* getExtremaMgmtD( ) { return _d_extrema_counter; }
+        inline int* getExtremaCounterH( ) { return _h_extrema_counter; }
+        inline int* getExtremaCounterD( ) { return _d_extrema_counter; }
         inline int* getFeatVecCounterH( ) { return _h_featvec_counter; }
         inline int* getFeatVecCounterD( ) { return _d_featvec_counter; }
 

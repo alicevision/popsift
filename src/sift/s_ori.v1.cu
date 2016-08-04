@@ -454,7 +454,7 @@ void Pyramid::orientation_v1( )
         for( int level=1; level<_levels-2; level++ ) {
             cudaStream_t oct_str = oct_obj.getStream(level+2);
 
-            int* extrema_counters = oct_obj.getExtremaMgmtD( );
+            int* extrema_counters = oct_obj.getExtremaCounterD( );
             int* extrema_counter  = &extrema_counters[level];
             if( _bemap_orientation_mode ) {
                 orientation_starter_v1
