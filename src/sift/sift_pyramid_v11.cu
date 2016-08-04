@@ -547,17 +547,14 @@ void Pyramid::build_v11( const Config& conf, Image* base )
                 {
                     switch( _scaling_mode )
                     {
-                    case Config::DirectDownscaling :
-                        {
-                            horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode(), false );
-                            vert_from_interm( octave, level, stream, false );
-                        }
+                    case Config::ScaleDirect :
+                        // Does not work yet
+                        horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode(), false );
+                        vert_from_interm( octave, level, stream, false );
                         break;
-                    case Config::IndirectUnfilteredDownscaling :
-                        downscale_from_prev_octave( octave, level, stream, conf.getSiftMode() );
-                        break;
+                    case Config::ScaleDefault :
                     default :
-                        cerr << __FILE__ << ":" << __LINE__ << ": unknown scaling mode" << endl;
+                        downscale_from_prev_octave( octave, level, stream, conf.getSiftMode() );
                         break;
                     }
                 }

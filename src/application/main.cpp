@@ -66,8 +66,8 @@ static void usage( const char* argv )
          << "                             do not reject points when reaching max iterations," << endl
          << "                             first contrast threshold is .8 * peak thresh." << endl
          << "                             Shift feature coords octave 0 back to original pos." << endl
-         << " --direct-downscale / --dd     Direct each octave from upscaled orig instead of blurred level" << endl
-         << " --indirect-unfiltered / --iu  Downscaling from level-3, without applying Gaussian blur" << endl
+         << " --test-direct-scaling       Direct each octave from upscaled orig instead of blurred level" << endl
+         << "                             Does not work yet" << endl
          << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
          << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
          << " --bemap-orientation         dual smoothing or orientation histogram instead of" << endl
@@ -97,10 +97,7 @@ static struct option longopts[] = {
     { "vlfeat-mode",         no_argument,            NULL, 1100 },
     { "opencv-mode",         no_argument,            NULL, 1101 },
     { "popsift-mode",        no_argument,            NULL, 1102 },
-    { "direct-downscale",    no_argument,            NULL, 1103 },
-    { "dd",                  no_argument,            NULL, 1103 },
-    { "indirect-unfiltered", no_argument,            NULL, 1104 },
-    { "iu",                  no_argument,            NULL, 1104 },
+    { "test-direct-scaling", no_argument,            NULL, 1103 },
     { "group-gauss",         required_argument,      NULL, 1105 },
     { "bemap-orientation",   no_argument,            NULL, 1106 },
 
@@ -140,8 +137,7 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 1100 : config.setMode( popart::Config::VLFeat ); break;
         case 1101 : config.setMode( popart::Config::OpenCV ); break;
         case 1102 : config.setMode( popart::Config::PopSift ); break;
-        case 1103 : config.setScalingMode( popart::Config::DirectDownscaling ); break;
-        case 1104 : config.setScalingMode( popart::Config::IndirectUnfilteredDownscaling ); break;
+        case 1103 : config.setScalingMode( popart::Config::ScaleDirect ); break;
         case 1105 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
         case 1106 : config.setBemapOrientation( ); break;
 

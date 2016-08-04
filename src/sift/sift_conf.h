@@ -20,13 +20,13 @@ struct Config
     };
 
     enum ScalingMode {
-        DirectDownscaling,
-        IndirectUnfilteredDownscaling
+        ScaleDirect,
+        ScaleDefault // Indirect - only working method
     };
 
     void setMode( SiftMode m );
     void setLogMode( LogMode mode = All );
-    void setScalingMode( ScalingMode mode = IndirectUnfilteredDownscaling );
+    void setScalingMode( ScalingMode mode = ScaleDefault );
     void setVerbose( bool on = true );
 
     void setBemapOrientation( );
