@@ -312,7 +312,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     ec.xpos    = 0;
     ec.ypos    = 0;
     ec.sigma   = 0;
-    ec.orientation = 0;
+    ec.num_ori = 0;
 
     /*
      * First consideration: extrema cannot be found on any outermost edge,
@@ -590,8 +590,6 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 #ifdef PRINT_EXTREMA_DEBUG_INFO
     printf("Found an extremum at %d %d (o=%d,l=%d)     -> x:%.1f y:%.1f z:%.1f sigma:%0.1f\n", x, y, debug_octave, level, xn, yn, sn, ec.sigma );
 #endif // PRINT_EXTREMA_DEBUG_INFO
-
-    ec.orientation = 0;
 
     return true;
 }

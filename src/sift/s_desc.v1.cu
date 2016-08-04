@@ -18,10 +18,12 @@
 using namespace popart;
 using namespace std;
 
-__global__
-void keypoint_descriptors( Extremum*     cand,
-                           Descriptor*   descs,
-                           Plane2D_float layer )
+inline __device__
+void keypoint_descriptors_sub( const float   ang,
+                               const int     write_index,
+                               Extremum*     cand,
+                               Descriptor*   descs,
+                               Plane2D_float layer )
 {
     const int width  = layer.getWidth();
     const int height = layer.getHeight();
@@ -35,7 +37,7 @@ void keypoint_descriptors( Extremum*     cand,
     const float x    = ext->xpos;
     const float y    = ext->ypos;
     const float sig  = ext->sigma;
-    const float ang  = ext->orientation;
+    // const float ang  = ext->orientation;
     const float SBP  = fabsf(DESC_MAGNIFY * sig);
 
     if( SBP == 0 ) {
@@ -137,10 +139,31 @@ void keypoint_descriptors( Extremum*     cand,
     // int offset = hid*8;
     int offset = ( ( ( threadIdx.z << 2 ) + threadIdx.y ) << 3 ); // ( ( threadIdx.z * 4 ) + threadIdx.y ) * 8;
 
-    Descriptor* desc = &descs[blockIdx.x];
+    // Descriptor* desc = &descs[blockIdx.x];
+    Descriptor* desc = &descs[write_index];
 
     if( threadIdx.x < 8 ) {
         desc->features[offset+threadIdx.x] = dpt[threadIdx.x];
+    }
+}
+
+__global__
+void keypoint_descriptors( Extremum*     cand,
+                           Descriptor*   descs,
+                           Plane2D_float layer )
+{
+    Extremum* ext = &cand[blockIdx.x];
+
+    for( int i=0; i<ext->num_ori; i++ )
+    {
+        const float ang  = ext->orientation[i];
+        const int write_index = ext->idx_ori + i;
+
+        keypoint_descriptors_sub( ang,
+                                  write_index,
+                                  cand,
+                                  descs,
+                                  layer );
     }
 }
 

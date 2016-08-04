@@ -150,7 +150,7 @@ void compute_keypoint_orientations_v1( Extremum*     extremum,
         float hp = hist[((binh - 1 + ORI_NBINS) % ORI_NBINS)];
         float th = compute_angle(binh, hc, hn, hp);
 
-        ext->orientation = th;
+        ext->orientation[0] = th;
     }
 
     /* find other peaks, boundary of 80% of max */
@@ -163,29 +163,18 @@ void compute_keypoint_orientations_v1( Extremum*     extremum,
         float hn = hist[((bin + 1 + ORI_NBINS) % ORI_NBINS)];
         float hp = hist[((bin - 1 + ORI_NBINS) % ORI_NBINS)];
 
-        /* find if a peak */
         if (hc >= (0.8f * maxh) && hc > hn && hc > hp) {
-            int idx = atomicAdd( extrema_counter, 1 );
-            if( idx >= d_max_orientations ) break;
-
             float th = compute_angle(bin, hc, hn, hp);
 
-            ext = &extremum[idx];
-            ext->xpos = x;
-            ext->ypos = y;
-            ext->sigma = sig;
-            ext->orientation = th;
+            ext->orientation[nangles] = th;
 
             nangles++;
-#ifdef LOWE_ORIENTATION_MAX
-            // Lowe wants at most 3 orientations at every extremum
-            if (nangles > 2) break;
-#else // LOWE_ORIENTATION_MAX
-            // OpenCV and VLFeat allow 4 orientations at every extremum
-            if (nangles > 3) break;
-#endif // LOWE_ORIENTATION_MAX
+
+            if( nangles == ORIENTATION_MAX_COUNT ) break;
         }
     }
+
+    ext->num_ori = nangles;
 }
 
 /*
@@ -287,19 +276,6 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
         maxbin[i] = -1;
         y_max[i] = -INFINITY;
     }
-
-#ifdef V2_WITH_BEMAP_SMOOTHING
-    for(int bin = 0; bin < ORI_NBINS; bin++) {
-        int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
-        int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-        xcoord[bin] = ( hist[prev] + 2.0f * hist[bin] + hist[next] ) / 4.0f;
-    }
-    for(int bin = 0; bin < ORI_NBINS; bin++) {
-        int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
-        int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-        hist[bin] = ( xcoord[prev] + 2.0f * xcoord[bin] + xcoord[next] ) / 4.0f;
-    }
-#endif // V2_WITH_BEMAP_SMOOTHING
 
 #ifdef V2_WITH_VLFEAT_SMOOTHING
     for( int i=0; i<3; i++ ) {
@@ -405,35 +381,23 @@ void compute_keypoint_orientations_v2( Extremum*     extremum,
 
     float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
 
-    ext->orientation = th;
+    ext->orientation[0] = th;
+    int angles = 1;
 
     for( int i=1; i<ORIENTATION_MAX_COUNT; i++ ) {
         if( y_max[i] < -1000.0f ) break; // this is a random number: no orientation can be this small
 
         if( y_max[i] < 0.8f * y_max[0] ) break;
 
-        int idx = atomicAdd( extrema_counter, 1 );
-        if( idx >= d_max_orientations ) break;
-
         float chosen_bin = xcoord[maxbin[i]];
         if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
         float th = __fdividef(M_PI2 * chosen_bin, ORI_NBINS) - M_PI;
 
-        ext = &extremum[idx];
-        ext->xpos = x;
-        ext->ypos = y;
-        ext->sigma = sig;
-        ext->orientation = th;
+        ext->orientation[i] = th;
+        angles++;
     }
 
-    __syncthreads();
-
-    if( threadIdx.x == 0 && threadIdx.y == 0 ) {
-        int ct = atomicAdd( d_number_of_blocks, 1 );
-        if( ct >= number_of_blocks-1 ) {
-            int num_ext = atomicMin( extrema_counter, d_max_orientations );
-        }
-    }
+    ext->num_ori = angles;
 }
 
 /*************************************************************

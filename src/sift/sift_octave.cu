@@ -194,36 +194,37 @@ void Octave::writeDescriptor( const Config& conf, ostream& ostr, bool really )
 
         int sz = _h_extrema_mgmt[l];
         for( int s=0; s<sz; s++ ) {
-            const float up_fac = conf.getUpscaleFactor();
+            for( int ori=0; ori<cand[s].num_ori; ori++ ) {
+                const float up_fac = conf.getUpscaleFactor();
 
-            float xpos  = cand[s].xpos * pow( 2.0, _debug_octave_id - up_fac );
-            float ypos  = cand[s].ypos * pow( 2.0, _debug_octave_id - up_fac );
-            float sigma = cand[s].sigma * pow( 2.0, _debug_octave_id - up_fac );
-            float ori = cand[s].orientation;
-            ori = ori / M_PI2 * 360;
-            if( ori < 0 ) ori += 360;
-            // ori = 360.0f - ( ori / M_PI2 * 360 );
-            // if( ori > 360.0f ) ori -= 360.0f;
+                float xpos  = cand[s].xpos * pow( 2.0, _debug_octave_id - up_fac );
+                float ypos  = cand[s].ypos * pow( 2.0, _debug_octave_id - up_fac );
+                float sigma = cand[s].sigma * pow( 2.0, _debug_octave_id - up_fac );
+                float dom_or = cand[s].orientation[ori];
+                dom_or = dom_or / M_PI2 * 360;
+                if( dom_or < 0 ) dom_or += 360;
 
 #ifdef PRINT_WITH_ORIENTATION
-            ostr << setprecision(5)
-                 << xpos << " "
-                 << ypos << " "
-                 << sigma << " "
-                 << ori << " ";
+                ostr << setprecision(5)
+                    << xpos << " "
+                    << ypos << " "
+                    << sigma << " "
+                    << dom_or << " ";
 #else
-            ostr << setprecision(5)
-                 << xpos << " " << ypos << " "
-                 << 1.0f / ( sigma * sigma )
-                 << " 0 "
-                 << 1.0f / ( sigma * sigma ) << " ";
+                ostr << setprecision(5)
+                    << xpos << " " << ypos << " "
+                    << 1.0f / ( sigma * sigma )
+                    << " 0 "
+                    << 1.0f / ( sigma * sigma ) << " ";
 #endif
-            if( really ) {
-                for( int i=0; i<128; i++ ) {
-                    ostr << desc[s].features[i] << " ";
+                if( really ) {
+                    int feat_vec_index = cand[s].idx_ori + ori;
+                    for( int i=0; i<128; i++ ) {
+                        ostr << desc[feat_vec_index].features[i] << " ";
+                    }
                 }
+                ostr << endl;
             }
-            ostr << endl;
         }
     }
 }

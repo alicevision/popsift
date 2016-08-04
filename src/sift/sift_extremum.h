@@ -9,7 +9,10 @@ struct Extremum
     float xpos;
     float ypos;
     float sigma; // scale;
-    float orientation;
+
+    int   num_ori; // number of this extremum's orientations
+    int   idx_ori; // exclusive prefix sum of the layer's orientations
+    float orientation[ORIENTATION_MAX_COUNT];
 };
 
 struct Descriptor
