@@ -395,15 +395,9 @@ inline void Pyramid::downscale_from_prev_octave( int octave, int level, cudaStre
 
     switch( mode )
     {
-    case Config::OpenCV :
-        gauss::v11::get_by_2_interpolate
-            <<<h_grid,h_block,0,stream>>>
-            ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
-              oct_obj.getData( level ),
-              level );
-        break;
     case Config::PopSift :
     case Config::VLFeat :
+    case Config::OpenCV :
         gauss::v11::get_by_2_pick_every_second
             <<<h_grid,h_block,0,stream>>>
             ( prev_oct_obj.getData( _levels-PREV_LEVEL ),
@@ -411,6 +405,11 @@ inline void Pyramid::downscale_from_prev_octave( int octave, int level, cudaStre
               level );
         break;
     default :
+        gauss::v11::get_by_2_interpolate
+            <<<h_grid,h_block,0,stream>>>
+            ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
+              oct_obj.getData( level ),
+              level );
         break;
     }
 }
