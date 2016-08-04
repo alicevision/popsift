@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# IMAGE1=/local/home/griff/GIT/github/openmvg/src/openMVG_Samples/imageData/StanfordMobileVisualSearch/Ace_40p_gray.pgm
+IMAGE1=/local/home/griff/GIT/github/openmvg/src/openMVG_Samples/imageData/StanfordMobileVisualSearch/Ace_40p_gray.pgm
 # IMAGE1=/local/home/griff/GIT/github/openmvg/build/gray.pgm
 
 # For a package to compare with OpenCV and VLFeat
@@ -11,7 +11,7 @@
 # IMAGE5=../sample/boat/img5.ppm
 # IMAGE6=../sample/boat/img6.ppm
 
-IMAGE1=../sample/big_set/boat/img3.ppm
+# IMAGE1=../sample/big_set/boat/img3.ppm
 IMAGE2=../sample/big_set/boat/img6.ppm
 IMAGE3=../sample/big_set/boat/img2.ppm
 IMAGE4=../sample/big_set/boat/img1.ppm
@@ -100,14 +100,14 @@ rm -rf outputs
 
 mkdir -p outputs/popsift
 
-# for i in $IMAGE1 ; do
+for i in $IMAGE1 ; do
 # for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 ; do
-for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 $IMAGE7 $IMAGE8 $IMAGE9 $IMAGE10 $IMAGE11 $IMAGE12 $IMAGE13 $IMAGE14 $IMAGE15 $IMAGE16 $IMAGE17 $IMAGE18 $IMAGE19 $IMAGE20 $IMAGE21 $IMAGE22 $IMAGE23 $IMAGE24 $IMAGE25 $IMAGE26 $IMAGE27 $IMAGE28 $IMAGE29 $IMAGE30 $IMAGE31 $IMAGE32 $IMAGE33 $IMAGE34 $IMAGE35 $IMAGE36 $IMAGE37 $IMAGE38 $IMAGE39 $IMAGE40 $IMAGE41 $IMAGE42 $IMAGE43 $IMAGE44 $IMAGE45 $IMAGE46 $IMAGE47 $IMAGE48 ; do
+# for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 $IMAGE7 $IMAGE8 $IMAGE9 $IMAGE10 $IMAGE11 $IMAGE12 $IMAGE13 $IMAGE14 $IMAGE15 $IMAGE16 $IMAGE17 $IMAGE18 $IMAGE19 $IMAGE20 $IMAGE21 $IMAGE22 $IMAGE23 $IMAGE24 $IMAGE25 $IMAGE26 $IMAGE27 $IMAGE28 $IMAGE29 $IMAGE30 $IMAGE31 $IMAGE32 $IMAGE33 $IMAGE34 $IMAGE35 $IMAGE36 $IMAGE37 $IMAGE38 $IMAGE39 $IMAGE40 $IMAGE41 $IMAGE42 $IMAGE43 $IMAGE44 $IMAGE45 $IMAGE46 $IMAGE47 $IMAGE48 ; do
   if [ -f "$i" ] ; then
     Dirname=`dirname $i`
     Dirname=`basename ${Dirname}`
-    outname=`basename --suffix=.ppm $i`
-    # outname=`basename --suffix=.pgm $i`
+    # outname=`basename --suffix=.ppm $i`
+    outname=`basename --suffix=.pgm $i`
     dir1st=outputs/${Dirname}/${outname}
     dir2nd=outputs/${Dirname}/popsift${SUFFIX}
     echo ./sift_v4 $MODE $PARAMS $LOG $i
