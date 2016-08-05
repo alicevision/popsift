@@ -1,10 +1,10 @@
 #!/bin/bash
 
-IMAGE1=/local/home/griff/GIT/github/openmvg/src/openMVG_Samples/imageData/StanfordMobileVisualSearch/Ace_40p_gray.pgm
+# IMAGE1=/local/home/griff/GIT/github/openmvg/src/openMVG_Samples/imageData/StanfordMobileVisualSearch/Ace_40p_gray.pgm
 # IMAGE1=/local/home/griff/GIT/github/openmvg/build/gray.pgm
 
 # For a package to compare with OpenCV and VLFeat
-# IMAGE1=../sample/boat/img1.ppm
+IMAGE1=../sample/boat/img1.ppm
 # IMAGE2=../sample/boat/img2.ppm
 # IMAGE3=../sample/boat/img3.ppm
 # IMAGE4=../sample/boat/img4.ppm
@@ -77,9 +77,9 @@ IMAGE48=../sample/big_set/trees/img4.ppm
 # PARAMS="--threshold=0.04 --edge-threshold=10.0" # finds 4 points
 # PARAMS="--downsampling=0 --octaves=4 --threshold=0.04 --edge-threshold=10.0"
 # PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --print-gauss-tables"
-PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+# PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 # PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
-# PARAMS="--octaves=4 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --bemap-orientation"
+PARAMS="--octaves=4 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
 # PARAMS="--sigma=1.6 --octaves=4 --levels=3 --downsampling=0 --threshold=0.0 --edge-threshold=10.0"
 
 MODE=--popsift-mode
@@ -106,8 +106,8 @@ for i in $IMAGE1 ; do
   if [ -f "$i" ] ; then
     Dirname=`dirname $i`
     Dirname=`basename ${Dirname}`
-    # outname=`basename --suffix=.ppm $i`
-    outname=`basename --suffix=.pgm $i`
+    outname=`basename --suffix=.ppm $i`
+    # outname=`basename --suffix=.pgm $i`
     dir1st=outputs/${Dirname}/${outname}
     dir2nd=outputs/${Dirname}/popsift${SUFFIX}
     echo ./sift_v4 $MODE $PARAMS $LOG $i
