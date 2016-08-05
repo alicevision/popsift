@@ -6,9 +6,6 @@
 #include "s_gradiant.h"
 #include "assist.h"
 
-// override global setting
-// #undef USE_DYNAMIC_PARALLELISM
-
 /*************************************************************
  * V1: device side
  *************************************************************/
@@ -289,7 +286,6 @@ __global__ void descriptor_starter( int*          extrema_counter,
                                     Descriptor*   descs,
                                     Plane2D_float layer )
 {
-#ifdef USE_DYNAMIC_PARALLELISM
     dim3 block;
     dim3 grid;
     grid.x  = *extrema_counter;
@@ -319,93 +315,94 @@ __global__ void descriptor_starter( int*          extrema_counter,
     normalize_histogram
         <<<grid,block>>>
         ( descs, *featvec_counter );
-#endif // not USE_DYNAMIC_PARALLELISM
 }
 
 /*************************************************************
  * V4: host side
  *************************************************************/
 __host__
-void Pyramid::descriptors_v1( )
+void Pyramid::descriptors_v1( const Config& conf )
 {
-#ifdef USE_DYNAMIC_PARALLELISM
-    cerr << "Calling descriptors with dynamic parallelism" << endl;
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        Octave&      oct_obj = _octaves[octave];
+    if( conf.useDPDescriptors() ) {
+        cerr << "Calling descriptors with dynamic parallelism" << endl;
 
-        for( int level=1; level<_levels-2; level++ ) {
-            cudaStream_t oct_str = oct_obj.getStream(level+2);
+        for( int octave=0; octave<_num_octaves; octave++ ) {
+            Octave&      oct_obj = _octaves[octave];
 
-            // Plane2D_float& data = oct_obj.getData( 0 ); - idea to extract points from unblurred image (wrong)
-            Plane2D_float& data = oct_obj.getData( level );
-
-            descriptor_starter
-                <<<1,1,0,oct_str>>>
-                ( oct_obj.getExtremaCtPtrD( level ),
-                  oct_obj.getFeatVecCtPtrD( level ),
-                  oct_obj.getExtrema( level ),
-                  oct_obj.getDescriptors( level ),
-                  data );
-        }
-    }
-
-    cudaDeviceSynchronize();
-
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        Octave& oct_obj = _octaves[octave];
-        oct_obj.readExtremaCount( );
-    }
-#else // not USE_DYNAMIC_PARALLELISM
-    cerr << "Calling descriptors -no- dynamic parallelism" << endl;
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        Octave&      oct_obj = _octaves[octave];
-
-        for( int level=3; level<_levels; level++ ) {
-            cudaStreamSynchronize( oct_obj.getStream(level) );
-        }
-
-        // async copy of extrema from device to host
-        oct_obj.readExtremaCount( );
-    }
-
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        Octave&      oct_obj = _octaves[octave];
-
-
-        for( int level=1; level<_levels-2; level++ ) {
-            dim3 block;
-            dim3 grid;
-            // replace with oct_obj.getFeatVecCtPtrH() and rewrite kernel !
-            grid.x = oct_obj.getExtremaCtPtrH( level );
-
-            if( grid.x != 0 ) {
-                block.x = 32;
-                block.y = 4;
-                block.z = 4;
+            for( int level=1; level<_levels-2; level++ ) {
+                cudaStream_t oct_str = oct_obj.getStream(level+2);
 
                 // Plane2D_float& data = oct_obj.getData( 0 ); - idea to extract points from unblurred image (wrong)
                 Plane2D_float& data = oct_obj.getData( level );
 
-                keypoint_descriptors
-                    <<<grid,block,0,oct_obj.getStream(level+2)>>>
-                    ( oct_obj.getExtrema( level ),
+                descriptor_starter
+                    <<<1,1,0,oct_str>>>
+                    ( oct_obj.getExtremaCtPtrD( level ),
+                      oct_obj.getFeatVecCtPtrD( level ),
+                      oct_obj.getExtrema( level ),
                       oct_obj.getDescriptors( level ),
                       data );
+            }
+        }
 
-                grid.x  = grid_divide( oct_obj.getFeatVecCtPtrH( level ), 32 );
-                block.x = 32;
-                block.y = 32;
-                block.z = 1;
+        cudaDeviceSynchronize();
 
-                normalize_histogram
-                    <<<grid,block,0,oct_obj.getStream(level+2)>>>
-                    ( oct_obj.getDescriptors( level ),
-                      oct_obj.getFeatVecCtPtrH( level ) );
+        for( int octave=0; octave<_num_octaves; octave++ ) {
+            Octave& oct_obj = _octaves[octave];
+            oct_obj.readExtremaCount( );
+        }
+    } else {
+        cerr << "Calling descriptors -no- dynamic parallelism" << endl;
+
+        for( int octave=0; octave<_num_octaves; octave++ ) {
+            Octave&      oct_obj = _octaves[octave];
+
+            for( int level=3; level<_levels; level++ ) {
+                cudaStreamSynchronize( oct_obj.getStream(level) );
+            }
+
+            // async copy of extrema from device to host
+            oct_obj.readExtremaCount( );
+        }
+
+        for( int octave=0; octave<_num_octaves; octave++ ) {
+            Octave&      oct_obj = _octaves[octave];
+
+
+            for( int level=1; level<_levels-2; level++ ) {
+                dim3 block;
+                dim3 grid;
+                // replace with oct_obj.getFeatVecCtPtrH() and rewrite kernel !
+                grid.x = oct_obj.getExtremaCountH( level );
+
+                if( grid.x != 0 ) {
+                    block.x = 32;
+                    block.y = 4;
+                    block.z = 4;
+
+                    // Plane2D_float& data = oct_obj.getData( 0 ); - idea to extract points from unblurred image (wrong)
+                    Plane2D_float& data = oct_obj.getData( level );
+
+                    keypoint_descriptors
+                        <<<grid,block,0,oct_obj.getStream(level+2)>>>
+                        ( oct_obj.getExtrema( level ),
+                          oct_obj.getDescriptors( level ),
+                          data );
+
+                    grid.x  = grid_divide( oct_obj.getFeatVecCountH( level ), 32 );
+                    block.x = 32;
+                    block.y = 32;
+                    block.z = 1;
+
+                    normalize_histogram
+                        <<<grid,block,0,oct_obj.getStream(level+2)>>>
+                          ( oct_obj.getDescriptors( level ),
+                            oct_obj.getFeatVecCountH( level ) );
+                }
             }
         }
     }
 
     cudaDeviceSynchronize( );
-#endif // not USE_DYNAMIC_PARALLELISM
 }
 

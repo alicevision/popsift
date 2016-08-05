@@ -1,4 +1,5 @@
 #include "sift_conf.h"
+#include "debug_macros.h"
 
 namespace popart
 {
@@ -18,7 +19,23 @@ Config::Config( )
     , _assume_initial_blur( false )
     , _initial_blur( 0.0f )
     , _print_gauss_tables( false )
+    , _dp_orientation( true )
+    , _dp_descriptors( true )
+    , _dp_capable( true )
 {
+    int            currentDev;
+    cudaDeviceProp currentProp;
+    cudaError_t    err;
+
+    err = cudaGetDevice( &currentDev );
+    POP_CUDA_FATAL_TEST( err, "Could not get current device ID" );
+
+    err = cudaGetDeviceProperties( &currentProp, currentDev );
+    POP_CUDA_FATAL_TEST( err, "Could not get current device properties" );
+
+    if( currentProp.major < 3 || ( currentProp.major == 3 && currentProp.minor < 5 ) ) {
+        _dp_capable = false;
+    }
 }
 
 void Config::setMode( Config::SiftMode m )
@@ -48,6 +65,9 @@ void Config::setSigma( float v ) { sigma = v; }
 void Config::setEdgeLimit( float v ) { _edge_limit = v; }
 void Config::setThreshold( float v ) { _threshold = v; }
 void Config::setPrintGaussTables() { _print_gauss_tables = true; }
+void Config::setDPOrientation( bool onoff ) { _dp_orientation = onoff; }
+void Config::setDPDescriptors( bool onoff ) { _dp_descriptors = onoff; }
+
 
 void Config::setInitialBlur( float blur )
 {

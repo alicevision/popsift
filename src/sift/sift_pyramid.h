@@ -56,9 +56,9 @@ private:
     template<int HEIGHT>
     void find_extrema_v6_sub( const Config& conf );
 
-    void orientation_v1( );
+    void orientation_v1( const Config& conf );
 
-    void descriptors_v1( );
+    void descriptors_v1( const Config& conf );
 
     void test_last_error( int line );
     void debug_out_floats  ( float* data, uint32_t pitch, uint32_t height );

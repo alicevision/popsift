@@ -40,6 +40,8 @@ struct Config
     void setThreshold( float v );
     void setInitialBlur( float blur );
     void setPrintGaussTables( );
+    void setDPOrientation( bool on );
+    void setDPDescriptors( bool on );
 
     bool  hasInitialBlur( ) const;
     float getInitialBlur( ) const;
@@ -78,6 +80,14 @@ struct Config
      */
     float getUpscaleFactor( ) const {
         return _upscale_factor;
+    }
+
+    bool useDPOrientation( ) const {
+        return ( _dp_capable & _dp_orientation );
+    }
+
+    bool useDPDescriptors( ) const {
+        return ( _dp_capable & _dp_descriptors );
     }
 
 private:
@@ -126,6 +136,17 @@ private:
      * filter width and Gauss tables in use.
      */
     bool _print_gauss_tables;
+
+    /* When these variables are true, CUDA Dynamic Parallelism can be used
+     * in the specified run-time stage.
+     */
+    bool _dp_orientation;
+    bool _dp_descriptors;
+
+    /* If the chosen GPU has compute capability below 3.5, then the previous
+     * configuration flags are always false.
+     */
+    bool _dp_capable;
 };
 
 }; // namespace popart

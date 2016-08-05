@@ -183,9 +183,9 @@ void Pyramid::find_extrema( const Config& conf, Image* base )
 
     find_extrema_v6( conf );
 
-    orientation_v1();
+    orientation_v1( conf );
 
-    descriptors_v1( );
+    descriptors_v1( conf );
 }
 
 void Pyramid::reset_extrema_mgmt( )

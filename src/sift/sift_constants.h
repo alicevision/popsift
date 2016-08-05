@@ -34,11 +34,6 @@
  */
 #undef DESC_USE_ROOT_SIFT
 
-/* CUDA Dynamic Parallelism does not work with all devices.
- * Try to maintain the possibility to compile without this.
- */
-#define USE_DYNAMIC_PARALLELISM
-
 // Lowe wants at most 3 orientations at every extremum,
 // VLFeat uses at most 4, OpenCV all it can find
 #undef  LOWE_ORIENTATION_MAX

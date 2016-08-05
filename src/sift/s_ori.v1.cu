@@ -334,35 +334,6 @@ void ori_prefix_sum( int*      extrema_counter,
     }
 }
 
-#if 0
-// verify that mapping from feature index to extremum index works
-
-__global__
-void print_fmap( int       octave,
-                 int       level,
-                 int*      extrema_counter,
-                 int*      featvec_counter,
-                 Extremum* extremum,
-                 int*      d_feat_to_ext_map )
-{
-    if( *extrema_counter == 0 && *featvec_counter == 0 ) return;
-
-    printf( "o/l %d/%d #e:%d #o:%d ", octave, level, *extrema_counter, *featvec_counter );
-    for( int i=0; i<*featvec_counter; i++ ) {
-        if( i != 0 ) printf(",  " );
-        if( i>0 && i % 8 == 0 )
-            printf("\n       ");
-        int e = d_feat_to_ext_map[i];
-        int n = extremum[e].num_ori;
-        if( n != 1 )
-            printf( "%2d->%2d (%d)", i, e, extremum[e].num_ori );
-        else
-            printf( "%2d->%2d", i, e );
-    }
-    printf("\n");
-}
-#endif
-
 
 /*************************************************************
  * V4: host side
@@ -375,7 +346,6 @@ void orientation_starter( Extremum*     extremum,
                           int*          d_feat_to_ext_map,
                           Plane2D_float layer )
 {
-#ifdef USE_DYNAMIC_PARALLELISM // defined in_s_pyramid.h
     dim3 block;
     dim3 grid;
     grid.x  = *extrema_counter;
@@ -398,126 +368,69 @@ void orientation_starter( Extremum*     extremum,
               extremum,
               d_feat_to_ext_map );
     }
-#endif // USE_DYNAMIC_PARALLELISM
 }
 
-#ifdef USE_DYNAMIC_PARALLELISM // defined in_s_pyramid.h
 __host__
-void Pyramid::orientation_v1( )
+void Pyramid::orientation_v1( const Config& conf )
 {
-    cerr << "Calling ori with dynamic parallelism" << endl;
+    if( conf.useDPOrientation() ) {
+        cerr << "Calling ori with dynamic parallelism" << endl;
 
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        Octave&      oct_obj = _octaves[octave];
+        for( int octave=0; octave<_num_octaves; octave++ ) {
+            Octave&      oct_obj = _octaves[octave];
 
-        // int*  orientation_num_blocks = oct_obj.getNumberOfOriBlocks( );
+            for( int level=1; level<_levels-2; level++ ) {
+                cudaStream_t oct_str = oct_obj.getStream(level+2);
 
-        for( int level=1; level<_levels-2; level++ ) {
-            cudaStream_t oct_str = oct_obj.getStream(level+2);
-
-            orientation_starter
-                <<<1,1,0,oct_str>>>
-                ( oct_obj.getExtrema( level ),
-                  oct_obj.getExtremaCtPtrD( level ),
-                  oct_obj.getFeatVecCtPtrD( level ),
-                  oct_obj.getFeatToExtMapD( level ),
-                  oct_obj.getData( level ) );
-        }
-    }
-
-#if 0
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        for( int level=1; level<_levels-2; level++ ) {
-            cudaDeviceSynchronize();
-            Octave& oct_obj = _octaves[octave];
-            int* extrema_counters  = oct_obj.getExtremaCounterD( );
-            int* extrema_counter   = &extrema_counters[level];
-            int* featvec_counters  = oct_obj.getFeatVecCounterD( );
-            int* featvec_counter   = &featvec_counters[level];
-            print_fmap
-                <<<1,1>>>
-                ( octave,
-                  level,
-                  extrema_counter,
-                  featvec_counter,
-                  oct_obj.getExtrema( level ),
-                  oct_obj.getFeatToExtMapD( level ) );
-        }
-    }
-    cudaDeviceSynchronize();
-#endif
-}
-
-#else // not USE_DYNAMIC_PARALLELISM
-
-__host__
-void Pyramid::orientation_v1( )
-{
-    cerr << "Calling ori with -no- dynamic parallelism" << endl;
-
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        Octave&      oct_obj = _octaves[octave];
-
-        for( int level=3; level<_levels; level++ ) {
-            cudaStreamSynchronize( oct_obj.getStream(level) );
-        }
-
-        oct_obj.readExtremaCount( );
-        cudaDeviceSynchronize( );
-
-        int* orientation_num_blocks = oct_obj.getNumberOfOriBlocks( );
-
-        for( int level=1; level<_levels-2; level++ ) {
-            cudaStream_t oct_str = oct_obj.getStream(level+2);
-
-            dim3 block;
-            dim3 grid;
-            grid.x  = oct_obj.getExtremaCtPtrH( level );
-            block.x = ORI_V1_NUM_THREADS;
-
-            if( grid.x != 0 ) {
-                compute_keypoint_orientations
-                    <<<grid,block,0,oct_str>>>
+                orientation_starter
+                    <<<1,1,0,oct_str>>>
                     ( oct_obj.getExtrema( level ),
                       oct_obj.getExtremaCtPtrD( level ),
-                      oct_obj.getData( level ),
-                      &orientation_num_blocks[level],
-                      grid.x * grid.y );
+                      oct_obj.getFeatVecCtPtrD( level ),
+                      oct_obj.getFeatToExtMapD( level ),
+                      oct_obj.getData( level ) );
+            }
+        }
+    } else {
+        cerr << "Calling ori with -no- dynamic parallelism" << endl;
 
-                block.x = 32;
-                block.y = 32;
-                grid.x  = 1;
-                ori_prefix_sum
-                    <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getExtremaCtPtrD( level ),
-                      oct_obj.getFeatVecMCtPtrD( level ),
-                      oct_obj.getExtrema( level ),
-                      oct_obj.getFeatToExtMapD(level) );
+        for( int octave=0; octave<_num_octaves; octave++ ) {
+            Octave&      oct_obj = _octaves[octave];
+
+            for( int level=3; level<_levels; level++ ) {
+                cudaStreamSynchronize( oct_obj.getStream(level) );
+            }
+
+            oct_obj.readExtremaCount( );
+            cudaDeviceSynchronize( );
+
+            for( int level=1; level<_levels-2; level++ ) {
+                cudaStream_t oct_str = oct_obj.getStream(level+2);
+
+                dim3 block;
+                dim3 grid;
+                grid.x  = oct_obj.getExtremaCountH( level );
+                block.x = ORI_V1_NUM_THREADS;
+
+                if( grid.x != 0 ) {
+                    compute_keypoint_orientations
+                        <<<grid,block,0,oct_str>>>
+                        ( oct_obj.getExtrema( level ),
+                          oct_obj.getExtremaCtPtrD( level ),
+                          oct_obj.getData( level ) );
+
+                    block.x = 32;
+                    block.y = 32;
+                    grid.x  = 1;
+                    ori_prefix_sum
+                        <<<grid,block,0,oct_str>>>
+                        ( oct_obj.getExtremaCtPtrD( level ),
+                        oct_obj.getFeatVecCtPtrD( level ),
+                        oct_obj.getExtrema( level ),
+                        oct_obj.getFeatToExtMapD(level) );
+                }
             }
         }
     }
-
-#if 0
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        for( int level=1; level<_levels-2; level++ ) {
-            cudaDeviceSynchronize();
-            Octave& oct_obj = _octaves[octave];
-            int* extrema_counters  = oct_obj.getExtremaCounterD( );
-            int* extrema_counter   = &extrema_counters[level];
-            int* featvec_counters  = oct_obj.getFeatVecCounterD( );
-            int* featvec_counter   = &featvec_counters[level];
-            print_fmap
-                <<<1,1>>>
-                ( octave,
-                  level,
-                  extrema_counter,
-                  featvec_counter,
-                  oct_obj.getExtrema( level ),
-                  oct_obj.getFeatToExtMapD( level ) );
-        }
-    }
-    cudaDeviceSynchronize();
-#endif
 }
-#endif // not USE_DYNAMIC_PARALLELISM
 

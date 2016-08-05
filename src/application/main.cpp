@@ -70,6 +70,9 @@ static void usage( const char* argv )
          << "                             Does not work yet" << endl
          << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
          << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
+         << " --dp-off                    Switch all CUDA Dynamic Parallelism off" << endl
+         << " --dp-ori-off                Switch DP off for orientation computation" << endl
+         << " --dp-desc-off               Switch DP off for descriptor computation" << endl
          << endl
          << "* Informational *" << endl
          << " --print-gauss-tables        A debug output printing Gauss filter size and tables" << endl
@@ -97,6 +100,9 @@ static struct option longopts[] = {
     { "popsift-mode",        no_argument,            NULL, 1102 },
     { "test-direct-scaling", no_argument,            NULL, 1103 },
     { "group-gauss",         required_argument,      NULL, 1104 },
+    { "dp-off",              no_argument,            NULL, 1105 },
+    { "dp-ori-off",          no_argument,            NULL, 1106 },
+    { "dp-desc-off",         no_argument,            NULL, 1107 },
 
     { "print-gauss-tables",  no_argument,            NULL, 1200 },
 
@@ -136,6 +142,9 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 1102 : config.setMode( popart::Config::PopSift ); break;
         case 1103 : config.setScalingMode( popart::Config::ScaleDirect ); break;
         case 1104 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
+        case 1105 : config.setDPOrientation( false ); config.setDPDescriptors( false ); break;
+        case 1106 : config.setDPOrientation( false ); break;
+        case 1107 : config.setDPDescriptors( false ); break;
 
         case 1200 : config.setPrintGaussTables( ); break;
         default   : usage( appName );
