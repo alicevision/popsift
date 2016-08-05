@@ -344,14 +344,10 @@ void Pyramid::descriptors_v1( )
             Plane2D_float& data = oct_obj.getData( level );
 #endif // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
 
-            int* extrema_counters = oct_obj.getExtremaCounterD();
-            int* extrema_counter  = &extrema_counters[level];
-            int* featvec_counters = oct_obj.getFeatVecCounterD();
-            int* featvec_counter  = &featvec_counters[level];
             descriptor_starter
                 <<<1,1,0,oct_str>>>
-                ( extrema_counter,
-                  featvec_counter,
+                ( oct_obj.getExtremaCtPtrD( level ),
+                  oct_obj.getFeatVecCtPtrD( level ),
                   oct_obj.getExtrema( level ),
                   oct_obj.getDescriptors( level ),
                   data );
@@ -380,13 +376,12 @@ void Pyramid::descriptors_v1( )
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
 
-        int* extrema_counters = oct_obj.getExtremaCounterH();
-        int* featvec_counters = oct_obj.getFeatVecCounterH();
 
         for( int level=1; level<_levels-2; level++ ) {
             dim3 block;
             dim3 grid;
-            grid.x  = extrema_counters[level];
+            // replace with oct_obj.getFeatVecCtPtrH() and rewrite kernel !
+            grid.x = oct_obj.getExtremaCtPtrH( level );
 
             if( grid.x != 0 ) {
                 block.x = 32;
@@ -405,7 +400,7 @@ void Pyramid::descriptors_v1( )
                       oct_obj.getDescriptors( level ),
                       data );
 
-                grid.x  = grid_divide( featvec_counters[level], 32 );
+                grid.x  = grid_divide( oct_obj.getFeatVecCtPtrH( level ), 32 );
                 block.x = 32;
                 block.y = 32;
                 block.z = 1;
@@ -413,7 +408,7 @@ void Pyramid::descriptors_v1( )
                 normalize_histogram
                     <<<grid,block,0,oct_obj.getStream(level+2)>>>
                     ( oct_obj.getDescriptors( level ),
-                      featvec_counters[level] );
+                      oct_obj.getFeatVecCtPtrH( level ) );
             }
         }
     }

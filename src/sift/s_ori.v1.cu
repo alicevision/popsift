@@ -415,15 +415,11 @@ void Pyramid::orientation_v1( )
         for( int level=1; level<_levels-2; level++ ) {
             cudaStream_t oct_str = oct_obj.getStream(level+2);
 
-            int* extrema_counters  = oct_obj.getExtremaCounterD( );
-            int* extrema_counter   = &extrema_counters[level];
-            int* featvec_counters  = oct_obj.getFeatVecCounterD( );
-            int* featvec_counter   = &featvec_counters[level];
             orientation_starter
                 <<<1,1,0,oct_str>>>
                 ( oct_obj.getExtrema( level ),
-                  extrema_counter,
-                  featvec_counter,
+                  oct_obj.getExtremaCtPtrD( level ),
+                  oct_obj.getFeatVecCtPtrD( level ),
                   oct_obj.getFeatToExtMapD( level ),
                   oct_obj.getData( level ) );
         }
@@ -469,10 +465,6 @@ void Pyramid::orientation_v1( )
         oct_obj.readExtremaCount( );
         cudaDeviceSynchronize( );
 
-        int* h_num_extrema = oct_obj.getExtremaMgmtH();
-        int* d_num_extrema = oct_obj.getExtremaMgmtD();
-        int* d_num_featvec = oct_obj.getFeatVecMgmtD();
-        int* d_feat_to_ext_map = oct_obj.getFeatToExtMapD(level);
         int* orientation_num_blocks = oct_obj.getNumberOfOriBlocks( );
 
         for( int level=1; level<_levels-2; level++ ) {
@@ -480,13 +472,14 @@ void Pyramid::orientation_v1( )
 
             dim3 block;
             dim3 grid;
-            grid.x  = h_num_extrema[level];
+            grid.x  = oct_obj.getExtremaCtPtrH( level );
             block.x = ORI_V1_NUM_THREADS;
+
             if( grid.x != 0 ) {
                 compute_keypoint_orientations
                     <<<grid,block,0,oct_str>>>
                     ( oct_obj.getExtrema( level ),
-                      &d_num_extrema[level],
+                      oct_obj.getExtremaCtPtrD( level ),
                       oct_obj.getData( level ),
                       &orientation_num_blocks[level],
                       grid.x * grid.y );
@@ -496,10 +489,10 @@ void Pyramid::orientation_v1( )
                 grid.x  = 1;
                 ori_prefix_sum
                     <<<grid,block,0,oct_str>>>
-                    ( &d_num_extrema[level],
-                      &d_num_featvec[level],
+                    ( oct_obj.getExtremaCtPtrD( level ),
+                      oct_obj.getFeatVecMCtPtrD( level ),
                       oct_obj.getExtrema( level ),
-                      d_feat_to_ext_map );
+                      oct_obj.getFeatToExtMapD(level) );
             }
         }
     }

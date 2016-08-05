@@ -644,7 +644,6 @@ void Pyramid::find_extrema_v6_sub( const Config& conf )
 
         cudaEvent_t  reset_done_ev  = oct_obj.getEventExtremaDone(0);
 
-        int*  extrema_counters   = oct_obj.getExtremaCounterD( );
         int*  extrema_num_blocks = oct_obj.getNumberOfBlocks( );
 
         for( int level=1; level<_levels-2; level++ ) {
@@ -662,7 +661,7 @@ void Pyramid::find_extrema_v6_sub( const Config& conf )
             cudaEvent_t  mid_ev  = oct_obj.getEventDogDone(level+1);
             // cudaEvent_t  low_ev  = oct_obj.getEventDogDone(level+2); - we are in the same stream
 
-            int*  extrema_counter = &extrema_counters[level];
+            int*  extrema_counter = oct_obj.getExtremaCtPtrD( level );
             int*  num_blocks      = &extrema_num_blocks[level];
 
             cudaStreamWaitEvent( oct_str, reset_done_ev, 0 );

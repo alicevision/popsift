@@ -138,20 +138,18 @@ class Octave
             return _data[0].getPitch();
         }
 
-        inline int*  getExtremaCounterH( ) { return _h_extrema_counter; }
-        inline int*  getExtremaCounterD( ) { return _d_extrema_counter; }
-        inline int*  getFeatVecCounterH( ) { return _h_featvec_counter; }
-        inline int*  getFeatVecCounterD( ) { return _d_featvec_counter; }
+        inline int*  getExtremaCtPtrH( int level ) { return &_h_extrema_counter[level]; }
+        inline int*  getExtremaCtPtrD( int level ) { return &_d_extrema_counter[level]; }
+        inline int*  getFeatVecCtPtrH( int level ) { return &_h_featvec_counter[level]; }
+        inline int*  getFeatVecCtPtrD( int level ) { return &_d_featvec_counter[level]; }
+        // inline int*  getExtremaCounterH( ) { return _h_extrema_counter; }
+        // inline int*  getExtremaCounterD( ) { return _d_extrema_counter; }
+        // inline int*  getFeatVecCounterH( ) { return _h_featvec_counter; }
+        // inline int*  getFeatVecCounterD( ) { return _d_featvec_counter; }
 
         inline int* getNumberOfBlocks( ) {
             return _d_extrema_num_blocks;
         }
-
-#if 0
-        inline int* getNumberOfOriBlocks( ) {
-            return _d_orientation_num_blocks;
-        }
-#endif
 
         inline Extremum* getExtrema( int level )       { return _d_extrema[level]; }
         inline Extremum* getExtremaH( int level )      { return _h_extrema[level]; }
