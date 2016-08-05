@@ -14,11 +14,10 @@ using namespace popart;
 using namespace std;
 
 inline __device__
-void keypoint_descriptors_sub( const float   ang,
-                               const int     write_index,
-                               Extremum*     cand,
-                               Descriptor*   descs,
-                               Plane2D_float layer )
+void keypoint_descriptors_sub( const float     ang,
+                               const Extremum* ext,
+                               Descriptor*     desc,
+                               Plane2D_float   layer )
 {
     const int width  = layer.getWidth();
     const int height = layer.getHeight();
@@ -26,8 +25,6 @@ void keypoint_descriptors_sub( const float   ang,
     // int bidx = blockIdx.x & 0xf; // lower 4 bits of block ID
     const int ix   = threadIdx.y; // bidx & 0x3;       // lower 2 bits of block ID
     const int iy   = threadIdx.z; // bidx >> 2;        // next lowest 2 bits of block ID
-
-    Extremum* ext = &cand[blockIdx.x];
 
     const float x    = ext->xpos;
     const float y    = ext->ypos;
@@ -134,33 +131,29 @@ void keypoint_descriptors_sub( const float   ang,
     // int offset = hid*8;
     int offset = ( ( ( threadIdx.z << 2 ) + threadIdx.y ) << 3 ); // ( ( threadIdx.z * 4 ) + threadIdx.y ) * 8;
 
-    // Descriptor* desc = &descs[blockIdx.x];
-    Descriptor* desc = &descs[write_index];
-
     if( threadIdx.x < 8 ) {
         desc->features[offset+threadIdx.x] = dpt[threadIdx.x];
     }
 }
 
 __global__
-void keypoint_descriptors( Extremum*     cand,
+void keypoint_descriptors( Extremum*     extrema,
                            Descriptor*   descs,
+                           int*          feat_to_ext_map,
                            Plane2D_float layer )
 {
-    Extremum* ext = &cand[blockIdx.x];
+    const int   offset   = blockIdx.x;
+    Descriptor* desc     = &descs[offset];
+    const int   ext_idx  = feat_to_ext_map[offset];
+    Extremum*   ext      = &extrema[ext_idx];
+    const int   ext_base = ext->idx_ori;
+    const int   ext_num  = ext_base - offset;
+    const float ang      = ext->orientation[ext_num];
 
-    for( int i=0; i<ext->num_ori; i++ )
-    {
-        const float ang  = ext->orientation[i];
-        const int write_index = ext->idx_ori + i;
-
-        keypoint_descriptors_sub( ang,
-                                  write_index,
-                                  cand,
-                                  descs,
-                                  layer );
-        __syncthreads();
-    }
+    keypoint_descriptors_sub( ang,
+                              ext,
+                              desc,
+                              layer );
 }
 
 __global__
@@ -284,11 +277,13 @@ __global__ void descriptor_starter( int*          extrema_counter,
                                     int*          featvec_counter,
                                     Extremum*     extrema,
                                     Descriptor*   descs,
+                                    int*          feat_to_ext_map,
                                     Plane2D_float layer )
 {
     dim3 block;
     dim3 grid;
-    grid.x  = *extrema_counter;
+    // grid.x  = *extrema_counter;
+    grid.x  = *featvec_counter;
 
     if( grid.x == 0 ) return;
 
@@ -302,6 +297,7 @@ __global__ void descriptor_starter( int*          extrema_counter,
         <<<grid,block>>>
         ( extrema,
           descs,
+          feat_to_ext_map,
           layer );
 
     // it may be good to start more threads, but this kernel
@@ -332,16 +328,14 @@ void Pyramid::descriptors_v1( const Config& conf )
             for( int level=1; level<_levels-2; level++ ) {
                 cudaStream_t oct_str = oct_obj.getStream(level+2);
 
-                // Plane2D_float& data = oct_obj.getData( 0 ); - idea to extract points from unblurred image (wrong)
-                Plane2D_float& data = oct_obj.getData( level );
-
                 descriptor_starter
                     <<<1,1,0,oct_str>>>
                     ( oct_obj.getExtremaCtPtrD( level ),
                       oct_obj.getFeatVecCtPtrD( level ),
                       oct_obj.getExtrema( level ),
                       oct_obj.getDescriptors( level ),
-                      data );
+                      oct_obj.getFeatToExtMapD( level ),
+                      oct_obj.getData( level ) );
             }
         }
 
@@ -372,22 +366,20 @@ void Pyramid::descriptors_v1( const Config& conf )
             for( int level=1; level<_levels-2; level++ ) {
                 dim3 block;
                 dim3 grid;
-                // replace with oct_obj.getFeatVecCtPtrH() and rewrite kernel !
-                grid.x = oct_obj.getExtremaCountH( level );
+                // grid.x = oct_obj.getExtremaCountH( level );
+                grid.x = oct_obj.getFeatVecCountH( level );
 
                 if( grid.x != 0 ) {
                     block.x = 32;
                     block.y = 4;
                     block.z = 4;
 
-                    // Plane2D_float& data = oct_obj.getData( 0 ); - idea to extract points from unblurred image (wrong)
-                    Plane2D_float& data = oct_obj.getData( level );
-
                     keypoint_descriptors
                         <<<grid,block,0,oct_obj.getStream(level+2)>>>
                         ( oct_obj.getExtrema( level ),
                           oct_obj.getDescriptors( level ),
-                          data );
+                          oct_obj.getFeatToExtMapD( level ),
+                          oct_obj.getData( level ) );
 
                     grid.x  = grid_divide( oct_obj.getFeatVecCountH( level ), 32 );
                     block.x = 32;
