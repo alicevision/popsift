@@ -1,13 +1,12 @@
+#include <cuda_runtime.h>
+#include <stdio.h>
+
 #include "sift_pyramid.h"
 #include "sift_constants.h"
-#include "sift_extrema_mgmt.h"
-#include "s_sigma.h"
 #include "s_solve.h"
 #include "debug_macros.h"
 #include "assist.h"
 #include "clamp.h"
-#include <cuda_runtime.h>
-#include <stdio.h>
 
 #undef PRINT_EXTREMA_DEBUG_INFO
 
@@ -151,7 +150,7 @@ public:
     inline __device__
     bool first_contrast_ok( const float val ) const
     {
-        return ( fabsf( val ) >= floorf( d_threshold ) );
+        return ( fabsf( val ) >= floorf( d_consts.threshold ) );
     }
 
     inline __device__
@@ -203,7 +202,7 @@ public:
     inline __device__
     bool first_contrast_ok( const float val ) const
     {
-        return ( fabsf( val ) >= 0.8f * 2.0f * d_threshold );
+        return ( fabsf( val ) >= 0.8f * 2.0f * d_consts.threshold );
     }
 
     inline __device__
@@ -255,7 +254,7 @@ public:
     inline __device__
     bool first_contrast_ok( const float val ) const
     {
-        return ( fabsf( val ) >= 1.6f * d_threshold );
+        return ( fabsf( val ) >= 1.6f * d_consts.threshold );
     }
 
     inline __device__
@@ -353,7 +352,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 #if 0
     if( debug_octave==0 && level==2 && x==14 && y==73 ) {
         printf("I am being tested\n");
-        printf("thresh = %0.8f\n", floorf( d_threshold ) );
+        printf("thresh = %0.8f\n", floorf( d_consts.threshold ) );
         printf("layer0 = %0.3f %0.3f %0.3f\n"
                "         %0.3f %0.3f %0.3f\n"
                "         %0.3f %0.3f %0.3f\n",
@@ -552,8 +551,8 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     }
 
     /* accept-reject extremum */
-    // if( fabsf(contr) < (d_threshold*2.0f) )
-    if( fabsf(contr) < scalbnf( d_threshold, 1 ) )
+    // if( fabsf(contr) < (d_consts.threshold*2.0f) )
+    if( fabsf(contr) < scalbnf( d_consts.threshold, 1 ) )
     {
 #ifdef PRINT_EXTREMA_DEBUG_INFO
         printf("Found an extremum at %d %d (o=%d,l=%d) - 2nd peak tresh failed\n", x, y, debug_octave, level );
@@ -562,7 +561,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     }
 
     /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
-    if( edgeval >= (d_edge_limit+1.0f)*(d_edge_limit+1.0f)/d_edge_limit ) {
+    if( edgeval >= (d_consts.edge_limit+1.0f)*(d_consts.edge_limit+1.0f)/d_consts.edge_limit ) {
 #ifdef PRINT_EXTREMA_DEBUG_INFO
         printf("Found an extremum at %d %d (o=%d,l=%d) - edge tresh failed\n", x, y, debug_octave, level );
 #endif // PRINT_EXTREMA_DEBUG_INFO
@@ -571,7 +570,7 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 
     ec.xpos    = xn;
     ec.ypos    = yn;
-    ec.sigma   = d_sigma0 * pow(d_sigma_k, sn); // * 2;
+    ec.sigma   = d_consts.sigma0 * pow(d_consts.sigma_k, sn); // * 2;
         // const float sigma_k = powf(2.0f, 1.0f / levels );
 
 
@@ -596,7 +595,6 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
 }
 
 
-
 template<int HEIGHT, int vlfeat_mode>
 __global__
 void find_extrema_in_dog_v6( cudaTextureObject_t dog,
@@ -616,7 +614,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
 
     uint32_t write_index = extrema_count<HEIGHT>( indicator, extrema_counter );
 
-    if( indicator && write_index < d_max.extrema ) {
+    if( indicator && write_index < d_consts.extrema ) {
         d_extrema[write_index] = ec;
     }
 
@@ -627,7 +625,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
         int ct = atomicAdd( d_number_of_blocks, 1 );
         if( ct >= number_of_blocks-1 ) {
-            int num_ext = atomicMin( extrema_counter, d_max.extrema );
+            int num_ext = atomicMin( extrema_counter, d_consts.extrema );
         }
     }
 }

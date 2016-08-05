@@ -1,13 +1,12 @@
-#include "sift_pyramid.h"
-#include "sift_constants.h"
-#include "sift_extrema_mgmt.h"
-#include "s_gradiant.h"
-#include "excl_blk_prefix_sum.h"
-#include "debug_macros.h"
-
 #include <math.h>
 #include <stdio.h>
 #include <inttypes.h>
+
+#include "sift_pyramid.h"
+#include "sift_constants.h"
+#include "s_gradiant.h"
+#include "excl_blk_prefix_sum.h"
+#include "debug_macros.h"
 
 using namespace popart;
 using namespace std;
@@ -322,13 +321,13 @@ void ori_prefix_sum( int*      extrema_counter,
     ExtremaRead r( extremum );
     ExtremaWrt  w( extremum );
     ExtremaTot  t( featvec_counter );
-    ExtremaWrtMap wrtm( d_feat_to_ext_map, d_max.orientations );
+    ExtremaWrtMap wrtm( d_feat_to_ext_map, d_consts.orientations );
     ExclusivePrefixSum::Block<ExtremaRead,ExtremaWrt,ExtremaTot,ExtremaWrtMap>( *extrema_counter, r, w, t, wrtm );
 
     __syncthreads();
 
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
-        *featvec_counter = min( *featvec_counter, d_max.orientations );
+        *featvec_counter = min( *featvec_counter, d_consts.orientations );
 
         // printf("Leave %s, %d extrema -> %d oris\n", __func__, *extrema_counter, *featvec_counter );
     }

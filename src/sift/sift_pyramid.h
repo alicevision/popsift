@@ -5,7 +5,7 @@
 #include "s_image.h"
 #include "sift_conf.h"
 #include "sift_extremum.h"
-#include "sift_extrema_mgmt.h"
+#include "sift_constants.h"
 #include "sift_octave.h"
 
 namespace popart {

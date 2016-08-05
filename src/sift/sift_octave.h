@@ -1,12 +1,12 @@
 #pragma once
 
 #include <iostream>
+#include <vector>
 
 #include "s_image.h"
 #include "sift_conf.h"
 #include "sift_extremum.h"
-#include "sift_extrema_mgmt.h"
-#include <vector>
+#include "sift_constants.h"
 
 namespace popart {
 

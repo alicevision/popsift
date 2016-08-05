@@ -1,8 +1,7 @@
+#include "sift_constants.h"
 #include "popsift.h"
-#include "s_sigma.h"
 #include "gauss_filter.h"
 #include "write_plane_2d.h"
-#include "sift_extrema_mgmt.h"
 #include "c_util_img.h"
 #include "sift_pyramid.h"
 
@@ -16,11 +15,11 @@ PopSift::PopSift( const popart::Config& config )
     popart::init_filter( _config,
                          _config.sigma,
                          _config.levels );
-    popart::init_sigma(  _config.sigma,
-                         _config.levels,
-                         _config.getPeakThreshold(),
-                         _config._edge_limit );
-    popart::init_extrema_limits( 10000 );
+    popart::init_constants(  _config.sigma,
+                             _config.levels,
+                             _config.getPeakThreshold(),
+                             _config._edge_limit,
+                             10000 ); // max extrema
 }
 
 PopSift::~PopSift()

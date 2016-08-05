@@ -44,3 +44,22 @@
 #define ORIENTATION_MAX_COUNT 4
 #endif
 
+namespace popart {
+
+struct ConstInfo
+{
+    int   extrema;
+    int   orientations;
+    float sigma0;
+    float sigma_k;
+    float edge_limit;
+    float threshold;
+};
+
+extern                         ConstInfo h_consts;
+extern __device__ __constant__ ConstInfo d_consts;
+
+
+void init_constants( float sigma0, int levels, float threshold, float edge_limit, int max_extrema );
+
+} // namespace popart
