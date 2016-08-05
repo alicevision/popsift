@@ -147,7 +147,7 @@ void keypoint_descriptors( Extremum*     extrema,
     const int   ext_idx  = feat_to_ext_map[offset];
     Extremum*   ext      = &extrema[ext_idx];
     const int   ext_base = ext->idx_ori;
-    const int   ext_num  = ext_base - offset;
+    const int   ext_num  = offset - ext_base;
     const float ang      = ext->orientation[ext_num];
 
     keypoint_descriptors_sub( ang,
