@@ -6,8 +6,6 @@
 #include "s_gradiant.h"
 #include "assist.h"
 
-#undef DESCRIPTORS_FROM_UNBLURRED_IMAGE
-
 // override global setting
 // #undef USE_DYNAMIC_PARALLELISM
 
@@ -338,11 +336,8 @@ void Pyramid::descriptors_v1( )
         for( int level=1; level<_levels-2; level++ ) {
             cudaStream_t oct_str = oct_obj.getStream(level+2);
 
-#ifdef DESCRIPTORS_FROM_UNBLURRED_IMAGE
-            Plane2D_float& data = oct_obj.getData( 0 );
-#else // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
+            // Plane2D_float& data = oct_obj.getData( 0 ); - idea to extract points from unblurred image (wrong)
             Plane2D_float& data = oct_obj.getData( level );
-#endif // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
 
             descriptor_starter
                 <<<1,1,0,oct_str>>>
@@ -388,11 +383,8 @@ void Pyramid::descriptors_v1( )
                 block.y = 4;
                 block.z = 4;
 
-#ifdef DESCRIPTORS_FROM_UNBLURRED_IMAGE
-                Plane2D_float& data = oct_obj.getData( 0 );
-#else // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
+                // Plane2D_float& data = oct_obj.getData( 0 ); - idea to extract points from unblurred image (wrong)
                 Plane2D_float& data = oct_obj.getData( level );
-#endif // not DESCRIPTORS_FROM_UNBLURRED_IMAGE
 
                 keypoint_descriptors
                     <<<grid,block,0,oct_obj.getStream(level+2)>>>
