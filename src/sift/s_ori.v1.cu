@@ -1,5 +1,6 @@
 #include "sift_pyramid.h"
 #include "sift_constants.h"
+#include "sift_extrema_mgmt.h"
 #include "s_gradiant.h"
 #include "excl_blk_prefix_sum.h"
 #include "debug_macros.h"
@@ -263,7 +264,7 @@ public:
     ExtremaRead( const Extremum* const d_oris ) : _oris( d_oris ) { }
 
     inline __device__
-    int operator()( int n ) const { return _oris[n].num_ori; }
+    int get( int n ) const { return _oris[n].num_ori; }
 };
 
 class ExtremaWrt
@@ -274,7 +275,7 @@ public:
     ExtremaWrt( Extremum* d_oris ) : _oris( d_oris ) { }
 
     inline __device__
-    int& operator()( int n ) const { return _oris[n].idx_ori; }
+    void set( int n, int value ) { _oris[n].idx_ori = value; }
 };
 
 class ExtremaTot
@@ -285,27 +286,83 @@ public:
     ExtremaTot( int* extrema_counter ) : _extrema_counter( extrema_counter ) { }
 
     inline __device__
-    int& operator()() { return *_extrema_counter; }
+    void set( int value ) { *_extrema_counter = value; }
+};
+
+class ExtremaWrtMap
+{
+    int* _featvec_to_extrema_mapper;
+    int  _max_feat;
+public:
+    inline __device__
+    ExtremaWrtMap( int* featvec_to_extrema_mapper, int max_feat )
+        : _featvec_to_extrema_mapper( featvec_to_extrema_mapper )
+        , _max_feat( max_feat )
+    { }
+
+    inline __device__
+    void set( int base, int num, int value )
+    {
+        int* baseptr = &_featvec_to_extrema_mapper[base];
+        do {
+            num--;
+            if( base + num < _max_feat ) {
+                baseptr[num] = value;
+            }
+        } while( num > 0 );
+    }
 };
 
 __global__
 void ori_prefix_sum( int*      extrema_counter,
                      int*      featvec_counter,
-                     Extremum* extremum )
+                     Extremum* extremum,
+                     int*      d_feat_to_ext_map )
 {
     ExtremaRead r( extremum );
     ExtremaWrt  w( extremum );
     ExtremaTot  t( featvec_counter );
-    ExclusivePrefixSum<ExtremaRead,ExtremaWrt,ExtremaTot>( *extrema_counter, r, w, t );
+    ExtremaWrtMap wrtm( d_feat_to_ext_map, d_max.orientations );
+    ExclusivePrefixSum::Block<ExtremaRead,ExtremaWrt,ExtremaTot,ExtremaWrtMap>( *extrema_counter, r, w, t, wrtm );
 
     __syncthreads();
 
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
-        *featvec_counter = min( *featvec_counter, d_max_orientations );
+        *featvec_counter = min( *featvec_counter, d_max.orientations );
 
         // printf("Leave %s, %d extrema -> %d oris\n", __func__, *extrema_counter, *featvec_counter );
     }
 }
+
+#if 0
+// verify that mapping from feature index to extremum index works
+
+__global__
+void print_fmap( int       octave,
+                 int       level,
+                 int*      extrema_counter,
+                 int*      featvec_counter,
+                 Extremum* extremum,
+                 int*      d_feat_to_ext_map )
+{
+    if( *extrema_counter == 0 && *featvec_counter == 0 ) return;
+
+    printf( "o/l %d/%d #e:%d #o:%d ", octave, level, *extrema_counter, *featvec_counter );
+    for( int i=0; i<*featvec_counter; i++ ) {
+        if( i != 0 ) printf(",  " );
+        if( i>0 && i % 8 == 0 )
+            printf("\n       ");
+        int e = d_feat_to_ext_map[i];
+        int n = extremum[e].num_ori;
+        if( n != 1 )
+            printf( "%2d->%2d (%d)", i, e, extremum[e].num_ori );
+        else
+            printf( "%2d->%2d", i, e );
+    }
+    printf("\n");
+}
+#endif
+
 
 /*************************************************************
  * V4: host side
@@ -313,9 +370,10 @@ void ori_prefix_sum( int*      extrema_counter,
 
 __global__
 void orientation_starter( Extremum*     extremum,
-                             int*          extrema_counter,
-                             int*          featvec_counter,
-                             Plane2D_float layer )
+                          int*          extrema_counter,
+                          int*          featvec_counter,
+                          int*          d_feat_to_ext_map,
+                          Plane2D_float layer )
 {
 #ifdef USE_DYNAMIC_PARALLELISM // defined in_s_pyramid.h
     dim3 block;
@@ -337,7 +395,8 @@ void orientation_starter( Extremum*     extremum,
             <<<grid,block>>>
             ( extrema_counter,
               featvec_counter,
-              extremum );
+              extremum,
+              d_feat_to_ext_map );
     }
 #endif // USE_DYNAMIC_PARALLELISM
 }
@@ -356,18 +415,41 @@ void Pyramid::orientation_v1( )
         for( int level=1; level<_levels-2; level++ ) {
             cudaStream_t oct_str = oct_obj.getStream(level+2);
 
-            int* extrema_counters = oct_obj.getExtremaCounterD( );
-            int* extrema_counter  = &extrema_counters[level];
-            int* featvec_counters = oct_obj.getFeatVecCounterD( );
-            int* featvec_counter  = &featvec_counters[level];
+            int* extrema_counters  = oct_obj.getExtremaCounterD( );
+            int* extrema_counter   = &extrema_counters[level];
+            int* featvec_counters  = oct_obj.getFeatVecCounterD( );
+            int* featvec_counter   = &featvec_counters[level];
             orientation_starter
                 <<<1,1,0,oct_str>>>
                 ( oct_obj.getExtrema( level ),
                   extrema_counter,
                   featvec_counter,
+                  oct_obj.getFeatToExtMapD( level ),
                   oct_obj.getData( level ) );
         }
     }
+
+#if 0
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        for( int level=1; level<_levels-2; level++ ) {
+            cudaDeviceSynchronize();
+            Octave& oct_obj = _octaves[octave];
+            int* extrema_counters  = oct_obj.getExtremaCounterD( );
+            int* extrema_counter   = &extrema_counters[level];
+            int* featvec_counters  = oct_obj.getFeatVecCounterD( );
+            int* featvec_counter   = &featvec_counters[level];
+            print_fmap
+                <<<1,1>>>
+                ( octave,
+                  level,
+                  extrema_counter,
+                  featvec_counter,
+                  oct_obj.getExtrema( level ),
+                  oct_obj.getFeatToExtMapD( level ) );
+        }
+    }
+    cudaDeviceSynchronize();
+#endif
 }
 
 #else // not USE_DYNAMIC_PARALLELISM
@@ -390,6 +472,7 @@ void Pyramid::orientation_v1( )
         int* h_num_extrema = oct_obj.getExtremaMgmtH();
         int* d_num_extrema = oct_obj.getExtremaMgmtD();
         int* d_num_featvec = oct_obj.getFeatVecMgmtD();
+        int* d_feat_to_ext_map = oct_obj.getFeatToExtMapD(level);
         int* orientation_num_blocks = oct_obj.getNumberOfOriBlocks( );
 
         for( int level=1; level<_levels-2; level++ ) {
@@ -415,10 +498,33 @@ void Pyramid::orientation_v1( )
                     <<<grid,block,0,oct_str>>>
                     ( &d_num_extrema[level],
                       &d_num_featvec[level],
-                      oct_obj.getExtrema( level ) );
+                      oct_obj.getExtrema( level ),
+                      d_feat_to_ext_map );
             }
         }
     }
+
+#if 0
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        for( int level=1; level<_levels-2; level++ ) {
+            cudaDeviceSynchronize();
+            Octave& oct_obj = _octaves[octave];
+            int* extrema_counters  = oct_obj.getExtremaCounterD( );
+            int* extrema_counter   = &extrema_counters[level];
+            int* featvec_counters  = oct_obj.getFeatVecCounterD( );
+            int* featvec_counter   = &featvec_counters[level];
+            print_fmap
+                <<<1,1>>>
+                ( octave,
+                  level,
+                  extrema_counter,
+                  featvec_counter,
+                  oct_obj.getExtrema( level ),
+                  oct_obj.getFeatToExtMapD( level ) );
+        }
+    }
+    cudaDeviceSynchronize();
+#endif
 }
 #endif // not USE_DYNAMIC_PARALLELISM
 

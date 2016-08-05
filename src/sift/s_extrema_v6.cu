@@ -1,5 +1,6 @@
 #include "sift_pyramid.h"
 #include "sift_constants.h"
+#include "sift_extrema_mgmt.h"
 #include "s_sigma.h"
 #include "s_solve.h"
 #include "debug_macros.h"
@@ -615,7 +616,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
 
     uint32_t write_index = extrema_count<HEIGHT>( indicator, extrema_counter );
 
-    if( indicator && write_index < d_max_extrema ) {
+    if( indicator && write_index < d_max.extrema ) {
         d_extrema[write_index] = ec;
     }
 
@@ -626,7 +627,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
         int ct = atomicAdd( d_number_of_blocks, 1 );
         if( ct >= number_of_blocks-1 ) {
-            int num_ext = atomicMin( extrema_counter, d_max_extrema );
+            int num_ext = atomicMin( extrema_counter, d_max.extrema );
         }
     }
 }

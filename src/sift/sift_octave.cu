@@ -58,7 +58,7 @@ void Octave::alloc( int width, int height, int levels, int gauss_group )
     _h_desc = new Descriptor*[_levels];
 
     for( int l=0; l<_levels; l++ ) {
-        int sz = h_max_orientations;
+        int sz = h_max.orientations;
         if( sz == 0 ) {
             _d_desc[l] = 0;
             _h_desc[l] = 0;
@@ -597,21 +597,39 @@ void Octave::alloc_extrema( )
     _d_extrema[0] = 0;
     _d_extrema[_levels-1] = 0;
 
-    int objects_per_level = h_max_orientations;
+    _d_feat_to_ext_map = new int*[ _levels ];
+    _h_feat_to_ext_map = new int*[ _levels ];
+
+    _h_feat_to_ext_map[0] = 0;
+    _h_feat_to_ext_map[_levels-1] = 0;
+    _d_feat_to_ext_map[0] = 0;
+    _d_feat_to_ext_map[_levels-1] = 0;
+
     int levels            = _levels - 2;
 
-    Extremum* d = popart::cuda::malloc_devT<Extremum>( levels * objects_per_level, __FILE__, __LINE__ );
-    Extremum* h = popart::cuda::malloc_hstT<Extremum>( levels * objects_per_level, __FILE__, __LINE__ );
+    Extremum* d = popart::cuda::malloc_devT<Extremum>( levels * h_max.extrema, __FILE__, __LINE__ );
+    Extremum* h = popart::cuda::malloc_hstT<Extremum>( levels * h_max.extrema, __FILE__, __LINE__ );
 
     for( uint32_t i=1; i<_levels-1; i++ ) {
         const int offset = i-1;
-        _d_extrema[i] = &d[offset*objects_per_level];
-        _h_extrema[i] = &h[offset*objects_per_level];
+        _d_extrema[i] = &d[ offset * h_max.extrema ];
+        _h_extrema[i] = &h[ offset * h_max.extrema ];
+    }
+
+    int* mapd = popart::cuda::malloc_devT<int>( levels * h_max.orientations, __FILE__, __LINE__ );
+    int* maph = popart::cuda::malloc_hstT<int>( levels * h_max.orientations, __FILE__, __LINE__ );
+
+    for( uint32_t i=1; i<_levels-1; i++ ) {
+        const int offset = i-1;
+        _d_feat_to_ext_map[i] = &mapd[ offset * h_max.orientations ];
+        _h_feat_to_ext_map[i] = &maph[ offset * h_max.orientations ];
     }
 }
 
 void Octave::free_extrema( )
 {
+    cudaFreeHost( _h_feat_to_ext_map[1] );
+    cudaFree(     _d_feat_to_ext_map[1] );
     cudaFreeHost( _h_extrema[1] );
     cudaFree(     _d_extrema[1] );
     delete [] _d_extrema;

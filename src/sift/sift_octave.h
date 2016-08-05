@@ -62,10 +62,18 @@ class Octave
 #if 0
         int*         _d_orientation_num_blocks; // build barrier after orientation finding, saves a kernel
 #endif
+        /* Data structure for the Extrema, host and device side */
         Extremum**   _h_extrema;
         Extremum**   _d_extrema;
+
+        /* Data structure for the Descriptors */
         Descriptor** _d_desc;
         Descriptor** _h_desc;
+
+        /* Array of arrays mapping a descriptor index back to an extremum index
+         * ie: _d_extrema[_d_feat_to_ext_map[i]] is the pos of _d_desc[i] */
+        int**        _h_feat_to_ext_map;
+        int**        _d_feat_to_ext_map;
 
     public:
         Octave( );
@@ -130,10 +138,10 @@ class Octave
             return _data[0].getPitch();
         }
 
-        inline int* getExtremaCounterH( ) { return _h_extrema_counter; }
-        inline int* getExtremaCounterD( ) { return _d_extrema_counter; }
-        inline int* getFeatVecCounterH( ) { return _h_featvec_counter; }
-        inline int* getFeatVecCounterD( ) { return _d_featvec_counter; }
+        inline int*  getExtremaCounterH( ) { return _h_extrema_counter; }
+        inline int*  getExtremaCounterD( ) { return _d_extrema_counter; }
+        inline int*  getFeatVecCounterH( ) { return _h_featvec_counter; }
+        inline int*  getFeatVecCounterD( ) { return _d_featvec_counter; }
 
         inline int* getNumberOfBlocks( ) {
             return _d_extrema_num_blocks;
@@ -145,13 +153,10 @@ class Octave
         }
 #endif
 
-        inline Extremum* getExtrema( uint32_t level ) {
-            return _d_extrema[level];
-        }
-
-        inline Extremum* getExtremaH( uint32_t level ) {
-            return _h_extrema[level];
-        }
+        inline Extremum* getExtrema( int level )       { return _d_extrema[level]; }
+        inline Extremum* getExtremaH( int level )      { return _h_extrema[level]; }
+        inline int*      getFeatToExtMapH( int level ) { return _h_feat_to_ext_map[level]; }
+        inline int*      getFeatToExtMapD( int level ) { return _d_feat_to_ext_map[level]; }
 
         // void resetExtremaCount( );
         void readExtremaCount( );
