@@ -1,13 +1,33 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <typeinfo>
 
-template<class Reader, class Writer, class Total>
-class ExclusivePrefixSum
+namespace ExclusivePrefixSum
+{
+class IgnoreTotal
+{
+    __device__ inline
+    void set( int , int ) { }
+};
+
+class IgnoreWriteMapping
+{
+public:
+    __device__ inline
+    void set( int , int , int ) { }
+};
+
+template<class Reader,
+         class Writer,
+         class Total = IgnoreTotal,
+         class WriteMapping = IgnoreWriteMapping>
+class Block
 {
     const Reader& _reader;
     Writer&       _writer;
     Total&        _total_writer;
+    WriteMapping& _mapping_writer;
     const int     _num;
 public:
     /* Instantiate an object of this type.
@@ -22,11 +42,12 @@ public:
      * Total  must provide operator()() that returns int& for writing the total sum.
      */
     __device__
-    ExclusivePrefixSum( int num, const Reader& reader, Writer& writer, Total& total_writer )
+    Block( int num, const Reader& reader, Writer& writer, Total& total_writer, WriteMapping& mapping_writer )
         : _num( num )
         , _reader( reader )
         , _writer( writer )
         , _total_writer( total_writer )
+        , _mapping_writer( mapping_writer )
     {
         sum( );
     }
@@ -50,14 +71,17 @@ private:
         const int end   = ( _num & (wrap-1) )
                         ? ( _num & ~(wrap-1) ) + wrap
                         : _num;
-        __syncthreads();
 
         for( int x=start; x<end; x+=wrap ) {
-            const int cell = min( x, _num-1 );
+            __syncthreads();
+
+            const bool valid = ( x < _num );
+            const int  cell  = min( x, _num-1 );
 
             int ews = 0; // exclusive warp prefix sum
-            int self = (x<_num) ? _reader(cell) : 0;
+            int self = (valid) ? _reader.get(cell) : 0;
 
+            // This loop is an exclusive prefix sum for one warp
             for( int s=0; s<5; s++ ) {
                 const int add = __shfl_up( ews+self, 1<<s );
                 ews += threadIdx.x < (1<<s) ? 0 : add;
@@ -85,8 +109,19 @@ private:
             }
             __syncthreads();
 
-            if( x<_num ) {
-                _writer(cell) = loop_total + sum[threadIdx.y] + ews;
+            if( valid ) {
+                const int ebs = loop_total + sum[threadIdx.y] + ews;
+
+                /* Conceptually: at index cell of the _writer,
+                 * store the exclusive prefix sum ebs.
+                 */
+                _writer.set( cell, ebs );
+
+                /* Conceptually: at index ebs of the _mapping_writer,
+                 * and the self-1 indices after it, store the position
+                 * cell within the original array, _reader.
+                 */
+                _mapping_writer.set( ebs, self, cell );
             }
 
             if( threadIdx.y == 0 && threadIdx.x == 31 ) {
@@ -96,8 +131,10 @@ private:
         }
 
         if( threadIdx.y == 0 && threadIdx.x == 31 ) {
-            _total_writer() = loop_total;
+            _total_writer.set( loop_total );
         }
     }
 };
+
+} // namespace ExclusivePrefixSum
 
