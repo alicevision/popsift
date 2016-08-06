@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+#include "assist.h"
 #include "sift_pyramid.h"
 #include "sift_constants.h"
 #include "s_gradiant.h"
@@ -49,7 +50,9 @@ void compute_keypoint_orientations( Extremum*     extremum,
 
     // if( threadIdx.y >= mgmt->getCounter() ) return;
 
-    Extremum* ext = &extremum[blockIdx.x];
+    const int extremum_index = blockIdx.x * blockDim.y + threadIdx.y;
+
+    Extremum* ext = &extremum[extremum_index];
 
     float hist[ORI_NBINS];
     for (int i = 0; i < ORI_NBINS; i++) hist[i] = 0.0f;
@@ -116,7 +119,6 @@ void compute_keypoint_orientations( Extremum*     extremum,
         hist[i] += __shfl_down( hist[i], 1 );
         hist[i]  = __shfl( hist[i], 0 );
     }
-
 
     if(threadIdx.x != 0) return;
 
@@ -255,6 +257,163 @@ void compute_keypoint_orientations( Extremum*     extremum,
     ext->num_ori = angles;
 }
 
+__global__
+void ori_par( int octave, int level, Extremum*     extremum,
+              int*          extrema_counter,
+              Plane2D_float layer )
+{
+    uint32_t w   = layer.getWidth();
+    uint32_t h   = layer.getHeight();
+
+    // if( threadIdx.y >= mgmt->getCounter() ) return;
+
+    const int extremum_index = blockIdx.x * blockDim.y + threadIdx.y;
+
+    Extremum* ext = &extremum[extremum_index];
+
+    __shared__ float hist   [ORI_NBINS];
+    __shared__ float sm_hist[ORI_NBINS];
+
+    for( int i = threadIdx.x; i < ORI_NBINS; i += blockDim.x )  hist[i] = 0.0f;
+
+    /* keypoint fractional geometry */
+    const float x    = ext->xpos;
+    const float y    = ext->ypos;
+    const float sig  = ext->sigma;
+
+    /* orientation histogram radius */
+    float  sigw = ORI_WINFACTOR * sig;
+    int32_t rad  = (int)rintf((3.0f * sigw));
+
+    float factor = __fdividef( -0.5f, (sigw * sigw) );
+    int sq_thres  = rad * rad;
+
+    int32_t xmin = max(1,     (int32_t)floor(x - rad));
+    int32_t xmax = min(w - 2, (int32_t)floor(x + rad));
+    int32_t ymin = max(1,     (int32_t)floor(y - rad));
+    int32_t ymax = min(h - 2, (int32_t)floor(y + rad));
+
+    int wx = xmax - xmin + 1;
+    int hy = ymax - ymin + 1;
+    int loops = wx * hy;
+
+    for( int i = threadIdx.x; __any(i < loops); i += blockDim.x )
+    {
+        if( i < loops ) {
+            int yy = i / wx + ymin;
+            int xx = i % wx + xmin;
+
+            float grad;
+            float theta;
+            get_gradiant( grad,
+                        theta,
+                        xx,
+                        yy,
+                        layer );
+
+            float dx = xx - x;
+            float dy = yy - y;
+
+            int sq_dist  = dx * dx + dy * dy;
+            if (sq_dist <= sq_thres) {
+                float weight = grad * expf(sq_dist * factor);
+
+                int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
+                // int bidx = (int)roundf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
+
+                if( bidx > ORI_NBINS ) {
+                    printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
+                }
+
+                bidx = (bidx == ORI_NBINS) ? 0 : bidx;
+
+                atomicAdd( &hist[bidx], weight );
+            }
+        }
+        __syncthreads();
+    }
+
+    for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
+        int prev2 = bin - 2;
+        int prev1 = bin - 1;
+        int next1 = bin + 1;
+        int next2 = bin + 2;
+        if( prev2 < 0 )          prev2 += ORI_NBINS;
+        if( prev1 < 0 )          prev1 += ORI_NBINS;
+        if( next1 >= ORI_NBINS ) next1 -= ORI_NBINS;
+        if( next2 >= ORI_NBINS ) next2 -= ORI_NBINS;
+        sm_hist[bin] = (   hist[prev2] + hist[next2]
+                         + ( hist[prev1] + hist[next1] ) * 4.0f
+                         +   hist[bin] * 6.0f ) / 16.0f;
+    }
+    __syncthreads();
+
+    // sub-cell refinement of the histogram cell index, yielding the angle
+    __shared__ float xcoord[ORI_NBINS];
+    __shared__ float yval[ORI_NBINS];
+
+    for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
+        int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
+        int next = bin == ORI_NBINS-1 ? 0 : bin+1;
+
+        bool predicate = ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) );
+
+        const float num  = predicate ? 3.0f *   sm_hist[prev] - 4.0f * sm_hist[bin] + sm_hist[next]   : 0.0f;
+        const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
+
+        const float newbin = __fdividef( num, denB );
+
+        predicate   = ( predicate && newbin >= 0.0f && newbin <= 2.0f );
+
+        xcoord[bin] = predicate ? prev + newbin : bin;
+        yval[bin]   = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
+    }
+    __syncthreads();
+
+    int best_index = threadIdx.x;
+    for( int bin=threadIdx.x+blockDim.x; bin < ORI_NBINS; bin += blockDim.x ) {
+        const bool pred = ( yval[bin] > yval[best_index] );
+        best_index = pred ? bin : best_index;
+    }
+    __syncthreads();
+
+    // bitonic sort
+    // only for a warp with 32 elements
+    for( int i=0; i<5; i++ ) {
+        for( int j=i; j>=0; j-- ) {
+            const bool swap_dir     = ( threadIdx.x & (2<<i) );
+            const int  xorval         = 1 << j;
+            const int  other_index  = __shfl_xor( best_index, xorval );
+            const bool id_below     = ( threadIdx.x < ( threadIdx.x ^ xorval ) );
+            const bool other_bigger = swap_dir ^ ( yval[other_index] > yval[best_index] );
+            const bool do_swap      = ( id_below ^ other_bigger == 0 );
+            best_index              = do_swap ? other_index : best_index;
+        }
+    }
+
+    // All threads retrieve the yval of thread 0, the largest
+    // of all yvals.
+    const float best_val = yval[best_index];
+    const float yval_ref = 0.8f * __shfl( best_val, 0 );
+    const bool  valid    = ( yval[best_index]  >= yval_ref );
+    bool        written  = false;
+
+    if( threadIdx.x < ORIENTATION_MAX_COUNT ) {
+        if( valid ) {
+            float chosen_bin = xcoord[best_index];
+            if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
+            float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
+            ext->orientation[threadIdx.x] = th;
+            written = true;
+        }
+    }
+
+    int angles = __popc( __ballot( written ) );
+    if( threadIdx.x == 0 ) {
+        ext->num_ori = angles;
+    }
+}
+
 class ExtremaRead
 {
     const Extremum* const _oris;
@@ -347,15 +506,27 @@ void orientation_starter( Extremum*     extremum,
 {
     dim3 block;
     dim3 grid;
-    grid.x  = *extrema_counter;
     block.x = ORI_V1_NUM_THREADS;
+    block.y = 1;
+    grid.x  = grid_divide( *extrema_counter, 1 );
 
     if( grid.x != 0 ) {
+#if 0
         compute_keypoint_orientations
             <<<grid,block>>>
             ( extremum,
               extrema_counter,
               layer );
+#else
+
+        ori_par
+            <<<*extrema_counter,32>>>
+            ( 0,
+              0,
+              extremum,
+              extrema_counter,
+              layer );
+#endif
 
         block.x = 32;
         block.y = 32;
@@ -408,15 +579,26 @@ void Pyramid::orientation_v1( const Config& conf )
 
                 dim3 block;
                 dim3 grid;
-                grid.x  = oct_obj.getExtremaCountH( level );
                 block.x = ORI_V1_NUM_THREADS;
+                block.y = 1;
+                grid.x  = oct_obj.getExtremaCountH(level);
 
                 if( grid.x != 0 ) {
+#if 0
                     compute_keypoint_orientations
                         <<<grid,block,0,oct_str>>>
                         ( oct_obj.getExtrema( level ),
                           oct_obj.getExtremaCtPtrD( level ),
                           oct_obj.getData( level ) );
+#else
+                    ori_par
+                        <<<oct_obj.getExtremaCountH(level),32,0,oct_str>>>
+                        ( octave,
+                          level,
+                          oct_obj.getExtrema( level ),
+                          oct_obj.getExtremaCtPtrD( level ),
+                          oct_obj.getData( level ) );
+#endif
 
                     block.x = 32;
                     block.y = 32;
