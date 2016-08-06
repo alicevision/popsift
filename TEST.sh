@@ -77,7 +77,7 @@ IMAGE48=../sample/big_set/trees/img4.ppm
 # PARAMS="--threshold=0.04 --edge-threshold=10.0" # finds 4 points
 # PARAMS="--downsampling=0 --octaves=4 --threshold=0.04 --edge-threshold=10.0"
 # PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --print-gauss-tables"
-PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --dp-off"
 # PARAMS="--octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
 # PARAMS="--octaves=4 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5 --downsampling=0"
 # PARAMS="--sigma=1.6 --octaves=4 --levels=3 --downsampling=0 --threshold=0.0 --edge-threshold=10.0"
@@ -86,8 +86,8 @@ MODE=--popsift-mode
 # MODE=--vlfeat-mode
 # MODE=--opencv-mode
 
-# LOG=--log
-LOG=
+LOG=--log
+# LOG=
 
 SUFFIX=
 # SUFFIX=-popsift
@@ -100,9 +100,9 @@ rm -rf outputs
 
 mkdir -p outputs/popsift
 
-# for i in $IMAGE1 ; do
+for i in $IMAGE1 ; do
 # for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 ; do
-for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 $IMAGE7 $IMAGE8 $IMAGE9 $IMAGE10 $IMAGE11 $IMAGE12 $IMAGE13 $IMAGE14 $IMAGE15 $IMAGE16 $IMAGE17 $IMAGE18 $IMAGE19 $IMAGE20 $IMAGE21 $IMAGE22 $IMAGE23 $IMAGE24 $IMAGE25 $IMAGE26 $IMAGE27 $IMAGE28 $IMAGE29 $IMAGE30 $IMAGE31 $IMAGE32 $IMAGE33 $IMAGE34 $IMAGE35 $IMAGE36 $IMAGE37 $IMAGE38 $IMAGE39 $IMAGE40 $IMAGE41 $IMAGE42 $IMAGE43 $IMAGE44 $IMAGE45 $IMAGE46 $IMAGE47 $IMAGE48 ; do
+# for i in $IMAGE1 $IMAGE2 $IMAGE3 $IMAGE4 $IMAGE5 $IMAGE6 $IMAGE7 $IMAGE8 $IMAGE9 $IMAGE10 $IMAGE11 $IMAGE12 $IMAGE13 $IMAGE14 $IMAGE15 $IMAGE16 $IMAGE17 $IMAGE18 $IMAGE19 $IMAGE20 $IMAGE21 $IMAGE22 $IMAGE23 $IMAGE24 $IMAGE25 $IMAGE26 $IMAGE27 $IMAGE28 $IMAGE29 $IMAGE30 $IMAGE31 $IMAGE32 $IMAGE33 $IMAGE34 $IMAGE35 $IMAGE36 $IMAGE37 $IMAGE38 $IMAGE39 $IMAGE40 $IMAGE41 $IMAGE42 $IMAGE43 $IMAGE44 $IMAGE45 $IMAGE46 $IMAGE47 $IMAGE48 ; do
   if [ -f "$i" ] ; then
     Dirname=`dirname $i`
     Dirname=`basename ${Dirname}`
