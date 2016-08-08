@@ -41,10 +41,6 @@ void py_print_corner_float_transposed( float* img, uint32_t pitch, uint32_t heig
     printf("\n");
 }
 
-/*************************************************************
- * Debug output: write an octave/level to disk as PGM
- *************************************************************/
-
 void Pyramid::download_and_save_array( const char* basename, uint32_t octave, uint32_t level )
 {
     if( octave < _num_octaves ) {
@@ -80,10 +76,6 @@ void Pyramid::save_descriptors( const Config& conf, const char* basename, uint32
     _octaves[octave].writeDescriptor( conf, of2, false );
 }
 
-/*************************************************************
- * Pyramid constructor
- *************************************************************/
-
 Pyramid::Pyramid( Config& config,
                   Image* base,
                   int width,
@@ -105,9 +97,6 @@ Pyramid::Pyramid( Config& config,
     cout << "Size of the first octave's images: " << w << "X" << h << endl;
 
     for( int o=0; o<_num_octaves; o++ ) {
-#if (PYRAMID_PRINT_DEBUG==1)
-        printf("Allocating octave %u with width %u and height %u (%u levels)\n", o, w, h, _levels );
-#endif // (PYRAMID_PRINT_DEBUG==1)
         _octaves[o].debugSetOctave( o );
         _octaves[o].alloc( w, h, _levels, _gauss_group );
         w = ceilf( w / 2.0f );
@@ -115,18 +104,10 @@ Pyramid::Pyramid( Config& config,
     }
 }
 
-/*************************************************************
- * Pyramid destructor
- *************************************************************/
-
 Pyramid::~Pyramid( )
 {
     delete [] _octaves;
 }
-
-/*************************************************************
- * Build the pyramid in all levels, one octave
- *************************************************************/
 
 void Pyramid::find_extrema( const Config& conf, Image* base )
 {
@@ -138,7 +119,7 @@ void Pyramid::find_extrema( const Config& conf, Image* base )
 
     orientation( conf );
 
-    descriptors_v1( conf );
+    descriptors( conf );
 }
 
 void Pyramid::reset_extrema_mgmt( )

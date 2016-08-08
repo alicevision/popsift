@@ -58,7 +58,7 @@ private:
 
     void orientation( const Config& conf );
 
-    void descriptors_v1( const Config& conf );
+    void descriptors( const Config& conf );
 
     void debug_out_floats  ( float* data, uint32_t pitch, uint32_t height );
     void debug_out_floats_t( float* data, uint32_t pitch, uint32_t height );

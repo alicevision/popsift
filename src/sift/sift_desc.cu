@@ -316,7 +316,7 @@ __global__ void descriptor_starter( int*          extrema_counter,
  * V4: host side
  *************************************************************/
 __host__
-void Pyramid::descriptors_v1( const Config& conf )
+void Pyramid::descriptors( const Config& conf )
 {
     if( conf.useDPDescriptors() ) {
         // cerr << "Calling descriptors with dynamic parallelism" << endl;
