@@ -29,7 +29,7 @@ string prefix          = "";
 static void usage( const char* argv )
 {
     cout << argv
-         << "     <filename>"
+         << " [options] <filename>"
          << endl << endl
          << "* Options *" << endl
          << " --help / -h / -?            Print usage" << endl
@@ -41,13 +41,18 @@ static void usage( const char* argv )
          << " --octaves=<int>             Number of octaves" << endl
          << " --levels=<int>              Number of levels per octave" << endl
          << " --sigma=<float>             Initial sigma value" << endl
-         << " --threshold=<float>         Keypoint strength threshold" << endl
+         << " --threshold=<float>         Constrast threshold" << endl
          << " --edge-threshold=<float> or" << endl
          << " --edge-limit=<float>        On-edge threshold" << endl
          << " --downsampling=<float>      Downscale width and height of input by 2^N (default N=-1)" << endl
          << " --initial-blur=<float>      Assume initial blur, subtract when blurring first time" << endl
          << endl
          << "* Modes *" << endl
+         << " --popsift-mode (default)    During the initial upscale, shift pixels by 1." << endl
+         << "                             In extrema refinement, steps up to 0.6," << endl
+         << "                             do not reject points when reaching max iterations," << endl
+         << "                             first contrast threshold is .8 * peak thresh." << endl
+         << "                             Shift feature coords octave 0 back to original pos." << endl
          << " --vlfeat-mode               During the initial upscale, shift pixels by 1." << endl
          << "                             That creates a sharper upscaled image. " << endl
          << "                             In extrema refinement, steps up to 0.6, levels remain unchanged," << endl
@@ -58,21 +63,17 @@ static void usage( const char* argv )
          << "                             reject points when reaching max iterations," << endl
          << "                             first contrast threshold is floor(.5 * peak thresh)." << endl
          << "                             Computed filter width are lower than VLFeat/PopSift" << endl
-         << " --popsift-mode (default)    During the initial upscale, shift pixels by 1." << endl
-         << "                             In extrema refinement, steps up to 0.6," << endl
-         << "                             do not reject points when reaching max iterations," << endl
-         << "                             first contrast threshold is .8 * peak thresh." << endl
-         << "                             Shift feature coords octave 0 back to original pos." << endl
-         << " --test-direct-scaling       Direct each octave from upscaled orig instead of blurred level" << endl
-         << "                             Does not work yet" << endl
-         << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
-         << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
          << " --dp-off                    Switch all CUDA Dynamic Parallelism off" << endl
          << " --dp-ori-off                Switch DP off for orientation computation" << endl
          << " --dp-desc-off               Switch DP off for descriptor computation" << endl
          << endl
          << "* Informational *" << endl
          << " --print-gauss-tables        A debug output printing Gauss filter size and tables" << endl
+         << " --test-direct-scaling       Direct each octave from upscaled orig instead of blurred level." << endl
+         << "                             Does not work yet." << endl
+         << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
+         << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
+         << "                             Does not work yet." << endl
          << endl;
     exit(0);
 }

@@ -4,14 +4,14 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
 
 
-add_executable( sift_v4 main.cpp
+add_executable( popsift-demo main.cpp
                         c_util_img.cpp c_util_img.h
                         c_util.cpp c_util.h )
 
-target_include_directories( sift_v4 PRIVATE
+target_include_directories( popsift-demo PRIVATE
                                     ${CMAKE_SOURCE_DIR}/src/sift )
 
-target_link_libraries( sift_v4 popsift
+target_link_libraries( popsift-demo popsift
                                ${CUDA_LIBRARIES}
 			       ${CUDA_CUDADEVRT_LIBRARY}
 			       ${Boost_LIBRARIES} )
