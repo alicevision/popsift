@@ -176,6 +176,9 @@ int main(int argc, char **argv)
     int w;
     int h;
     unsigned char* image_data = readPGMfile( inputFile, w, h );
+    if( image_data == 0 ) {
+        exit( -1 );
+    }
 
     cerr << "Input image size: "
          << w << "X" << h
