@@ -9,15 +9,15 @@
 #include "write_plane_2d.h"
 #include "sift_octave.h"
 
+/* Define this only for debugging the descriptor by writing
+ * the dominent orientation in readable form (otherwise
+ * incompatible with other tools).
+ */
 #undef PRINT_WITH_ORIENTATION
 
 using namespace std;
 
 namespace popart {
-
-/*************************************************************
- * Octave
- *************************************************************/
 
 Octave::Octave( )
     : _data(0)

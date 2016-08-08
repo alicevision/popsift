@@ -8,11 +8,8 @@
 #include <iostream>
 #include <stdio.h>
 
+/* It makes no sense whatsoever to change this value */
 #define PREV_LEVEL 3
-
-/*************************************************************
- * V11: device side
- *************************************************************/
 
 namespace popart {
 
@@ -81,8 +78,7 @@ void horiz_tex_128x1( cudaTextureObject_t src_data,
     const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
     out += ( v3 * g );
 
-    dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f; // scalbnf( out, 8 );
-    // dst_data.ptr(blockIdx.y)[off_x] = scalbnf( out, 8 );
+    dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f;
 }
 
 __global__
@@ -116,8 +112,7 @@ void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
     const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
     out += ( v3 * g );
 
-    dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f; // scalbnf( out, 8 );
-    // dst_data.ptr(blockIdx.y)[off_x] = scalbnf( out, 8 );
+    dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f;
 }
 
 
@@ -285,7 +280,6 @@ void vert_initial_blur( cudaTextureObject_t src_data,
 }
 
 
-#if 1
 __global__
 void make_dog( Plane2D_float       this_data,
                Plane2D_float       top_data,
@@ -303,27 +297,10 @@ void make_dog( Plane2D_float       this_data,
 
     const float b = this_data.ptr(r_y)[r_x];
     const float a = top_data .ptr(r_y)[r_x];
-    const float c = b - a; // c = fabs( a - b );
+    const float c = b - a;
 
     surf2DLayeredwrite( c, dog_data, idx*4, idy, level, cudaBoundaryModeZero );
 }
-#else
-__global__
-void make_dog( cudaTextureObject_t this_data,
-               cudaTextureObject_t top_data,
-               cudaSurfaceObject_t dog_data,
-               int                 level )
-{
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
-    const float b = tex2D<float>( this_data, idx, idy );
-    const float a = tex2D<float>( top_data, idx, idy );
-    const float c = b - a; // c = fabs( a - b );
-
-    surf2DLayeredwrite( c, dog_data, idx*4, idy, level, cudaBoundaryModeZero );
-}
-#endif
 
 } // namespace gauss
 } // namespace v11
@@ -335,9 +312,6 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, in
 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
-
-    /* I believe that waiting is not necessary because image is upscaled
-     * in default stream */
 
     dim3 block( 128, 1 );
     dim3 grid;
@@ -488,21 +462,12 @@ inline void Pyramid::dog_from_blurred( int octave, int level, cudaStream_t strea
     cudaEvent_t  ev     = oct_obj.getEventGaussDone( level-1 );
     cudaStreamWaitEvent( stream, ev, 0 );
 
-#if 1
     gauss::v11::make_dog
         <<<grid,block,0,stream>>>
         ( oct_obj.getData(level),
           oct_obj.getData(level-1),
           oct_obj.getDogSurface( ),
           level-1 );
-#else
-    gauss::v11::make_dog
-        <<<grid,block,0,stream>>>
-        ( oct_obj._data_tex[level],
-          oct_obj._data_tex[level-1],
-          oct_obj.getDogSurface( ),
-          level-1 );
-#endif
 }
 
 /*************************************************************

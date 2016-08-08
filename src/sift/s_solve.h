@@ -3,10 +3,8 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-#define CLOSED_FORM_SOLVE
-
 __device__
-inline bool solve_closed_form( float i[3][3], float3& b )
+inline bool solve( float i[3][3], float3& b )
 {
     float det0b = - i[1][2] * i[1][2];
     float det0a =   i[1][1] * i[2][2];
@@ -66,81 +64,5 @@ inline bool solve_closed_form( float i[3][3], float3& b )
     b.z = vout[2];
 
     return true;
-}
-
-__device__
-inline bool solve_iterative( float A[3][3], float3& b_in )
-{
-    float b[3];
-    b[0] = b_in.x;
-    b[1] = b_in.y;
-    b[2] = b_in.z;
-    // Gauss elimination
-    for( int j = 0 ; j < 3 ; j++ ) {
-            // look for leading pivot
-            float maxa    = 0;
-            float maxabsa = 0;
-            int   maxi    = -1;
-            for( int i = j ; i < 3 ; i++ ) {
-                float a    = A[j][i];
-                float absa = fabs( a );
-                if ( absa > maxabsa ) {
-                    maxa    = a;
-                    maxabsa = absa;
-                    maxi    = i;
-                }
-            }
-
-            // singular?
-            if( maxabsa < 1e-15 ) {
-                return false;
-            }
-
-            int i = maxi;
-
-            // swap j-th row with i-th row and
-            // normalize j-th row
-            for(int jj = j ; jj < 3 ; ++jj) {
-                float tmp = A[jj][j];
-                A[jj][j]  = A[jj][i];
-                A[jj][i]  = tmp;
-                A[jj][j] /= maxa;
-            }
-            float tmp = b[j];
-            b[j]  = b[i];
-            b[i]  = tmp;
-            b[j] /= maxa;
-
-            // elimination
-            for(int ii = j+1 ; ii < 3 ; ++ii) {
-                float x = A[j][ii];
-                for( int jj = j ; jj < 3 ; jj++ ) {
-                    A[jj][ii] -= x * A[jj][j];
-                }
-                b[ii] -= x * b[j] ;
-            }
-    }
-
-    // backward substitution
-    for( int i = 2 ; i > 0 ; i-- ) {
-        float x = b[i] ;
-        for( int ii = i-1 ; ii >= 0 ; ii-- ) {
-            b[ii] -= x * A[i][ii];
-        }
-    }
-    b_in.x = b[0];
-    b_in.y = b[1];
-    b_in.z = b[2];
-    return true;
-}
-
-__device__
-inline bool solve( float i[3][3], float3& b )
-{
-#ifdef CLOSED_FORM_SOLVE
-    return solve_closed_form( i, b );
-#else
-    return solve_iterative( i, b );
-#endif
 }
 

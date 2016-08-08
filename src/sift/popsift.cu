@@ -2,7 +2,6 @@
 #include "popsift.h"
 #include "gauss_filter.h"
 #include "write_plane_2d.h"
-// #include "c_util_img.h"
 #include "sift_pyramid.h"
 
 using namespace std;
@@ -76,10 +75,8 @@ void PopSift::uninit( int pipe )
     delete _pipe[pipe]._pyramid;
 }
 
-void PopSift::execute( int pipe, const unsigned char* imageData ) // const imgStream* inpPtr )
+void PopSift::execute( int pipe, const unsigned char* imageData )
 {
-    // const imgStream& inp = *inpPtr;
-
     if( pipe < 0 && pipe >= MAX_PIPES ) return;
 
     cudaEvent_t start, end;
@@ -89,8 +86,6 @@ void PopSift::execute( int pipe, const unsigned char* imageData ) // const imgSt
     cudaDeviceSynchronize();
     cudaEventRecord( start, 0 );
 
-    // assert( inp.data_g == 0 );
-    // assert( inp.data_b == 0 );
 
     _pipe[pipe]._inputImage->load( _config, imageData );
 

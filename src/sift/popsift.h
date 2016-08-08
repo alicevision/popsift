@@ -39,7 +39,7 @@ public:
 
     inline popart::Pyramid& pyramid(int pipe)
     {
-      return *_pipe[pipe]._pyramid;
+        return *_pipe[pipe]._pyramid;
     }
 
     void uninit( int pipe );

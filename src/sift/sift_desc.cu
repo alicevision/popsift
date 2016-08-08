@@ -68,7 +68,6 @@ void keypoint_descriptors_sub( const float     ang,
     const int loops = wx * hy;
 
     float dpt[9] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
-    // for (int i = 0; i < 9; i++) dpt[i] = 0.0f;
 
     for( int i = threadIdx.x; i < loops; i+=blockDim.x )
     {
@@ -205,6 +204,9 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     // OpenCV normalization
 
 #undef HAVE_NORMF
+    // normf() is an elegant function: sqrt(sum_0^127{v^2})
+    // It exists from CUDA 7.5 but the trouble with CUB on the GTX 980 Ti forces
+    // us to with CUDA 7.0 right now
 
 #ifdef HAVE_NORMF
     float norm;
@@ -282,12 +284,9 @@ __global__ void descriptor_starter( int*          extrema_counter,
 {
     dim3 block;
     dim3 grid;
-    // grid.x  = *extrema_counter;
     grid.x  = *featvec_counter;
 
     if( grid.x == 0 ) return;
-
-    // printf("Number of extrema after ori: %d\n", grid.x );
 
     block.x = 32;
     block.y = 4;
@@ -320,7 +319,7 @@ __host__
 void Pyramid::descriptors_v1( const Config& conf )
 {
     if( conf.useDPDescriptors() ) {
-        cerr << "Calling descriptors with dynamic parallelism" << endl;
+        // cerr << "Calling descriptors with dynamic parallelism" << endl;
 
         for( int octave=0; octave<_num_octaves; octave++ ) {
             Octave&      oct_obj = _octaves[octave];
@@ -346,7 +345,7 @@ void Pyramid::descriptors_v1( const Config& conf )
             oct_obj.readExtremaCount( );
         }
     } else {
-        cerr << "Calling descriptors -no- dynamic parallelism" << endl;
+        // cerr << "Calling descriptors -no- dynamic parallelism" << endl;
 
         for( int octave=0; octave<_num_octaves; octave++ ) {
             Octave&      oct_obj = _octaves[octave];
@@ -366,7 +365,6 @@ void Pyramid::descriptors_v1( const Config& conf )
             for( int level=1; level<_levels-2; level++ ) {
                 dim3 block;
                 dim3 grid;
-                // grid.x = oct_obj.getExtremaCountH( level );
                 grid.x = oct_obj.getFeatVecCountH( level );
 
                 if( grid.x != 0 ) {

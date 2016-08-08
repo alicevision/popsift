@@ -14,11 +14,15 @@ struct Image
 
     ~Image( );
 
-    /** Load a new image, copy to device and upscale */
-    void load( const Config& conf, const unsigned char* input ); // const imgStream& inp );
+    /* This loading function copies all image data to a local
+     * buffer that is pinned in memory. We should offer two
+     * other functions: one that take a device-sided buffer
+     * if the image is already uploaded, and one that takes
+     * an image in pinned memory.
+     */
+    void load( const Config& conf, const unsigned char* input );
 
     void debug_out( );
-    void test_last_error( const char* file, int line );
 
     inline cudaTextureObject_t& getInputTexture() {
         return _input_image_tex;

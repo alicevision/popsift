@@ -10,10 +10,6 @@
 
 namespace popart{
 
-/*************************************************************
- * V6 (with dog array): device side
- *************************************************************/
-
 template<int HEIGHT>
 __device__
 static
@@ -152,7 +148,7 @@ public:
     inline __device__
     int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it ) const
     {
-        // OpenCV mode is a special case because d remain unmodified.
+        // OpenCV mode is a special case because d remains unmodified.
         // Either we return 1, and n has not been modified.
         // Or we quit the loop by exceeding the limit, and reject the point anyway.
 
@@ -164,7 +160,7 @@ public:
         }
 
         // This test in OpenCV is totally useless in CUDA because the thread
-        // would simple idle before failing 7 instructions below anyway.
+        // would simply idle before failing 7 instructions below anyway.
         // if( t.x > (float)(INT_MAX/3) || t.y > (float)(INT_MAX/3) || t.z > (float)(INT_MAX/3) ) {
             // return false, quit the loop, fail
             // return -1;
@@ -187,7 +183,6 @@ public:
     int verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const
     {
         return true;
-        // return ( xn < 5 || xn >= width-5 || yn < 5 || yn >= height-5 || sn < 1 || sn > maxlevel-2 ) ? false : true;
     }
 };
 
@@ -356,7 +351,6 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
 
 #define MAX_ITERATIONS 5
 
-    /* must be execute at least once */
     do {
         iter++;
 
@@ -533,9 +527,6 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
     }
 }
 
-/*************************************************************
- * V6: host side
- *************************************************************/
 template<int HEIGHT>
 __host__
 void Pyramid::find_extrema_sub( const Config& conf )

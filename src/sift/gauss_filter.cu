@@ -223,13 +223,13 @@ void GaussInfo::computeInitialBlurTable( int span, float sigma )
 __host__
 void GaussInfo::computeBlurTable( int level, int span, float sigma )
 {
-        /* Should be:
-         * kernel[x] = exp( -0.5 * (pow((x-mean)/sigma, 2.0) ) )
-         *           / sqrt(2 * M_PI * sigma * sigma);
-         * _w /= 2;
-         * _h /= 2;
-         * but the denominator is constant and we divide by sum anyway
-         */
+    /* Should be:
+     * kernel[x] = exp( -0.5 * (pow((x-mean)/sigma, 2.0) ) )
+     *           / sqrt(2 * M_PI * sigma * sigma);
+     * _w /= 2;
+     * _h /= 2;
+     * but the denominator is constant and we divide by sum anyway
+     */
     double sum = 1.0;
     filter[level*GAUSS_ALIGN + 0] = 1.0;
     for( int x = 1; x < span; x++ ) {
@@ -260,9 +260,9 @@ void GaussInfo::computeAbsBlurTable( int level, int span, float sigma )
 __host__
 int GaussInfo::vlFeatSpan( float sigma )
 {
-        /* This is the VLFeat computation for choosing the Gaussian filter width.
-         * In our case, we look at the half-sided filter including the center value.
-         */
+    /* This is the VLFeat computation for choosing the Gaussian filter width.
+     * In our case, we look at the half-sided filter including the center value.
+     */
     return min<int>( ceilf( 4.0f * sigma ) + 1, GAUSS_ALIGN - 1 );
 }
 
@@ -270,9 +270,8 @@ __host__
 int GaussInfo::openCVSpan( float sigma )
 {
     int span = int( roundf( 2.0f * 4.0f * sigma + 1.0f ) ) | 1;
-    // span = span | 1;   // don't make odd like original code, because
-    span >>= 1;           // we divide by two anyway
-    span  += 1;           // add the center node
+    span >>= 1;
+    span  += 1;
     return min<int>( span, GAUSS_ALIGN - 1 );
 }
 

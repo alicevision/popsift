@@ -13,10 +13,6 @@ using namespace std;
 
 namespace popart {
 
-/*************************************************************
- * CUDA device functions for printing debug information
- *************************************************************/
-
 __global__
 void py_print_corner_float( float* img, uint32_t pitch, uint32_t height, uint32_t level )
 {
@@ -43,49 +39,6 @@ void py_print_corner_float_transposed( float* img, uint32_t pitch, uint32_t heig
         printf("\n");
     }
     printf("\n");
-}
-
-/*************************************************************
- * Callers for CUDA device functions that print debug information
- *************************************************************/
-
-void Pyramid::debug_out_floats( float* data, uint32_t pitch, uint32_t height )
-{
-    py_print_corner_float
-        <<<1,1>>>
-        ( data,
-          pitch,
-          height,
-          0 );
-
-    test_last_error( __LINE__ );
-}
-
-void Pyramid::debug_out_floats_t( float* data, uint32_t pitch, uint32_t height )
-{
-    py_print_corner_float_transposed
-        <<<1,1>>>
-        ( data,
-          pitch,
-          height,
-          0 );
-
-    test_last_error( __LINE__ );
-}
-
-/*************************************************************
- * Host-sided debug function
- *************************************************************/
-
-void Pyramid::test_last_error( int line )
-{
-    cudaError_t err;
-    cudaDeviceSynchronize( );
-    err = cudaGetLastError();
-    if( err != cudaSuccess ) {
-        printf("A problem in line %d, %s\n", line, cudaGetErrorString(err) );
-        exit( -__LINE__ );
-    }
 }
 
 /*************************************************************

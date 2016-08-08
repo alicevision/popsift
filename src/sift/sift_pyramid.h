@@ -60,7 +60,6 @@ private:
 
     void descriptors_v1( const Config& conf );
 
-    void test_last_error( int line );
     void debug_out_floats  ( float* data, uint32_t pitch, uint32_t height );
     void debug_out_floats_t( float* data, uint32_t pitch, uint32_t height );
 };

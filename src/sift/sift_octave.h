@@ -30,7 +30,7 @@ class Octave
         cudaTextureObject_t   _dog_3d_tex;
 
         // one CUDA stream per level
-        // cosnider later whether some of them can be removed
+        // consider whether some of them can be removed
         cudaStream_t* _streams;
         cudaEvent_t*  _gauss_done;
         cudaEvent_t*  _dog_done;
@@ -41,7 +41,8 @@ class Octave
         cudaTextureObject_t  _interm_data_tex;
 
     private:
-        /* It seems strange strange to collect extrema globally only.
+        /* It seems strange strange to collect extrema globally only
+         * as other code does.
          * Because of the global cut-off, features from the later
          * octave have a smaller chance of being accepted.
          * Besides, the management of computing gradiants and atans
@@ -145,10 +146,6 @@ class Octave
         inline int*  getFeatVecCtPtrH( int level ) { return &_h_featvec_counter[level]; }
         inline int*  getFeatVecCtPtrD( int level ) { return &_d_featvec_counter[level]; }
         inline int   getFeatVecCountH( int level ) { return  _h_featvec_counter[level]; }
-        // inline int*  getExtremaCounterH( ) { return _h_extrema_counter; }
-        // inline int*  getExtremaCounterD( ) { return _d_extrema_counter; }
-        // inline int*  getFeatVecCounterH( ) { return _h_featvec_counter; }
-        // inline int*  getFeatVecCounterD( ) { return _d_featvec_counter; }
 
         inline int* getNumberOfBlocks( ) {
             return _d_extrema_num_blocks;
@@ -159,7 +156,6 @@ class Octave
         inline int*      getFeatToExtMapH( int level ) { return _h_feat_to_ext_map[level]; }
         inline int*      getFeatToExtMapD( int level ) { return _d_feat_to_ext_map[level]; }
 
-        // void resetExtremaCount( );
         void readExtremaCount( );
         int getExtremaCount( ) const;
         int getExtremaCount( uint32_t level ) const;

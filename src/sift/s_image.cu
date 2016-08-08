@@ -10,16 +10,6 @@ using namespace std;
 
 namespace popart {
 
-void Image::test_last_error( const char* file, int line )
-{
-    cudaError_t err;
-    err = cudaGetLastError();
-    if( err != cudaSuccess ) {
-        printf("Error in %s:%d\n     CUDA failed: %s\n", file, line, cudaGetErrorString(err) );
-        exit( -__LINE__ );
-    }
-}
-
 Image::Image( size_t w, size_t h )
     : _w(w), _h(h)
 {
@@ -65,13 +55,12 @@ Image::~Image( )
     err = cudaDestroyTextureObject( _input_image_tex );
     POP_CUDA_FATAL_TEST( err, "Could not destroy texture object: " );
 
-    _input_image_d   .freeDev( );
-    _input_image_h   .freeHost( popart::CudaAllocated );
+    _input_image_d.freeDev( );
+    _input_image_h.freeHost( popart::CudaAllocated );
 }
 
-void Image::load( const Config& conf, const unsigned char* input ) // const imgStream& inp )
+void Image::load( const Config& conf, const unsigned char* input )
 {
-    // memcpy( _input_image_h.data, inp.data_r, _w*_h );
     memcpy( _input_image_h.data, input, _w*_h );
     _input_image_h.memcpyToDevice( _input_image_d );
 }
