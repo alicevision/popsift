@@ -80,7 +80,7 @@ void ori_par( Extremum*     extremum,
     int hy = ymax - ymin + 1;
     int loops = wx * hy;
 
-    for( int i = threadIdx.x; __any(i < loops); i += blockDim.x )
+    for( int i = threadIdx.x; ::__any(i < loops); i += blockDim.x )
     {
         if( i < loops ) {
             int yy = i / wx + ymin;
@@ -156,7 +156,7 @@ void ori_par( Extremum*     extremum,
     __shared__ float refined_angle[HEIGHT][64];
     __shared__ float yval         [HEIGHT][64];
 
-    for( int bin = threadIdx.x; __any( bin < ORI_NBINS ); bin += blockDim.x ) {
+    for( int bin = threadIdx.x; ::__any( bin < ORI_NBINS ); bin += blockDim.x ) {
         const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
         const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
 
