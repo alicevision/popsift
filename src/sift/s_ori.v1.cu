@@ -131,6 +131,10 @@ void ori_par( Extremum*     extremum,
         }
         __syncthreads();
     }
+    for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
+        sm_hist[threadIdx.y][bin] = hist[threadIdx.y][bin];
+    }
+    __syncthreads();
 #else // not V2_WITH_VLFEAT_SMOOTHING
     for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
         int prev2 = bin - 2;
