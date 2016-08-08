@@ -350,33 +350,25 @@ void ori_par( int octave, int level, Extremum*     extremum,
     __syncthreads();
 
     // sub-cell refinement of the histogram cell index, yielding the angle
-    // __shared__ float refined_angle[ORI_NBINS];
-    // __shared__ float yval[ORI_NBINS];
     __shared__ float refined_angle[64];
     __shared__ float yval[64];
 
     for( int bin = threadIdx.x; __any( bin < ORI_NBINS ); bin += blockDim.x ) {
-        if( bin < ORI_NBINS ) {
-            const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
-            const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
+        const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
+        const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
 
-            bool predicate = ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) );
+        bool predicate = ( bin < ORI_NBINS ) && ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) );
 
-            const float num  = predicate ? 3.0f *   sm_hist[prev] - 4.0f * sm_hist[bin] + sm_hist[next]   : 0.0f;
-            const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
+        const float num  = predicate ? 3.0f *   sm_hist[prev] - 4.0f * sm_hist[bin] + sm_hist[next]   : 0.0f;
+        const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
 
-            const float newbin = __fdividef( num, denB );
+        const float newbin = __fdividef( num, denB );
 
-            predicate   = ( predicate && newbin >= 0.0f && newbin <= 2.0f );
+        predicate   = ( predicate && newbin >= 0.0f && newbin <= 2.0f );
 
-            refined_angle[bin] = predicate ? prev + newbin : -1;
-            yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
-        } else {
-            refined_angle[bin] = -1;
-            yval[bin]          = -INFINITY;
-        }
+        refined_angle[bin] = predicate ? prev + newbin                               : -1;
+        yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
     }
-    __syncthreads();
 
     int2 best_index = make_int2( threadIdx.x, threadIdx.x + 32 );
 
