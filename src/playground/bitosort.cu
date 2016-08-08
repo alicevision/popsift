@@ -65,10 +65,11 @@ private:
     {
         const T    my_val      = _array[my_index];
         const T    other_val   = __shfl_xor( my_val, 1 << shift );
-        const bool my_less     = ( my_val < other_val );
         const bool reverse     = ( threadIdx.x & ( 1 << direction ) );
         const bool id_less     = ( ( threadIdx.x & ( 1 << shift ) ) == 0 );
-        const bool must_swap   = not ( my_less ^ id_less ^ reverse ^ increasing );
+        const bool my_more     = id_less ? ( my_val > other_val )
+                                         : ( my_val < other_val );
+        const bool must_swap   = not ( my_more ^ reverse ^ increasing );
 
         return ( must_swap ? __shfl_xor( my_index, 1 << shift )
                            : my_index );
@@ -105,29 +106,25 @@ void sort_64( )
 }
 
 __global__
-void init_32( int i )
+void init_32( )
 {
     for( int i=0; i<32; i++ ) index_array_32[i] = i;
 
-    if( i == 0 )
-        for( int i=0; i<32; i++ ) array_32[i] = 327 * i % 97;
-    else if( i == 1 )
-        for( int i=0; i<32; i++ ) array_32[i] = 32 - i;
-    else
-        for( int i=0; i<32; i++ ) array_32[i] = i;
+    for( int i=0; i<32; i++ ) array_32[i] = i / 2;
+    // for( int i=0; i<32; i++ ) array_32[i] = 327 * i % 97;
+    // for( int i=0; i<32; i++ ) array_32[i] = 32 - i;
+    // for( int i=0; i<32; i++ ) array_32[i] = i;
 }
 
 __global__
-void init_64( int i )
+void init_64( )
 {
     for( int i=0; i<64; i++ ) index_array_64[i] = i;
 
-    if( i == 0 )
-        for( int i=0; i<64; i++ ) array_64[i] = 647 * i % 97;
-    else if( i == 1 )
-        for( int i=0; i<64; i++ ) array_64[i] = 64 - i;
-    else
-        for( int i=0; i<64; i++ ) array_64[i] = i;
+    for( int i=0; i<64; i++ ) array_64[i] = i / 2;
+    // for( int i=0; i<64; i++ ) array_64[i] = 647 * i % 97;
+    // for( int i=0; i<64; i++ ) array_64[i] = 64 - i;
+    // for( int i=0; i<64; i++ ) array_64[i] = i;
 }
 
 __global__
@@ -150,33 +147,13 @@ void print_64( )
 
 int main( )
 {
-    init_32<<<1,1>>>( 0 );
-    print_32<<<1,1>>>( );
-    sort_32<<<1,32>>>( );
-    print_32<<<1,1>>>( );
-    cudaDeviceSynchronize( );
-    init_32<<<1,1>>>( 1 );
-    print_32<<<1,1>>>( );
-    sort_32<<<1,32>>>( );
-    print_32<<<1,1>>>( );
-    cudaDeviceSynchronize( );
-    init_32<<<1,1>>>( 2 );
+    init_32<<<1,1>>>( );
     print_32<<<1,1>>>( );
     sort_32<<<1,32>>>( );
     print_32<<<1,1>>>( );
     cudaDeviceSynchronize( );
 
-    init_64<<<1,1>>>( 0 );
-    print_64<<<1,1>>>( );
-    sort_64<<<1,32>>>( );
-    print_64<<<1,1>>>( );
-    cudaDeviceSynchronize( );
-    init_64<<<1,1>>>( 1 );
-    print_64<<<1,1>>>( );
-    sort_64<<<1,32>>>( );
-    print_64<<<1,1>>>( );
-    cudaDeviceSynchronize( );
-    init_64<<<1,1>>>( 2 );
+    init_64<<<1,1>>>( );
     print_64<<<1,1>>>( );
     sort_64<<<1,32>>>( );
     print_64<<<1,1>>>( );
