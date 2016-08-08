@@ -4,8 +4,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
 
 
-add_executable( popsift-demo main.cpp
-                        c_util_img.cpp c_util_img.h )
+add_executable( popsift-demo main.cpp pgmread.cpp pgmread.h )
 
 target_include_directories( popsift-demo PRIVATE
                                     ${CMAKE_SOURCE_DIR}/src/sift )

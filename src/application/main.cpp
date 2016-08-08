@@ -18,7 +18,7 @@
 #include "popsift.h"
 #include "sift_conf.h"
 #include "device_prop.h"
-#include "c_util_img.h"
+#include "pgmread.h"
 
 using namespace std;
 
@@ -173,19 +173,13 @@ int main(int argc, char **argv)
         usage( appName );
     }
 
-    boost::filesystem::path p( inputFile );
+    int w;
+    int h;
+    unsigned char* image_data = readPGMfile( inputFile, w, h );
 
-    if( not boost::filesystem::exists( p ) ) {
-        cerr << "File " << inputFile << " not found" << endl;
-        usage( appName );
-    }
-
-    imgStream inp;
-
-    read_gray( inputFile, inp );
     cerr << "Input image size: "
-         << inp.width << "X" << inp.height
-         << " filename: " << p.filename() << endl;
+         << w << "X" << h
+         << " filename: " << inputFile << endl;
 
     device_prop_t deviceInfo;
     deviceInfo.set( 0 );
@@ -195,11 +189,10 @@ int main(int argc, char **argv)
 
     PopSift PopSift( config );
 
-    PopSift.init( 0, inp.width, inp.height );
-    assert( inp.data_g == 0 );
-    assert( inp.data_b == 0 );
-    PopSift.execute( 0, inp.data_r );
+    PopSift.init( 0, w, h );
+    PopSift.execute( 0, image_data );
     PopSift.uninit( 0 );
+    delete [] image_data;
     return 0;
 }
 
