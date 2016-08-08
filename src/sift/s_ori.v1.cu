@@ -380,14 +380,16 @@ void ori_par( int octave, int level, Extremum*     extremum,
     // of all yvals.
     const float best_val = yval[best_index.x];
     const float yval_ref = 0.8f * __shfl( best_val, 0 );
-    const bool  valid    = ( yval[best_index.x]  >= yval_ref );
+    // const bool  valid    = ( yval[best_index.x]  >= yval_ref );
+    const bool  valid    = ( best_val >= yval_ref );
     bool        written  = false;
 
     if( threadIdx.x < ORIENTATION_MAX_COUNT ) {
         if( valid ) {
             float chosen_bin = refined_angle[best_index.x];
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
-            float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
+            // float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
+            float th = fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
             ext->orientation[threadIdx.x] = th;
             written = true;
         }
