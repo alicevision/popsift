@@ -509,7 +509,7 @@ inline void Pyramid::dog_from_blurred( int octave, int level, cudaStream_t strea
  * V11: host side
  *************************************************************/
 __host__
-void Pyramid::build_v11( const Config& conf, Image* base )
+void Pyramid::build_pyramid( const Config& conf, Image* base )
 {
     cudaError_t err;
 

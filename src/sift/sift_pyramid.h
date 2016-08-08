@@ -42,7 +42,7 @@ public:
     inline Octave & getOctave(const int o){ return _octaves[o]; }
 
 private:
-    void build_v11( const Config& conf, Image* base );
+    void build_pyramid( const Config& conf, Image* base );
 
     inline void horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode, bool initial_blur );
     inline void downscale_from_prev_octave( int octave, int level, cudaStream_t stream, Config::SiftMode mode );
@@ -56,7 +56,7 @@ private:
     template<int HEIGHT>
     void find_extrema_sub( const Config& conf );
 
-    void orientation_v1( const Config& conf );
+    void orientation( const Config& conf );
 
     void descriptors_v1( const Config& conf );
 

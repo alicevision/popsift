@@ -16,7 +16,7 @@ using namespace std;
 /* Smoothing like VLFeat is the default mode.
  * If you choose to undefine it, you get the smoothing approach taken by OpenCV
  */
-#define V2_WITH_VLFEAT_SMOOTHING
+#define WITH_VLFEAT_SMOOTHING
 
 __device__
 inline float compute_angle( int bin, float hc, float hn, float hp )
@@ -116,7 +116,7 @@ void ori_par( Extremum*     extremum,
         __syncthreads();
     }
 
-#ifdef V2_WITH_VLFEAT_SMOOTHING
+#ifdef WITH_VLFEAT_SMOOTHING
     for( int i=0; i<3; i++ ) {
         for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
             int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
@@ -135,7 +135,7 @@ void ori_par( Extremum*     extremum,
         sm_hist[threadIdx.y][bin] = hist[threadIdx.y][bin];
     }
     __syncthreads();
-#else // not V2_WITH_VLFEAT_SMOOTHING
+#else // not WITH_VLFEAT_SMOOTHING
     for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
         int prev2 = bin - 2;
         int prev1 = bin - 1;
@@ -150,7 +150,7 @@ void ori_par( Extremum*     extremum,
                          +   hist[threadIdx.y][bin] * 6.0f ) / 16.0f;
     }
     __syncthreads();
-#endif // not V2_WITH_VLFEAT_SMOOTHING
+#endif // not WITH_VLFEAT_SMOOTHING
 
     // sub-cell refinement of the histogram cell index, yielding the angle
     __shared__ float refined_angle[HEIGHT][64];
@@ -323,7 +323,7 @@ void orientation_starter( Extremum*     extremum,
 }
 
 __host__
-void Pyramid::orientation_v1( const Config& conf )
+void Pyramid::orientation( const Config& conf )
 {
     if( conf.useDPOrientation() ) {
         // cerr << "Calling ori with dynamic parallelism" << endl;

@@ -179,11 +179,11 @@ void Pyramid::find_extrema( const Config& conf, Image* base )
 {
     reset_extrema_mgmt( );
 
-    build_v11( conf, base );
+    build_pyramid( conf, base );
 
     find_extrema( conf );
 
-    orientation_v1( conf );
+    orientation( conf );
 
     descriptors_v1( conf );
 }
