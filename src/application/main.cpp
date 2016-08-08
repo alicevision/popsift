@@ -1,3 +1,10 @@
+/*
+ * Copyright 2016, Simula Research Laboratory
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -16,13 +23,6 @@
 using namespace std;
 
 static void validate( const char* appName, popart::Config& config );
-
-/* User parameters */
-// int    verbose         = false;
-static bool print_info      = false;
-
-string keyFilename     = "";
-string inputFilename   = "";
 
 static void usage( const char* argv )
 {
@@ -123,7 +123,6 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 'h' : usage( appName ); break;
         case 'v' : config.setVerbose(); break;
         case 'l' : config.setLogMode( popart::Config::All ); break;
-        case 'p' : print_info = true; break;
 
         case 1000 : config.setOctaves( strtol( optarg, NULL, 0 ) ); break;
         case 1001 : config.setLevels(  strtol( optarg, NULL, 0 ) ); break;
@@ -190,9 +189,9 @@ int main(int argc, char **argv)
 
     device_prop_t deviceInfo;
     deviceInfo.set( 0 );
-    if( print_info ) {
-        deviceInfo.print( );
-    }
+#ifndef NDEBUG
+    deviceInfo.print( );
+#endif
 
     PopSift PopSift( config );
 
