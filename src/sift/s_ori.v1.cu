@@ -183,7 +183,6 @@ void ori_par( Extremum*     extremum,
     // of all yvals.
     const float best_val = yval[threadIdx.y][best_index.x];
     const float yval_ref = 0.8f * __shfl( best_val, 0 );
-    // const bool  valid    = ( yval[best_index.x]  >= yval_ref );
     const bool  valid    = ( best_val >= yval_ref );
     bool        written  = false;
 
@@ -277,8 +276,6 @@ void ori_prefix_sum( int*      extrema_counter,
 
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
         *featvec_counter = min( *featvec_counter, d_consts.orientations );
-
-        // printf("Leave %s, %d extrema -> %d oris\n", __func__, *extrema_counter, *featvec_counter );
     }
 }
 
