@@ -8,9 +8,6 @@
 #include <getopt.h>
 #include <boost/filesystem.hpp>
 
-#include "libavformat/avformat.h"
-#include "libavutil/avutil.h"
-
 #include "popsift.h"
 #include "sift_conf.h"
 #include "device_prop.h"

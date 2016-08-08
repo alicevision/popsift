@@ -12,11 +12,6 @@ set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_DEBUG}   -O3")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DGRIFF_DEBUG")
 set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -DGRIFF_DEBUG")
 
-# if(APPLE)
-  # set(CMAKE_CXX_FLAGS       "${CMAKE_CXX_FLAGS}       -Wno-c++11-extensions")
-# endif(APPLE)
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
-
 find_package(Boost 1.53.0 REQUIRED COMPONENTS system filesystem)
 
 if(Boost_FOUND)
@@ -62,14 +57,6 @@ IF(CUDA_FOUND)
 ELSE(CUDA_FOUND)
   message( FATAL_ERROR "Could not find CUDA >= 7.0" )
 ENDIF(CUDA_FOUND)
-
-# find_package(LibAV COMPONENTS REQUIRED avcodec avresample swscale avutil)
-find_package(LibAV COMPONENTS REQUIRED avformat)
-if(LIBAV_FOUND)
-  include_directories( ${LIBAV_INCLUDE_DIRS} )
-else(LIBAV_FOUND)
-  message( FATAL_ERROR "Could not find libav" )
-endif(LIBAV_FOUND)
 
 add_subdirectory(src)
 
