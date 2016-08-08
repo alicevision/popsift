@@ -17,5 +17,4 @@ CUDA_ADD_LIBRARY( popsift STATIC
 		  ${src_files_cpp} )
 
 add_subdirectory(application)
-add_subdirectory(playground)
 

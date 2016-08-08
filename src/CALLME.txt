@@ -1,7 +1,0 @@
-cmake -DCMAKE_INSTALL_PREFIX=/opt/local/stdcxx \
-      -DCMAKE_CXX_FLAGS="-stdlib=libstdc++" \
-      -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libstdc++" \
-      -DCMAKE_INCLUDE_PATH="/opt/local/stdcxx/include" \
-      -DCMAKE_LIBRARY_PATH="/opt/local/stdcxx/lib" \
-      -DCUDA_ARCH_BIN="2.0 2.1(2.0) 3.0 3.5" \
-      ..
