@@ -35,7 +35,7 @@ public:
 public:
     bool init( int pipe, int w, int h );
 
-    void execute( int pipe, const imgStream* _inp );
+    void execute( int pipe, const unsigned char* imageData ); // const imgStream* _inp );
 
     inline popart::Pyramid& pyramid(int pipe)
     {

@@ -200,7 +200,9 @@ int main(int argc, char **argv)
     PopSift PopSift( config );
 
     PopSift.init( 0, inp.width, inp.height );
-    PopSift.execute( 0, &inp );
+    assert( inp.data_g == 0 );
+    assert( inp.data_b == 0 );
+    PopSift.execute( 0, inp.data_r );
     PopSift.uninit( 0 );
     return 0;
 }

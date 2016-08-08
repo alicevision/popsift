@@ -27,14 +27,14 @@
 
 using namespace std;
 
-/*************************************/
-/* @namespace Comment                */
-/* @brief Comment crusher            */
-/*************************************/
-namespace Comment {
-    static class _comment {
-    } cmnt;
-    inline std::istream& operator>>(std::istream& is, _comment & manip) {
+namespace popart {
+class Comment
+{ };
+Comment cmnt;
+}
+
+inline std::istream& operator>>(std::istream& is, popart::Comment & manip)
+{
         char c;
         char b[1024];
         while( is.good() )
@@ -45,89 +45,16 @@ namespace Comment {
             is.getline(b, 1024);
         }
         return is;
-    }
 }
-
-/** 
- * BEMAP Utility for finding an input file
- * Finding process iterates on the given folder:
-
- "./",
- "common/data/",
- "../common/data/",
- "../../common/data/",
- "../../../common/data/",
- "../../../../common/data/"
-
- * 
- * @param filename 
- * 
- * @return bool Return TRUE if file found, FALSE if not found
- */
-
-bool find_file(std::string & filename)
-{
-    /* try to open the given file first */
-    std::fstream tryin(filename.c_str(), std::ios_base::in | std::ios_base::binary);
-    if (tryin.good()) {
-        return true;
-    }
-
-    const char* search_path[] = {
-        "./",
-        "common/data/",
-        "../common/data/",
-        "../../common/data/",
-        "../../../common/data/",
-        "../../../../common/data/"
-    };
-
-    /* extract file name first */
-    std::string prefix = "";
-    std::string realname = "";
-
-    realname = extract_filename(filename, prefix);
-    realname += prefix;
-
-    std::cerr << "File not found: " << realname << std::endl;
-    std::cerr << "find_file is trying to search " << realname << " in another path..\n";
-
-    if (filename != "") {
-        for (int i = 0; i < sizeof(search_path)/sizeof(char *); i++) {
-            std::string path(search_path[i]);
-            path.append(realname);
-
-            std::fstream trying(path.c_str(), std::ios_base::in | std::ios_base::binary);
-            if (trying.good()) {
-                /* file found, return this */
-                std::cerr << path << " found. Proceed to execute with this.\n";
-                filename = path;
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-/** 
- * @brief Take an image input, PGM or PPM format, and then
- *        save it into the imgStream buffer
- * 
- * @param filename 
- * @param buffer 
- * @param isPGM 
- */
 
 void read_pgpm(std::string & filename, imgStream & buffer, int &isPGM)
 {
-    if (!find_file(filename)) {
-        std::cerr << "ERROR: " << "Cannot open file: " << filename << std::endl;
-        exit(1);
-    }
-
     std::fstream in(filename.c_str(),
                     std::ios_base::in | std::ios_base::binary);
+    if( not in.good() ) {
+        std::cerr << "ERROR: " << "Cannot open file: " << filename << std::endl;
+        exit( -1 );
+    }
 
     pixel_uc *ptr_r = NULL;
     pixel_uc *ptr_g = NULL;
@@ -157,8 +84,8 @@ void read_pgpm(std::string & filename, imgStream & buffer, int &isPGM)
         exit(1);
     }
 
-    in >> Comment::cmnt
-       >> width >> Comment::cmnt >> height >> Comment::cmnt >> maxval;
+    in >> popart::cmnt
+       >> width >> popart::cmnt >> height >> popart::cmnt >> maxval;
 
     /* get trash */
     {
@@ -247,18 +174,15 @@ void read_pgpm(std::string & filename, imgStream & buffer, int &isPGM)
 
 void read_gray(std::string & filename, imgStream & buffer)
 {
-    // cerr << "Entering " << __FUNCTION__ << endl;
-    // cerr << "   filename " << filename << endl;
-
     bool isPGM;
-
-    if (!find_file(filename)) {
-        std::cerr << "ERROR: " << "Cannot open file: " << filename << std::endl;
-        exit(1);
-    }
 
     std::fstream in(filename.c_str(),
                     std::ios_base::in | std::ios_base::binary);
+
+    if( not in.good() ) {
+        std::cerr << "ERROR: " << "Cannot open file: " << filename << std::endl;
+        exit( -1 );
+    }
 
     pixel_uc *ptr_r = NULL;
     int width, height, maxval;
@@ -279,7 +203,6 @@ void read_gray(std::string & filename, imgStream & buffer)
         isPGM = true;
         break;
     case '6':
-        // cerr << "    File is in PPM format" << endl;
         isPGM = false;
         break;
     default:
@@ -287,8 +210,8 @@ void read_gray(std::string & filename, imgStream & buffer)
         exit(1);
     }
 
-    in >> Comment::cmnt
-       >> width >> Comment::cmnt >> height >> Comment::cmnt >> maxval;
+    in >> popart::cmnt
+       >> width >> popart::cmnt >> height >> popart::cmnt >> maxval;
 
     /* get trash */
     {
@@ -340,7 +263,6 @@ void read_gray(std::string & filename, imgStream & buffer)
             *start++ = (pixel_uc) (*buffer++);
       }
     } else {
-      // cerr << "    NOT PGM case" << endl;
       if( not isAscii ) {    // PPM P6 image
         ptr_r = new pixel_uc[width * height];
 
@@ -366,10 +288,6 @@ void read_gray(std::string & filename, imgStream & buffer)
             float b = *src; src++;
             ptr_r[i] = (unsigned char)( R_RATE*r+G_RATE*g+B_RATE*b );
 #endif // RGB2GRAY_IN_INT
-    // cerr << "(" << i%width << "," << i/width << ") -> R " << r << " G " << g << " B " << b << " -> " << (int)ptr_r[i] << endl;
-// if( i == 19*width+3 ) {
-    // cerr << "(3,19) -> R " << r << " G " << g << " B " << b << " -> " << (int)ptr_r[i] << endl;
-// }
         }
       } else {
         std::cerr << "ERROR: Unknown parsing mode\n" << std::endl;
@@ -382,17 +300,7 @@ void read_gray(std::string & filename, imgStream & buffer)
     buffer.data_r = ptr_r;
     buffer.data_g = 0;
     buffer.data_b = 0;
-
-    // cerr << "Leaving " << __FUNCTION__ << endl;
 }
-
-/** 
- * @brief Output image in PGM or PPM format
- * 
- * @param filename 
- * @param buffer 
- * @param isPGM 
- */
 
 void out_pgpm(const std::string & filename, imgStream & buffer, int &isPGM)
 {

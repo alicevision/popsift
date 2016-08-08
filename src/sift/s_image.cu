@@ -70,22 +70,10 @@ Image::~Image( )
     _input_image_h   .freeHost( popart::CudaAllocated );
 }
 
-void Image::load( const Config& conf, const imgStream& inp )
+void Image::load( const Config& conf, const unsigned char* input ) // const imgStream& inp )
 {
-#if 0
-    ofstream of( "color-conv.pgm" );
-    of << "P2" << endl
-       << _w << " " << _h << endl
-       << "255" << endl;
-    for( int h=0; h<_h; h++ ) {
-        for( int w=0; w<_w; w++ ) {
-            int val = inp.data_r[h*_w+w];
-            of << val << " ";
-        }
-        of << endl;
-    }
-#endif
-    memcpy( _input_image_h.data, inp.data_r, _w*_h );
+    // memcpy( _input_image_h.data, inp.data_r, _w*_h );
+    memcpy( _input_image_h.data, input, _w*_h );
     _input_image_h.memcpyToDevice( _input_image_d );
 }
 

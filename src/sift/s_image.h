@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdint.h>
-#include "c_util_img.h"
+// #include "c_util_img.h"
 #include "plane_2d.h"
 #include "sift_conf.h"
 
@@ -15,7 +15,7 @@ struct Image
     ~Image( );
 
     /** Load a new image, copy to device and upscale */
-    void load( const Config& conf, const imgStream& inp );
+    void load( const Config& conf, const unsigned char* input ); // const imgStream& inp );
 
     void debug_out( );
     void test_last_error( const char* file, int line );
