@@ -1,2 +1,0 @@
-Known TODOs:
- - replace Gauss parameters with mix of linear interpolation and modified factors (optional, halves #*)
