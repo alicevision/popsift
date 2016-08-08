@@ -1,10 +1,12 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <vector>
 #include <stdio.h>
 #include <sys/stat.h>
 
 #include "sift_pyramid.h"
+#include "sift_extremum.h"
 #include "debug_macros.h"
 
 #define PYRAMID_PRINT_DEBUG 0
@@ -109,7 +111,10 @@ Pyramid::~Pyramid( )
     delete [] _octaves;
 }
 
-void Pyramid::find_extrema( const Config& conf, Image* base )
+void Pyramid::find_extrema( const Config&                conf,
+                            Image*                       base,
+                            vector<vector<Extremum> >*   extrema,
+                            vector<vector<Descriptor> >* descs )
 {
     reset_extrema_mgmt( );
 
@@ -120,6 +125,16 @@ void Pyramid::find_extrema( const Config& conf, Image* base )
     orientation( conf );
 
     descriptors( conf );
+
+    if( extrema && descs ) {
+        extrema->resize( _num_octaves * _levels );
+        descs  ->resize( _num_octaves * _levels );
+        for( int o=0; o<_num_octaves; o++ ) {
+            for( int l=0; l<_levels; l++ ) {
+                _octaves[o].downloadToVector( l, (*extrema)[o*_levels+l], (*descs)[o*_levels+l] );
+            }
+        }
+    }
 }
 
 void Pyramid::reset_extrema_mgmt( )

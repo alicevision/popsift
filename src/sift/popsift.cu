@@ -24,13 +24,15 @@ PopSift::PopSift( const popart::Config& config )
 PopSift::~PopSift()
 { }
 
-bool PopSift::init( int pipe, int w, int h )
+bool PopSift::init( int pipe, int w, int h, bool checktime )
 {
     cudaEvent_t start, end;
-    cudaEventCreate( &start );
-    cudaEventCreate( &end );
-    cudaDeviceSynchronize();
-    cudaEventRecord( start, 0 );
+    if( checktime ) {
+        cudaEventCreate( &start );
+        cudaEventCreate( &end );
+        cudaDeviceSynchronize();
+        cudaEventRecord( start, 0 );
+    }
 
     if( pipe < 0 && pipe >= MAX_PIPES ) {
         return false;
@@ -57,12 +59,15 @@ bool PopSift::init( int pipe, int w, int h )
                                                 ceilf( h * scaleFactor ) );
 
     cudaDeviceSynchronize();
-    cudaEventRecord( end, 0 );
-    cudaEventSynchronize( end );
-    float elapsedTime;
-    cudaEventElapsedTime( &elapsedTime, start, end );
 
-    cerr << "Initialization of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
+    if( checktime ) {
+        cudaEventRecord( end, 0 );
+        cudaEventSynchronize( end );
+        float elapsedTime;
+        cudaEventElapsedTime( &elapsedTime, start, end );
+
+        cerr << "Initialization of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
+    }
 
     return true;
 }
@@ -75,40 +80,46 @@ void PopSift::uninit( int pipe )
     delete _pipe[pipe]._pyramid;
 }
 
-void PopSift::execute( int pipe, const unsigned char* imageData )
+void PopSift::execute( int                                  pipe,
+                       const unsigned char*                 imageData,
+                       vector<vector<popart::Extremum> >*   extrema,
+                       vector<vector<popart::Descriptor> >* descs,
+                       bool                                 checktime )
 {
     if( pipe < 0 && pipe >= MAX_PIPES ) return;
 
     cudaEvent_t start, end;
-    cudaEventCreate( &start );
-    cudaEventCreate( &end );
+    if( checktime ) {
+        cudaEventCreate( &start );
+        cudaEventCreate( &end );
 
-    cudaDeviceSynchronize();
-    cudaEventRecord( start, 0 );
-
+        cudaDeviceSynchronize();
+        cudaEventRecord( start, 0 );
+    }
 
     _pipe[pipe]._inputImage->load( _config, imageData );
 
     _pipe[pipe]._pyramid->find_extrema( _config, _pipe[pipe]._inputImage );
 
-    int octaves = _pipe[pipe]._pyramid->getNumOctaves();
-
     cudaDeviceSynchronize();
 
-    for( int o=0; o<octaves; o++ ) {
-        _pipe[pipe]._pyramid->download_descriptors( _config, o );
+    if( checktime ) {
+        cudaEventRecord( end, 0 );
+        cudaEventSynchronize( end );
+        float elapsedTime;
+        cudaEventElapsedTime( &elapsedTime, start, end );
+
+        cerr << "Execution of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
     }
-
-    cudaDeviceSynchronize();
-    cudaEventRecord( end, 0 );
-    cudaEventSynchronize( end );
-    float elapsedTime;
-    cudaEventElapsedTime( &elapsedTime, start, end );
-
-    cerr << "Execution of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
 
     bool log_to_file = ( _config.log_mode == popart::Config::All );
     if( log_to_file ) {
+        int octaves = _pipe[pipe]._pyramid->getNumOctaves();
+
+        for( int o=0; o<octaves; o++ ) {
+            _pipe[pipe]._pyramid->download_descriptors( _config, o );
+        }
+
         int levels  = _pipe[pipe]._pyramid->getNumLevels();
 
         for( int o=0; o<octaves; o++ ) {
