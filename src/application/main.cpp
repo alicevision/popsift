@@ -23,8 +23,6 @@ static bool print_info      = false;
 
 string keyFilename     = "";
 string inputFilename   = "";
-string realName        = ""; 
-string prefix          = "";
 
 static void usage( const char* argv )
 {
@@ -176,18 +174,19 @@ int main(int argc, char **argv)
         usage( appName );
     }
 
-    if( not boost::filesystem::exists( inputFile ) ) {
+    boost::filesystem::path p( inputFile );
+
+    if( not boost::filesystem::exists( p ) ) {
         cerr << "File " << inputFile << " not found" << endl;
         usage( appName );
     }
 
     imgStream inp;
 
-    realName = extract_filename( inputFile, prefix );
     read_gray( inputFile, inp );
     cerr << "Input image size: "
          << inp.width << "X" << inp.height
-         << " filename: " << realName << endl;
+         << " filename: " << p.filename() << endl;
 
     device_prop_t deviceInfo;
     deviceInfo.set( 0 );
