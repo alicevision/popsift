@@ -140,12 +140,12 @@ void compute_keypoint_orientations( Extremum*     extremum,
         for(int bin = 0; bin < ORI_NBINS; bin++) {
             int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
             int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            refined_angle[bin] = ( hist[prev] + hist[bin] + hist[next] ) / 3.0f;
+            yval[bin] = ( hist[prev] + hist[bin] + hist[next] ) / 3.0f;
         }
         for(int bin = 0; bin < ORI_NBINS; bin++) {
             int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
             int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            hist[bin] = ( refined_angle[prev] + refined_angle[bin] + refined_angle[next] ) / 3.0f;
+            hist[bin] = ( yval[prev] + yval[bin] + yval[next] ) / 3.0f;
         }
     }
 #endif // V2_WITH_VLFEAT_SMOOTHING
@@ -160,12 +160,12 @@ void compute_keypoint_orientations( Extremum*     extremum,
         if( prev1 < 0 )          prev1 += ORI_NBINS;
         if( next1 >= ORI_NBINS ) next1 -= ORI_NBINS;
         if( next2 >= ORI_NBINS ) next2 -= ORI_NBINS;
-        refined_angle[bin] = (   hist[prev2] + hist[next2]
+        yval[bin] = (   hist[prev2] + hist[next2]
                       + ( hist[prev1] + hist[next1] ) * 4.0f
                       +   hist[bin] * 6.0f ) / 16.0f;
     }
     for(int bin = 0; bin < ORI_NBINS; bin++) {
-        hist[bin] = refined_angle[bin];
+        hist[bin] = yval[bin];
     }
 #endif // V2_WITH_OPENCV_SMOOTHING
 
