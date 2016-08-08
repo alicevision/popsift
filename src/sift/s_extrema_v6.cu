@@ -8,10 +8,6 @@
 #include "assist.h"
 #include "clamp.h"
 
-#undef PRINT_EXTREMA_DEBUG_INFO
-
-#undef DEBUG_MEGA_LOOP
-
 namespace popart{
 
 /*************************************************************
@@ -301,13 +297,13 @@ public:
 
 template<int sift_mode>
 __device__
-bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
-                                 int                 debug_octave,
-                                 int                 level,
-                                 int                 width,
-                                 int                 height,
-                                 const uint32_t      maxlevel,
-                                 Extremum&           ec )
+bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
+                              int                 debug_octave,
+                              int                 level,
+                              int                 width,
+                              int                 height,
+                              const uint32_t      maxlevel,
+                              Extremum&           ec )
 {
     ec.xpos    = 0;
     ec.ypos    = 0;
@@ -331,13 +327,6 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     const int y       = block_y + threadIdx.y + 1;
     const int x       = block_x + threadIdx.x + 1;
 
-    // int32_t x0 = x;
-    // int32_t x1 = x+1;
-    // int32_t x2 = x+2;
-    // int32_t y0 = y;
-    // int32_t y1 = y+1;
-    // int32_t y2 = y+2;
-
     if( sift_mode == Config::OpenCV ) {
         if( x < 5 || y < 5 || x >= width-5 || y >= height-5 ) {
             return false;
@@ -349,54 +338,11 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     ModeFunctions<sift_mode> f;
     if( not f.first_contrast_ok( val ) ) return false;
 
-#if 0
-    if( debug_octave==0 && level==2 && x==14 && y==73 ) {
-        printf("I am being tested\n");
-        printf("thresh = %0.8f\n", floorf( d_consts.threshold ) );
-        printf("layer0 = %0.3f %0.3f %0.3f\n"
-               "         %0.3f %0.3f %0.3f\n"
-               "         %0.3f %0.3f %0.3f\n",
-            tex2DLayered<float>( dog, x-1, y-1, level-1 ),
-            tex2DLayered<float>( dog, x  , y-1, level-1 ),
-            tex2DLayered<float>( dog, x+1, y-1, level-1 ),
-            tex2DLayered<float>( dog, x-1, y  , level-1 ),
-            tex2DLayered<float>( dog, x  , y  , level-1 ),
-            tex2DLayered<float>( dog, x+1, y  , level-1 ),
-            tex2DLayered<float>( dog, x-1, y+1, level-1 ),
-            tex2DLayered<float>( dog, x  , y+1, level-1 ),
-            tex2DLayered<float>( dog, x+1, y+1, level-1 ) );
-        printf("layer1 = %0.3f %0.3f %0.3f\n"
-               "         %0.3f %0.3f %0.3f\n"
-               "         %0.3f %0.3f %0.3f\n",
-            tex2DLayered<float>( dog, x-1, y-1, level ),
-            tex2DLayered<float>( dog, x  , y-1, level ),
-            tex2DLayered<float>( dog, x+1, y-1, level ),
-            tex2DLayered<float>( dog, x-1, y  , level ),
-            tex2DLayered<float>( dog, x  , y  , level ),
-            tex2DLayered<float>( dog, x+1, y  , level ),
-            tex2DLayered<float>( dog, x-1, y+1, level ),
-            tex2DLayered<float>( dog, x  , y+1, level ),
-            tex2DLayered<float>( dog, x+1, y+1, level ) );
-        printf("layer2 = %0.3f %0.3f %0.3f\n"
-               "         %0.3f %0.3f %0.3f\n"
-               "         %0.3f %0.3f %0.3f\n",
-            tex2DLayered<float>( dog, x-1, y-1, level+1 ),
-            tex2DLayered<float>( dog, x  , y-1, level+1 ),
-            tex2DLayered<float>( dog, x+1, y-1, level+1 ),
-            tex2DLayered<float>( dog, x-1, y  , level+1 ),
-            tex2DLayered<float>( dog, x  , y  , level+1 ),
-            tex2DLayered<float>( dog, x+1, y  , level+1 ),
-            tex2DLayered<float>( dog, x-1, y+1, level+1 ),
-            tex2DLayered<float>( dog, x  , y+1, level+1 ),
-            tex2DLayered<float>( dog, x+1, y+1, level+1 ) );
-    }
-#endif
     if( not is_extremum( dog, x-1, y-1, level-1 ) ) {
         // if( debug_octave==0 && level==2 && x==14 && y==73 ) printf("But I fail\n");
         return false;
     }
 
-    // based on Bemap
     float3 D; // Dx Dy Ds
     float3 DD; // Dxx Dyy Dss
     float3 DX; // Dxy Dxs Dys
@@ -478,7 +424,6 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
             d.z = 0;
             break ;
         }
-        // printf( "moving (%d,%d) by l: %f (%f,%f)\n", x+1, y+1, d.z, d.x, d.y );
 
         d = b;
 
@@ -488,9 +433,6 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
         const int retval = f.refine( d, n, width, height, maxlevel, iter==MAX_ITERATIONS );
 
         if( retval == -1 ) {
-#ifdef PRINT_EXTREMA_DEBUG_INFO
-            printf("Found an extremum at %d %d (o=%d,l=%d) - deviating to much in refinement l:%d (%d,%d)\n", x, y, debug_octave, level, n.z, n.x, n.y );
-#endif // PRINT_EXTREMA_DEBUG_INFO
             return false;
         } else if( retval == 1 ) {
             break;
@@ -501,18 +443,12 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     if (iter >= MAX_ITERATIONS) {
         if( sift_mode == Config::OpenCV ) {
             /* ensure convergence of interpolation */
-#ifdef PRINT_EXTREMA_DEBUG_INFO
-            printf("Found an extremum at %d %d (o=%d,l=%d) - rejected in refinement, was moved to l:%d (%d,%d)\n", x, y, debug_octave, level, n.z, n.x, n.y );
-#endif // PRINT_EXTREMA_DEBUG_INFO
             return false;
         }
     }
 
     if( sift_mode == Config::PopSift || sift_mode == Config::VLFeat ) {
         if( d.x >= 1.5f || d.y >= 1.5f || d.z >= 1.5f ) {
-#ifdef PRINT_EXTREMA_DEBUG_INFO
-            printf("Found an extremum at %d %d (o=%d,l=%d) - rejected because of large d l:%0.2f (%0.2f,%0.2f)\n", x, y, debug_octave, level, d.z, d.x, d.y );
-#endif // PRINT_EXTREMA_DEBUG_INFO
             // excessive pixel movement in at least dimension, reject
             return false;
         }
@@ -523,9 +459,6 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     const float sn      = n.z + d.z;
 
     if( not f.verify( xn, yn, sn, width, height, maxlevel ) ) {
-#ifdef PRINT_EXTREMA_DEBUG_INFO
-        printf("Found an extremum at %d %d (o=%d,l=%d) - rejected in verification, was moved to l:%0.2f (%0.2f,%0.2f)\n", x, y, debug_octave, level, sn, xn, yn ); // n.z, n.x, n.y );
-#endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
 
@@ -536,17 +469,11 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     const float edgeval = tr * tr / det;
 
     if( sift_mode == Config::PopSift && iter >= MAX_ITERATIONS && ( sn<0 || sn>maxlevel) ) {
-#ifdef PRINT_EXTREMA_DEBUG_INFO
-        printf("Found an extremum at %d %d (o=%d,l=%d) - rejected in refinement, was moved to l:%d (%d,%d)\n", x, y, debug_octave, level, n.z, n.x, n.y );
-#endif
         return false;
     }
 
     /* negative determinant => curvatures have different signs -> reject it */
     if (det <= 0.0f) {
-#ifdef PRINT_EXTREMA_DEBUG_INFO
-        printf("Found an extremum at %d %d (o=%d,l=%d) - negative determinant\n", x, y, debug_octave, level );
-#endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
 
@@ -554,17 +481,11 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     // if( fabsf(contr) < (d_consts.threshold*2.0f) )
     if( fabsf(contr) < scalbnf( d_consts.threshold, 1 ) )
     {
-#ifdef PRINT_EXTREMA_DEBUG_INFO
-        printf("Found an extremum at %d %d (o=%d,l=%d) - 2nd peak tresh failed\n", x, y, debug_octave, level );
-#endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
 
     /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
     if( edgeval >= (d_consts.edge_limit+1.0f)*(d_consts.edge_limit+1.0f)/d_consts.edge_limit ) {
-#ifdef PRINT_EXTREMA_DEBUG_INFO
-        printf("Found an extremum at %d %d (o=%d,l=%d) - edge tresh failed\n", x, y, debug_octave, level );
-#endif // PRINT_EXTREMA_DEBUG_INFO
         return false;
     }
 
@@ -573,31 +494,13 @@ bool find_extrema_in_dog_v6_sub( cudaTextureObject_t dog,
     ec.sigma   = d_consts.sigma0 * pow(d_consts.sigma_k, sn); // * 2;
         // const float sigma_k = powf(2.0f, 1.0f / levels );
 
-
-// #ifdef DEBUG_MEGA_LOOP
-//     float sigw = 3.0f * ec.sigma;
-//     int   rad  = (int)rintf((3.0f * sigw));
-// 
-//     if( sn < -1 ) {
-//         printf("o/l=%d/%d pos=(%0.1f, %0.1f, %0.1f) n.z=%d d.z=%0.2f det=%0.2f scale=%0.2f pixel radius=%d\n", debug_octave, level, ec.xpos, ec.ypos, sn, n.z, d.z, det, ec.sigma, rad );
-//     } else if( sn > maxlevel ) {
-//         printf("o/l=%d/%d pos=(%0.1f, %0.1f, %0.1f) n.z=%d d.z=%0.2f det=%0.2f scale=%0.2f pixel radius=%d\n", debug_octave, level, ec.xpos, ec.ypos, sn, n.z, d.z, det, ec.sigma, rad );
-//     } else if( sn > maxlevel-1 ) {
-//         printf("o/l=%d/%d pos=(%0.1f, %0.1f, %0.1f) n.z=%d d.z=%0.2f det=%0.2f scale=%0.2f pixel radius=%d\n", debug_octave, level, ec.xpos, ec.ypos, sn, n.z, d.z, det, ec.sigma, rad );
-//     }
-// #endif // DEBUG_MEGA_LOOP
-
-#ifdef PRINT_EXTREMA_DEBUG_INFO
-    printf("Found an extremum at %d %d (o=%d,l=%d)     -> x:%.1f y:%.1f z:%.1f sigma:%0.1f\n", x, y, debug_octave, level, xn, yn, sn, ec.sigma );
-#endif // PRINT_EXTREMA_DEBUG_INFO
-
     return true;
 }
 
 
 template<int HEIGHT, int vlfeat_mode>
 __global__
-void find_extrema_in_dog_v6( cudaTextureObject_t dog,
+void find_extrema_in_dog( cudaTextureObject_t dog,
                              int                 octave,
                              int                 level,
                              int                 width,
@@ -610,7 +513,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
 {
     Extremum ec;
 
-    bool indicator = find_extrema_in_dog_v6_sub<vlfeat_mode>( dog, octave, level, width, height, maxlevel, ec );
+    bool indicator = find_extrema_in_dog_sub<vlfeat_mode>( dog, octave, level, width, height, maxlevel, ec );
 
     uint32_t write_index = extrema_count<HEIGHT>( indicator, extrema_counter );
 
@@ -635,7 +538,7 @@ void find_extrema_in_dog_v6( cudaTextureObject_t dog,
  *************************************************************/
 template<int HEIGHT>
 __host__
-void Pyramid::find_extrema_v6_sub( const Config& conf )
+void Pyramid::find_extrema_sub( const Config& conf )
 {
     for( int octave=0; octave<_num_octaves; octave++ ) {
         Octave&      oct_obj = _octaves[octave];
@@ -670,7 +573,7 @@ void Pyramid::find_extrema_v6_sub( const Config& conf )
             switch( conf.getSiftMode() )
             {
             case Config::VLFeat :
-                find_extrema_in_dog_v6<HEIGHT,Config::VLFeat>
+                find_extrema_in_dog<HEIGHT,Config::VLFeat>
                     <<<grid,block,0,oct_str>>>
                     ( oct_obj.getDogTexture( ),
                       octave,
@@ -684,7 +587,7 @@ void Pyramid::find_extrema_v6_sub( const Config& conf )
                       grid.x * grid.y );
                 break;
             case Config::OpenCV :
-                find_extrema_in_dog_v6<HEIGHT,Config::OpenCV>
+                find_extrema_in_dog<HEIGHT,Config::OpenCV>
                     <<<grid,block,0,oct_str>>>
                     ( oct_obj.getDogTexture( ),
                       octave,
@@ -698,7 +601,7 @@ void Pyramid::find_extrema_v6_sub( const Config& conf )
                       grid.x * grid.y );
                 break;
             default :
-                find_extrema_in_dog_v6<HEIGHT,Config::PopSift>
+                find_extrema_in_dog<HEIGHT,Config::PopSift>
                     <<<grid,block,0,oct_str>>>
                     ( oct_obj.getDogTexture( ),
                       octave,
@@ -720,21 +623,9 @@ void Pyramid::find_extrema_v6_sub( const Config& conf )
 }
 
 __host__
-void Pyramid::find_extrema_v6( const Config& conf )
+void Pyramid::find_extrema( const Config& conf )
 {
-#define MANYLY(H) \
-    find_extrema_v6_sub<H> ( conf );
-
-    // MANYLY(1)
-    // MANYLY(2)
-    // MANYLY(3)
-    MANYLY(4)
-    // MANYLY(5)
-    // MANYLY(6)
-    // MANYLY(7)
-    // MANYLY(8)
-    // MANYLY(16)
-    // fails // MANYLY(32)
+    find_extrema_sub<4>( conf );
 }
 
 } // namespace popart

@@ -181,7 +181,7 @@ void Pyramid::find_extrema( const Config& conf, Image* base )
 
     build_v11( conf, base );
 
-    find_extrema_v6( conf );
+    find_extrema( conf );
 
     orientation_v1( conf );
 

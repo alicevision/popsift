@@ -2,7 +2,6 @@
 #include <iostream>
 #include <fstream>
 #include "debug_macros.h"
-#include "align_macro.h"
 #include "assist.h"
 #include <stdio.h>
 #include <assert.h>

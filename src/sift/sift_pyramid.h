@@ -51,10 +51,10 @@ private:
     inline void dog_from_blurred( int octave, int level, cudaStream_t stream );
 
     void reset_extrema_mgmt( );
-    void find_extrema_v6( const Config& conf );
+    void find_extrema( const Config& conf );
 
     template<int HEIGHT>
-    void find_extrema_v6_sub( const Config& conf );
+    void find_extrema_sub( const Config& conf );
 
     void orientation_v1( const Config& conf );
 
