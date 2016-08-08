@@ -7,6 +7,7 @@
 #include "sift_constants.h"
 #include "s_gradiant.h"
 #include "excl_blk_prefix_sum.h"
+#include "warp_bitonic_sort.h"
 #include "debug_macros.h"
 
 using namespace popart;
@@ -122,7 +123,7 @@ void compute_keypoint_orientations( Extremum*     extremum,
 
     if(threadIdx.x != 0) return;
 
-    float xcoord[ORI_NBINS];
+    float refined_angle[ORI_NBINS];
     float yval[ORI_NBINS];
 
     int   maxbin[ORIENTATION_MAX_COUNT];
@@ -139,12 +140,12 @@ void compute_keypoint_orientations( Extremum*     extremum,
         for(int bin = 0; bin < ORI_NBINS; bin++) {
             int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
             int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            xcoord[bin] = ( hist[prev] + hist[bin] + hist[next] ) / 3.0f;
+            refined_angle[bin] = ( hist[prev] + hist[bin] + hist[next] ) / 3.0f;
         }
         for(int bin = 0; bin < ORI_NBINS; bin++) {
             int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
             int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            hist[bin] = ( xcoord[prev] + xcoord[bin] + xcoord[next] ) / 3.0f;
+            hist[bin] = ( refined_angle[prev] + refined_angle[bin] + refined_angle[next] ) / 3.0f;
         }
     }
 #endif // V2_WITH_VLFEAT_SMOOTHING
@@ -159,12 +160,12 @@ void compute_keypoint_orientations( Extremum*     extremum,
         if( prev1 < 0 )          prev1 += ORI_NBINS;
         if( next1 >= ORI_NBINS ) next1 -= ORI_NBINS;
         if( next2 >= ORI_NBINS ) next2 -= ORI_NBINS;
-        xcoord[bin] = (   hist[prev2] + hist[next2]
+        refined_angle[bin] = (   hist[prev2] + hist[next2]
                       + ( hist[prev1] + hist[next1] ) * 4.0f
                       +   hist[bin] * 6.0f ) / 16.0f;
     }
     for(int bin = 0; bin < ORI_NBINS; bin++) {
-        hist[bin] = xcoord[bin];
+        hist[bin] = refined_angle[bin];
     }
 #endif // V2_WITH_OPENCV_SMOOTHING
 
@@ -182,7 +183,7 @@ void compute_keypoint_orientations( Extremum*     extremum,
 
             float newbin = __fdividef( num, denB ); // * M_PI/18.0f; // * 10.0f;
             if( newbin >= 0 && newbin <= 2 ) {
-                xcoord[bin] = prev + newbin;
+                refined_angle[bin] = prev + newbin;
                 yval[bin]   = -(num*num) / (4.0f * denB) + hist[prev];
 
 #ifdef LOWE_ORIENTATION_MAX
@@ -233,7 +234,7 @@ void compute_keypoint_orientations( Extremum*     extremum,
         }
     }
 
-    float chosen_bin = xcoord[maxbin[0]];
+    float chosen_bin = refined_angle[maxbin[0]];
     if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
 
     float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
@@ -246,7 +247,7 @@ void compute_keypoint_orientations( Extremum*     extremum,
 
         if( y_max[i] < 0.8f * y_max[0] ) break;
 
-        float chosen_bin = xcoord[maxbin[i]];
+        float chosen_bin = refined_angle[maxbin[i]];
         if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
         float th = __fdividef(M_PI2 * chosen_bin, ORI_NBINS) - M_PI;
 
@@ -349,58 +350,50 @@ void ori_par( int octave, int level, Extremum*     extremum,
     __syncthreads();
 
     // sub-cell refinement of the histogram cell index, yielding the angle
-    __shared__ float xcoord[ORI_NBINS];
-    __shared__ float yval[ORI_NBINS];
+    // __shared__ float refined_angle[ORI_NBINS];
+    // __shared__ float yval[ORI_NBINS];
+    __shared__ float refined_angle[64];
+    __shared__ float yval[64];
 
-    for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
-        int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
-        int next = bin == ORI_NBINS-1 ? 0 : bin+1;
+    for( int bin = threadIdx.x; __any( bin < ORI_NBINS ); bin += blockDim.x ) {
+        if( bin < ORI_NBINS ) {
+            const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
+            const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
 
-        bool predicate = ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) );
+            bool predicate = ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) );
 
-        const float num  = predicate ? 3.0f *   sm_hist[prev] - 4.0f * sm_hist[bin] + sm_hist[next]   : 0.0f;
-        const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
+            const float num  = predicate ? 3.0f *   sm_hist[prev] - 4.0f * sm_hist[bin] + sm_hist[next]   : 0.0f;
+            const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
 
-        const float newbin = __fdividef( num, denB );
+            const float newbin = __fdividef( num, denB );
 
-        predicate   = ( predicate && newbin >= 0.0f && newbin <= 2.0f );
+            predicate   = ( predicate && newbin >= 0.0f && newbin <= 2.0f );
 
-        xcoord[bin] = predicate ? prev + newbin : bin;
-        yval[bin]   = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
-    }
-    __syncthreads();
-
-    int best_index = threadIdx.x;
-    for( int bin=threadIdx.x+blockDim.x; bin < ORI_NBINS; bin += blockDim.x ) {
-        const bool pred = ( yval[bin] > yval[best_index] );
-        best_index = pred ? bin : best_index;
-    }
-    __syncthreads();
-
-    // bitonic sort
-    // only for a warp with 32 elements
-    for( int i=0; i<5; i++ ) {
-        for( int j=i; j>=0; j-- ) {
-            const bool swap_dir     = ( threadIdx.x & (2<<i) );
-            const int  xorval         = 1 << j;
-            const int  other_index  = __shfl_xor( best_index, xorval );
-            const bool id_below     = ( threadIdx.x < ( threadIdx.x ^ xorval ) );
-            const bool other_bigger = swap_dir ^ ( yval[other_index] > yval[best_index] );
-            const bool do_swap      = ( id_below ^ other_bigger == 0 );
-            best_index              = do_swap ? other_index : best_index;
+            refined_angle[bin] = predicate ? prev + newbin : -1;
+            yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
+        } else {
+            refined_angle[bin] = -1;
+            yval[bin]          = -INFINITY;
         }
     }
+    __syncthreads();
+
+    int2 best_index = make_int2( threadIdx.x, threadIdx.x + 32 );
+
+    BitonicSort::Warp32<float> sorter( yval );
+    sorter.sort64( best_index );
+    __syncthreads();
 
     // All threads retrieve the yval of thread 0, the largest
     // of all yvals.
-    const float best_val = yval[best_index];
+    const float best_val = yval[best_index.x];
     const float yval_ref = 0.8f * __shfl( best_val, 0 );
-    const bool  valid    = ( yval[best_index]  >= yval_ref );
+    const bool  valid    = ( yval[best_index.x]  >= yval_ref );
     bool        written  = false;
 
     if( threadIdx.x < ORIENTATION_MAX_COUNT ) {
         if( valid ) {
-            float chosen_bin = xcoord[best_index];
+            float chosen_bin = refined_angle[best_index.x];
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
             ext->orientation[threadIdx.x] = th;
