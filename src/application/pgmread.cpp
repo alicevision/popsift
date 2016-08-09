@@ -43,7 +43,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         return 0;
     }
 
-    ifstream pgmfile( filename );
+    ifstream pgmfile( filename.c_str() );
     if( not pgmfile.is_open() ) {
         cerr << "File " << input_file << " could not be opened for reading" << endl;
         return 0;
