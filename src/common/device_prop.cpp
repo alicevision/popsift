@@ -62,14 +62,16 @@ void device_prop_t::print( )
     }
 }
 
-void device_prop_t::set( int n )
+void device_prop_t::set( int n, bool print_choice )
 {
     cudaError_t err;
     err = cudaSetDevice( n );
     ostringstream ostr;
     ostr << "Cannot set device " << n;
     POP_CUDA_FATAL_TEST( err, ostr.str() );
-    std::cout << "Choosing device " << n << ": " << _properties[n]->name << std::endl;
+    if( print_choice ) {
+        std::cout << "Choosing device " << n << ": " << _properties[n]->name << std::endl;
+    }
 }
 
 device_prop_t::~device_prop_t( )

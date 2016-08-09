@@ -103,7 +103,7 @@ Pyramid::Pyramid( Config& config,
     int w = width;
     int h = height;
 
-    cout << "Size of the first octave's images: " << w << "X" << h << endl;
+    // cout << "Size of the first octave's images: " << w << "X" << h << endl;
 
     for( int o=0; o<_num_octaves; o++ ) {
         _octaves[o].debugSetOctave( o );

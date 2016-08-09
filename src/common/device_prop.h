@@ -19,6 +19,6 @@ public:
     ~device_prop_t( );
 
     void print( );
-    void set( int n );
+    void set( int n, bool print_choice = false );
 };
 

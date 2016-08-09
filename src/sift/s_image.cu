@@ -26,7 +26,7 @@ Image::Image( size_t w, size_t h )
 
     _input_image_d.allocDev( w, h );
 
-    cout << "Upscaled size of the input image: " << 2*w << "X" << 2*h << endl;
+    // cout << "Upscaled size of the input image: " << 2*w << "X" << 2*h << endl;
 
     /* initializing texture for upscaling
      */

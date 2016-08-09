@@ -74,7 +74,6 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
 
     do {
         pgmfile.getline( line, 1000 );
-        cerr << "Read line >" << line << "<" << endl;
 
         if( pgmfile.fail() ) {
             cerr << "File " << input_file << " is too short" << endl;

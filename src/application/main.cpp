@@ -67,6 +67,8 @@ static void usage( const char* argv )
          << endl
          << "* Informational *" << endl
          << " --print-gauss-tables        A debug output printing Gauss filter size and tables" << endl
+         << " --print-dev-info            A debug output printing CUDA device information" << endl
+         << " --print-time-info           A debug output printing image processing time after load()" << endl
          << " --test-direct-scaling       Direct each octave from upscaled orig instead of blurred level." << endl
          << "                             Does not work yet." << endl
          << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
@@ -101,9 +103,14 @@ static struct option longopts[] = {
     { "dp-desc-off",         no_argument,            NULL, 1107 },
 
     { "print-gauss-tables",  no_argument,            NULL, 1200 },
+    { "print-dev-info",      no_argument,            NULL, 1201 },
+    { "print-time-info",     no_argument,            NULL, 1202 },
 
     { NULL,                  0,                      NULL, 0  }
 };
+
+static bool print_dev_info  = false;
+static bool print_time_info = false;
 
 static void parseargs( int argc, char**argv, popart::Config& config, string& inputFile )
 {
@@ -142,6 +149,8 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 1107 : config.setDPDescriptors( false ); break;
 
         case 1200 : config.setPrintGaussTables( ); break;
+        case 1201 : print_dev_info  = true; break;
+        case 1202 : print_time_info = true; break;
         default   : usage( appName );
         }
     }
@@ -180,20 +189,18 @@ int main(int argc, char **argv)
         exit( -1 );
     }
 
-    cerr << "Input image size: "
-         << w << "X" << h
-         << " filename: " << inputFile << endl;
+    // cerr << "Input image size: "
+    //      << w << "X" << h
+    //      << " filename: " << boost::filesystem::path(inputFile).filename() << endl;
 
     device_prop_t deviceInfo;
-    deviceInfo.set( 0 );
-#ifndef NDEBUG
-    deviceInfo.print( );
-#endif
+    deviceInfo.set( 0, print_dev_info );
+    if( print_dev_info ) deviceInfo.print( );
 
     PopSift PopSift( config );
 
-    PopSift.init( 0, w, h );
-    PopSift.execute( 0, image_data );
+    PopSift.init( 0, w, h, print_time_info );
+    PopSift.execute( 0, image_data, 0, 0, print_time_info );
     PopSift.uninit( 0 );
     delete [] image_data;
     return 0;
