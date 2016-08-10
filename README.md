@@ -1,7 +1,7 @@
 PopSift
 =======
 
-PopSift is an implementation of the SIFT algorithm implemented in CUDA.
+PopSift is an implementation of the SIFT algorithm in CUDA.
 PopSift tries to stick as closely as possible to David Lowe's famous paper (Lowe, D. G. (2004). Distinctive Image Features from Scale-Invariant Keypoints. International Journal of Computer Vision, 60(2), 91–110. doi:10.1023/B:VISI.0000029664.99615.94), while extracting features from an image in real-time at least on an NVidia GTX 980 Ti GPU.
 
 Build
@@ -26,6 +26,7 @@ As far as we know, no implementation that is faster than PopSift at the time of 
 
 License
 -------
+
 PopSift is licensed under [MPL v2 license](LICENSE.md).
 However, SIFT is patented in the US and perhaps other countries, and this license does not release users of this code from any requirements that may arise from such patents.
 
