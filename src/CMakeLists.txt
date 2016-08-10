@@ -18,3 +18,5 @@ CUDA_ADD_LIBRARY( popsift STATIC
 
 add_subdirectory(application)
 
+install(TARGETS popsift DESTINATION lib EXPORT popsift-targets)
+
