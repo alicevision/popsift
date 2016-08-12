@@ -24,4 +24,3 @@ INSTALL(
   COMPONENT headers
   FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
 )
-

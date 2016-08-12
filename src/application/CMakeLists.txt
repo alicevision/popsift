@@ -11,3 +11,5 @@ target_link_libraries( popsift-demo popsift
 			       ${CUDA_CUDADEVRT_LIBRARY}
 			       ${Boost_LIBRARIES} )
 
+install(TARGETS popsift-demo DESTINATION bin EXPORT popsift-targets)
+
