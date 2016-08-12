@@ -10,7 +10,7 @@
 #include "sift_constants.h"
 #include "common/debug_macros.h"
 
-namespace popart {
+namespace popsift {
 
 ConstInfo                         h_consts;
 __device__ __constant__ ConstInfo d_consts;
@@ -32,5 +32,5 @@ void init_constants( float sigma0, int levels, float threshold, float edge_limit
     POP_CUDA_FATAL_TEST( err, "Failed to upload h_consts to device: " );
 }
 
-} // namespace iopart
+} // namespace popsift
 

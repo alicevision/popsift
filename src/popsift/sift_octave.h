@@ -15,7 +15,7 @@
 #include "sift_extremum.h"
 #include "sift_constants.h"
 
-namespace popart {
+namespace popsift {
 
 class Octave
 {
@@ -217,4 +217,4 @@ private:
     void free_data_planes( );
 };
 
-} // namespace popart
+} // namespace popsift

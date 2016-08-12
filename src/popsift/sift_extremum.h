@@ -9,7 +9,7 @@
 
 #include "sift_constants.h"
 
-namespace popart {
+namespace popsift {
 
 /* For performance reasons, it would be appropriate to split
  * the first 3 floats from the rest of this structure. Right
@@ -31,4 +31,4 @@ struct Descriptor
     float features[128];
 };
 
-} // namespace popart
+} // namespace popsift

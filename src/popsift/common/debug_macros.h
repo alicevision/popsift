@@ -18,7 +18,7 @@ void pop_check_last_error( const char* file,
                            size_t      line );
 #define POP_CHK pop_check_last_error( __FILE__, __LINE__ )
 
-namespace popart {
+namespace popsift {
 namespace cuda {
 void malloc_dev( void** ptr, int sz,
                  const char* file, int line );
@@ -44,21 +44,21 @@ void memcpy_sync( void* dst, const void* src, size_t sz,
                    cudaMemcpyKind type,
                    const char* file, size_t line );
 #define popcuda_memcpy_sync( dst, src, sz, type ) \
-    popart::cuda::memcpy_sync( dst, src, sz, type, __FILE__, __LINE__ )
+    popsift::cuda::memcpy_sync( dst, src, sz, type, __FILE__, __LINE__ )
 
 void memcpy_async( void* dst, const void* src, size_t sz,
                    cudaMemcpyKind type, cudaStream_t stream,
                    const char* file, size_t line );
 #define popcuda_memcpy_async( dst, src, sz, type, stream ) \
-    popart::cuda::memcpy_async( dst, src, sz, type, stream, __FILE__, __LINE__ )
+    popsift::cuda::memcpy_async( dst, src, sz, type, stream, __FILE__, __LINE__ )
 
 void memset_sync( void* ptr, int value, size_t bytes, const char* file, size_t line );
 #define popcuda_memset_sync( ptr, val, sz ) \
-    popart::cuda::memset_sync( ptr, val, sz, __FILE__, __LINE__ )
+    popsift::cuda::memset_sync( ptr, val, sz, __FILE__, __LINE__ )
 
 void memset_async( void* ptr, int value, size_t bytes, cudaStream_t stream, const char* file, size_t line );
 #define popcuda_memset_async( ptr, val, sz, stream ) \
-    popart::cuda::memset_async( ptr, val, sz, stream, __FILE__, __LINE__ )
+    popsift::cuda::memset_async( ptr, val, sz, stream, __FILE__, __LINE__ )
 
 cudaStream_t stream_create( const char* file, size_t line );
 void         stream_destroy( cudaStream_t s, const char* file, size_t line );

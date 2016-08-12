@@ -33,7 +33,7 @@ inline void get_gradiant( float&         grad,
                           float&         theta,
                           uint32_t       x,
                           uint32_t       y,
-                          popart::Plane2D_float& layer )
+                          popsift::Plane2D_float& layer )
 {
     grad  = 0.0f;
     theta = 0.0f;
@@ -49,7 +49,7 @@ inline void get_gradiant( float&         grad,
 __device__
 inline float2 get_gradiant( uint32_t       x,
                             uint32_t       y,
-                            popart::Plane2D_float& layer )
+                            popsift::Plane2D_float& layer )
 {
     if( x > 0 && x < layer.getCols()-1 && y > 0 && y < layer.getRows()-1 ) {
         float dx = layer.ptr(y)[x+1] - layer.ptr(y)[x-1];

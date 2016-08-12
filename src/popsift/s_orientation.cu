@@ -17,7 +17,7 @@
 #include "common/warp_bitonic_sort.h"
 #include "common/debug_macros.h"
 
-using namespace popart;
+using namespace popsift;
 using namespace std;
 
 /* Smoothing like VLFeat is the default mode.

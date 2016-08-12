@@ -7,7 +7,7 @@
  */
 #pragma once
 
-namespace popart
+namespace popsift
 {
 
 struct Config
@@ -156,5 +156,5 @@ private:
     bool _dp_capable;
 };
 
-}; // namespace popart
+}; // namespace popsift
 

@@ -14,7 +14,7 @@
 
 using namespace std;
 
-namespace popart {
+namespace popsift {
 
 __host__
 void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
@@ -174,5 +174,5 @@ void dump_plane2Dfloat( const char* filename, Plane2D_float& f )
     delete [] c;
 }
 
-} // namespace popart
+} // namespace popsift
 

@@ -17,7 +17,7 @@
  * V1: device side
  *************************************************************/
 
-using namespace popart;
+using namespace popsift;
 using namespace std;
 
 inline __device__

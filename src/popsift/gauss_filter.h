@@ -12,7 +12,7 @@
 
 #define SUPPORT_ABSOLUTE_SIGMA
 
-namespace popart {
+namespace popsift {
 
 struct GaussInfo
 {
@@ -91,5 +91,5 @@ void init_filter( const Config& conf,
                   float         sigma0,
                   int           levels );
 
-} // namespace popart
+} // namespace popsift
 

@@ -13,15 +13,15 @@
 
 using namespace std;
 
-PopSift::PopSift( const popart::Config& config )
+PopSift::PopSift( const popsift::Config& config )
     : _config( config )
 {
     _config.levels = max( 2, config.levels );
 
-    popart::init_filter( _config,
+    popsift::init_filter( _config,
                          _config.sigma,
                          _config.levels );
-    popart::init_constants(  _config.sigma,
+    popsift::init_constants(  _config.sigma,
                              _config.levels,
                              _config.getPeakThreshold(),
                              _config._edge_limit,
@@ -59,8 +59,8 @@ bool PopSift::init( int pipe, int w, int h, bool checktime )
         _config.octaves = oct;
     }
 
-    _pipe[pipe]._inputImage = new popart::Image( w, h );
-    _pipe[pipe]._pyramid = new popart::Pyramid( _config,
+    _pipe[pipe]._inputImage = new popsift::Image( w, h );
+    _pipe[pipe]._pyramid = new popsift::Pyramid( _config,
                                                 _pipe[pipe]._inputImage,
                                                 ceilf( w * scaleFactor ),
                                                 ceilf( h * scaleFactor ) );
@@ -89,8 +89,8 @@ void PopSift::uninit( int pipe )
 
 void PopSift::execute( int                                  pipe,
                        const unsigned char*                 imageData,
-                       vector<vector<popart::Extremum> >*   extrema,
-                       vector<vector<popart::Descriptor> >* descs,
+                       vector<vector<popsift::Extremum> >*   extrema,
+                       vector<vector<popsift::Descriptor> >* descs,
                        bool                                 checktime )
 {
     if( pipe < 0 && pipe >= MAX_PIPES ) return;
@@ -119,7 +119,7 @@ void PopSift::execute( int                                  pipe,
         cerr << "Execution of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
     }
 
-    bool log_to_file = ( _config.log_mode == popart::Config::All );
+    bool log_to_file = ( _config.log_mode == popsift::Config::All );
     if( log_to_file ) {
         int octaves = _pipe[pipe]._pyramid->getNumOctaves();
 

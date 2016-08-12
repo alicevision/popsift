@@ -20,7 +20,7 @@
 
 using namespace std;
 
-namespace popart {
+namespace popsift {
 
 __global__
 void py_print_corner_float( float* img, uint32_t pitch, uint32_t height, uint32_t level )
@@ -151,5 +151,5 @@ void Pyramid::reset_extrema_mgmt( )
     }
 }
 
-} // namespace popart
+} // namespace popsift
 

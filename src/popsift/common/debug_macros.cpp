@@ -22,7 +22,7 @@ void pop_check_last_error( const char* file, size_t line )
     }
 }
 
-namespace popart { namespace cuda {
+namespace popsift { namespace cuda {
 void malloc_dev( void** ptr, int sz,
                  const char* file, int line )
 {
@@ -34,12 +34,12 @@ void malloc_dev( void** ptr, int sz,
         exit( -__LINE__ );
     }
 #ifdef DEBUG_INIT_DEVICE_ALLOCATIONS
-    popart::cuda::memset_sync( *ptr, 0, sz, file, line );
+    popsift::cuda::memset_sync( *ptr, 0, sz, file, line );
 #endif // NDEBUG
 }
 } }
 
-namespace popart { namespace cuda {
+namespace popsift { namespace cuda {
 void malloc_hst( void** ptr, int sz,
                  const char* file, int line )
 {
@@ -56,7 +56,7 @@ void malloc_hst( void** ptr, int sz,
 }
 } }
 
-namespace popart { namespace cuda {
+namespace popsift { namespace cuda {
 void memcpy_async( void* dst, const void* src, size_t sz,
                    cudaMemcpyKind type, cudaStream_t stream,
                    const char* file, size_t line )
@@ -123,7 +123,7 @@ void memset_sync( void* ptr, int value, size_t bytes, const char* file, size_t l
 }
 } }
 
-namespace popart { namespace cuda {
+namespace popsift { namespace cuda {
 cudaStream_t stream_create( const char* file, size_t line )
 {
     cudaStream_t stream;

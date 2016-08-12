@@ -9,7 +9,7 @@
 
 #include <cuda_runtime.h>
 
-namespace popart {
+namespace popsift {
 namespace BitonicSort {
 
 template<class T>
@@ -75,6 +75,6 @@ private:
         l = m;
     }
 };
-} // namespace popart
+} // namespace popsift
 } // namespace BitonicSort
 

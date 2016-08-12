@@ -15,14 +15,14 @@
 
 using namespace std;
 
-namespace popart {
+namespace popsift {
 
 Image::Image( size_t w, size_t h )
     : _w(w), _h(h)
 {
     cudaError_t err;
 
-    _input_image_h.allocHost( w, h, popart::CudaAllocated );
+    _input_image_h.allocHost( w, h, popsift::CudaAllocated );
 
     _input_image_d.allocDev( w, h );
 
@@ -63,7 +63,7 @@ Image::~Image( )
     POP_CUDA_FATAL_TEST( err, "Could not destroy texture object: " );
 
     _input_image_d.freeDev( );
-    _input_image_h.freeHost( popart::CudaAllocated );
+    _input_image_h.freeHost( popsift::CudaAllocated );
 }
 
 void Image::load( const Config& conf, const unsigned char* input )
@@ -72,5 +72,5 @@ void Image::load( const Config& conf, const unsigned char* input )
     _input_image_h.memcpyToDevice( _input_image_d );
 }
 
-} // namespace popart
+} // namespace popsift
 

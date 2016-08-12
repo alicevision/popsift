@@ -8,7 +8,7 @@
 #include "sift_conf.h"
 #include "common/debug_macros.h"
 
-namespace popart
+namespace popsift
 {
 
 Config::Config( )
@@ -118,5 +118,5 @@ Config::SiftMode Config::getSiftMode() const
 }
 
 
-}; // namespace popart
+}; // namespace popsift
 

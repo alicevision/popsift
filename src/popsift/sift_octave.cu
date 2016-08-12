@@ -24,7 +24,7 @@
 
 using namespace std;
 
-namespace popart {
+namespace popsift {
 
 Octave::Octave( )
     : _data(0)
@@ -70,8 +70,8 @@ void Octave::alloc( int width, int height, int levels, int gauss_group )
             _d_desc[l] = 0;
             _h_desc[l] = 0;
         } else {
-            _d_desc[l] = popart::cuda::malloc_devT<Descriptor>( sz, __FILE__, __LINE__ );
-            _h_desc[l] = popart::cuda::malloc_hstT<Descriptor>( sz, __FILE__, __LINE__ );
+            _d_desc[l] = popsift::cuda::malloc_devT<Descriptor>( sz, __FILE__, __LINE__ );
+            _h_desc[l] = popsift::cuda::malloc_hstT<Descriptor>( sz, __FILE__, __LINE__ );
         }
     }
 }
@@ -251,7 +251,7 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
 
         ostringstream ostr;
         ostr << "dir-octave/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
-        popart::write_plane2Dunscaled( ostr.str().c_str(), true, getData(level) );
+        popsift::write_plane2Dunscaled( ostr.str().c_str(), true, getData(level) );
 
         if (stat("dir-octave-dump", &st) == -1) {
             mkdir("dir-octave-dump", 0700);
@@ -259,7 +259,7 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
 
         ostringstream ostr2;
         ostr2 << "dir-octave-dump/" << basename << "-o-" << octave << "-l-" << level << ".dump";
-        popart::dump_plane2Dfloat( ostr2.str().c_str(), true, getData(level) );
+        popsift::dump_plane2Dfloat( ostr2.str().c_str(), true, getData(level) );
 
         if( level == 0 ) {
             int width  = getData(level).getWidth();
@@ -322,8 +322,8 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
                 of.close();
         #endif
 
-                popart::write_plane2D( ostr.str().c_str(), false, hostPlane_f );
-                popart::write_plane2Dunscaled( ostr2.str().c_str(), false, hostPlane_f );
+                popsift::write_plane2D( ostr.str().c_str(), false, hostPlane_f );
+                popsift::write_plane2Dunscaled( ostr2.str().c_str(), false, hostPlane_f );
             }
 
             hostPlane_f.freeHost( CudaAllocated );
@@ -365,15 +365,15 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
             ostringstream ostr;
             ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".pgm";
             // cerr << "Writing " << ostr.str() << endl;
-            popart::write_plane2D( ostr.str().c_str(), true, p );
+            popsift::write_plane2D( ostr.str().c_str(), true, p );
 
             ostringstream pstr;
             pstr << "dir-dog-txt/d-" << basename << "-o-" << octave << "-l-" << l << ".txt";
-            popart::write_plane2Dunscaled( pstr.str().c_str(), true, p, 127 );
+            popsift::write_plane2Dunscaled( pstr.str().c_str(), true, p, 127 );
 
             ostringstream qstr;
             qstr << "dir-dog-dump/d-" << basename << "-o-" << octave << "-l-" << l << ".dump";
-            popart::dump_plane2Dfloat( qstr.str().c_str(), true, p );
+            popsift::dump_plane2Dfloat( qstr.str().c_str(), true, p );
         }
 
         POP_CUDA_FREE_HOST( array );
@@ -572,13 +572,13 @@ void Octave::free_dog_tex( )
 
 void Octave::alloc_extrema_mgmt( )
 {
-    _h_extrema_counter        = popart::cuda::malloc_hstT<int>( _levels, __FILE__, __LINE__ );
-    _d_extrema_counter        = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
-    _d_extrema_num_blocks     = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
-    _h_featvec_counter        = popart::cuda::malloc_hstT<int>( _levels, __FILE__, __LINE__ );
-    _d_featvec_counter        = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
+    _h_extrema_counter        = popsift::cuda::malloc_hstT<int>( _levels, __FILE__, __LINE__ );
+    _d_extrema_counter        = popsift::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
+    _d_extrema_num_blocks     = popsift::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
+    _h_featvec_counter        = popsift::cuda::malloc_hstT<int>( _levels, __FILE__, __LINE__ );
+    _d_featvec_counter        = popsift::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
 #if 0
-    _d_orientation_num_blocks = popart::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
+    _d_orientation_num_blocks = popsift::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
 #endif
 }
 
@@ -614,8 +614,8 @@ void Octave::alloc_extrema( )
 
     int levels            = _levels - 2;
 
-    Extremum* d = popart::cuda::malloc_devT<Extremum>( levels * h_consts.extrema, __FILE__, __LINE__ );
-    Extremum* h = popart::cuda::malloc_hstT<Extremum>( levels * h_consts.extrema, __FILE__, __LINE__ );
+    Extremum* d = popsift::cuda::malloc_devT<Extremum>( levels * h_consts.extrema, __FILE__, __LINE__ );
+    Extremum* h = popsift::cuda::malloc_hstT<Extremum>( levels * h_consts.extrema, __FILE__, __LINE__ );
 
     for( uint32_t i=1; i<_levels-1; i++ ) {
         const int offset = i-1;
@@ -623,8 +623,8 @@ void Octave::alloc_extrema( )
         _h_extrema[i] = &h[ offset * h_consts.extrema ];
     }
 
-    int* mapd = popart::cuda::malloc_devT<int>( levels * h_consts.orientations, __FILE__, __LINE__ );
-    int* maph = popart::cuda::malloc_hstT<int>( levels * h_consts.orientations, __FILE__, __LINE__ );
+    int* mapd = popsift::cuda::malloc_devT<int>( levels * h_consts.orientations, __FILE__, __LINE__ );
+    int* maph = popsift::cuda::malloc_hstT<int>( levels * h_consts.orientations, __FILE__, __LINE__ );
 
     for( uint32_t i=1; i<_levels-1; i++ ) {
         const int offset = i-1;
@@ -648,14 +648,14 @@ void Octave::alloc_streams( )
     _streams = new cudaStream_t[_levels];
 
     for( int i=0; i<_levels; i++ ) {
-        _streams[i]    = popart::cuda::stream_create( __FILE__, __LINE__ );
+        _streams[i]    = popsift::cuda::stream_create( __FILE__, __LINE__ );
     }
 }
 
 void Octave::free_streams( )
 {
     for( int i=0; i<_levels; i++ ) {
-        popart::cuda::stream_destroy( _streams[i], __FILE__, __LINE__ );
+        popsift::cuda::stream_destroy( _streams[i], __FILE__, __LINE__ );
     }
     delete [] _streams;
 }
@@ -666,18 +666,18 @@ void Octave::alloc_events( )
     _dog_done     = new cudaEvent_t[_levels];
     _extrema_done = new cudaEvent_t[_levels];
     for( int i=0; i<_levels; i++ ) {
-        _gauss_done[i]   = popart::cuda::event_create( __FILE__, __LINE__ );
-        _dog_done[i]     = popart::cuda::event_create( __FILE__, __LINE__ );
-        _extrema_done[i] = popart::cuda::event_create( __FILE__, __LINE__ );
+        _gauss_done[i]   = popsift::cuda::event_create( __FILE__, __LINE__ );
+        _dog_done[i]     = popsift::cuda::event_create( __FILE__, __LINE__ );
+        _extrema_done[i] = popsift::cuda::event_create( __FILE__, __LINE__ );
     }
 }
 
 void Octave::free_events( )
 {
     for( int i=0; i<_levels; i++ ) {
-        popart::cuda::event_destroy( _gauss_done[i],   __FILE__, __LINE__ );
-        popart::cuda::event_destroy( _dog_done[i],     __FILE__, __LINE__ );
-        popart::cuda::event_destroy( _extrema_done[i], __FILE__, __LINE__ );
+        popsift::cuda::event_destroy( _gauss_done[i],   __FILE__, __LINE__ );
+        popsift::cuda::event_destroy( _dog_done[i],     __FILE__, __LINE__ );
+        popsift::cuda::event_destroy( _extrema_done[i], __FILE__, __LINE__ );
     }
 
     delete [] _gauss_done;
@@ -705,5 +705,5 @@ void Octave::downloadToVector(uint32_t level, std::vector<Extremum> &candidates,
     }
 }
 
-} // namespace popart
+} // namespace popsift
 

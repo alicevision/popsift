@@ -17,7 +17,7 @@
 
 using namespace std;
 
-namespace popart {
+namespace popsift {
 
 __host__
 void* PlaneBase::allocDev2D( size_t& pitch, int w, int h, int elemSize )
@@ -199,5 +199,5 @@ void PlaneBase::waitAndCheck( cudaStream_t stream ) const
 }
 #endif // PLANE2D_CUDA_OP_DEBUG
 
-} // namespace popart
+} // namespace popsift
 

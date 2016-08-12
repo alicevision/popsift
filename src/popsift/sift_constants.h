@@ -50,7 +50,7 @@
 #define ORIENTATION_MAX_COUNT 4
 #endif
 
-namespace popart {
+namespace popsift {
 
 struct ConstInfo
 {
@@ -68,4 +68,4 @@ extern __device__ __constant__ ConstInfo d_consts;
 
 void init_constants( float sigma0, int levels, float threshold, float edge_limit, int max_extrema );
 
-} // namespace popart
+} // namespace popsift

@@ -18,7 +18,7 @@
 /* It makes no sense whatsoever to change this value */
 #define PREV_LEVEL 3
 
-namespace popart {
+namespace popsift {
 
 namespace gauss {
 namespace v11 {
@@ -39,14 +39,14 @@ void horiz_128x1( cudaTextureObject_t src_data,
 
     #pragma unroll
     for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
-        const float& g  = popart::d_gauss.filter[level*GAUSS_ALIGN + offset];
+        const float& g  = popsift::d_gauss.filter[level*GAUSS_ALIGN + offset];
         const float  v1 = tex2D<float>( src_data, off_x - offset + 0.5f, blockIdx.y + 0.5f );
         out += ( v1 * g );
 
         const float  v2 = tex2D<float>( src_data, off_x + offset + 0.5f, blockIdx.y + 0.5f );
         out += ( v2 * g );
     }
-    const float& g  = popart::d_gauss.filter[level*GAUSS_ALIGN];
+    const float& g  = popsift::d_gauss.filter[level*GAUSS_ALIGN];
     const float v3 = tex2D<float>( src_data, off_x+0.5f, blockIdx.y+0.5f );
     out += ( v3 * g );
 
@@ -71,7 +71,7 @@ void horiz_tex_128x1( cudaTextureObject_t src_data,
 
     #pragma unroll
     for( int offset = d_gauss.span[0]; offset>0; offset-- ) {
-        const float& g  = popart::d_gauss.filter[0*GAUSS_ALIGN + offset];
+        const float& g  = popsift::d_gauss.filter[0*GAUSS_ALIGN + offset];
         const float read_x_l = ( off_x - offset );
         const float  v1 = tex2D<float>( src_data, ( read_x_l + shift ) / dst_w, read_y );
         out += ( v1 * g );
@@ -80,7 +80,7 @@ void horiz_tex_128x1( cudaTextureObject_t src_data,
         const float  v2 = tex2D<float>( src_data, ( read_x_r + shift ) / dst_w, read_y );
         out += ( v2 * g );
     }
-    const float& g  = popart::d_gauss.filter[0*GAUSS_ALIGN];
+    const float& g  = popsift::d_gauss.filter[0*GAUSS_ALIGN];
     const float read_x = off_x;
     const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
     out += ( v3 * g );
@@ -105,7 +105,7 @@ void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
 
     #pragma unroll
     for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
-        const float& g  = popart::d_gauss.filter_initial_blur[offset];
+        const float& g  = popsift::d_gauss.filter_initial_blur[offset];
         const float read_x_l = ( off_x - offset );
         const float  v1 = tex2D<float>( src_data, ( read_x_l + shift ) / dst_w, read_y );
         out += ( v1 * g );
@@ -114,7 +114,7 @@ void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
         const float  v2 = tex2D<float>( src_data, ( read_x_r + shift ) / dst_w, read_y );
         out += ( v2 * g );
     }
-    const float& g  = popart::d_gauss.filter_initial_blur[0];
+    const float& g  = popsift::d_gauss.filter_initial_blur[0];
     const float read_x = off_x;
     const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
     out += ( v3 * g );
@@ -182,7 +182,7 @@ void vert( cudaTextureObject_t src_data,
 
 #ifdef GAUSS_INTERM_FILTER_MODE_POINT
     for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
-        g  = popart::d_gauss.filter[level*GAUSS_ALIGN + offset];
+        g  = popsift::d_gauss.filter[level*GAUSS_ALIGN + offset];
 
         idy = threadIdx.y - offset;
         val = tex2D<float>( src_data, block_x + idx, block_y + idy );
@@ -193,13 +193,13 @@ void vert( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popart::d_gauss.filter[level*GAUSS_ALIGN];
+    g  = popsift::d_gauss.filter[level*GAUSS_ALIGN];
     idy = threadIdx.y;
     val = tex2D<float>( src_data, block_x + idx, block_y + idy );
     out += ( val * g );
 #else // not GAUSS_INTERM_FILTER_MODE_POINT
     for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
-        g  = popart::d_gauss.filter[level*GAUSS_ALIGN + offset];
+        g  = popsift::d_gauss.filter[level*GAUSS_ALIGN + offset];
 
         idy = threadIdx.y - offset;
         val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
@@ -210,7 +210,7 @@ void vert( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popart::d_gauss.filter[level*GAUSS_ALIGN];
+    g  = popsift::d_gauss.filter[level*GAUSS_ALIGN];
     idy = threadIdx.y;
     val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
     out += ( val * g );
@@ -243,7 +243,7 @@ void vert_initial_blur( cudaTextureObject_t src_data,
 
 #ifdef GAUSS_INTERM_FILTER_MODE_POINT
     for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
-        g  = popart::d_gauss.filter_initial_blur[offset];
+        g  = popsift::d_gauss.filter_initial_blur[offset];
 
         idy = threadIdx.y - offset;
         val = tex2D<float>( src_data, block_x + idx, block_y + idy );
@@ -254,13 +254,13 @@ void vert_initial_blur( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popart::d_gauss.filter_initial_blur[0];
+    g  = popsift::d_gauss.filter_initial_blur[0];
     idy = threadIdx.y;
     val = tex2D<float>( src_data, block_x + idx, block_y + idy );
     out += ( val * g );
 #else // not GAUSS_INTERM_FILTER_MODE_POINT
     for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
-        g  = popart::d_gauss.filter_initial_blur[offset];
+        g  = popsift::d_gauss.filter_initial_blur[offset];
 
         idy = threadIdx.y - offset;
         val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
@@ -271,7 +271,7 @@ void vert_initial_blur( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popart::d_gauss.filter_initial_blur[0];
+    g  = popsift::d_gauss.filter_initial_blur[0];
     idy = threadIdx.y;
     val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
     out += ( val * g );
@@ -550,5 +550,5 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
     }
 }
 
-} // namespace popart
+} // namespace popsift
 

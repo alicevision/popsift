@@ -15,7 +15,7 @@
 #include "assist.h"
 #include "common/clamp.h"
 
-namespace popart{
+namespace popsift{
 
 template<int HEIGHT>
 __device__
@@ -626,5 +626,5 @@ void Pyramid::find_extrema( const Config& conf )
     find_extrema_sub<4>( conf );
 }
 
-} // namespace popart
+} // namespace popsift
 

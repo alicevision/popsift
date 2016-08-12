@@ -12,7 +12,7 @@
 
 using namespace std;
 
-namespace popart {
+namespace popsift {
 
 __device__ __constant__
 GaussInfo d_gauss;
@@ -282,5 +282,5 @@ int GaussInfo::openCVSpan( float sigma )
     return min<int>( span, GAUSS_ALIGN - 1 );
 }
 
-} // namespace popart
+} // namespace popsift
 

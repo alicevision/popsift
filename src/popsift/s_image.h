@@ -11,7 +11,7 @@
 #include "common/plane_2d.h"
 #include "sift_conf.h"
 
-namespace popart {
+namespace popsift {
 
 struct Image
 {
@@ -51,4 +51,4 @@ private:
     cudaResourceDesc    _input_image_resDesc;
 };
 
-} // namespace popart
+} // namespace popsift

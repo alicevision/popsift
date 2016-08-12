@@ -16,7 +16,7 @@
 #include "sift_constants.h"
 #include "sift_octave.h"
 
-namespace popart {
+namespace popsift {
 
 class Pyramid
 {
@@ -75,4 +75,4 @@ private:
     void debug_out_floats_t( float* data, uint32_t pitch, uint32_t height );
 };
 
-} // namespace popart
+} // namespace popsift

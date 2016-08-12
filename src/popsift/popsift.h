@@ -17,7 +17,7 @@
 
 
 /* user parameters */
-namespace popart
+namespace popsift
 {
     class Image;
     class Pyramid;
@@ -27,16 +27,16 @@ class PopSift
 {
     struct Pipe
     {
-        popart::Image*   _inputImage;
+        popsift::Image*   _inputImage;
 
-        popart::Pyramid* _pyramid;
+        popsift::Pyramid* _pyramid;
     };
 
 public:
     /* We support more than 1 streams, but we support only one sigma and one
      * level parameters.
      */
-    PopSift( const popart::Config& config );
+    PopSift( const popsift::Config& config );
     ~PopSift();
 
 public:
@@ -44,11 +44,11 @@ public:
 
     void execute( int                                            pipe,
                   const unsigned char*                           imageData,
-                  std::vector<std::vector<popart::Extremum> >*   extrema = 0,
-                  std::vector<std::vector<popart::Descriptor> >* descs = 0,
+                  std::vector<std::vector<popsift::Extremum> >*   extrema = 0,
+                  std::vector<std::vector<popsift::Descriptor> >* descs = 0,
                   bool                                           checktime = false );
 
-    inline popart::Pyramid& pyramid(int pipe)
+    inline popsift::Pyramid& pyramid(int pipe)
     {
         return *_pipe[pipe]._pyramid;
     }
@@ -57,6 +57,6 @@ public:
 
 private:
     Pipe           _pipe[MAX_PIPES];
-    popart::Config _config;
+    popsift::Config _config;
 };
 

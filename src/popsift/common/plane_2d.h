@@ -23,7 +23,7 @@
 #endif
 #endif // not NDEBUG
 
-namespace popart {
+namespace popsift {
 
 enum PlaneMapMode
 {
@@ -487,5 +487,5 @@ typedef Plane2D<float>        Plane2D_float;
 typedef Plane2D<uchar2>       Plane2D_uchar_2;
 typedef Plane2D<float4>       Plane2D_float_4;
 
-} // namespace popart
+} // namespace popsift
 
