@@ -194,7 +194,7 @@ int main(int argc, char **argv)
     //      << w << "X" << h
     //      << " filename: " << boost::filesystem::path(inputFile).filename() << endl;
 
-    device_prop_t deviceInfo;
+    popsift::cuda::device_prop_t deviceInfo;
     deviceInfo.set( 0, print_dev_info );
     if( print_dev_info ) deviceInfo.print( );
 

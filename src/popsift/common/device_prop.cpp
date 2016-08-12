@@ -11,6 +11,8 @@
 #include "device_prop.h"
 #include "debug_macros.h"
 
+namespace popsift { namespace cuda {
+
 using namespace std;
 
 device_prop_t::device_prop_t( )
@@ -83,4 +85,6 @@ device_prop_t::~device_prop_t( )
         delete ptr;
     }
 }
+
+}}
 

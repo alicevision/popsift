@@ -10,6 +10,8 @@
 #include <vector>
 #include <cuda_runtime.h>
 
+namespace popsift { namespace cuda {
+
 class device_prop_t
 {
     int _num_devices;
@@ -21,4 +23,6 @@ public:
     void print( );
     void set( int n, bool print_choice = false );
 };
+
+}}
 
