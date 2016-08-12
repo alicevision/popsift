@@ -14,7 +14,7 @@
 
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
-#include "debug_macros.h"
+#include "common/debug_macros.h"
 
 #define PYRAMID_PRINT_DEBUG 0
 

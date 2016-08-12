@@ -11,9 +11,9 @@
 #include "sift_pyramid.h"
 #include "sift_constants.h"
 #include "s_solve.h"
-#include "debug_macros.h"
+#include "common/debug_macros.h"
 #include "assist.h"
-#include "clamp.h"
+#include "common/clamp.h"
 
 namespace popart{
 

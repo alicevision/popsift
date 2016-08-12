@@ -8,7 +8,7 @@
 #include "sift_constants.h"
 #include "popsift.h"
 #include "gauss_filter.h"
-#include "write_plane_2d.h"
+#include "common/write_plane_2d.h"
 #include "sift_pyramid.h"
 
 using namespace std;

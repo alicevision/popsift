@@ -8,7 +8,7 @@
 #include <cuda_runtime.h>
 
 #include "sift_constants.h"
-#include "debug_macros.h"
+#include "common/debug_macros.h"
 
 namespace popart {
 

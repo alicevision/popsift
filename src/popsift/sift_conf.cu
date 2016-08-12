@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include "sift_conf.h"
-#include "debug_macros.h"
+#include "common/debug_macros.h"
 
 namespace popart
 {

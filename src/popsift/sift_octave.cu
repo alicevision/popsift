@@ -11,9 +11,9 @@
 
 #include "sift_pyramid.h"
 #include "sift_constants.h"
-#include "debug_macros.h"
-#include "clamp.h"
-#include "write_plane_2d.h"
+#include "common/debug_macros.h"
+#include "common/clamp.h"
+#include "common/write_plane_2d.h"
 #include "sift_octave.h"
 
 /* Define this only for debugging the descriptor by writing

@@ -8,7 +8,7 @@
 #pragma once
 
 #include <stdint.h>
-#include "plane_2d.h"
+#include "common/plane_2d.h"
 #include "sift_conf.h"
 
 namespace popart {

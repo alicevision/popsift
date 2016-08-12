@@ -8,7 +8,7 @@
 #include <stdio.h>
 
 #include "gauss_filter.h"
-#include "debug_macros.h"
+#include "common/debug_macros.h"
 
 using namespace std;
 

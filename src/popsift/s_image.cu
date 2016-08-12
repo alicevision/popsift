@@ -8,7 +8,7 @@
 #include "s_image.h"
 #include <iostream>
 #include <fstream>
-#include "debug_macros.h"
+#include "common/debug_macros.h"
 #include "assist.h"
 #include <stdio.h>
 #include <assert.h>

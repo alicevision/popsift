@@ -8,9 +8,9 @@
 #include "sift_pyramid.h"
 #include "sift_constants.h"
 #include "gauss_filter.h"
-#include "debug_macros.h"
+#include "common/debug_macros.h"
 #include "assist.h"
-#include "clamp.h"
+#include "common/clamp.h"
 
 #include <iostream>
 #include <stdio.h>

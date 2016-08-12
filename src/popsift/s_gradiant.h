@@ -9,7 +9,8 @@
 
 #include <stdio.h>
 #include <inttypes.h>
-#include "plane_2d.h"
+
+#include "common/plane_2d.h"
 #include "sift_constants.h"
 
 /*

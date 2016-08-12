@@ -13,9 +13,9 @@
 #include "sift_pyramid.h"
 #include "sift_constants.h"
 #include "s_gradiant.h"
-#include "excl_blk_prefix_sum.h"
-#include "warp_bitonic_sort.h"
-#include "debug_macros.h"
+#include "common/excl_blk_prefix_sum.h"
+#include "common/warp_bitonic_sort.h"
+#include "common/debug_macros.h"
 
 using namespace popart;
 using namespace std;

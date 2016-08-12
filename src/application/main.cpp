@@ -15,9 +15,10 @@
 #include <getopt.h>
 #include <boost/filesystem.hpp>
 
-#include "popsift.h"
-#include "sift_conf.h"
-#include "device_prop.h"
+#include <popsift/popsift.h>
+#include <popsift/sift_conf.h>
+#include <popsift/common/device_prop.h>
+
 #include "pgmread.h"
 
 using namespace std;

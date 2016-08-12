@@ -1,12 +1,10 @@
 FILE( GLOB_RECURSE
       src_files_cu
-      ./sift/*.cu
-      ./common/*.cu )
+      ./popsift/*.cu)
 
 FILE( GLOB_RECURSE
       src_files_cpp
-      ./sift/*.cpp
-      ./common/*.cpp )
+      ./popsift/*.cpp)
 
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
@@ -17,4 +15,13 @@ CUDA_ADD_LIBRARY( popsift STATIC
 		  ${src_files_cpp} )
 
 add_subdirectory(application)
+
+install(TARGETS popsift DESTINATION lib EXPORT popsift-targets)
+
+INSTALL(
+  DIRECTORY popsift
+  DESTINATION include
+  COMPONENT headers
+  FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
+)
 
