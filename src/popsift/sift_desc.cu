@@ -282,6 +282,7 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     }
 }
 
+#if __CUDA_ARCH__ > 350
 __global__ void descriptor_starter( int*          extrema_counter,
                                     int*          featvec_counter,
                                     Extremum*     extrema,
@@ -318,6 +319,17 @@ __global__ void descriptor_starter( int*          extrema_counter,
         <<<grid,block>>>
         ( descs, *featvec_counter );
 }
+#else // __CUDA_ARCH__ > 350
+__global__ void descriptor_starter( int*          extrema_counter,
+                                    int*          featvec_counter,
+                                    Extremum*     extrema,
+                                    Descriptor*   descs,
+                                    int*          feat_to_ext_map,
+                                    Plane2D_float layer )
+{
+    printf( "Dynamic Parallelism requires a card with Compute Capability 3.5 or higher\n" );
+}
+#endif // __CUDA_ARCH__ > 350
 
 /*************************************************************
  * V4: host side
