@@ -35,7 +35,6 @@ static void usage( const char* argv )
          << " --help / -h / -?            Print usage" << endl
          << " --verbose / -v" << endl
          << " --log / -l                  Write debugging files" << endl
-         << " --print-info / -p           Print info about GPUs" << endl
          << endl
          << "* Parameters *" << endl
          << " --octaves=<int>             Number of octaves" << endl
@@ -71,11 +70,13 @@ static void usage( const char* argv )
          << " --print-gauss-tables        A debug output printing Gauss filter size and tables" << endl
          << " --print-dev-info            A debug output printing CUDA device information" << endl
          << " --print-time-info           A debug output printing image processing time after load()" << endl
+#if 0
          << " --test-direct-scaling       Direct each octave from upscaled orig instead of blurred level." << endl
          << "                             Does not work yet." << endl
          << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
          << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
          << "                             Does not work yet." << endl
+#endif
          << endl;
     exit(0);
 }
