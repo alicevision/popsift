@@ -1,13 +1,10 @@
-include_directories(${CMAKE_SOURCE_DIR}/src/common)
-
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
-
-
 
 add_executable( popsift-demo main.cpp pgmread.cpp pgmread.h )
 
 target_include_directories( popsift-demo PRIVATE
-                                    ${CMAKE_SOURCE_DIR}/src/sift )
+                            ${CMAKE_SOURCE_DIR}/src
+                            )
 
 target_link_libraries( popsift-demo popsift
                                ${CUDA_LIBRARIES}
