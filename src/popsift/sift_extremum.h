@@ -47,8 +47,9 @@ struct Feature
 {
     float       xpos;
     float       ypos;
-    float       sigma; // scale;
-    int         num_ori; // number of this extremum's orientations
+    float       sigma;     // scale;
+    int         num_descs; // number of this extremum's orientations
+                           // remaining entries in desc are 0
     Descriptor* desc[ORIENTATION_MAX_COUNT];
 
 };

@@ -36,7 +36,7 @@ std::ostream& operator<<( std::ostream& ostr, const Feature& feature )
 {
     float sigval =  1.0f / ( feature.sigma * feature.sigma );
 
-    for( int ori=0; ori<feature.num_ori; ori++ ) {
+    for( int ori=0; ori<feature.num_descs; ori++ ) {
         ostr << feature.xpos << " " << feature.ypos << " "
              << sigval << " 0 " << sigval << " ";
         for( int i=0; i<128; i++ ) {

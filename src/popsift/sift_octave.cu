@@ -245,10 +245,10 @@ void Octave::copyExtrema( const Config& conf, Feature* feature, Descriptor* desc
             float sigma   = ext[i].sigma * pow( 2.0, _debug_octave_id - up_fac );
             int   num_ori = ext[i].num_ori;
 
-            feature[i].xpos    = xpos;
-            feature[i].ypos    = ypos;
-            feature[i].sigma   = sigma;
-            feature[i].num_ori = num_ori;
+            feature[i].xpos      = xpos;
+            feature[i].ypos      = ypos;
+            feature[i].sigma     = sigma;
+            feature[i].num_descs = num_ori;
 
             int ori;
             for( ori=0; ori<num_ori; ori++ ) {
