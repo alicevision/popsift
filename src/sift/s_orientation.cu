@@ -198,7 +198,7 @@ void ori_par( Extremum*     extremum,
             float chosen_bin = refined_angle[threadIdx.y][best_index.x];
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             // float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
-            float th = fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
+            float th = ::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
             ext->orientation[threadIdx.x] = th;
             written = true;
         }
