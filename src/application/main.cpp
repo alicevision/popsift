@@ -15,14 +15,15 @@
 #include <getopt.h>
 #include <boost/filesystem.hpp>
 
-#include "popsift.h"
-#include "sift_conf.h"
-#include "device_prop.h"
+#include <popsift/popsift.h>
+#include <popsift/sift_conf.h>
+#include <popsift/common/device_prop.h>
+
 #include "pgmread.h"
 
 using namespace std;
 
-static void validate( const char* appName, popart::Config& config );
+static void validate( const char* appName, popsift::Config& config );
 
 static void usage( const char* argv )
 {
@@ -112,7 +113,7 @@ static struct option longopts[] = {
 static bool print_dev_info  = false;
 static bool print_time_info = false;
 
-static void parseargs( int argc, char**argv, popart::Config& config, string& inputFile )
+static void parseargs( int argc, char**argv, popsift::Config& config, string& inputFile )
 {
     const char* appName = argv[0];
     if( argc == 0 ) usage( "<program>" );
@@ -129,7 +130,7 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case '?' :
         case 'h' : usage( appName ); break;
         case 'v' : config.setVerbose(); break;
-        case 'l' : config.setLogMode( popart::Config::All ); break;
+        case 'l' : config.setLogMode( popsift::Config::All ); break;
 
         case 1000 : config.setOctaves( strtol( optarg, NULL, 0 ) ); break;
         case 1001 : config.setLevels(  strtol( optarg, NULL, 0 ) ); break;
@@ -139,10 +140,10 @@ static void parseargs( int argc, char**argv, popart::Config& config, string& inp
         case 1005 : applySigma = true; sigma = strtof( optarg, NULL ); break;
         case 1006 : config.setInitialBlur( strtof( optarg, NULL ) ); break;
 
-        case 1100 : config.setMode( popart::Config::VLFeat ); break;
-        case 1101 : config.setMode( popart::Config::OpenCV ); break;
-        case 1102 : config.setMode( popart::Config::PopSift ); break;
-        case 1103 : config.setScalingMode( popart::Config::ScaleDirect ); break;
+        case 1100 : config.setMode( popsift::Config::VLFeat ); break;
+        case 1101 : config.setMode( popsift::Config::OpenCV ); break;
+        case 1102 : config.setMode( popsift::Config::PopSift ); break;
+        case 1103 : config.setScalingMode( popsift::Config::ScaleDirect ); break;
         case 1104 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
         case 1105 : config.setDPOrientation( false ); config.setDPDescriptors( false ); break;
         case 1106 : config.setDPOrientation( false ); break;
@@ -171,7 +172,7 @@ int main(int argc, char **argv)
 {
     cudaDeviceReset();
 
-    popart::Config config;
+    popsift::Config config;
     string         inputFile = "";
     const char*    appName   = argv[0];
 
@@ -193,7 +194,7 @@ int main(int argc, char **argv)
     //      << w << "X" << h
     //      << " filename: " << boost::filesystem::path(inputFile).filename() << endl;
 
-    device_prop_t deviceInfo;
+    popsift::cuda::device_prop_t deviceInfo;
     deviceInfo.set( 0, print_dev_info );
     if( print_dev_info ) deviceInfo.print( );
 
@@ -206,7 +207,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-static void validate( const char* appName, popart::Config& config )
+static void validate( const char* appName, popsift::Config& config )
 {
     switch( config.getGaussGroup() )
     {
