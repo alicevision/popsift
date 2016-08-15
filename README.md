@@ -16,6 +16,10 @@ make
 make install
 ```
 
+Continuous integration: 
+ - [![Build Status](https://travis-ci.org/poparteu/popsift.svg?branch=master)](https://travis-ci.org/poparteu/popsift) master branch.
+ - [![Build Status](https://travis-ci.org/poparteu/popsift.svg?branch=develop)](https://travis-ci.org/poparteu/popsift) develop branch.
+
 Usage
 -----
 

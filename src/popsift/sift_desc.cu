@@ -60,8 +60,8 @@ void keypoint_descriptors_sub( const float     ang,
     // The following 2 lines were the primary bottleneck of this kernel
     // const float ptx = csbp * offsetptx - ssbp * offsetpty + x;
     // const float pty = csbp * offsetpty + ssbp * offsetptx + y;
-    const float ptx = fmaf( csbp, offsetptx, fmaf( -ssbp, offsetpty, x ) );
-    const float pty = fmaf( csbp, offsetpty, fmaf(  ssbp, offsetptx, y ) );
+    const float ptx = ::fmaf( csbp, offsetptx, ::fmaf( -ssbp, offsetpty, x ) );
+    const float pty = ::fmaf( csbp, offsetpty, ::fmaf(  ssbp, offsetptx, y ) );
 
     const float bsz = fabsf(csbp) + fabsf(ssbp);
 
@@ -83,8 +83,8 @@ void keypoint_descriptors_sub( const float     ang,
 
         const float dx = jj - ptx;
         const float dy = ii - pty;
-        const float nx = fmaf( crsbp, dx,  srsbp * dy ); // crsbp * dx + srsbp * dy;
-        const float ny = fmaf( crsbp, dy, -srsbp * dx ); // crsbp * dy - srsbp * dx;
+        const float nx = ::fmaf( crsbp, dx,  srsbp * dy ); // crsbp * dx + srsbp * dy;
+        const float ny = ::fmaf( crsbp, dy, -srsbp * dx ); // crsbp * dy - srsbp * dx;
         const float nxn = fabsf(nx);
         const float nyn = fabsf(ny);
         if (nxn < 1.0f && nyn < 1.0f) {

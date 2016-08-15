@@ -1,0 +1,75 @@
+dist: trusty
+sudo: required
+
+language: cpp
+compiler: gcc
+
+cache:
+  apt: true
+
+addons:
+  apt:
+    packages:
+      - libboost-filesystem-dev 
+      - libboost-system-dev 
+
+env:
+  global:
+    - NUM_CPU="`grep processor /proc/cpuinfo | wc -l`"; echo $NUM_CPU
+    - BUILD_TYPE="RELEASE"
+    - BUILD_SYSTEM="`uname -s`"
+    - BUILD_PROCESSOR="`uname -p`"
+    - POPSIFT_SOURCE=${TRAVIS_BUILD_DIR}
+    - POPSIFT_BUILD=${TRAVIS_BUILD_DIR}/build
+    # CMAKE
+    # - CMAKE_URL="https://cmake.org/files/v3.6/cmake-3.6.1-Linux-x86_64.tar.gz"
+    - CMAKE_URL="https://cmake.org/files/v3.4/cmake-3.4.1-Linux-x86_64.tar.gz"
+    - CMAKE_ROOT=${TRAVIS_BUILD_DIR}/cmake
+    - CMAKE_SOURCE=${CMAKE_ROOT}/source
+    - CMAKE_INSTALL=${CMAKE_ROOT}/install
+
+before_install:
+ # CMAKE most recent version
+ - >
+    if [ "$(ls -A ${CMAKE_INSTALL})" ]; then
+      echo "CMake found in cache.";
+      ls -A ${CMAKE_INSTALL}
+      export PATH=${CMAKE_INSTALL}/bin:${PATH};
+      cmake --version
+    else
+      mkdir --parent ${CMAKE_SOURCE}
+      mkdir --parent ${CMAKE_INSTALL}
+      ls -A ${CMAKE_INSTALL}
+      travis_retry wget --no-check-certificate --quiet -O - ${CMAKE_URL} | tar --strip-components=1 -xz -C ${CMAKE_INSTALL}
+      export PATH=${CMAKE_INSTALL}/bin:${PATH};
+      cmake --version
+    fi
+
+install:
+  - CUDA_REPO_PKG=cuda-repo-ubuntu1404_7.5-18_amd64.deb
+  - wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64/$CUDA_REPO_PKG
+  - sudo dpkg -i $CUDA_REPO_PKG
+  - rm $CUDA_REPO_PKG
+  - sudo apt-get -y update
+  - CUDA_PKG_VERSION="7-5"
+  - CUDA_VERSION="7.5"
+  - sudo apt-get install -y --no-install-recommends  cuda-core-$CUDA_PKG_VERSION  cuda-cudart-dev-$CUDA_PKG_VERSION  cuda-cublas-dev-$CUDA_PKG_VERSION cuda-curand-dev-$CUDA_PKG_VERSION
+  - sudo ln -s /usr/local/cuda-$CUDA_VERSION /usr/local/cuda
+
+before_script:
+  # Create build folder
+  - mkdir $POPSIFT_BUILD
+  - cd $POPSIFT_BUILD
+  # Classic release build
+  - >
+     cmake . $POPSIFT_SOURCE
+
+script:
+# limit GCC builds to a reduced number of thread for the virtual machine
+  - make -j 2 VERBOSE=1
+# Perform unit tests
+  # - make test
+
+cache:
+  directories:
+    - $CMAKE_INSTALL
