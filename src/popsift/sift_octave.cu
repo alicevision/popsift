@@ -250,12 +250,15 @@ void Octave::copyExtrema( const Config& conf, Feature* feature, Descriptor* desc
             feature[i].sigma     = sigma;
             feature[i].num_descs = num_ori;
 
+
             int ori;
             for( ori=0; ori<num_ori; ori++ ) {
                 int desc_idx = ext[i].idx_ori + ori;
-                feature[i].desc[ori] = &descBuffer[desc_idx];
+                feature[i].orientation[ori] = ext[i].orientation[ori];
+                feature[i].desc[ori]        = &descBuffer[desc_idx];
             }
             for( ; ori<ORIENTATION_MAX_COUNT; ori++ ) {
+                feature[i].orientation[ori] = 0;
                 feature[i].desc[ori] = 0;
             }
         }
