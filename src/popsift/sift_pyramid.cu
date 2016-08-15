@@ -118,7 +118,6 @@ Pyramid::~Pyramid( )
     delete [] _octaves;
 }
 
-#if 1
 Features* Pyramid::find_extrema( const Config& conf,
                                  Image*        base )
 {
@@ -166,33 +165,6 @@ Features* Pyramid::find_extrema( const Config& conf,
 
     return features;
 }
-#else
-void Pyramid::find_extrema( const Config&                conf,
-                            Image*                       base,
-                            vector<vector<Extremum> >*   extrema,
-                            vector<vector<Descriptor> >* descs )
-{
-    reset_extrema_mgmt( );
-
-    build_pyramid( conf, base );
-
-    find_extrema( conf );
-
-    orientation( conf );
-
-    descriptors( conf );
-
-    if( extrema && descs ) {
-        extrema->resize( _num_octaves * _levels );
-        descs  ->resize( _num_octaves * _levels );
-        for( int o=0; o<_num_octaves; o++ ) {
-            for( int l=0; l<_levels; l++ ) {
-                _octaves[o].downloadToVector( l, (*extrema)[o*_levels+l], (*descs)[o*_levels+l] );
-            }
-        }
-    }
-}
-#endif
 
 void Pyramid::reset_extrema_mgmt( )
 {

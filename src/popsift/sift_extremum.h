@@ -42,7 +42,6 @@ struct Descriptor
  * The xpos/ypos information in feature is scale-adapted.
  * Note that these data structures are filled host-size in a loop
  * because addresses are not shared between CPU and GPU.
-
  */
 struct Feature
 {

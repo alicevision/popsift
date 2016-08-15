@@ -67,9 +67,7 @@ class Octave
          */
         int*         _h_featvec_counter;
         int*         _d_featvec_counter;
-#if 0
-        int*         _d_orientation_num_blocks; // build barrier after orientation finding, saves a kernel
-#endif
+
         /* Data structure for the Extrema, host and device side */
         Extremum**   _h_extrema;
         Extremum**   _d_extrema;
@@ -166,14 +164,11 @@ class Octave
         void readExtremaCount( );
         int getExtremaCount( ) const;
         int getDescriptorCount( ) const;
-        // int getExtremaCount( uint32_t level ) const;
 
         Descriptor* getDescriptors( uint32_t level );
         void        downloadDescriptor( const Config& conf );
         void        writeDescriptor( const Config& conf, std::ostream& ostr, bool really );
         void        copyExtrema( const Config& conf, Feature* feature, Descriptor* descBuffer );
-
-
 
         /**
          * alloc() - allocates all GPU memories for one octave
@@ -194,8 +189,6 @@ class Octave
          * download a level and write to disk
          */
          void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
-
-         void downloadToVector(uint32_t level, std::vector<Extremum> &candidates, std::vector<Descriptor> &descriptors);
 
 private:
     void alloc_data_planes( );

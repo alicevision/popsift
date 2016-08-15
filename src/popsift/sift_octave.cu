@@ -153,13 +153,6 @@ int Octave::getDescriptorCount( ) const
     return ct;
 }
 
-// int Octave::getExtremaCount( uint32_t level ) const
-// {
-//     if( level < 1 )         return 0;
-//     if( level > _levels-2 ) return 0;
-//     return _h_extrema_counter[level];
-// }
-
 void Octave::downloadDescriptor( const Config& conf )
 {
     for( uint32_t l=0; l<_levels; l++ ) {
@@ -293,7 +286,6 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
 
     struct stat st = {0};
 
-#if 1
     {
         if (stat("dir-octave", &st) == -1) {
             mkdir("dir-octave", 0700);
@@ -362,15 +354,6 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
                 ostr << "dir-feat/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
                 ostringstream ostr2;
                 ostr2 << "dir-feat-txt/" << basename << "-o-" << octave << "-l-" << level << ".txt";
-        #if 0
-                ofstream of( ostr.str().c_str() );
-                // cerr << "Writing " << ostr.str() << endl;
-                of << "P5" << endl
-                   << width << " " << height << endl
-                   << "255" << endl;
-                of.write( (char*)hostPlane_c.data, hostPlane_c.getByteSize() );
-                of.close();
-        #endif
 
                 popsift::write_plane2D( ostr.str().c_str(), false, hostPlane_f );
                 popsift::write_plane2Dunscaled( ostr2.str().c_str(), false, hostPlane_f );
@@ -379,8 +362,7 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
             hostPlane_f.freeHost( CudaAllocated );
         }
     }
-#endif
-#if 1
+
     if( level == _levels-1 ) {
         cudaError_t err;
         int width  = getData(0).getWidth();
@@ -428,7 +410,6 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
 
         POP_CUDA_FREE_HOST( array );
     }
-#endif
 }
 
 void Octave::alloc_data_planes( )
@@ -627,16 +608,10 @@ void Octave::alloc_extrema_mgmt( )
     _d_extrema_num_blocks     = popsift::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
     _h_featvec_counter        = popsift::cuda::malloc_hstT<int>( _levels, __FILE__, __LINE__ );
     _d_featvec_counter        = popsift::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
-#if 0
-    _d_orientation_num_blocks = popsift::cuda::malloc_devT<int>( _levels, __FILE__, __LINE__ );
-#endif
 }
 
 void Octave::free_extrema_mgmt( )
 {
-#if 0
-    cudaFree( _d_orientation_num_blocks );
-#endif
     cudaFree( _d_extrema_num_blocks );
     cudaFree( _d_extrema_counter );
     cudaFreeHost( _h_extrema_counter );
@@ -733,27 +708,6 @@ void Octave::free_events( )
     delete [] _gauss_done;
     delete [] _dog_done;
     delete [] _extrema_done;
-}
-
-void Octave::downloadToVector(uint32_t level, std::vector<Extremum> &candidates, std::vector<Descriptor> &descriptors)
-{
-
-    readExtremaCount( ); // CHECK
-    cudaDeviceSynchronize( );
-    int ct = getExtremaCountH( level ); // getExtremaCount( level );
-    if( ct > 0 ) {
-        candidates.resize(ct);        
-        popcuda_memcpy_sync( &candidates[0],
-                            _d_extrema[level],
-                            ct * sizeof(Extremum),
-                            cudaMemcpyDeviceToHost );
-        int fct = getFeatVecCountH( level );
-        descriptors.resize(fct);        
-        popcuda_memcpy_sync( &descriptors[0],
-                        _d_desc[level],
-                        fct * sizeof(Descriptor),
-                        cudaMemcpyDeviceToHost );
-    }
 }
 
 } // namespace popsift
