@@ -165,11 +165,15 @@ class Octave
 
         void readExtremaCount( );
         int getExtremaCount( ) const;
-        int getExtremaCount( uint32_t level ) const;
+        int getDescriptorCount( ) const;
+        // int getExtremaCount( uint32_t level ) const;
 
         Descriptor* getDescriptors( uint32_t level );
         void        downloadDescriptor( const Config& conf );
         void        writeDescriptor( const Config& conf, std::ostream& ostr, bool really );
+        void        copyExtrema( const Config& conf, Feature* feature, Descriptor* descBuffer );
+
+
 
         /**
          * alloc() - allocates all GPU memories for one octave

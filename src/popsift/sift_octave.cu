@@ -144,12 +144,21 @@ int Octave::getExtremaCount( ) const
     return ct;
 }
 
-int Octave::getExtremaCount( uint32_t level ) const
+int Octave::getDescriptorCount( ) const
 {
-    if( level < 1 )         return 0;
-    if( level > _levels-2 ) return 0;
-    return _h_extrema_counter[level];
+    int ct = 0;
+    for( uint32_t i=1; i<_levels-1; i++ ) {
+        ct += _h_featvec_counter[i];
+    }
+    return ct;
 }
+
+// int Octave::getExtremaCount( uint32_t level ) const
+// {
+//     if( level < 1 )         return 0;
+//     if( level > _levels-2 ) return 0;
+//     return _h_extrema_counter[level];
+// }
 
 void Octave::downloadDescriptor( const Config& conf )
 {
@@ -223,6 +232,47 @@ void Octave::writeDescriptor( const Config& conf, ostream& ostr, bool really )
     }
 }
 
+void Octave::copyExtrema( const Config& conf, Feature* feature, Descriptor* descBuffer )
+{
+    int num_extrema     = getExtremaCount();
+    int num_descriptors = getDescriptorCount();
+
+    for( uint32_t l=0; l<_levels; l++ ) {
+        Extremum*   ext     = _h_extrema[l];
+        Descriptor* desc    = _h_desc[l];
+        int         ext_sz  = _h_extrema_counter[l];
+        int         desc_sz = _h_featvec_counter[l];
+
+        memcpy( descBuffer, desc, desc_sz * sizeof( Descriptor ) );
+        for( int i=0; i<ext_sz; i++ ) {
+            const float up_fac = conf.getUpscaleFactor();
+
+            float xpos    = ext[i].xpos * pow( 2.0, _debug_octave_id - up_fac );
+            float ypos    = ext[i].ypos * pow( 2.0, _debug_octave_id - up_fac );
+            float sigma   = ext[i].sigma * pow( 2.0, _debug_octave_id - up_fac );
+            int   num_ori = ext[i].num_ori;
+
+            feature[i].xpos    = xpos;
+            feature[i].ypos    = ypos;
+            feature[i].sigma   = sigma;
+            feature[i].num_ori = num_ori;
+
+            int ori;
+            for( ori=0; ori<num_ori; ori++ ) {
+                int desc_idx = ext[i].idx_ori + ori;
+                feature[i].desc[ori] = &descBuffer[desc_idx];
+            }
+            for( ; ori<ORIENTATION_MAX_COUNT; ori++ ) {
+                feature[i].desc[ori] = 0;
+            }
+        }
+
+        feature    += ext_sz;
+        descBuffer += desc_sz;
+    }
+
+}
+
 Descriptor* Octave::getDescriptors( uint32_t level )
 {
     return _d_desc[level];
@@ -274,7 +324,7 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
             readExtremaCount( );
             cudaDeviceSynchronize( );
             for( uint32_t l=0; l<_levels; l++ ) {
-                uint32_t ct = getExtremaCount( l );
+                uint32_t ct = getExtremaCountH( l ); // getExtremaCount( l );
                 if( ct > 0 ) {
                     total_ct += ct;
 
@@ -690,17 +740,18 @@ void Octave::downloadToVector(uint32_t level, std::vector<Extremum> &candidates,
 
     readExtremaCount( ); // CHECK
     cudaDeviceSynchronize( );
-    uint32_t ct = getExtremaCount( level );
+    int ct = getExtremaCountH( level ); // getExtremaCount( level );
     if( ct > 0 ) {
         candidates.resize(ct);        
         popcuda_memcpy_sync( &candidates[0],
                             _d_extrema[level],
                             ct * sizeof(Extremum),
                             cudaMemcpyDeviceToHost );
-        descriptors.resize(ct);        
+        int fct = getFeatVecCountH( level );
+        descriptors.resize(fct);        
         popcuda_memcpy_sync( &descriptors[0],
                         _d_desc[level],
-                        ct * sizeof(Descriptor),
+                        fct * sizeof(Descriptor),
                         cudaMemcpyDeviceToHost );
     }
 }

@@ -118,6 +118,55 @@ Pyramid::~Pyramid( )
     delete [] _octaves;
 }
 
+#if 1
+Features* Pyramid::find_extrema( const Config& conf,
+                                 Image*        base )
+{
+    reset_extrema_mgmt( );
+
+    build_pyramid( conf, base );
+
+    find_extrema( conf );
+
+    orientation( conf );
+
+    descriptors( conf );
+
+    Features* features        = new Features;
+    int       num_extrema     = 0;
+    int       num_descriptors = 0;
+    for( int o=0; o<_num_octaves; o++ ) {
+        // synchronous download of number of extrema and number of descriptors
+        _octaves[o].readExtremaCount( );
+
+        // asynchronous download of extrema and descriptors (in stream 0)
+        _octaves[o].downloadDescriptor( conf );
+
+        num_extrema     += _octaves[o].getExtremaCount();
+        num_descriptors += _octaves[o].getDescriptorCount();
+    }
+
+    features->_features.resize( num_extrema );
+
+    features->_desc_buffer = new Descriptor[ num_descriptors ];
+
+    // ensure that asynchronous downloads are finished
+    cudaDeviceSynchronize( );
+
+    num_extrema     = 0;
+    num_descriptors = 0;
+    for( int o=0; o<_num_octaves; o++ ) {
+        Feature*    feature_base = &features->_features[num_extrema];
+        Descriptor* desc_base    = &features->_desc_buffer[num_descriptors];
+        _octaves[o].copyExtrema( conf, feature_base, desc_base );
+
+        num_extrema     += _octaves[o].getExtremaCount();
+        num_descriptors += _octaves[o].getDescriptorCount();
+    }
+
+    return features;
+}
+#else
 void Pyramid::find_extrema( const Config&                conf,
                             Image*                       base,
                             vector<vector<Extremum> >*   extrema,
@@ -143,6 +192,7 @@ void Pyramid::find_extrema( const Config&                conf,
         }
     }
 }
+#endif
 
 void Pyramid::reset_extrema_mgmt( )
 {

@@ -36,10 +36,15 @@ public:
              int     h );
     ~Pyramid( );
 
+#if 1
+    Features* find_extrema( const Config& conf,
+                            Image*        base );
+#else
     void find_extrema( const Config&                          conf,
                        Image*                                 base,
                        std::vector<std::vector<Extremum> >*   extrema = 0,
                        std::vector<std::vector<Descriptor> >* descs = 0 );
+#endif
 
     void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
 

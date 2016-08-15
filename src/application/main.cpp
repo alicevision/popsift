@@ -6,6 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <cmath>
@@ -201,8 +202,13 @@ int main(int argc, char **argv)
     PopSift PopSift( config );
 
     PopSift.init( 0, w, h, print_time_info );
-    PopSift.execute( 0, image_data, 0, 0, print_time_info );
+    popsift::Features* feature_list = PopSift.execute( 0, image_data, print_time_info );
     PopSift.uninit( 0 );
+
+    std::ofstream of( "output-features.txt" );
+    of << *feature_list;
+    delete feature_list;
+
     delete [] image_data;
     return 0;
 }
