@@ -147,6 +147,7 @@ Features* Pyramid::find_extrema( const Config& conf,
 
     features->_features.resize( num_extrema );
 
+    features->_num_descriptors = num_descriptors;
     features->_desc_buffer = new Descriptor[ num_descriptors ];
 
     // ensure that asynchronous downloads are finished

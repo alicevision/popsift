@@ -49,10 +49,9 @@ struct Feature
     float       ypos;
     float       sigma;     // scale;
     int         num_descs; // number of this extremum's orientations
-                           // remaining entries in desc are 0
+                            // remaining entries in desc are 0
     float       orientation[ORIENTATION_MAX_COUNT];
     Descriptor* desc[ORIENTATION_MAX_COUNT];
-
 };
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
@@ -72,6 +71,7 @@ class Features
 
     std::vector<Feature> _features;
     Descriptor*          _desc_buffer;
+    unsigned int         _num_descriptors;
 
 public:
     Features( );
@@ -81,6 +81,10 @@ public:
     inline F_const_iterator begin() const { return _features.begin(); }
     inline F_iterator       end()         { return _features.end(); }
     inline F_const_iterator end() const   { return _features.end(); }
+
+    inline unsigned int     size() const                { return _features.size(); }
+    inline unsigned int     getFeatureCount() const     { return _features.size(); }
+    inline unsigned int     getDescriptorCount() const  { return _num_descriptors; }
 
 protected:
     friend class Pyramid;
