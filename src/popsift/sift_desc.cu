@@ -163,8 +163,10 @@ void keypoint_descriptors( Extremum*     extrema,
 }
 
 __global__
-void normalize_histogram( Descriptor* descs, int num_orientations )
+void normalize_histogram_root_sift( Descriptor* descs, int num_orientations )
 {
+    // root sift normalization
+
     int offset = blockIdx.x * 32 + threadIdx.y;
 
     // all of these threads are useless
@@ -182,8 +184,6 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     float4 descr;
     descr = ptr4[threadIdx.x];
 
-#ifdef DESC_USE_ROOT_SIFT
-    // root sift normalization
     float sum = descr.x + descr.y + descr.z + descr.w;
 
     sum += __shfl_down( sum, 16 );
@@ -207,8 +207,32 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     val = 512.0f * __fsqrt_rn( __fdividef( descr.w, sum ) );
     descr.w = val;
 
-#else // not DESC_USE_ROOT_SIFT
+    if( not ignoreme ) {
+        ptr4[threadIdx.x] = descr;
+    }
+}
+
+__global__
+void normalize_histogram( Descriptor* descs, int num_orientations )
+{
     // OpenCV normalization
+
+    int offset = blockIdx.x * 32 + threadIdx.y;
+
+    // all of these threads are useless
+    if( blockIdx.x * 32 >= num_orientations ) return;
+
+    bool ignoreme = ( offset >= num_orientations );
+
+    offset = ( offset < num_orientations ) ? offset
+                                           : num_orientations-1;
+    Descriptor* desc = &descs[offset];
+
+    float*  ptr1 = desc->features;
+    float4* ptr4 = (float4*)ptr1;
+
+    float4 descr;
+    descr = ptr4[threadIdx.x];
 
 #undef HAVE_NORMF
     // normf() is an elegant function: sqrt(sum_0^127{v^2})
@@ -275,8 +299,6 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     descr.z = descr.z * norm;
     descr.w = descr.w * norm;
 
-#endif // not DESC_USE_ROOT_SIFT
-
     if( not ignoreme ) {
         ptr4[threadIdx.x] = descr;
     }
@@ -288,7 +310,8 @@ __global__ void descriptor_starter( int*          extrema_counter,
                                     Extremum*     extrema,
                                     Descriptor*   descs,
                                     int*          feat_to_ext_map,
-                                    Plane2D_float layer )
+                                    Plane2D_float layer,
+                                    bool          use_root_sift )
 {
     dim3 block;
     dim3 grid;
@@ -315,9 +338,15 @@ __global__ void descriptor_starter( int*          extrema_counter,
     block.y = 32;
     block.z = 1;
 
-    normalize_histogram
-        <<<grid,block>>>
-        ( descs, *featvec_counter );
+    if( use_root_sift ) {
+        normalize_histogram_root_sift
+            <<<grid,block>>>
+            ( descs, *featvec_counter );
+    } else {
+        normalize_histogram
+            <<<grid,block>>>
+            ( descs, *featvec_counter );
+    }
 }
 #else // __CUDA_ARCH__ > 350
 __global__ void descriptor_starter( int*          extrema_counter,
@@ -325,7 +354,8 @@ __global__ void descriptor_starter( int*          extrema_counter,
                                     Extremum*     extrema,
                                     Descriptor*   descs,
                                     int*          feat_to_ext_map,
-                                    Plane2D_float layer )
+                                    Plane2D_float layer,
+                                    bool          use_root_sift )
 {
     printf( "Dynamic Parallelism requires a card with Compute Capability 3.5 or higher\n" );
 }
@@ -353,7 +383,8 @@ void Pyramid::descriptors( const Config& conf )
                       oct_obj.getExtrema( level ),
                       oct_obj.getDescriptors( level ),
                       oct_obj.getFeatToExtMapD( level ),
-                      oct_obj.getData( level ) );
+                      oct_obj.getData( level ),
+                      conf.getUseRootSift() );
             }
         }
 
@@ -403,10 +434,17 @@ void Pyramid::descriptors( const Config& conf )
                     block.y = 32;
                     block.z = 1;
 
-                    normalize_histogram
-                        <<<grid,block,0,oct_obj.getStream(level+2)>>>
-                          ( oct_obj.getDescriptors( level ),
-                            oct_obj.getFeatVecCountH( level ) );
+                    if( conf.getUseRootSift() ) {
+                        normalize_histogram_root_sift
+                            <<<grid,block,0,oct_obj.getStream(level+2)>>>
+                            ( oct_obj.getDescriptors( level ),
+                              oct_obj.getFeatVecCountH( level ) );
+                    } else {
+                        normalize_histogram
+                            <<<grid,block,0,oct_obj.getStream(level+2)>>>
+                            ( oct_obj.getDescriptors( level ),
+                              oct_obj.getFeatVecCountH( level ) );
+                    }
                 }
             }
         }
