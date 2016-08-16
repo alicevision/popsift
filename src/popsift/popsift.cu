@@ -18,7 +18,6 @@ using namespace std;
 
 PopSift::PopSift( const popsift::Config& config )
     : _config( config )
-    , _configured( true )
     , _initialized( false )
 {
     _config.levels = max( 2, config.levels );
@@ -35,7 +34,6 @@ PopSift::PopSift( const popsift::Config& config )
 }
 
 PopSift::PopSift( )
-    : _configured( false )
     , _initialized( false )
 { }
 
@@ -44,10 +42,7 @@ PopSift::~PopSift()
 
 bool PopSift::configure( const popsift::Config& config )
 {
-    if( _configured ) return false;
     if( _initialized ) return false;
-
-    _configured = true;
 
     _config = config;
 
@@ -67,8 +62,6 @@ bool PopSift::configure( const popsift::Config& config )
 
 bool PopSift::init( int pipe, int w, int h, bool checktime )
 {
-    if( not _configured ) return false;
-
     if( _initialized ) return false;
 
     cudaEvent_t start, end;
@@ -133,7 +126,6 @@ popsift::Features* PopSift::execute( int                  pipe,
                                      const unsigned char* imageData,
                                      bool                 checktime )
 {
-    if( not _configured ) return 0;
     if( not _initialized ) return 0;
 
     if( pipe < 0 && pipe >= MAX_PIPES ) return 0;
