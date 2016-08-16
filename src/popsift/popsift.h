@@ -21,6 +21,7 @@ namespace popsift
 {
     class Image;
     class Pyramid;
+    class Features;
 };
 
 class PopSift
@@ -42,11 +43,17 @@ public:
 public:
     bool init( int pipe, int w, int h, bool checktime = false );
 
+#if 1
+    popsift::Features* execute( int                  pipe,
+                                const unsigned char* imageData,
+                                bool                 checktime = false );
+#else
     void execute( int                                            pipe,
                   const unsigned char*                           imageData,
                   std::vector<std::vector<popsift::Extremum> >*   extrema = 0,
                   std::vector<std::vector<popsift::Descriptor> >* descs = 0,
                   bool                                           checktime = false );
+#endif
 
     inline popsift::Pyramid& pyramid(int pipe)
     {

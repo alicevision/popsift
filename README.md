@@ -7,7 +7,8 @@ PopSift tries to stick as closely as possible to David Lowe's famous paper (Lowe
 Build
 -----
 
-PopSift has been developed and tested on Linux machines, mostly a variant of Ubuntu. It comes as a CMake project and requires at least CUDA 7.0 and a device with compute capability 3.5 or later. It requires also boost to compile the test application.
+PopSift has been developed and tested on Linux machines, mostly a variant of Ubuntu, but compiles on MacOSX as well. It comes as a CMake project and requires at least CUDA 7.0. It is known to compile and work with NVidia cards of compute capability 3.0 (including the GT 650M), but the code is developed with the compute capability 5.2 card GTX 980 Ti in mind.
+PopSift requires boost to compile the test application.
 
 ```
 mkdir build && cd build
@@ -23,8 +24,9 @@ Continuous integration:
 Usage
 -----
 
-Two artifacts are made: libpopsift and the test application popsift-demo. Calling popsift-demo without parameters shows an option. To integrate PopSift into other software, link with libpopsift.
-The caller must create a popart::Config struct (documented in src/sift/sift_conf.h) to control the behaviour of the PopSift, and instantiate an object of class PopSift (found in src/sift/popsift.h). After creating an instance, it must be configured to the constant width and height of the input image (init()). After that, it can be fed a one image at a time (execute()). The only valid input format is a single plane of grayscale unsigned characters. The caller can pass two pointers to one vector of vectors each. They should be empty on entry. The first one will on return hold the extrema (several copies for several orientations) sorted by level and the second the descriptors belonging to each of them.
+Two artifacts are made: libpopsift and the test application popsift-demo. Calling popsift-demo without parameters shows an option.
+
+To integrate PopSift into other software, link with libpopsift.  The caller must create a popart::Config struct (documented in src/sift/sift_conf.h) to control the behaviour of the PopSift, and instantiate an object of class PopSift (found in src/sift/popsift.h).  After creating an instance, it must be configured to the constant width and height of the input image (init()).  After that, it can be fed a one image at a time (execute()). The only valid input format is a single plane of grayscale unsigned characters. The execute() function returns a pointer to an object of type Features that must be deleted by the caller after use. Features offer iterators that iterate over objects of type Feature. Both classes are documented in sift_extremum.h. Each feature represents a feature point in the coordinate system of the input image, providing X and Y coordinates and scale (sigma), as well as several alternative descriptors for the feature point (according to Lowe, 15% of the feature points should be expected to have 2 or more descriptors).
 
 As far as we know, no implementation that is faster than PopSift at the time of PopSift's release comes under a license that allows commercial use and sticks close to the original paper at the same time as well. PopSift can be configured at runtime to use constants that affect it behaviours. In particular, users can choose to generate results very similar to VLFeat or results that are closer (but not as close) to the SIFT implementation of the OpenCV extras. We acknowledge that there is at least one SIFT implementation that is vastly faster, but it makes considerable sacifices in terms of accuracy and compatibility.
 

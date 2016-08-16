@@ -46,6 +46,7 @@ struct Config
     void setEdgeLimit( float v );
     void setThreshold( float v );
     void setInitialBlur( float blur );
+    void setUseRootSift( bool on );
     void setPrintGaussTables( );
     void setDPOrientation( bool on );
     void setDPDescriptors( bool on );
@@ -81,6 +82,10 @@ struct Config
     // default edge_limit 16.0f from Celebrandil
     // default edge_limit 10.0f from Bemap
     float    _edge_limit;
+
+    bool getUseRootSift( ) const {
+        return _use_root_sift;
+    }
 
     /* The input image is stretched by 2^upscale_factor
      * before processing. The factor 1 is default.
@@ -138,6 +143,11 @@ private:
      */
     bool  _assume_initial_blur;
     float _initial_blur;
+
+    /* OpenMVG requires a normalization named rootSift.
+     * Default is the OpenCV method.
+     */
+    bool _use_root_sift;
 
     /* Call the debug functions in gauss_filter.cu to print Gauss
      * filter width and Gauss tables in use.

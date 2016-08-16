@@ -6,6 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <cmath>
@@ -34,7 +35,6 @@ static void usage( const char* argv )
          << " --help / -h / -?            Print usage" << endl
          << " --verbose / -v" << endl
          << " --log / -l                  Write debugging files" << endl
-         << " --print-info / -p           Print info about GPUs" << endl
          << endl
          << "* Parameters *" << endl
          << " --octaves=<int>             Number of octaves" << endl
@@ -62,6 +62,8 @@ static void usage( const char* argv )
          << "                             reject points when reaching max iterations," << endl
          << "                             first contrast threshold is floor(.5 * peak thresh)." << endl
          << "                             Computed filter width are lower than VLFeat/PopSift" << endl
+         << " --root-sift                 Use the L1-based norm for OpenMVG rather than" << endl
+         << "                             L2-based as in OpenCV" << endl
          << " --dp-off                    Switch all CUDA Dynamic Parallelism off" << endl
          << " --dp-ori-off                Switch DP off for orientation computation" << endl
          << " --dp-desc-off               Switch DP off for descriptor computation" << endl
@@ -70,11 +72,13 @@ static void usage( const char* argv )
          << " --print-gauss-tables        A debug output printing Gauss filter size and tables" << endl
          << " --print-dev-info            A debug output printing CUDA device information" << endl
          << " --print-time-info           A debug output printing image processing time after load()" << endl
+#if 0
          << " --test-direct-scaling       Direct each octave from upscaled orig instead of blurred level." << endl
          << "                             Does not work yet." << endl
          << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
          << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
          << "                             Does not work yet." << endl
+#endif
          << endl;
     exit(0);
 }
@@ -102,6 +106,7 @@ static struct option longopts[] = {
     { "dp-off",              no_argument,            NULL, 1105 },
     { "dp-ori-off",          no_argument,            NULL, 1106 },
     { "dp-desc-off",         no_argument,            NULL, 1107 },
+    { "root-sift",           no_argument,            NULL, 1108 },
 
     { "print-gauss-tables",  no_argument,            NULL, 1200 },
     { "print-dev-info",      no_argument,            NULL, 1201 },
@@ -148,6 +153,7 @@ static void parseargs( int argc, char**argv, popsift::Config& config, string& in
         case 1105 : config.setDPOrientation( false ); config.setDPDescriptors( false ); break;
         case 1106 : config.setDPOrientation( false ); break;
         case 1107 : config.setDPDescriptors( false ); break;
+        case 1108 : config.setUseRootSift( true ); break;
 
         case 1200 : config.setPrintGaussTables( ); break;
         case 1201 : print_dev_info  = true; break;
@@ -201,8 +207,13 @@ int main(int argc, char **argv)
     PopSift PopSift( config );
 
     PopSift.init( 0, w, h, print_time_info );
-    PopSift.execute( 0, image_data, 0, 0, print_time_info );
+    popsift::Features* feature_list = PopSift.execute( 0, image_data, print_time_info );
     PopSift.uninit( 0 );
+
+    std::ofstream of( "output-features.txt" );
+    of << *feature_list;
+    delete feature_list;
+
     delete [] image_data;
     return 0;
 }

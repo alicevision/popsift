@@ -286,7 +286,7 @@ void ori_prefix_sum( int*      extrema_counter,
     }
 }
 
-
+#if __CUDA_ARCH__ > 350
 __global__
 void orientation_starter( Extremum*     extremum,
                           int*          extrema_counter,
@@ -328,6 +328,17 @@ void orientation_starter( Extremum*     extremum,
               d_feat_to_ext_map );
     }
 }
+#else // __CUDA_ARCH__ > 350
+__global__
+void orientation_starter( Extremum*     extremum,
+                          int*          extrema_counter,
+                          int*          featvec_counter,
+                          int*          d_feat_to_ext_map,
+                          Plane2D_float layer )
+{
+    printf( "Dynamic Parallelism requires a card with Compute Capability 3.5 or higher\n" );
+}
+#endif // __CUDA_ARCH__ > 350
 
 __host__
 void Pyramid::orientation( const Config& conf )

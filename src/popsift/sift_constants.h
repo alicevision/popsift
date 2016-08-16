@@ -35,11 +35,6 @@
 #define DESC_BINS        8
 #define DESC_MAGNIFY           3.0f
 
-/* Define this to prefer L1 norm in descriptor normalization
- * instead of default L2 norm.
- */
-#undef DESC_USE_ROOT_SIFT
-
 // Lowe wants at most 3 orientations at every extremum,
 // VLFeat uses at most 4
 #undef  LOWE_ORIENTATION_MAX

@@ -5,11 +5,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+#include <fstream>
+
 #include "sift_constants.h"
 #include "popsift.h"
 #include "gauss_filter.h"
 #include "common/write_plane_2d.h"
 #include "sift_pyramid.h"
+#include "sift_extremum.h"
 
 using namespace std;
 
@@ -87,13 +90,11 @@ void PopSift::uninit( int pipe )
     delete _pipe[pipe]._pyramid;
 }
 
-void PopSift::execute( int                                  pipe,
-                       const unsigned char*                 imageData,
-                       vector<vector<popsift::Extremum> >*   extrema,
-                       vector<vector<popsift::Descriptor> >* descs,
-                       bool                                 checktime )
+popsift::Features* PopSift::execute( int                  pipe,
+                                     const unsigned char* imageData,
+                                     bool                 checktime )
 {
-    if( pipe < 0 && pipe >= MAX_PIPES ) return;
+    if( pipe < 0 && pipe >= MAX_PIPES ) return 0;
 
     cudaEvent_t start, end;
     if( checktime ) {
@@ -106,7 +107,7 @@ void PopSift::execute( int                                  pipe,
 
     _pipe[pipe]._inputImage->load( _config, imageData );
 
-    _pipe[pipe]._pyramid->find_extrema( _config, _pipe[pipe]._inputImage );
+    popsift::Features* features = _pipe[pipe]._pyramid->find_extrema( _config, _pipe[pipe]._inputImage );
 
     cudaDeviceSynchronize();
 
@@ -138,5 +139,7 @@ void PopSift::execute( int                                  pipe,
             _pipe[pipe]._pyramid->save_descriptors( _config, "pyramid", o );
         }
     }
+
+    return features;
 }
 
