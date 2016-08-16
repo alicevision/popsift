@@ -69,7 +69,5 @@ public:
 private:
     Pipe            _pipe[MAX_PIPES];
     popsift::Config _config;
-    bool            _configured;
-    bool            _initialized;
 };
 

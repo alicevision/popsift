@@ -18,7 +18,6 @@ using namespace std;
 
 PopSift::PopSift( const popsift::Config& config )
     : _config( config )
-    , _initialized( false )
 {
     _config.levels = max( 2, config.levels );
 
@@ -31,18 +30,31 @@ PopSift::PopSift( const popsift::Config& config )
                              _config._edge_limit,
                              10000, // max extrema
                              _config.getNormalizationMultiplier() );
+
+    for( int i=0; i<MAX_PIPES; i++ ) {
+        _pipe[i]._inputImage = 0;
+        _pipe[i]._pyramid    = 0;
+    }
 }
 
 PopSift::PopSift( )
-    , _initialized( false )
-{ }
+{
+    for( int i=0; i<MAX_PIPES; i++ ) {
+        _pipe[i]._inputImage = 0;
+        _pipe[i]._pyramid    = 0;
+    }
+}
 
 PopSift::~PopSift()
 { }
 
 bool PopSift::configure( const popsift::Config& config )
 {
-    if( _initialized ) return false;
+    for( int i=0; i<MAX_PIPES; i++ ) {
+        if( _pipe[i]._inputImage != 0 ) {
+            return false;
+        }
+    }
 
     _config = config;
 
@@ -62,7 +74,7 @@ bool PopSift::configure( const popsift::Config& config )
 
 bool PopSift::init( int pipe, int w, int h, bool checktime )
 {
-    if( _initialized ) return false;
+    if( _pipe[pipe]._inputImage != 0 ) return false;
 
     cudaEvent_t start, end;
     if( checktime ) {
@@ -107,8 +119,6 @@ bool PopSift::init( int pipe, int w, int h, bool checktime )
         cerr << "Initialization of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
     }
 
-    _initialized = true;
-
     return true;
 }
 
@@ -119,14 +129,15 @@ void PopSift::uninit( int pipe )
     delete _pipe[pipe]._inputImage;
     delete _pipe[pipe]._pyramid;
 
-    _initialized = false;
+    _pipe[pipe]._inputImage = 0;
+    _pipe[pipe]._pyramid    = 0;
 }
 
 popsift::Features* PopSift::execute( int                  pipe,
                                      const unsigned char* imageData,
                                      bool                 checktime )
 {
-    if( not _initialized ) return 0;
+    if( _pipe[pipe]._inputImage == 0 ) return 0;
 
     if( pipe < 0 && pipe >= MAX_PIPES ) return 0;
 
