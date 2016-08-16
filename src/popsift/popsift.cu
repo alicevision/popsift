@@ -28,7 +28,8 @@ PopSift::PopSift( const popsift::Config& config )
                              _config.levels,
                              _config.getPeakThreshold(),
                              _config._edge_limit,
-                             10000 ); // max extrema
+                             10000, // max extrema
+                             _config.getNormalizationMultiplier() );
 }
 
 PopSift::~PopSift()

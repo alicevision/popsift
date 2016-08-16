@@ -64,6 +64,7 @@ static void usage( const char* argv )
          << "                             Computed filter width are lower than VLFeat/PopSift" << endl
          << " --root-sift                 Use the L1-based norm for OpenMVG rather than" << endl
          << "                             L2-based as in OpenCV" << endl
+         << " --norm-multi=<int>          Multiply the descriptor by pow(2,<int>), default 0" << endl
          << " --dp-off                    Switch all CUDA Dynamic Parallelism off" << endl
          << " --dp-ori-off                Switch DP off for orientation computation" << endl
          << " --dp-desc-off               Switch DP off for descriptor computation" << endl
@@ -107,6 +108,7 @@ static struct option longopts[] = {
     { "dp-ori-off",          no_argument,            NULL, 1106 },
     { "dp-desc-off",         no_argument,            NULL, 1107 },
     { "root-sift",           no_argument,            NULL, 1108 },
+    { "norm-multi",          required_argument,      NULL, 1109 },
 
     { "print-gauss-tables",  no_argument,            NULL, 1200 },
     { "print-dev-info",      no_argument,            NULL, 1201 },
@@ -154,6 +156,7 @@ static void parseargs( int argc, char**argv, popsift::Config& config, string& in
         case 1106 : config.setDPOrientation( false ); break;
         case 1107 : config.setDPDescriptors( false ); break;
         case 1108 : config.setUseRootSift( true ); break;
+        case 1109 : config.setNormalizationMultiplier( strtol( optarg, NULL, 0 ) ); break;
 
         case 1200 : config.setPrintGaussTables( ); break;
         case 1201 : print_dev_info  = true; break;

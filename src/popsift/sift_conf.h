@@ -50,6 +50,7 @@ struct Config
     void setPrintGaussTables( );
     void setDPOrientation( bool on );
     void setDPDescriptors( bool on );
+    void setNormalizationMultiplier( int mul );
 
     bool  hasInitialBlur( ) const;
     float getInitialBlur( ) const;
@@ -83,15 +84,19 @@ struct Config
     // default edge_limit 10.0f from Bemap
     float    _edge_limit;
 
-    bool getUseRootSift( ) const {
+    inline bool getUseRootSift( ) const {
         return _use_root_sift;
     }
 
     /* The input image is stretched by 2^upscale_factor
      * before processing. The factor 1 is default.
      */
-    float getUpscaleFactor( ) const {
+    inline float getUpscaleFactor( ) const {
         return _upscale_factor;
+    }
+
+    int getNormalizationMultiplier( ) const {
+        return _normalization_multiplier;
     }
 
     bool useDPOrientation( ) const {
@@ -148,6 +153,13 @@ private:
      * Default is the OpenCV method.
      */
     bool _use_root_sift;
+
+    /* SIFT descriptors are normalized in a final step.
+     * The values of the descriptor can also be multiplied
+     * by a power of 2 if required.
+     * Specify the exponent.
+     */
+    int      _normalization_multiplier;
 
     /* Call the debug functions in gauss_filter.cu to print Gauss
      * filter width and Gauss tables in use.
