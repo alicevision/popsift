@@ -18,6 +18,8 @@ using namespace std;
 
 PopSift::PopSift( const popsift::Config& config )
     : _config( config )
+    , _configured( true )
+    , _initialized( false )
 {
     _config.levels = max( 2, config.levels );
 
@@ -32,11 +34,43 @@ PopSift::PopSift( const popsift::Config& config )
                              _config.getNormalizationMultiplier() );
 }
 
+PopSift::PopSift( )
+    : _configured( false )
+    , _initialized( false )
+{ }
+
 PopSift::~PopSift()
 { }
 
+bool PopSift::configure( const popsift::Config& config )
+{
+    if( _configured ) return false;
+    if( _initialized ) return false;
+
+    _configured = true;
+
+    _config = config;
+
+    _config.levels = max( 2, config.levels );
+
+    popsift::init_filter( _config,
+                         _config.sigma,
+                         _config.levels );
+    popsift::init_constants(  _config.sigma,
+                             _config.levels,
+                             _config.getPeakThreshold(),
+                             _config._edge_limit,
+                             10000, // max extrema
+                             _config.getNormalizationMultiplier() );
+    return true;
+}
+
 bool PopSift::init( int pipe, int w, int h, bool checktime )
 {
+    if( not _configured ) return false;
+
+    if( _initialized ) return false;
+
     cudaEvent_t start, end;
     if( checktime ) {
         cudaEventCreate( &start );
@@ -80,6 +114,8 @@ bool PopSift::init( int pipe, int w, int h, bool checktime )
         cerr << "Initialization of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
     }
 
+    _initialized = true;
+
     return true;
 }
 
@@ -89,12 +125,17 @@ void PopSift::uninit( int pipe )
 
     delete _pipe[pipe]._inputImage;
     delete _pipe[pipe]._pyramid;
+
+    _initialized = false;
 }
 
 popsift::Features* PopSift::execute( int                  pipe,
                                      const unsigned char* imageData,
                                      bool                 checktime )
 {
+    if( not _configured ) return 0;
+    if( not _initialized ) return 0;
+
     if( pipe < 0 && pipe >= MAX_PIPES ) return 0;
 
     cudaEvent_t start, end;

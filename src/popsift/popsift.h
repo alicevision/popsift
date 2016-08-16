@@ -37,11 +37,17 @@ public:
     /* We support more than 1 streams, but we support only one sigma and one
      * level parameters.
      */
+    PopSift( );
     PopSift( const popsift::Config& config );
     ~PopSift();
 
 public:
+    /* provide the configuration if you used the PopSift constructor */
+    bool configure( const popsift::Config& config );
+
     bool init( int pipe, int w, int h, bool checktime = false );
+
+    void uninit( int pipe );
 
 #if 1
     popsift::Features* execute( int                  pipe,
@@ -60,10 +66,10 @@ public:
         return *_pipe[pipe]._pyramid;
     }
 
-    void uninit( int pipe );
-
 private:
-    Pipe           _pipe[MAX_PIPES];
+    Pipe            _pipe[MAX_PIPES];
     popsift::Config _config;
+    bool            _configured;
+    bool            _initialized;
 };
 
