@@ -50,7 +50,8 @@ install:
   - sudo apt-get update -qq
   - sudo apt-get install -qq nvidia-cuda-toolkit
   - sudo apt-get install -qq nvidia-cuda-dev
-  - sudo apt-get install -qq cuda-core cuda-cudart-dev cuda-cublas-dev cuda-curand-dev
+  - sudo apt-get search cuda
+  - sudo apt-get search nvidia
 
 before_script:
   # Create build folder
