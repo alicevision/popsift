@@ -28,7 +28,7 @@ find_package(CUDA 7.0)
 IF(CUDA_FOUND)
   SET(CUDA_SEPARABLE_COMPILATION ON)
   include_directories(${CUDA_INCLUDE_DIRS})
-  add_definitions("-DWITH_CUDA")
+
   set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG};-G;-g")
   set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-O3")
   set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_30,code=sm_30")
