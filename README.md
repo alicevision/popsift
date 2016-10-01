@@ -24,6 +24,7 @@ Continuous integration:
 - [![Build Status](https://travis-ci.org/poparteu/popsift.svg?branch=develop)](https://travis-ci.org/poparteu/popsift) develop branch.
 
 
+
 Usage
 -----
 
@@ -36,7 +37,7 @@ To integrate PopSift into other software, link with `libpopsift`.  If your are u
 ```cmake
 # Find the package from the PopSiftConfig.cmake 
 # in <prefix>/lib/cmake/PopSift/. Under the namespace PopSift::
-# it expose the target popsift that allows you to compile
+# it exposes the target popsift that allows you to compile
 # and link with the library
 find_package(PopSift CONFIG REQUIRED)
 ...
@@ -45,6 +46,14 @@ add_executable(poptest yourfile.cpp)
 # add link to the library
 target_link_libraries(poptest PUBLIC PopSift::popsift)
 ```
+
+Then, in order to build just pass the location of `PopSiftConfig.cmake` from the cmake command line:
+
+```bash
+cmake .. -DPopSift_DIR=<prefix>/lib/cmake/PopSift/
+```
+
+
 
 ### Calling the API
 
