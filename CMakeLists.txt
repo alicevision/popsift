@@ -14,15 +14,6 @@ set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -DGRIFF_DEBUG")
 
 find_package(Boost 1.53.0 REQUIRED COMPONENTS system filesystem)
 
-if(Boost_FOUND)
-  include_directories(${Boost_INCLUDE_DIRS})
-  # link_directories(${Boost_LIB_DIR})
-  add_definitions(${Boost_DEFINITIONS})
-  message( STATUS "Found BOOST: ${Boost_LIBRARIES}" )
-else(Boost_FOUND)
-  message( FATAL_ERROR "Boost not found" )
-endif(Boost_FOUND)
-
 find_package(CUDA 7.0)
 
 if(NOT CUDA_FOUND)
@@ -30,7 +21,6 @@ if(NOT CUDA_FOUND)
 endif()
 
 set(CUDA_SEPARABLE_COMPILATION ON)
-include_directories(${CUDA_INCLUDE_DIRS})
 
 set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG};-G;-g")
 set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-O3")
@@ -55,7 +45,6 @@ endif(CUDA_VERSION>=7.5)
 # library required for CUDA dynamic parallelism, forgotten by CMake 3.4
 cuda_find_library_local_first(CUDA_CUDADEVRT_LIBRARY cudadevrt "\"cudadevrt\" library")
 
-include_directories("${CMAKE_SOURCE_DIR}/popsift/Cuda-7.0-cub")
 
 add_subdirectory(src)
 
