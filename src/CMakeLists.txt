@@ -10,8 +10,8 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
 
 CUDA_ADD_LIBRARY(popsift STATIC
-                  ${src_files_cu}
-		  ${src_files_cpp})
+                 ${src_files_cu}
+                 ${src_files_cpp})
 
 target_include_directories(popsift 
             PRIVATE ${Boost_INCLUDE_DIRS}
