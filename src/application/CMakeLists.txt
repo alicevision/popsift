@@ -3,6 +3,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 add_executable(popsift-demo main.cpp pgmread.cpp )
 
 target_include_directories(popsift-demo PRIVATE
+                           ${Boost_INCLUDE_DIRS}
                            ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(popsift-demo popsift
