@@ -13,6 +13,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src/common)
 CUDA_ADD_LIBRARY( popsift STATIC
                   ${src_files_cu}
 		  ${src_files_cpp} )
+set_property(TARGET popsift PROPERTY VERSION ${PROJECT_VERSION})
 
 add_subdirectory(application)
 
