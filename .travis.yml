@@ -62,11 +62,11 @@ before_script:
   - cd $POPSIFT_BUILD
   # Classic release build
   - >
-     cmake . $POPSIFT_SOURCE
+     cmake . $POPSIFT_SOURCE -DCMAKE_INSTALL_PREFIX=`pwd`/install
 
 script:
 # limit GCC builds to a reduced number of thread for the virtual machine
-  - make -j 2 VERBOSE=1
+  - make install -j 2 VERBOSE=1
 # Perform unit tests
   # - make test
 
