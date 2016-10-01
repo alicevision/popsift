@@ -5,19 +5,25 @@ project(PopSift VERSION 1.0.0)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
-set(CMAKE_BUILD_TYPE Release) # Debug, Release
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+  message(STATUS "Build type not set, building in Release configuration")
+else()
+  message(STATUS "Building in ${CMAKE_BUILD_TYPE} configuration")
+endif()
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -O3")
 set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_DEBUG}   -O3")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DGRIFF_DEBUG")
-set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -DGRIFF_DEBUG")
+
+#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DGRIFF_DEBUG")
+#set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -DGRIFF_DEBUG")
 
 find_package(Boost 1.53.0 REQUIRED COMPONENTS system filesystem)
 
 find_package(CUDA 7.0)
 
 if(NOT CUDA_FOUND)
-  message( FATAL_ERROR "Could not find CUDA >= 7.0" )
+  message(FATAL_ERROR "Could not find CUDA >= 7.0")
 endif()
 
 set(CUDA_SEPARABLE_COMPILATION ON)
