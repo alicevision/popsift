@@ -21,6 +21,10 @@ env:
     - BUILD_PROCESSOR="`uname -p`"
     - POPSIFT_SOURCE=${TRAVIS_BUILD_DIR}
     - POPSIFT_BUILD=${TRAVIS_BUILD_DIR}/build
+    - POPSIFT_INSTALL=${POPSIFT_BUILD}/install
+    - POPSIFT_APP_SRC=${POPSIFT_SOURCE}/src/application
+    - POPSIFT_APP_BUILD=${POPSIFT_APP_SRC}/build
+    - POPSIFT_APP_INSTALL=${POPSIFT_APP_BUILD}/install
     # CMAKE
     # - CMAKE_URL="https://cmake.org/files/v3.6/cmake-3.6.1-Linux-x86_64.tar.gz"
     - CMAKE_URL="https://cmake.org/files/v3.4/cmake-3.4.1-Linux-x86_64.tar.gz"
@@ -62,13 +66,19 @@ before_script:
   - cd $POPSIFT_BUILD
   # Classic release build
   - >
-     cmake . $POPSIFT_SOURCE -DCMAKE_INSTALL_PREFIX=`pwd`/install
+     cmake . $POPSIFT_SOURCE -DCMAKE_INSTALL_PREFIX=$POPSIFT_INSTALL
 
 script:
 # limit GCC builds to a reduced number of thread for the virtual machine
   - make install -j 2 VERBOSE=1
 # Perform unit tests
   # - make test
+# Perform tests building application with PopSift as 3rd party
+  - cd $POPSIFT_APP_SRC
+  - mkdir POPSIFT_APP_BUILD
+  - cd POPSIFT_APP_BUILD
+  - cmake .. -DPopSift_DIR=$POPSIFT_INSTALL/lib/cmake/PopSift/ -DCMAKE_INSTALL_PREFIX=$POPSIFT_APP_INSTALL
+  - make install -j 2 VERBOSE=1
 
 cache:
   directories:
