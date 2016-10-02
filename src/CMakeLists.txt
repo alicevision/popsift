@@ -13,9 +13,12 @@ CUDA_ADD_LIBRARY(popsift STATIC
                  ${src_files_cu}
                  ${src_files_cpp})
 
+# BUILD_INTERFACE allows to include the directory with source only when target is
+# built in the building tree (ie, not from an install location)
 target_include_directories(popsift 
             PRIVATE ${Boost_INCLUDE_DIRS}
-            PUBLIC ${CUDA_INCLUDE_DIRS})
+            PUBLIC ${CUDA_INCLUDE_DIRS}
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>")
 
 target_compile_definitions(popsift PRIVATE ${Boost_DEFINITIONS})
 
@@ -25,8 +28,6 @@ set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 # cannot use PRIVATE here as there is a bug in FindCUDA and CUDA_ADD_LIBRARY
 # https://gitlab.kitware.com/cmake/cmake/issues/16097
 target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
-
-add_subdirectory(application)
 
 
 # EXPORTING THE LIBRARY
@@ -87,3 +88,6 @@ install(FILES "${project_config}" "${version_config}"
 install(EXPORT "${targets_export_name}"
         NAMESPACE "${namespace}"
         DESTINATION "${config_install_dir}")
+
+
+add_subdirectory(application)
