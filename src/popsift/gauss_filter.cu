@@ -233,8 +233,6 @@ void GaussInfo::computeBlurTable( int level, int span, float sigma )
     /* Should be:
      * kernel[x] = exp( -0.5 * (pow((x-mean)/sigma, 2.0) ) )
      *           / sqrt(2 * M_PI * sigma * sigma);
-     * _w /= 2;
-     * _h /= 2;
      * but the denominator is constant and we divide by sum anyway
      */
     double sum = 1.0;
