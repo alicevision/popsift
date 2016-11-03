@@ -17,24 +17,13 @@
 using namespace std;
 
 PopSift::PopSift( const popsift::Config& config )
-    : _config( config )
 {
-    _config.levels = max( 2, config.levels );
-
-    popsift::init_filter( _config,
-                         _config.sigma,
-                         _config.levels );
-    popsift::init_constants(  _config.sigma,
-                             _config.levels,
-                             _config.getPeakThreshold(),
-                             _config._edge_limit,
-                             10000, // max extrema
-                             _config.getNormalizationMultiplier() );
-
     for( int i=0; i<MAX_PIPES; i++ ) {
         _pipe[i]._inputImage = 0;
         _pipe[i]._pyramid    = 0;
     }
+
+    configure(config);
 }
 
 PopSift::PopSift( )
