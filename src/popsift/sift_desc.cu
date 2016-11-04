@@ -194,9 +194,21 @@ void normalize_histogram_root_sift( Descriptor* descs, int num_orientations )
 
     sum = __shfl( sum,  0 );
 
-    /* multiplying with 512 is some scaling by convention */
-    // sum = 512.0f / sum;
-    // sum = __frcp_rn( scalbnf( sum, -9 ) );
+#if 1
+    float val;
+    val = scalbnf( __fsqrt_rn( __fdividef( descr.x, sum ) ),
+                   d_consts.norm_multi );
+    descr.x = val;
+    val = scalbnf( __fsqrt_rn( __fdividef( descr.y, sum ) ),
+                   d_consts.norm_multi );
+    descr.y = val;
+    val = scalbnf( __fsqrt_rn( __fdividef( descr.z, sum ) ),
+                   d_consts.norm_multi );
+    descr.z = val;
+    val = scalbnf( __fsqrt_rn( __fdividef( descr.w, sum ) ),
+                   d_consts.norm_multi );
+    descr.w = val;
+#else
     float val;
     val = 512.0f * __fsqrt_rn( __fdividef( descr.x, sum ) );
     descr.x = val;
@@ -206,6 +218,7 @@ void normalize_histogram_root_sift( Descriptor* descs, int num_orientations )
     descr.z = val;
     val = 512.0f * __fsqrt_rn( __fdividef( descr.w, sum ) );
     descr.w = val;
+#endif
 
     if( not ignoreme ) {
         ptr4[threadIdx.x] = descr;
@@ -254,7 +267,7 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     descr.w = min( descr.w, 0.2f*norm );
 
     if( threadIdx.x == 0 ) {
-        norm = 512.0f * rnormf( 128, ptr1 );
+        norm = scalbnf( rnormf( 128, ptr1 ), d_consts.norm_multi );
     }
 #else
     float norm;
@@ -288,8 +301,10 @@ void normalize_histogram( Descriptor* descs, int num_orientations )
     norm += __shfl_down( norm,  2 );
     norm += __shfl_down( norm,  1 );
     if( threadIdx.x == 0 ) {
-        norm = __fsqrt_rn( norm );
-        norm = __fdividef( 512.0f, norm );
+        // norm = __fsqrt_rn( norm );
+        // norm = __fdividef( 512.0f, norm );
+        norm = __frsqrt_rn( norm ); // inverse square root
+        norm = scalbnf( norm, d_consts.norm_multi );
     }
 #endif
     norm = __shfl( norm,  0 );
