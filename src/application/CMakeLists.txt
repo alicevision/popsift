@@ -20,6 +20,7 @@ target_include_directories(popsift-demo PUBLIC ${Boost_INCLUDE_DIRS})
 
 target_link_libraries(popsift-demo PUBLIC PopSift::popsift ${Boost_LIBRARIES})
 
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
+# set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
+set_target_properties(popsift-demo PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}" )
 
 install(TARGETS popsift-demo DESTINATION bin)
