@@ -47,6 +47,7 @@ struct Config
     void setThreshold( float v );
     void setInitialBlur( float blur );
     void setUseRootSift( bool on );
+    void setMaxExtreme( int m );
     void setPrintGaussTables( );
     void setDPOrientation( bool on );
     void setDPDescriptors( bool on );
@@ -107,6 +108,10 @@ struct Config
         return ( _dp_capable & _dp_descriptors );
     }
 
+    int getMaxExtrema( ) const {
+        return _max_extrema;
+    }
+
 private:
     // default threshold 0.0 default of vlFeat
     // default threshold 5.0 / 256.0
@@ -137,6 +142,11 @@ public:
     int gauss_group_size;
 
 private:
+    /* The maximum number of extrema that are returned. There may be
+     * several descriptors for each extremum.
+     */
+    int _max_extrema;
+
     /* Modes are PopSift, OpenCV and VLFeat.
      * Default is currently identical to PopSift.
      */
