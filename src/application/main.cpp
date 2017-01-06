@@ -44,7 +44,7 @@ static void usage( const char* argv )
          << " --edge-threshold=<float> or" << endl
          << " --edge-limit=<float>        On-edge threshold" << endl
          << " --downsampling=<float>      Downscale width and height of input by 2^N (default N=-1)" << endl
-         << " --initial-blur=<float>      Assume initial blur, subtract when blurring first time" << endl
+         << " --initial-blur=<float>      Assume initial blur, subtract when blurring first time (default 0.5)" << endl
          << endl
          << "* Modes *" << endl
          << " --popsift-mode (default)    During the initial upscale, shift pixels by 1." << endl
@@ -73,6 +73,9 @@ static void usage( const char* argv )
          << " --print-gauss-tables        A debug output printing Gauss filter size and tables" << endl
          << " --print-dev-info            A debug output printing CUDA device information" << endl
          << " --print-time-info           A debug output printing image processing time after load()" << endl
+         << " --write-as-uchar            Output descriptors rounded to int" << endl
+         << "                             Scaling to sensible ranges is not automatic, should be" << endl
+         << "                             combined with --norm-multi=9 or similar" << endl
 #if 0
          << " --test-direct-scaling       Direct each octave from upscaled orig instead of blurred level." << endl
          << "                             Does not work yet." << endl
@@ -113,12 +116,14 @@ static struct option longopts[] = {
     { "print-gauss-tables",  no_argument,            NULL, 1200 },
     { "print-dev-info",      no_argument,            NULL, 1201 },
     { "print-time-info",     no_argument,            NULL, 1202 },
+    { "write-as-uchar",      no_argument,            NULL, 1203 },
 
     { NULL,                  0,                      NULL, 0  }
 };
 
 static bool print_dev_info  = false;
 static bool print_time_info = false;
+static bool write_as_uchar  = false;
 
 static void parseargs( int argc, char**argv, popsift::Config& config, string& inputFile )
 {
@@ -161,6 +166,7 @@ static void parseargs( int argc, char**argv, popsift::Config& config, string& in
         case 1200 : config.setPrintGaussTables( ); break;
         case 1201 : print_dev_info  = true; break;
         case 1202 : print_time_info = true; break;
+        case 1203 : write_as_uchar = true; break;
         default   : usage( appName );
         }
     }
@@ -214,7 +220,8 @@ int main(int argc, char **argv)
     PopSift.uninit( 0 );
 
     std::ofstream of( "output-features.txt" );
-    of << *feature_list;
+    feature_list->print( of, write_as_uchar );
+    // of << *feature_list;
     delete feature_list;
 
     delete [] image_data;

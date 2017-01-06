@@ -24,8 +24,8 @@ Config::Config( )
     , verbose( false )
     , gauss_group_size( 1 )
     , _max_extrema( 10000 )
-    , _assume_initial_blur( false )
-    , _initial_blur( 0.0f )
+    , _assume_initial_blur( true )
+    , _initial_blur( 0.5f )
     , _use_root_sift( false )
     , _normalization_multiplier( 0 )
     , _print_gauss_tables( false )
@@ -82,8 +82,13 @@ void Config::setNormalizationMultiplier( int mul ) { _normalization_multiplier =
 
 void Config::setInitialBlur( float blur )
 {
-    _assume_initial_blur = true;
-    _initial_blur        = blur;
+    if( blur == 0.0f ) {
+        _assume_initial_blur = false;
+        _initial_blur        = blur;
+    } else {
+        _assume_initial_blur = true;
+        _initial_blur        = blur;
+    }
 }
 
 void Config::setGaussGroup( int groupsize )

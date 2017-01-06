@@ -52,6 +52,8 @@ struct Feature
                             // remaining entries in desc are 0
     float       orientation[ORIENTATION_MAX_COUNT];
     Descriptor* desc[ORIENTATION_MAX_COUNT];
+
+    void print( std::ostream& ostr, bool write_as_uchar ) const;
 };
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
@@ -85,6 +87,8 @@ public:
     inline unsigned int     size() const                { return _features.size(); }
     inline unsigned int     getFeatureCount() const     { return _features.size(); }
     inline unsigned int     getDescriptorCount() const  { return _num_descriptors; }
+
+    void print( std::ostream& ostr, bool write_as_uchar ) const;
 
 protected:
     friend class Pyramid;

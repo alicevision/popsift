@@ -6,6 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include "sift_extremum.h"
+#include <iomanip>
 
 namespace popsift {
 
@@ -19,31 +20,48 @@ Features::~Features( )
     delete [] _desc_buffer;
 }
 
-std::ostream& operator<<( std::ostream& ostr, const Features& feature )
+void Features::print( std::ostream& ostr, bool write_as_uchar ) const
 {
-    std::vector<Feature>::const_iterator it  = feature.begin();
-    std::vector<Feature>::const_iterator end = feature.end();
+    std::vector<Feature>::const_iterator it  = _features.begin();
+    std::vector<Feature>::const_iterator end = _features.end();
 
     for( ; it!=end; it++ ) {
         const Feature& f = *it;
-        ostr << f;
+        f.print( ostr, write_as_uchar );
     }
+}
 
+std::ostream& operator<<( std::ostream& ostr, const Features& feature )
+{
+    feature.print( ostr, false );
     return ostr;
+}
+
+void Feature::print( std::ostream& ostr, bool write_as_uchar ) const
+{
+    float sigval =  1.0f / ( sigma * sigma );
+
+    for( int ori=0; ori<num_descs; ori++ ) {
+        ostr << xpos << " " << ypos << " "
+             << sigval << " 0 " << sigval << " ";
+        if( write_as_uchar ) {
+            for( int i=0; i<128; i++ ) {
+                ostr << roundf(desc[ori]->features[i]) << " ";
+            }
+        } else {
+            ostr << std::setprecision(3);
+            for( int i=0; i<128; i++ ) {
+                ostr << desc[ori]->features[i] << " ";
+            }
+            ostr << std::setprecision(6);
+        }
+        ostr << std::endl;
+    }
 }
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature )
 {
-    float sigval =  1.0f / ( feature.sigma * feature.sigma );
-
-    for( int ori=0; ori<feature.num_descs; ori++ ) {
-        ostr << feature.xpos << " " << feature.ypos << " "
-             << sigval << " 0 " << sigval << " ";
-        for( int i=0; i<128; i++ ) {
-            ostr << feature.desc[ori]->features[i] << " ";
-        }
-        ostr << std::endl;
-    }
+    feature.print( ostr, false );
     return ostr;
 }
 
