@@ -18,6 +18,7 @@ Config::Config( )
     , sigma( 1.6f )
     , _edge_limit( 10.0f )
     , _threshold( 0.04 ) // ( 10.0f / 256.0f )
+    , _gauss_mode( Config::VLFeat_Compute )
     , _sift_mode( Config::PopSift )
     , log_mode( Config::None )
     , scaling_mode( Config::ScaleDefault )
@@ -51,6 +52,25 @@ Config::Config( )
 void Config::setMode( Config::SiftMode m )
 {
     _sift_mode = m;
+}
+
+void Config::setGaussMode( Config::GaussMode m )
+{
+    _gauss_mode = m;
+}
+
+void Config::setGaussMode( const std::string& m )
+{
+    if( m == "vlfeat" )
+        setGaussMode( Config::VLFeat_Compute );
+    else if( m == "opencv" )
+        setGaussMode( Config::OpenCV_Compute );
+    else if( m == "fixed4" )
+        setGaussMode( Config::Fixed4 );
+    else if( m == "fixed8" )
+        setGaussMode( Config::Fixed8 );
+    else
+        POP_FATAL( "specified Gauss mode must be one of vlfeat, opencv, fixed4 or fixed8" );
 }
 
 void Config::setVerbose( bool on )
@@ -91,6 +111,16 @@ void Config::setInitialBlur( float blur )
     }
 }
 
+Config::GaussMode Config::getGaussMode( ) const
+{
+    return _gauss_mode;
+}
+
+Config::SiftMode Config::getSiftMode() const
+{
+    return _sift_mode;
+}
+
 void Config::setGaussGroup( int groupsize )
 {
     gauss_group_size = groupsize;
@@ -119,11 +149,6 @@ float Config::getPeakThreshold() const
 bool Config::ifPrintGaussTables() const
 {
     return _print_gauss_tables;
-}
-
-Config::SiftMode Config::getSiftMode() const
-{
-    return _sift_mode;
 }
 
 

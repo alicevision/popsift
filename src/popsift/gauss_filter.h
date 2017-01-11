@@ -78,6 +78,16 @@ struct GaussInfo
     __host__
     void computeAbsBlurTable( int level, int span, float sigma );
 
+public:
+    __host__
+    void setSpanMode( Config::GaussMode m );
+
+    __host__
+    int getSpan( float sigma ) const;
+
+private:
+    Config::GaussMode _span_mode;
+
     __host__
     static int vlFeatSpan( float sigma );
 

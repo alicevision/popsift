@@ -116,6 +116,8 @@ void init_filter( const Config& conf,
 
     GaussInfo h_gauss;
 
+    h_gauss.setSpanMode( conf.getGaussMode() );
+
     h_gauss.clearTables();
 
     h_gauss.required_filter_stages = levels + 3;
@@ -126,9 +128,7 @@ void init_filter( const Config& conf,
         const float initial_blur = conf.getInitialBlur() * pow( 2.0, conf.getUpscaleFactor() );
 
         h_gauss.initial_sigma = sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) );
-        h_gauss.initial_span  = ( conf.getSiftMode() == Config::OpenCV )
-                              ? GaussInfo::openCVSpan( h_gauss.initial_sigma )
-                              : GaussInfo::vlFeatSpan( h_gauss.initial_sigma );
+        h_gauss.initial_span  = h_gauss.getSpan( h_gauss.initial_sigma );
 
         h_gauss.computeInitialBlurTable( h_gauss.initial_span, h_gauss.initial_sigma );
 
@@ -138,9 +138,7 @@ void init_filter( const Config& conf,
     }
 
     h_gauss.sigma[0] = sigma0;
-    h_gauss.span[0]  = ( conf.getSiftMode() == Config::OpenCV )
-                     ? GaussInfo::openCVSpan( sigma0 )
-                     : GaussInfo::vlFeatSpan( sigma0 );
+    h_gauss.span[0]  = h_gauss.getSpan( sigma0 );
     h_gauss.computeBlurTable( 0, h_gauss.span[0], h_gauss.sigma[0] );
     if( conf.ifPrintGaussTables() ) {
         printf("    Sigma for level 0: %2.6f = sigma0(%2.6f)\n", h_gauss.sigma[0], sigma0 );
@@ -151,9 +149,7 @@ void init_filter( const Config& conf,
         const float sigmaS = sigma0 * pow( 2.0, (float)(lvl  )/(float)levels );
 
         h_gauss.sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
-        h_gauss.span[lvl]  = ( conf.getSiftMode() == Config::OpenCV )
-                           ? GaussInfo::openCVSpan( h_gauss.sigma[lvl] )
-                           : GaussInfo::vlFeatSpan( h_gauss.sigma[lvl] );
+        h_gauss.span[lvl]  = h_gauss.getSpan( h_gauss.sigma[lvl] );
         h_gauss.computeBlurTable( lvl, h_gauss.span[lvl], h_gauss.sigma[lvl] );
 
         if( conf.ifPrintGaussTables() ) {
@@ -166,11 +162,9 @@ void init_filter( const Config& conf,
         const float sigmaP = sigma0;
         const float sigmaS = sigma0 * pow( 2.0, (float)(lvl)/(float)levels );
 
-        h_gauss.abs_sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
+        h_gauss.abs_sigma[lvl]  = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
         h_gauss.from_lvl_1[lvl] = sigma0 * pow( 2.0, (float)(lvl)/(float)levels );
-        h_gauss.abs_span[lvl]  = ( conf.getSiftMode() == Config::OpenCV )
-                               ? GaussInfo::openCVSpan( h_gauss.abs_sigma[lvl] )
-                               : GaussInfo::vlFeatSpan( h_gauss.abs_sigma[lvl] );
+        h_gauss.abs_span[lvl]   = h_gauss.getSpan( h_gauss.abs_sigma[lvl] );
         h_gauss.computeAbsBlurTable( lvl, h_gauss.span[lvl], h_gauss.abs_sigma[lvl] );
     }
 #endif // SUPPORT_ABSOLUTE_SIGMA
@@ -259,6 +253,33 @@ void GaussInfo::computeAbsBlurTable( int level, int span, float sigma )
     }
     for( int x = 0; x < span; x++ ) {
         from_lvl_1[level*GAUSS_ALIGN + x] /= sum;
+    }
+}
+
+__host__
+void GaussInfo::setSpanMode( Config::GaussMode m )
+{
+    _span_mode = m;
+}
+
+__host__
+int GaussInfo::getSpan( float sigma ) const
+{
+    switch( _span_mode )
+    {
+    case Config::VLFeat_Compute :
+        return GaussInfo::vlFeatSpan( sigma );
+    case Config::OpenCV_Compute :
+        return GaussInfo::openCVSpan( sigma );
+    case Config::Fixed4 :
+        return 4;
+    case Config::Fixed8 :
+        return 8;
+    default :
+        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
+             << " The mode for computing Gauss filter scan is invalid"
+             << endl;
+        exit( -__LINE__ );
     }
 }
 

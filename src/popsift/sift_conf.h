@@ -7,12 +7,21 @@
  */
 #pragma once
 
+#include <string>
+
 namespace popsift
 {
 
 struct Config
 {
     Config( );
+
+    enum GaussMode {
+        VLFeat_Compute,
+        OpenCV_Compute,
+        Fixed4,
+        Fixed8
+    };
 
     enum SiftMode {
         PopSift,
@@ -31,6 +40,8 @@ struct Config
         ScaleDefault // Indirect - only working method
     };
 
+    void setGaussMode( const std::string& m );
+    void setGaussMode( GaussMode m );
     void setMode( SiftMode m );
     void setLogMode( LogMode mode = All );
     void setScalingMode( ScalingMode mode = ScaleDefault );
@@ -62,6 +73,9 @@ struct Config
 
     // print Gauss spans and tables?
     bool ifPrintGaussTables() const;
+
+    // What Gauss filter scan is desired?
+    GaussMode getGaussMode( ) const;
 
     // get the SIFT mode for more detailed sub-modes
     SiftMode getSiftMode() const;
@@ -146,6 +160,11 @@ private:
      * several descriptors for each extremum.
      */
     int _max_extrema;
+
+    /* Modes are computation according to VLFeat or OpenCV,
+     * or fixed size. Default is VLFeat mode.
+     */
+    GaussMode _gauss_mode;
 
     /* Modes are PopSift, OpenCV and VLFeat.
      * Default is currently identical to PopSift.
