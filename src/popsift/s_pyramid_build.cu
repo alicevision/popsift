@@ -54,10 +54,11 @@ void horiz( cudaTextureObject_t src_data,
     dst_data.ptr(blockIdx.y)[off_x] = out;
 }
 
-__global__
-void vert( cudaTextureObject_t src_data,
-           Plane2D_float       dst_data,
-           int level )
+__device__
+inline void vert( cudaTextureObject_t src_data,
+                  Plane2D_float       dst_data,
+                  int                 span,
+                  float*              filter )
 {
     const int dst_w = dst_data.getWidth();
     const int dst_h = dst_data.getHeight();
@@ -71,8 +72,8 @@ void vert( cudaTextureObject_t src_data,
     float val;
     float out = 0;
 
-    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
-        g  = popsift::d_gauss.filter[level*GAUSS_ALIGN + offset];
+    for( int offset = span; offset>0; offset-- ) {
+        g  = filter[offset];
 
         idy = threadIdx.y - offset;
         val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
@@ -83,7 +84,7 @@ void vert( cudaTextureObject_t src_data,
         out += ( val * g );
     }
 
-    g  = popsift::d_gauss.filter[level*GAUSS_ALIGN];
+    g  = filter[0];
     idy = threadIdx.y;
     val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
     out += ( val * g );
@@ -95,58 +96,33 @@ void vert( cudaTextureObject_t src_data,
     if( idy >= dst_h ) return;
 
     dst_data.ptr(idy)[idx] = out;
+}
+
+__global__
+void vert( cudaTextureObject_t src_data,
+           Plane2D_float       dst_data,
+           int level )
+{
+    vert( src_data, dst_data, d_gauss.span[level], &popsift::d_gauss.filter[level*GAUSS_ALIGN] );
 }
 
 __global__
 void vert_initial_blur( cudaTextureObject_t src_data,
                         Plane2D_float       dst_data )
 {
-    const int dst_w = dst_data.getWidth();
-    const int dst_h = dst_data.getHeight();
-
-    int block_x = blockIdx.x * blockDim.x;
-    int block_y = blockIdx.y * blockDim.y;
-    int idx     = threadIdx.x;
-    int idy;
-
-    float g;
-    float val;
-    float out = 0;
-
-    for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
-        g  = popsift::d_gauss.filter_initial_blur[offset];
-
-        idy = threadIdx.y - offset;
-        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-        out += ( val * g );
-
-        idy = threadIdx.y + offset;
-        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-        out += ( val * g );
-    }
-
-    g  = popsift::d_gauss.filter_initial_blur[0];
-    idy = threadIdx.y;
-    val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-    out += ( val * g );
-
-    idx = block_x+threadIdx.x;
-    idy = block_y+threadIdx.y;
-
-    if( idx >= dst_w ) return;
-    if( idy >= dst_h ) return;
-
-    dst_data.ptr(idy)[idx] = out;
+    vert( src_data, dst_data, d_gauss.initial_span, popsift::d_gauss.filter_initial_blur );
 }
 
 } // namespace absoluteTexAddress
 
 namespace relativeTexAddress {
 
-__global__
-void horiz( cudaTextureObject_t src_data,
-            Plane2D_float       dst_data,
-            float               shift )
+__device__
+inline void horiz( cudaTextureObject_t src_data,
+                   Plane2D_float       dst_data,
+                   float               shift,
+                   int                 span,
+                   float*              filter )
 {
     const float dst_w  = dst_data.getWidth();
     const float dst_h  = dst_data.getHeight();
@@ -159,8 +135,8 @@ void horiz( cudaTextureObject_t src_data,
     float out = 0.0f;
 
     #pragma unroll
-    for( int offset = d_gauss.span[0]; offset>0; offset-- ) {
-        const float& g  = popsift::d_gauss.filter[0*GAUSS_ALIGN + offset];
+    for( int offset = span; offset>0; offset-- ) {
+        const float& g  = filter[offset];
         const float read_x_l = ( off_x - offset );
         const float  v1 = tex2D<float>( src_data, ( read_x_l + shift ) / dst_w, read_y );
         out += ( v1 * g );
@@ -169,12 +145,20 @@ void horiz( cudaTextureObject_t src_data,
         const float  v2 = tex2D<float>( src_data, ( read_x_r + shift ) / dst_w, read_y );
         out += ( v2 * g );
     }
-    const float& g  = popsift::d_gauss.filter[0*GAUSS_ALIGN];
+    const float& g  = filter[0];
     const float read_x = off_x;
     const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
     out += ( v3 * g );
 
     dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f;
+}
+
+__global__
+void horiz( cudaTextureObject_t src_data,
+            Plane2D_float       dst_data,
+            float               shift )
+{
+    horiz( src_data, dst_data, shift, d_gauss.span[0], &popsift::d_gauss.filter[0*GAUSS_ALIGN] );
 }
 
 __global__
@@ -182,33 +166,7 @@ void horiz_initial_blur( cudaTextureObject_t src_data,
                          Plane2D_float       dst_data,
                          float               shift )
 {
-    const float dst_w  = dst_data.getWidth();
-    const float dst_h  = dst_data.getHeight();
-    const float read_y = ( blockIdx.y + shift ) / dst_h;
-
-    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if( off_x >= dst_w ) return;
-
-    float out = 0.0f;
-
-    #pragma unroll
-    for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
-        const float& g  = popsift::d_gauss.filter_initial_blur[offset];
-        const float read_x_l = ( off_x - offset );
-        const float  v1 = tex2D<float>( src_data, ( read_x_l + shift ) / dst_w, read_y );
-        out += ( v1 * g );
-
-        const float read_x_r = ( off_x + offset );
-        const float  v2 = tex2D<float>( src_data, ( read_x_r + shift ) / dst_w, read_y );
-        out += ( v2 * g );
-    }
-    const float& g  = popsift::d_gauss.filter_initial_blur[0];
-    const float read_x = off_x;
-    const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
-    out += ( v3 * g );
-
-    dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f;
+    horiz( src_data, dst_data, shift, d_gauss.initial_span, popsift::d_gauss.filter_initial_blur );
 }
 } // namespace relativeTexAddress
 
@@ -255,8 +213,6 @@ void get_by_2_pick_every_second( Plane2D_float src_data,
 
     dst_data.ptr(idy)[idx] = val;
 }
-
-
 
 
 __global__
