@@ -22,6 +22,8 @@ Features::~Features( )
 
 void Features::print( std::ostream& ostr, bool write_as_uchar ) const
 {
+    std::cout << "Num features: " << _features.size() << std::endl;
+
     std::vector<Feature>::const_iterator it  = _features.begin();
     std::vector<Feature>::const_iterator end = _features.end();
 
