@@ -52,10 +52,10 @@ public:
 private:
     void build_pyramid( const Config& conf, Image* base );
 
-    inline void horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode, bool initial_blur );
+    inline void horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode );
     inline void downscale_from_prev_octave( int octave, int level, cudaStream_t stream, Config::SiftMode mode );
     inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream );
-    inline void vert_from_interm( int octave, int level, cudaStream_t stream, bool initial_blur );
+    inline void vert_from_interm( int octave, int level, cudaStream_t stream );
     inline void dog_from_blurred( int octave, int level, cudaStream_t stream );
 
     void reset_extrema_mgmt( );

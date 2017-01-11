@@ -18,16 +18,15 @@ struct GaussInfo
 {
     int required_filter_stages;
 
-    /* If initial blur is used, then this is the 1D Gauss table
-     * for blurring the remaining amount up to the blur value
-     * of sigma0
+    /* These are the 1D Gauss tables for all levels of an octave.
+     * The first row is special:
+     * - in octave 0 if initial blur is non-zero, contains the
+     *   remaining blur that is required to reach sigma0
+     * - in octave 0 if initial blur is zero, contains the
+     *   filter for sigma0
+     * - in all other octaves, row 0 is unused
      */
-    float filter_initial_blur[ GAUSS_ALIGN ];
-
-    /* These are the 1D Gauss tables for all levels, starting
-     * sigma0 (always, even if sigma0 remain unused.
-     */
-    float filter[ GAUSS_ALIGN * GAUSS_LEVELS ];
+    float incremental_filter[ GAUSS_ALIGN * GAUSS_LEVELS ];
 
 #ifdef SUPPORT_ABSOLUTE_SIGMA
     /* An experimental 1D Gauss table. The idea is to blur
@@ -62,21 +61,16 @@ struct GaussInfo
     int   abs_span[ GAUSS_LEVELS ];
 #endif // SUPPORT_ABSOLUTE_SIGMA
 
-    /* The span of the table that is generated for initial blur.
-     */
-    int initial_span;
-
     __host__
     void clearTables( );
 
     __host__
-    void computeInitialBlurTable( int span, float sigma );
-
-    __host__
     void computeBlurTable( int level, int span, float sigma );
 
+#ifdef SUPPORT_ABSOLUTE_SIGMA
     __host__
     void computeAbsBlurTable( int level, int span, float sigma );
+#endif // SUPPORT_ABSOLUTE_SIGMA
 
 public:
     __host__
