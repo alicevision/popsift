@@ -80,6 +80,9 @@ struct Config
     // get the SIFT mode for more detailed sub-modes
     SiftMode getSiftMode() const;
 
+    // find out if we should print logging info or not
+    LogMode getLogMode() const;
+
     // The number of octaves is chosen freely. If not specified,
     // it is: log_2( min(x,y) ) - 3 - start_sampling
     int      octaves;
@@ -140,10 +143,10 @@ private:
     // (x / 2^start_sampling, y / 2^start_sampling )
     float    _upscale_factor;
 
-public:
     // default LogMode::None
-    LogMode  log_mode;
+    LogMode  _log_mode;
 
+public:
     // default: ScalingMode::DownscaledOctaves
     ScalingMode scaling_mode;
 

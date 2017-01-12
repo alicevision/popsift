@@ -154,7 +154,7 @@ popsift::Features* PopSift::execute( int                  pipe,
         cerr << "Execution of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
     }
 
-    bool log_to_file = ( _config.log_mode == popsift::Config::All );
+    bool log_to_file = ( _config.getLogMode() == popsift::Config::All );
     if( log_to_file ) {
         int octaves = _pipe[pipe]._pyramid->getNumOctaves();
 

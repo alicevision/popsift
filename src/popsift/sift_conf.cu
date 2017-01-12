@@ -20,7 +20,7 @@ Config::Config( )
     , _threshold( 0.04 ) // ( 10.0f / 256.0f )
     , _gauss_mode( Config::VLFeat_Compute )
     , _sift_mode( Config::PopSift )
-    , log_mode( Config::None )
+    , _log_mode( Config::None )
     , scaling_mode( Config::ScaleDefault )
     , verbose( false )
     , gauss_group_size( 1 )
@@ -80,7 +80,12 @@ void Config::setVerbose( bool on )
 
 void Config::setLogMode( LogMode mode )
 {
-    log_mode = mode;
+    _log_mode = mode;
+}
+
+Config::LogMode Config::getLogMode( ) const
+{
+    return _log_mode;
 }
 
 void Config::setScalingMode( ScalingMode mode )
