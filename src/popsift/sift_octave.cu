@@ -44,7 +44,6 @@ void Octave::alloc( int width, int height, int levels, int gauss_group )
     _w           = width;
     _h           = height;
     _levels      = levels;
-    _gauss_group = gauss_group;
 
     alloc_data_planes( );
     alloc_data_tex( );

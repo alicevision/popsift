@@ -92,7 +92,6 @@ Pyramid::Pyramid( Config& config,
     : _num_octaves( config.octaves )
     , _levels( config.levels + 3 )
     , _scaling_mode( config.scaling_mode )
-    , _gauss_group( config.gauss_group_size )
     , _assume_initial_blur( config.hasInitialBlur() )
     , _initial_blur( config.getInitialBlur() )
 {

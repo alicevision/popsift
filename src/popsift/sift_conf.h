@@ -152,12 +152,6 @@ public:
 
     bool     verbose;
 
-    /* A single Gauss filtering step filters for several levels at once,
-     * saving load operations. Accuracy is maintained only for very small
-     * numbers.
-     */
-    int gauss_group_size;
-
 private:
     /* The maximum number of extrema that are returned. There may be
      * several descriptors for each extremum.

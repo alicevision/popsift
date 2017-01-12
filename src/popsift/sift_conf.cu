@@ -23,7 +23,6 @@ Config::Config( )
     , _log_mode( Config::None )
     , scaling_mode( Config::ScaleDefault )
     , verbose( false )
-    , gauss_group_size( 1 )
     , _max_extrema( 10000 )
     , _assume_initial_blur( true )
     , _initial_blur( 0.5f )
@@ -124,16 +123,6 @@ Config::GaussMode Config::getGaussMode( ) const
 Config::SiftMode Config::getSiftMode() const
 {
     return _sift_mode;
-}
-
-void Config::setGaussGroup( int groupsize )
-{
-    gauss_group_size = groupsize;
-}
-
-int  Config::getGaussGroup( ) const
-{
-    return gauss_group_size;
 }
 
 bool Config::hasInitialBlur( ) const
