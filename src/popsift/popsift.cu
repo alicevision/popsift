@@ -23,7 +23,7 @@ PopSift::PopSift( const popsift::Config& config )
         _pipe[i]._pyramid    = 0;
     }
 
-    configure(config);
+    configure( config, true );
 }
 
 PopSift::PopSift( )
@@ -37,7 +37,7 @@ PopSift::PopSift( )
 PopSift::~PopSift()
 { }
 
-bool PopSift::configure( const popsift::Config& config )
+bool PopSift::configure( const popsift::Config& config, bool force )
 {
     for( int i=0; i<MAX_PIPES; i++ ) {
         if( _pipe[i]._inputImage != 0 ) {
@@ -49,15 +49,19 @@ bool PopSift::configure( const popsift::Config& config )
 
     _config.levels = max( 2, config.levels );
 
-    popsift::init_filter( _config,
-                         _config.sigma,
-                         _config.levels );
-    popsift::init_constants(  _config.sigma,
-                             _config.levels,
-                             _config.getPeakThreshold(),
-                             _config._edge_limit,
-                             _config.getMaxExtrema(),
-                             _config.getNormalizationMultiplier() );
+    if( force || ( _config  != _shadow_config ) )
+    {
+        popsift::init_filter( _config,
+                              _config.sigma,
+                              _config.levels );
+        popsift::init_constants(  _config.sigma,
+                                  _config.levels,
+                                  _config.getPeakThreshold(),
+                                  _config._edge_limit,
+                                  _config.getMaxExtrema(),
+                                  _config.getNormalizationMultiplier() );
+    }
+    _shadow_config = _config;
     return true;
 }
 

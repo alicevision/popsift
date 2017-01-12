@@ -145,6 +145,28 @@ bool Config::ifPrintGaussTables() const
     return _print_gauss_tables;
 }
 
+bool Config::equal( const Config& other ) const
+{
+    #define COMPARE(a) ( this->a != other.a )
+    if( COMPARE( octaves ) ||
+        COMPARE( levels ) ||
+        COMPARE( sigma ) ||
+        COMPARE( _edge_limit ) ||
+        COMPARE( _threshold ) ||
+        COMPARE( _upscale_factor ) ||
+        COMPARE( scaling_mode ) ||
+        COMPARE( _max_extrema ) ||
+        COMPARE( _gauss_mode ) ||
+        COMPARE( _sift_mode ) ||
+        COMPARE( _assume_initial_blur ) ||
+        COMPARE( _initial_blur ) ||
+        COMPARE( _use_root_sift ) ||
+        COMPARE( _normalization_multiplier ) ||
+        COMPARE( _dp_orientation ) ||
+        COMPARE( _dp_descriptors ) ||
+        COMPARE( _dp_capable ) ) return false;
+    return true;
+}
 
 }; // namespace popsift
 

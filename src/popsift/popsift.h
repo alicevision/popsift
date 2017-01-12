@@ -43,7 +43,7 @@ public:
 
 public:
     /* provide the configuration if you used the PopSift constructor */
-    bool configure( const popsift::Config& config );
+    bool configure( const popsift::Config& config, bool force = false );
 
     bool init( int pipe, int w, int h, bool checktime = false );
 
@@ -69,5 +69,10 @@ public:
 private:
     Pipe            _pipe[MAX_PIPES];
     popsift::Config _config;
+
+    /* Keep a copy of the config to avoid unnecessary re-configurations
+     * in configure()
+     */
+    popsift::Config _shadow_config;
 };
 

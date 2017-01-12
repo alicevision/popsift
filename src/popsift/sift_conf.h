@@ -129,6 +129,8 @@ struct Config
         return _max_extrema;
     }
 
+    bool equal( const Config& other ) const;
+
 private:
     // default threshold 0.0 default of vlFeat
     // default threshold 5.0 / 256.0
@@ -203,6 +205,16 @@ private:
      */
     bool _dp_capable;
 };
+
+inline bool operator==( const Config& l, const Config& r )
+{
+    return l.equal( r );
+}
+
+inline bool operator!=( const Config& l, const Config& r )
+{
+    return not l.equal( r );
+}
 
 }; // namespace popsift
 
