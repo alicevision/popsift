@@ -82,9 +82,6 @@ static void usage( const char* argv )
 #if 0
          << " --test-direct-scaling       Direct each octave from upscaled orig instead of blurred level." << endl
          << "                             Does not work yet." << endl
-         << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
-         << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
-         << "                             Does not work yet." << endl
 #endif
          << endl;
     exit(0);
@@ -109,13 +106,12 @@ static struct option longopts[] = {
     { "opencv-mode",         no_argument,            NULL, 1101 },
     { "popsift-mode",        no_argument,            NULL, 1102 },
     { "test-direct-scaling", no_argument,            NULL, 1103 },
-    { "group-gauss",         required_argument,      NULL, 1104 },
+    { "gauss-mode",          required_argument,      NULL, 1104 },
     { "dp-off",              no_argument,            NULL, 1105 },
     { "dp-ori-off",          no_argument,            NULL, 1106 },
     { "dp-desc-off",         no_argument,            NULL, 1107 },
     { "root-sift",           no_argument,            NULL, 1108 },
     { "norm-multi",          required_argument,      NULL, 1109 },
-    { "gauss-mode",          required_argument,      NULL, 1110 },
 
     { "print-gauss-tables",  no_argument,            NULL, 1200 },
     { "print-dev-info",      no_argument,            NULL, 1201 },
@@ -160,13 +156,12 @@ static void parseargs( int argc, char**argv, popsift::Config& config, string& in
         case 1101 : config.setMode( popsift::Config::OpenCV ); break;
         case 1102 : config.setMode( popsift::Config::PopSift ); break;
         case 1103 : config.setScalingMode( popsift::Config::ScaleDirect ); break;
-        case 1104 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
+        case 1104 : config.setGaussMode( optarg ); break;
         case 1105 : config.setDPOrientation( false ); config.setDPDescriptors( false ); break;
         case 1106 : config.setDPOrientation( false ); break;
         case 1107 : config.setDPDescriptors( false ); break;
         case 1108 : config.setUseRootSift( true ); break;
         case 1109 : config.setNormalizationMultiplier( strtol( optarg, NULL, 0 ) ); break;
-        case 1110 : config.setGaussMode( optarg ); break;
 
         case 1200 : config.setPrintGaussTables( ); break;
         case 1201 : print_dev_info  = true; break;
@@ -235,17 +230,5 @@ int main(int argc, char **argv)
 
 static void validate( const char* appName, popsift::Config& config )
 {
-    switch( config.getGaussGroup() )
-    {
-    case 1 :
-    case 2 :
-    case 3 :
-    case 8 :
-        break;
-    default :
-        cerr << "Only 2, 3 or 8 Gauss levels can be combined at this time" << endl;
-        usage( appName );
-        exit( -1 );
-    }
 }
 
