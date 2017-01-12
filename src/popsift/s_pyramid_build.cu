@@ -158,6 +158,100 @@ void horiz( cudaTextureObject_t src_data,
 
 } // namespace variableSpan
 
+namespace fixedSpan {
+
+template<int SPAN, bool isOctave0>
+__global__
+void octave( Plane2D_float src_data,
+             Plane2D_float dst_data,
+             cudaSurfaceObject_t dog_data )
+{
+    /* Idea: Process a 16x16 square of the src image and compute
+     *       all levels except level 0 (must be computed before)
+     *       blockIdx.x and blockIdx.y are the X and Y blocks.
+     *       threadIdx.x runs 0 ... 16 + 2*(span-1)
+     *       threadIdx.y runs 0 ... LEVELS-2
+     */
+    const int stride = 16 + 2 * (SPAN-1);
+    const int noff   = SPAN - 1;
+    const int level  = threadIdx.y;
+
+    __shared__ float inn_block[stride][stride];
+    __shared__ float mid_block[blockDim.y][stride][stride];
+    __shared__ float out_block[blockDim.y][stride][stride];
+
+    const int w = src_data.getWidth();
+    const int h = src_data.getHeight();
+    const int xko = blockIdx.x * 16 + threadIdx.x - noff;
+    const int yko = blockIdx.y * 16 - noff;
+
+    if( threadIdx.z == 0 ) {
+        for( int y = threadIdx.y ; yko+y < stride; y += blockDim.y ) {
+            const r_x = clamp( xko, w );
+            const r_y = clamp( y, h );
+            inn_block[y][threadIdx.x] = src_data.ptr(r_y)[r_x];
+        }
+    }
+    __syncthreads();
+
+    float* filter = isOctave0
+                  ? &d_gauss.abs_filter_o0[ level * GAUSS_ALIGN ]
+                  : &d_gauss.abs_filter_oN[ level * GAUSS_ALIGN ];
+
+    for( int row=threadIdx.z; row<stride; row += blockDim.z ) {
+        float in = inn_block[row][threadIdx.x];
+        float out = in * filter[0];
+
+        #pragma unroll
+        for( int s=1; s<SPAN; s++ ) {
+            float g = __shfl_up( in, -s ) + __shfl_down( in, s );
+            out += g * filter[s];
+        }
+        mid_block[level][threadIdx.x][row] = out;
+    }
+    __syncthreads();
+
+    for( int col=threadIdx.z; col<stride; col += blockDim.z ) {
+        float in = mid_block[level][col][threadIdx.x];
+        float out = in * filter[0];
+
+        #pragma unroll
+        for( int s=1; s<SPAN; s++ ) {
+            float g = __shfl_up( in, -s ) + __shfl_down( in, s );
+            out += g * filter[s];
+        }
+        out_block[level][threadIdx.x][col] = out;
+    }
+    __syncthreads();
+
+    for( int row=threadIdx.z; row<16; row += blockDim.z ) {
+        const int base_x = blockIdx.x * 16;
+        const int base_y = blockIdx.y * 16;
+        if( threadIdx.x < 16 ) {
+            float val = out_block[level][row+noff][threadIdx.x+noff];
+            float dog = ( level == 0
+                        ? inn_block[row+noff][threadIdx.x+noff]
+                        : out_block[level-1][row+noff][threadIdx.x+noff] )
+                      - val;
+            if( base_y+row < h && base_x+threadIdx.x < w ) {
+                int idx = base_x+threadIdx.x;
+                int idy = base_y+row;
+                dst_data.ptr(level*h + idy)[idx] = val;
+
+                surf2DLayeredwrite( dog,
+                                    dog_data,
+                                    idx*4,
+                                    idy,
+                                    level,
+                                    cudaBoundaryModeZero );
+            }
+        }
+    }
+    __syncthreads();
+}
+
+} // namespace fixedSpan
+
 
 
 __global__
@@ -365,6 +459,57 @@ inline void Pyramid::dog_from_blurred( int octave, int level, cudaStream_t strea
           level-1 );
 }
 
+__host__
+inline void Pyramid::make_octave( const Config& conf, Octave& oct_obj, cudaStream_t stream, bool isOctaveZero )
+{
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    if( conf.getGaussMode() == Config::Fixed4 ) {
+        dim3 block( 22, 22, 2 );
+        dim3 grid;
+        grid.x = grid_divide( width,  16 );
+        grid.y = grid_divide( height, 16 );
+
+        if( isOctaveZero ) {
+            gauss::fixedSpan::octave
+                <<4,true>>
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getData(0),
+                  oct_obj.getData(1),
+                  oct_obj.getDogSurface( ) );
+        } else {
+            gauss::fixedSpan::octave
+                <<4,false>>
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getData(0),
+                  oct_obj.getData(1),
+                  oct_obj.getDogSurface( ) );
+        }
+    } else {
+        dim3 block( 30, 30, 1 );
+        dim3 grid;
+        grid.x = grid_divide( width,  16 );
+        grid.y = grid_divide( height, 16 );
+
+        if( isOctaveZero ) {
+            gauss::fixedSpan::octave
+                <<8,true>>
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getData(0),
+                  oct_obj.getData(1),
+                  oct_obj.getDogSurface( ) );
+        } else {
+            gauss::fixedSpan::octave
+                <<8,false>>
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getData(0),
+                  oct_obj.getData(1),
+                  oct_obj.getDogSurface( ) );
+        }
+    }
+}
+
 /*************************************************************
  * V11: host side
  *************************************************************/
@@ -386,7 +531,31 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
     cudaDeviceSynchronize();
 
     for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
-        Octave& oct_obj   = _octaves[octave];
+      Octave& oct_obj   = _octaves[octave];
+
+      if( conf.getGaussMode() == Config::Fixed4 || conf.getGaussMode() == Config::Fixed 8 ) {
+        cudaStream_t stream = oct_obj.getStream(0);
+        if( octave == 0 ) {
+            horiz_from_input_image( conf, base, 0, stream, conf.getSiftMode() );
+            vert_from_interm( octave, 0, stream );
+            make_octave( conf, oct_obj, stream, true );
+        } else {
+            downscale_from_prev_octave( octave, level, stream, conf.getSiftMode() );
+            make_octave( conf, oct_obj, stream, false );
+        }
+
+        /*
+         * The multitude of events may be required by the following stages.
+         */
+        for( uint32_t level=0; level<_levels; level++ ) {
+            cudaEvent_t  ev     = oct_obj.getEventGaussDone(level);
+            cudaEvent_t  dog_ev = oct_obj.getEventDogDone(level);
+            err = cudaEventRecord( ev, stream );
+            POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
+            err = cudaEventRecord( dog_ev, stream );
+            POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
+        }
+      } else {
 
         for( uint32_t level=0; level<_levels; level++ ) {
             const int width  = oct_obj.getWidth();
@@ -401,7 +570,7 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
                 if( octave == 0 )
                 {
                     horiz_from_input_image( conf, base, 0, stream, conf.getSiftMode() );
-                    vert_from_interm( octave, level, stream );
+                    vert_from_interm( octave, 0, stream );
                 }
                 else
                 {
@@ -436,6 +605,7 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
                 POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
             }
         }
+      }
     }
 }
 
