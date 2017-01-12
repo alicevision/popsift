@@ -9,6 +9,10 @@
 
 #include <string>
 
+#define MAX_PIPES      3
+#define MAX_OCTAVES   20
+#define MAX_LEVELS    10
+
 namespace popsift
 {
 

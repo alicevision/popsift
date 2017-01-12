@@ -13,8 +13,6 @@
 #include "sift_conf.h"
 #include "sift_extremum.h"
 
-#define MAX_PIPES 3
-
 
 /* user parameters */
 namespace popsift
