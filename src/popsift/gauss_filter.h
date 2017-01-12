@@ -26,39 +26,37 @@ struct GaussInfo
      *   filter for sigma0
      * - in all other octaves, row 0 is unused
      */
-    float incremental_filter[ GAUSS_ALIGN * GAUSS_LEVELS ];
-
+    float inc_filter[ GAUSS_ALIGN * GAUSS_LEVELS ];
 #ifdef SUPPORT_ABSOLUTE_SIGMA
-    /* An experimental 1D Gauss table. The idea is to blur
-     * directly level 1. Level 1 is more suitable than level 0
-     * because level 0 has special handling in octave 0.
-     * For ease of use, level 0 exists in the table but is
-     * initialized to 0.
+    /* Compute the 1D Gauss tables for all levels of octave 0.
+     * For octave 0, all of these tables derive from the input
+     * image.
      */
-    float from_lvl_1[ GAUSS_ALIGN * GAUSS_LEVELS ];
+    float abs_filter_o0[ GAUSS_ALIGN * GAUSS_LEVELS ];
 
-    float abs_sigma[ GAUSS_LEVELS ];
+    /* Compute the 1D Gauss tables for all levels of octaves 1 and up.
+     * Level 0 is empty, since it is created by other means.
+     * All other levels blur from level 0, not considering any
+     * initial blur.
+     */
+    float abs_filter_oN[ GAUSS_ALIGN * GAUSS_LEVELS ];
 #endif // SUPPORT_ABSOLUTE_SIGMA
 
     /* The sigma used to generate the Gauss table for each level.
      * Meaning these are the differences between sigma0 and sigmaN.
      */
-    float sigma[ GAUSS_LEVELS ];
-
-    /* The sigma value that is the difference between the assumed
-     * initial blur (given blur of the input) and sigma0. Used to
-     * generated filter_initial_blur.
-     */
-    float initial_sigma;
+    float inc_sigma[ GAUSS_LEVELS ];
+#ifdef SUPPORT_ABSOLUTE_SIGMA
+    float abs_sigma_o0[ GAUSS_LEVELS ];
+    float abs_sigma_oN[ GAUSS_LEVELS ];
+#endif // SUPPORT_ABSOLUTE_SIGMA
 
     /* The span of the table that is generated for each level.
      */
-    int span[ GAUSS_LEVELS ];
-
+    int inc_span[ GAUSS_LEVELS ];
 #ifdef SUPPORT_ABSOLUTE_SIGMA
-    /* Equivalent to span for from_lvl_1 tables.
-     */
-    int   abs_span[ GAUSS_LEVELS ];
+    int abs_span_o0[ GAUSS_LEVELS ];
+    int abs_span_oN[ GAUSS_LEVELS ];
 #endif // SUPPORT_ABSOLUTE_SIGMA
 
     __host__
@@ -69,7 +67,10 @@ struct GaussInfo
 
 #ifdef SUPPORT_ABSOLUTE_SIGMA
     __host__
-    void computeAbsBlurTable( int level, int span, float sigma );
+    void computeAbsBlurTable_o0( int level, int span, float sigma );
+
+    __host__
+    void computeAbsBlurTable_oN( int level, int span, float sigma );
 #endif // SUPPORT_ABSOLUTE_SIGMA
 
 public:

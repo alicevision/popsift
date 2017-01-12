@@ -39,15 +39,15 @@ void horiz( cudaTextureObject_t src_data,
     float out = 0.0f;
 
     #pragma unroll
-    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
-        const float& g  = popsift::d_gauss.incremental_filter[level*GAUSS_ALIGN + offset];
+    for( int offset = d_gauss.inc_span[level]; offset>0; offset-- ) {
+        const float& g  = popsift::d_gauss.inc_filter[level*GAUSS_ALIGN + offset];
         const float  v1 = tex2D<float>( src_data, off_x - offset + 0.5f, blockIdx.y + 0.5f );
         out += ( v1 * g );
 
         const float  v2 = tex2D<float>( src_data, off_x + offset + 0.5f, blockIdx.y + 0.5f );
         out += ( v2 * g );
     }
-    const float& g  = popsift::d_gauss.incremental_filter[level*GAUSS_ALIGN];
+    const float& g  = popsift::d_gauss.inc_filter[level*GAUSS_ALIGN];
     const float v3 = tex2D<float>( src_data, off_x+0.5f, blockIdx.y+0.5f );
     out += ( v3 * g );
 
@@ -103,7 +103,7 @@ void vert( cudaTextureObject_t src_data,
            Plane2D_float       dst_data,
            int                 level )
 {
-    vert( src_data, dst_data, d_gauss.span[level], &popsift::d_gauss.incremental_filter[level*GAUSS_ALIGN] );
+    vert( src_data, dst_data, d_gauss.inc_span[level], &popsift::d_gauss.inc_filter[level*GAUSS_ALIGN] );
 }
 
 } // namespace absoluteTexAddress
@@ -151,7 +151,7 @@ void horiz( cudaTextureObject_t src_data,
             Plane2D_float       dst_data,
             float               shift )
 {
-    horiz( src_data, dst_data, shift, d_gauss.span[0], &popsift::d_gauss.incremental_filter[0*GAUSS_ALIGN] );
+    horiz( src_data, dst_data, shift, d_gauss.inc_span[0], &d_gauss.inc_filter[0*GAUSS_ALIGN] );
 }
 
 } // namespace relativeTexAddress
