@@ -174,23 +174,22 @@ void octave( Plane2D_float src_data,
      */
     const int stride = 16 + 2 * (SPAN-1);
     const int noff   = SPAN - 1;
-    const int level  = threadIdx.y;
+    const int level  = threadIdx.y + 1;
 
     __shared__ float inn_block[stride][stride];
-    __shared__ float mid_block[blockDim.y][stride][stride];
-    __shared__ float out_block[blockDim.y][stride][stride];
+    __shared__ float out_block[MAX_LEVELS][stride][stride];
 
     const int w = src_data.getWidth();
     const int h = src_data.getHeight();
-    const int xko = blockIdx.x * 16 + threadIdx.x - noff;
-    const int yko = blockIdx.y * 16 - noff;
 
-    if( threadIdx.z == 0 ) {
-        for( int y = threadIdx.y ; yko+y < stride; y += blockDim.y ) {
-            const r_x = clamp( xko, w );
-            const r_y = clamp( y, h );
-            inn_block[y][threadIdx.x] = src_data.ptr(r_y)[r_x];
-        }
+    Plane2D_float destination( w, h,
+                               dst_data.ptr( threadIdx.y * h ),
+                               dst_data.getPitch() );
+
+    for( int row=threadIdx.y; row<stride; row+=blockDim.y ) {
+        const int idx = blockIdx.x * 16 + threadIdx.x - noff;
+        const int idy = blockIdx.y * 16 + row         - noff;
+        inn_block[row][threadIdx.x] = src_data.ptr(idy)[idx];
     }
     __syncthreads();
 
@@ -198,21 +197,31 @@ void octave( Plane2D_float src_data,
                   ? &d_gauss.abs_filter_o0[ level * GAUSS_ALIGN ]
                   : &d_gauss.abs_filter_oN[ level * GAUSS_ALIGN ];
 
-    for( int row=threadIdx.z; row<stride; row += blockDim.z ) {
+    for( int row=0; row<stride; row++ ) {
         float in = inn_block[row][threadIdx.x];
         float out = in * filter[0];
+        float g;
+        if( SPAN==4 ) {
+            g = __shfl_up( in, 1 ) + __shfl_down( in, 1, 22 ); out += g * filter[1];
+            g = __shfl_up( in, 2 ) + __shfl_down( in, 2, 22 ); out += g * filter[2];
+            g = __shfl_up( in, 3 ) + __shfl_down( in, 3, 22 ); out += g * filter[3];
+        }
 
+#if 0
         #pragma unroll
         for( int s=1; s<SPAN; s++ ) {
-            float g = __shfl_up( in, -s ) + __shfl_down( in, s );
+            float g = __shfl_up( in, s ) + __shfl_down( in, s );
             out += g * filter[s];
         }
-        mid_block[level][threadIdx.x][row] = out;
+#endif
+        out_block[level][row][threadIdx.x] = out;
     }
     __syncthreads();
 
-    for( int col=threadIdx.z; col<stride; col += blockDim.z ) {
-        float in = mid_block[level][col][threadIdx.x];
+#if 0
+    float out_col[stride];
+    for( int col=0; col<stride; col++ ) {
+        float in = out_block[level][threadIdx.x][col];
         float out = in * filter[0];
 
         #pragma unroll
@@ -220,11 +229,16 @@ void octave( Plane2D_float src_data,
             float g = __shfl_up( in, -s ) + __shfl_down( in, s );
             out += g * filter[s];
         }
-        out_block[level][threadIdx.x][col] = out;
+        out_col[col] = out;
     }
     __syncthreads();
 
-    for( int row=threadIdx.z; row<16; row += blockDim.z ) {
+    for( int col=0; col<stride; col++ ) {
+        out_block[level][threadIdx.x][col] = out_col[col];
+    }
+#endif
+
+    for( int row=0; row<16; row++ ) {
         const int base_x = blockIdx.x * 16;
         const int base_y = blockIdx.y * 16;
         if( threadIdx.x < 16 ) {
@@ -236,7 +250,12 @@ void octave( Plane2D_float src_data,
             if( base_y+row < h && base_x+threadIdx.x < w ) {
                 int idx = base_x+threadIdx.x;
                 int idy = base_y+row;
-                dst_data.ptr(level*h + idy)[idx] = val;
+
+                destination.ptr(idy)[idx] = out_block[threadIdx.y][row+noff][threadIdx.x+noff];
+                // destination.ptr(idy)[idx] = inn_block[row+noff][threadIdx.x+noff];
+                // destination.ptr(idy)[idx] = src_data.ptr(idy)[idx];
+                // destination.ptr(idy)[idx] = 0;
+                // destination.ptr(idy)[idx] = val;
 
                 surf2DLayeredwrite( dog,
                                     dog_data,
@@ -466,42 +485,42 @@ inline void Pyramid::make_octave( const Config& conf, Octave& oct_obj, cudaStrea
     const int height = oct_obj.getHeight();
 
     if( conf.getGaussMode() == Config::Fixed4 ) {
-        dim3 block( 22, 22, 2 );
+        dim3 block( 22, _levels-1 );
         dim3 grid;
         grid.x = grid_divide( width,  16 );
         grid.y = grid_divide( height, 16 );
 
         if( isOctaveZero ) {
             gauss::fixedSpan::octave
-                <<4,true>>
+                <4,true>
                 <<<grid,block,0,stream>>>
                 ( oct_obj.getData(0),
                   oct_obj.getData(1),
                   oct_obj.getDogSurface( ) );
         } else {
             gauss::fixedSpan::octave
-                <<4,false>>
+                <4,false>
                 <<<grid,block,0,stream>>>
                 ( oct_obj.getData(0),
                   oct_obj.getData(1),
                   oct_obj.getDogSurface( ) );
         }
     } else {
-        dim3 block( 30, 30, 1 );
+        dim3 block( 30, _levels-1 );
         dim3 grid;
         grid.x = grid_divide( width,  16 );
         grid.y = grid_divide( height, 16 );
 
         if( isOctaveZero ) {
             gauss::fixedSpan::octave
-                <<8,true>>
+                <8,true>
                 <<<grid,block,0,stream>>>
                 ( oct_obj.getData(0),
                   oct_obj.getData(1),
                   oct_obj.getDogSurface( ) );
         } else {
             gauss::fixedSpan::octave
-                <<8,false>>
+                <8,false>
                 <<<grid,block,0,stream>>>
                 ( oct_obj.getData(0),
                   oct_obj.getData(1),
@@ -533,14 +552,14 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
     for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
       Octave& oct_obj   = _octaves[octave];
 
-      if( conf.getGaussMode() == Config::Fixed4 || conf.getGaussMode() == Config::Fixed 8 ) {
+      if( conf.getGaussMode() == Config::Fixed4 || conf.getGaussMode() == Config::Fixed8 ) {
         cudaStream_t stream = oct_obj.getStream(0);
         if( octave == 0 ) {
             horiz_from_input_image( conf, base, 0, stream, conf.getSiftMode() );
             vert_from_interm( octave, 0, stream );
             make_octave( conf, oct_obj, stream, true );
         } else {
-            downscale_from_prev_octave( octave, level, stream, conf.getSiftMode() );
+            downscale_from_prev_octave( octave, 0, stream, conf.getSiftMode() );
             make_octave( conf, oct_obj, stream, false );
         }
 
