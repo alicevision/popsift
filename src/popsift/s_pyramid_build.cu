@@ -18,6 +18,8 @@
 /* It makes no sense whatsoever to change this value */
 #define PREV_LEVEL 3
 
+#define MAKE_DOG_LATER
+
 namespace popsift {
 
 namespace gauss {
@@ -163,8 +165,11 @@ namespace fixedSpan {
 template<int SPAN, bool isOctave0>
 __global__
 void octave( Plane2D_float src_data,
-             Plane2D_float dst_data,
-             cudaSurfaceObject_t dog_data )
+             Plane2D_float dst_data
+#ifndef MAKE_DOG_LATER
+             , cudaSurfaceObject_t dog_data
+#endif // MAKE_DOG_LATER
+             )
 {
     /* Idea: Process a 16x16 square of the src image and compute
      *       all levels except level 0 (must be computed before)
@@ -187,8 +192,8 @@ void octave( Plane2D_float src_data,
                                dst_data.getPitch() );
 
     for( int row=threadIdx.y; row<stride; row+=blockDim.y ) {
-        const int idx = blockIdx.x * 16 + threadIdx.x - noff;
-        const int idy = blockIdx.y * 16 + row         - noff;
+        const int idx = clamp( blockIdx.x * 16 + threadIdx.x - noff, w );
+        const int idy = clamp( blockIdx.y * 16 + row         - noff, h );
         inn_block[row][threadIdx.x] = src_data.ptr(idy)[idx];
     }
     __syncthreads();
@@ -200,14 +205,18 @@ void octave( Plane2D_float src_data,
     for( int row=0; row<stride; row++ ) {
         float in = inn_block[row][threadIdx.x];
         float out = in * filter[0];
+#if 0
+// do no filtering at all
         float g;
         if( SPAN==4 ) {
             g = __shfl_up( in, 1 ) + __shfl_down( in, 1, 22 ); out += g * filter[1];
             g = __shfl_up( in, 2 ) + __shfl_down( in, 2, 22 ); out += g * filter[2];
             g = __shfl_up( in, 3 ) + __shfl_down( in, 3, 22 ); out += g * filter[3];
         }
+#endif
 
 #if 0
+// perhaps manual unrolling is safe --- stick with that until it works
         #pragma unroll
         for( int s=1; s<SPAN; s++ ) {
             float g = __shfl_up( in, s ) + __shfl_down( in, s );
@@ -243,26 +252,29 @@ void octave( Plane2D_float src_data,
         const int base_y = blockIdx.y * 16;
         if( threadIdx.x < 16 ) {
             float val = out_block[level][row+noff][threadIdx.x+noff];
+#ifndef MAKE_DOG_LATER
             float dog = ( level == 0
                         ? inn_block[row+noff][threadIdx.x+noff]
                         : out_block[level-1][row+noff][threadIdx.x+noff] )
                       - val;
+#endif // MAKE_DOG_LATER
             if( base_y+row < h && base_x+threadIdx.x < w ) {
                 int idx = base_x+threadIdx.x;
                 int idy = base_y+row;
 
-                destination.ptr(idy)[idx] = out_block[threadIdx.y][row+noff][threadIdx.x+noff];
+                destination.ptr(idy)[idx] = val;
                 // destination.ptr(idy)[idx] = inn_block[row+noff][threadIdx.x+noff];
                 // destination.ptr(idy)[idx] = src_data.ptr(idy)[idx];
                 // destination.ptr(idy)[idx] = 0;
                 // destination.ptr(idy)[idx] = val;
-
+#ifndef MAKE_DOG_LATER
                 surf2DLayeredwrite( dog,
                                     dog_data,
                                     idx*4,
                                     idy,
                                     level,
                                     cudaBoundaryModeZero );
+#endif // MAKE_DOG_LATER
             }
         }
     }
@@ -494,16 +506,22 @@ inline void Pyramid::make_octave( const Config& conf, Octave& oct_obj, cudaStrea
             gauss::fixedSpan::octave
                 <4,true>
                 <<<grid,block,0,stream>>>
-                ( oct_obj.getData(0),
-                  oct_obj.getData(1),
-                  oct_obj.getDogSurface( ) );
+                ( oct_obj.getData(0)
+                  , oct_obj.getData(1)
+#ifndef MAKE_DOG_LATER
+                  , oct_obj.getDogSurface( )
+#endif // MAKE_DOG_LATER
+                );
         } else {
             gauss::fixedSpan::octave
                 <4,false>
                 <<<grid,block,0,stream>>>
-                ( oct_obj.getData(0),
-                  oct_obj.getData(1),
-                  oct_obj.getDogSurface( ) );
+                ( oct_obj.getData(0)
+                  , oct_obj.getData(1)
+#ifndef MAKE_DOG_LATER
+                  , oct_obj.getDogSurface( )
+#endif // MAKE_DOG_LATER
+                );
         }
     } else {
         dim3 block( 30, _levels-1 );
@@ -515,16 +533,22 @@ inline void Pyramid::make_octave( const Config& conf, Octave& oct_obj, cudaStrea
             gauss::fixedSpan::octave
                 <8,true>
                 <<<grid,block,0,stream>>>
-                ( oct_obj.getData(0),
-                  oct_obj.getData(1),
-                  oct_obj.getDogSurface( ) );
+                ( oct_obj.getData(0)
+                  , oct_obj.getData(1)
+#ifndef MAKE_DOG_LATER
+                  , oct_obj.getDogSurface( )
+#endif // MAKE_DOG_LATER
+                );
         } else {
             gauss::fixedSpan::octave
                 <8,false>
                 <<<grid,block,0,stream>>>
-                ( oct_obj.getData(0),
-                  oct_obj.getData(1),
-                  oct_obj.getDogSurface( ) );
+                ( oct_obj.getData(0)
+                  , oct_obj.getData(1)
+#ifndef MAKE_DOG_LATER
+                  , oct_obj.getDogSurface( )
+#endif // MAKE_DOG_LATER
+                );
         }
     }
 }
@@ -563,16 +587,21 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
             make_octave( conf, oct_obj, stream, false );
         }
 
-        /*
-         * The multitude of events may be required by the following stages.
-         */
         for( uint32_t level=0; level<_levels; level++ ) {
             cudaEvent_t  ev     = oct_obj.getEventGaussDone(level);
             cudaEvent_t  dog_ev = oct_obj.getEventDogDone(level);
+
             err = cudaEventRecord( ev, stream );
             POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
-            err = cudaEventRecord( dog_ev, stream );
-            POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
+
+            if( level > 0 ) {
+#ifdef MAKE_DOG_LATER
+                dog_from_blurred( octave, level, stream );
+#endif // MAKE_DOG_LATER
+
+                err = cudaEventRecord( dog_ev, stream );
+                POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
+            }
         }
       } else {
 
