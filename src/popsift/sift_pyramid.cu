@@ -10,7 +10,9 @@
 #include <sstream>
 #include <vector>
 #include <stdio.h>
-#include <sys/stat.h>
+#ifndef __CUDACC__
+#include <boost/filesystem.hpp>
+#endif
 
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
@@ -65,25 +67,29 @@ void Pyramid::download_descriptors( const Config& conf, uint32_t octave )
     _octaves[octave].downloadDescriptor( conf );
 }
 
+#ifndef __CUDACC__
 void Pyramid::save_descriptors( const Config& conf, const char* basename, uint32_t octave )
 {
-    struct stat st = {0};
-    if (stat("dir-desc", &st) == -1) {
-        mkdir("dir-desc", 0700);
+	using namespace boost::filesystem;
+
+    if (!exists(path("dir-desc"))) {
+		create_directory(path("dir-desc"));
     }
     ostringstream ostr;
     ostr << "dir-desc/desc-" << basename << "-o-" << octave << ".txt";
     ofstream of( ostr.str().c_str() );
     _octaves[octave].writeDescriptor( conf, of, true );
+	
+	if (!exists(path("dir-fpt"))) {
+		create_directory(path("dir-fpt"));
+	}
 
-    if (stat("dir-fpt", &st) == -1) {
-        mkdir("dir-fpt", 0700);
-    }
     ostringstream ostr2;
     ostr2 << "dir-fpt/desc-" << basename << "-o-" << octave << ".txt";
     ofstream of2( ostr2.str().c_str() );
     _octaves[octave].writeDescriptor( conf, of2, false );
 }
+#endif
 
 Pyramid::Pyramid( Config& config,
                   Image* base,

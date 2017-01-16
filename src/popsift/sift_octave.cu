@@ -9,6 +9,10 @@
 #include <sys/stat.h>
 #include <new> // for placement new
 
+#ifndef __CUDACC__
+#include <boost/filesystem.hpp>
+#endif
+
 #include "sift_pyramid.h"
 #include "sift_constants.h"
 #include "common/debug_macros.h"
@@ -276,9 +280,12 @@ Descriptor* Octave::getDescriptors( uint32_t level )
 /*************************************************************
  * Debug output: write an octave/level to disk as PGM
  *************************************************************/
+#ifndef __CUDACC__
 
 void Octave::download_and_save_array( const char* basename, uint32_t octave, uint32_t level )
 {
+	using namespace boost::filesystem;
+
     // cerr << "Calling " << __FUNCTION__ << " for octave " << octave << endl;
 
     if( level >= _levels ) {
@@ -289,18 +296,18 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
     struct stat st = {0};
 
     {
-        if (stat("dir-octave", &st) == -1) {
-            mkdir("dir-octave", 0700);
-        }
-
+		if (!exists(path("dir-octave"))) {
+			create_directory(path("dir-octave"));
+		}
+       
         ostringstream ostr;
         ostr << "dir-octave/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
         popsift::write_plane2Dunscaled( ostr.str().c_str(), true, getData(level) );
 
-        if (stat("dir-octave-dump", &st) == -1) {
-            mkdir("dir-octave-dump", 0700);
-        }
-
+		if (!exists(path("dir-octave-dump"))) {
+			create_directory(path("dir-octave-dump"));
+		}
+       
         ostringstream ostr2;
         ostr2 << "dir-octave-dump/" << basename << "-o-" << octave << "-l-" << level << ".dump";
         popsift::dump_plane2Dfloat( ostr2.str().c_str(), true, getData(level) );
@@ -343,15 +350,14 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
             }
 
             if( total_ct > 0 ) {
-                if (stat("dir-feat", &st) == -1) {
-                    mkdir("dir-feat", 0700);
-                }
-
-                if (stat("dir-feat-txt", &st) == -1) {
-                    mkdir("dir-feat-txt", 0700);
-                }
-
-
+				if (!exists(path("dir-feat"))) {
+					create_directory(path("dir-feat"));
+				}
+ 
+				if (!exists(path("dir-feat-txt"))) {
+					create_directory(path("dir-feat-txt"));
+				}
+              
                 ostringstream ostr;
                 ostr << "dir-feat/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
                 ostringstream ostr2;
@@ -370,18 +376,18 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
         int width  = getData(0).getWidth();
         int height = getData(0).getHeight();
 
-        if (stat("dir-dog", &st) == -1) {
-            mkdir("dir-dog", 0700);
-        }
-
-        if (stat("dir-dog-txt", &st) == -1) {
-            mkdir("dir-dog-txt", 0700);
-        }
-
-        if (stat("dir-dog-dump", &st) == -1) {
-            mkdir("dir-dog-dump", 0700);
-        }
-
+		if (!exists(path("dir-dog"))) {
+			create_directory(path("dir-dog"));
+		}
+       
+		if (!exists(path("dir-dog-txt"))) {
+			create_directory(path("dir-dog-txt"));
+		}
+        
+		if (!exists(path("dir-dog-dump"))) {
+			create_directory(path("dir-dog-dump"));
+		}
+       
         float* array;
         POP_CUDA_MALLOC_HOST( &array, width * height * (_levels-1) * sizeof(float) );
 
@@ -413,6 +419,7 @@ void Octave::download_and_save_array( const char* basename, uint32_t octave, uin
         POP_CUDA_FREE_HOST( array );
     }
 }
+#endif // !__CUDACC__
 
 void Octave::alloc_data_planes( )
 {
