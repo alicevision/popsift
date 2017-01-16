@@ -8,8 +8,13 @@
 #include <iostream>
 #include <string.h>
 #include <stdlib.h>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <malloc.h>
+#else
 #include <unistd.h>
-
+#endif
 #include <cuda_runtime.h>
 
 #include "plane_2d.h"
@@ -52,8 +57,7 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
         char b[100];
         const char* buf = strerror_r( errno, b, 100 );
 #else
-        char buf[100];
-        strerror_r( errno, buf, 100 );
+		const char* buf = strerror(errno);
 #endif
         cerr << __FILE__ << ":" << __LINE__ << endl
              << "    Failed to allocate " << sz << " bytes of unaligned host memory." << endl
@@ -61,17 +65,24 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
         exit( -1 );
     } else if( m == PageAligned ) {
         void* ptr;
-        long  pagesize = sysconf(_SC_PAGESIZE);
-        int   retval = posix_memalign( &ptr, pagesize, sz );
-
-        if( retval == 0 ) return ptr;
+#ifdef _WIN32
+		{
+			SYSTEM_INFO sys_inf;
+			GetSystemInfo(&sys_inf);
+			ptr = _aligned_malloc(sz, sys_inf.dwPageSize);
+			if (!ptr) return ptr;
+		}
+#else
+		long  pagesize = sysconf(_SC_PAGESIZE);
+		int   retval = posix_memalign(&ptr, pagesize, sz);
+		if (retval == 0) return ptr;
+#endif
 
 #ifdef _GNU_SOURCE
         char b[100];
         const char* buf = strerror_r( errno, b, 100 );
 #else
-        char buf[100];
-        strerror_r( errno, buf, 100 );
+		const char* buf = strerror(errno);
 #endif
         cerr << __FILE__ << ":" << __LINE__ << endl
              << "    Failed to allocate " << sz << " bytes of page-aligned host memory." << endl
@@ -97,7 +108,15 @@ void PlaneBase::freeHost2D( void* data, PlaneMapMode m )
 {
     if( data != 0 ) {
         if( m != CudaAllocated ) {
-            free( data );
+#ifdef _WIN32
+			if (m == PageAligned) {
+				_aligned_free(data);
+			} else {
+				free(data);
+			}
+#else
+			free(data);
+#endif
         } else {
             cudaFreeHost( data );
         }

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <string>
+#include <iso646.h>
 
 #define MAX_PIPES      3
 #define MAX_OCTAVES   20
