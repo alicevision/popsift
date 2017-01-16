@@ -58,7 +58,10 @@ private:
     inline void vert_from_interm( int octave, int level, cudaStream_t stream );
     inline void dog_from_blurred( int octave, int level, cudaStream_t stream );
 
-    inline void make_octave( const Config& conf, Octave& oct_obj, cudaStream_t stream, bool isOctaveZero );
+    template<int SPAN, bool OCT_0>
+    inline void make_octave_sub( Octave& oct_obj, cudaStream_t stream );
+
+    void make_octave( const Config& conf, Octave& oct_obj, cudaStream_t stream, bool isOctaveZero );
 
     void reset_extrema_mgmt( );
     void find_extrema( const Config& conf );
