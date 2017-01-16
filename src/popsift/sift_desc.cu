@@ -7,6 +7,7 @@
  */
 #include <iostream>
 #include <stdio.h>
+#include <iso646.h>
 
 #include "sift_pyramid.h"
 #include "sift_constants.h"
