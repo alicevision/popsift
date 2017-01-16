@@ -11,6 +11,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
+#include <iso646.h>
 #include "pgmread.h"
 
 #define RGB2GRAY_IN_INT
