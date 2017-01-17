@@ -19,7 +19,13 @@ set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_DEBUG}   -O3")
 #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DGRIFF_DEBUG")
 #set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -DGRIFF_DEBUG")
 
-find_package(Boost 1.53.0 REQUIRED COMPONENTS system filesystem)
+find_package(Boost 1.53.0 REQUIRED COMPONENTS system)
+if(WIN32)
+ADD_DEFINITIONS("-DBOOST_ALL_NO_LIB")
+LINK_DIRECTORIES(Boost_LIBRARRY_DIR_DEBUG)
+LINK_DIRECTORIES(Boost_LIBRARRY_DIR_RELEASE)
+
+endif()
 
 find_package(CUDA 7.0)
 
@@ -31,7 +37,7 @@ set(CUDA_SEPARABLE_COMPILATION ON)
 
 set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG};-G;-g")
 if(APPLE)
-else(APPLE)
+elseif(NOT WIN32)
 set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG};-Xcompiler;-rdynamic;-lineinfo")
 endif(APPLE)
 set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-O3")
@@ -40,6 +46,7 @@ set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_35,code=sm
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_50,code=sm_50")
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_52,code=sm_52")
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_52,code=compute_52")
+
 # default stream legacy implies that the 0 stream synchronizes all streams
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;legacy")
 # default stream per-thread implies that each host thread has one non-synchronizing 0-stream

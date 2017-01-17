@@ -20,14 +20,13 @@ target_include_directories(popsift
             PUBLIC ${CUDA_INCLUDE_DIRS}
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>")
 
-target_compile_definitions(popsift PRIVATE ${Boost_DEFINITIONS})
 
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 
 # cannot use PRIVATE here as there is a bug in FindCUDA and CUDA_ADD_LIBRARY
 # https://gitlab.kitware.com/cmake/cmake/issues/16097
-target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
+ target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
 
 
 # EXPORTING THE LIBRARY

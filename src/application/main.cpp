@@ -12,6 +12,7 @@
 #include <cmath>
 #include <iomanip>
 #include <stdlib.h>
+#include <stdexcept>
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -47,37 +48,39 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     std::string gauss_mode;
 
     {
-    desc.add_options()
-        ("help,h", "Print usage")
-        ("verbose,v", bool_switch()->default_value(false)->notifier([&](bool) {config.setVerbose(); }), "")
-        ("log,l", bool_switch()->default_value(false)->notifier([&](bool) {config.setLogMode(popsift::Config::All); }), "Write debugging files")
+        desc.add_options()
+            ("help,h", "Print usage")
+            ("verbose,v", bool_switch()->default_value(false)->notifier([&](bool) {config.setVerbose(); }), "")
+            ("log,l", bool_switch()->default_value(false)->notifier([&](bool) {config.setLogMode(popsift::Config::All); }), "Write debugging files")
 
-        ("input-file,-i", value<std::string>(&inputFile)->required())
-        ("octaves", value<int>(&config.octaves)->required(), "Number of octaves")
-        ("levels", value<int>(&config.levels)->required(), "Number of levels per octave")
-        ("sigma", value<float>(&sigma)->required()->notifier([&](float f) { config.setSigma(f); }), "Initial sigma value")
-        ("threshold", value<float>(&threshold)->required()->notifier([&](float f) { config.setThreshold(f); }), "Contrast threshold")
-        ("edge-threshold,edge-limit", value<float>(&edge_limit)->required()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
+            ("input-file,i", value<std::string>(&inputFile)->required(), "Input file")
+            ("octaves", value<int>(&config.octaves)->required(), "Number of octaves")
+            ("levels", value<int>(&config.levels)->required(), "Number of levels per octave")
+            ("sigma", value<float>(&sigma)->required()->notifier([&](float f) { config.setSigma(f); }), "Initial sigma value")
+
+            ("threshold", value<float>(&threshold)->required()->notifier([&](float f) { config.setThreshold(f); }), "Contrast threshold")
+            ("edge-threshold", value<float>(&edge_limit)->required()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
+            ("edge-limit", value<float>(&edge_limit)->required()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
         ("downsampling", value<float>(&upscale_factor)->default_value(-1.0f)->notifier([&](float f) { config.setDownsampling(f); }), "Downscale width and height of input by 2^N")
-        ("initial-blur", value<float>(&blur)->default_value(0.5f)->notifier([&](float f) {config.setInitialBlur(f); }), "Assume initial blur, subtract when blurring first time")
-
+            ("initial-blur", value<float>(&blur)->default_value(0.5f)->notifier([&](float f) {config.setInitialBlur(f); }), "Assume initial blur, subtract when blurring first time")
 
         ("gauss-mode", value<std::string>(&gauss_mode)->required()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
-            "Choice of span (1-sided) for Gauss filters. Default is VLFeat-like computation depending on sigma. Options are: vlfeat, opencv, fixed4, fixed8")
+        "Choice of span (1-sided) for Gauss filters. Default is VLFeat-like computation depending on sigma. Options are: vlfeat, opencv, fixed4, fixed8")
         ("popsift-mode", bool_switch()->default_value(false)->notifier([&](bool) {config.setMode(popsift::Config::PopSift); }),
-            "During the initial upscale, shift pixels by 1. In extrema refinement, steps up to 0.6, do not reject points when reaching max iterations, "
-            "first contrast threshold is .8 * peak thresh. Shift feature coords octave 0 back to original pos.")
+        "During the initial upscale, shift pixels by 1. In extrema refinement, steps up to 0.6, do not reject points when reaching max iterations, "
+        "first contrast threshold is .8 * peak thresh. Shift feature coords octave 0 back to original pos.")
         ("vlfeat-mode", bool_switch()->default_value(false)->notifier([&](bool) { config.setMode(popsift::Config::VLFeat); }),
-            "During the initial upscale, shift pixels by 1. That creates a sharper upscaled image. "
-            "In extrema refinement, steps up to 0.6, levels remain unchanged, "
-            "do not reject points when reaching max iterations, "
+        "During the initial upscale, shift pixels by 1. That creates a sharper upscaled image. "
+        "In extrema refinement, steps up to 0.6, levels remain unchanged, "
+        "do not reject points when reaching max iterations, "
         "first contrast threshold is .8 * peak thresh.")
         ("opencv-mode", bool_switch()->default_value(false)->notifier([&](bool) { config.setMode(popsift::Config::OpenCV); }),
-            "During the initial upscale, shift pixels by 0.5. "
-            "In extrema refinement, steps up to 0.5, "
-            "reject points when reaching max iterations, "
-            "first contrast threshold is floor(.5 * peak thresh). "
-            "Computed filter width are lower than VLFeat/PopSift")
+        "During the initial upscale, shift pixels by 0.5. "
+        "In extrema refinement, steps up to 0.5, "
+        "reject points when reaching max iterations, "
+        "first contrast threshold is floor(.5 * peak thresh). "
+        "Computed filter width are lower than VLFeat/PopSift")
+        
         ("root-sift", bool_switch()->default_value(false)->notifier([&](bool) { config.setUseRootSift(true); }),
             "Use the L1-based norm for OpenMVG rather than L2-based as in OpenCV")
         ("norm-multi", value<int>(&norm_multi)->required()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
@@ -90,7 +93,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         ("print-dev-info", bool_switch(&print_dev_info)->default_value(false), "A debug output printing CUDA device information")
         ("print-time-info", bool_switch(&print_time_info)->default_value(false), "A debug output printing image processing time after load()")
         ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded to int Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar");
-
+        
         //("test-direct-scaling")
     }
 
@@ -114,7 +117,14 @@ int main(int argc, char **argv)
     string         inputFile = "";
     const char*    appName   = argv[0];
 
-    parseargs( argc, argv, config, inputFile ); // Parse command line
+    try {
+        parseargs(argc, argv, config, inputFile); // Parse command line
+        std::cout << inputFile << std::endl;
+    }
+    catch (std::exception& e) {
+        std::cout << e.what() << std::endl;
+        exit(1);
+    }
 
     int w;
     int h;
