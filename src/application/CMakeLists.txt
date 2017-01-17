@@ -19,6 +19,9 @@ target_compile_definitions(popsift-demo PRIVATE ${Boost_DEFINITIONS} BOOST_ALL_D
 
 target_include_directories(popsift-demo PUBLIC ${Boost_INCLUDE_DIRS})
 target_compile_definitions(popsift-demo PRIVATE BOOST_ALL_DYN_LINK BOOST_ALL_NO_LIB)
+if(NOT WIN32)
+  target_compile_options(popsift-demo PRIVATE -std=c++11)
+endif()
 target_link_libraries(popsift-demo PUBLIC PopSift::popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
 
 # set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
