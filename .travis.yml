@@ -12,6 +12,7 @@ addons:
     packages:
       - libboost-filesystem-dev 
       - libboost-system-dev 
+      - libboost-program-options-dev
 
 env:
   global:
