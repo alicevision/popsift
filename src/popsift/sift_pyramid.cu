@@ -70,19 +70,19 @@ void Pyramid::download_descriptors( const Config& conf, uint32_t octave )
 #ifndef __CUDACC__
 void Pyramid::save_descriptors( const Config& conf, const char* basename, uint32_t octave )
 {
-	using namespace boost::filesystem;
+    using namespace boost::filesystem;
 
     if (!exists(path("dir-desc"))) {
-		create_directory(path("dir-desc"));
+        create_directory(path("dir-desc"));
     }
     ostringstream ostr;
     ostr << "dir-desc/desc-" << basename << "-o-" << octave << ".txt";
     ofstream of( ostr.str().c_str() );
     _octaves[octave].writeDescriptor( conf, of, true );
-	
-	if (!exists(path("dir-fpt"))) {
-		create_directory(path("dir-fpt"));
-	}
+    
+    if (!exists(path("dir-fpt"))) {
+        create_directory(path("dir-fpt"));
+    }
 
     ostringstream ostr2;
     ostr2 << "dir-fpt/desc-" << basename << "-o-" << octave << ".txt";
