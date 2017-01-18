@@ -29,7 +29,7 @@ static bool print_dev_info  = false;
 static bool print_time_info = false;
 static bool write_as_uchar  = false;
 
-static void parseargs(int argc, char** argv, popsift::Config& config, string& inputFile) {
+static void parseargs(int argc, char** argv, popsift::Config& config, string& inputFile, string& matchFile) {
     using namespace boost::program_options;
 
     options_description options("Options");
@@ -39,7 +39,8 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
             ("verbose,v", bool_switch()->notifier([&](bool) {config.setVerbose(); }), "")
             ("log,l", bool_switch()->notifier([&](bool) {config.setLogMode(popsift::Config::All); }), "Write debugging files")
 
-            ("input-file,i", value<std::string>(&inputFile)->required(), "Input file");
+            ("input-file,i", value<std::string>(&inputFile)->required(), "Input file")
+            ("match-file,m", value<std::string>(&matchFile), "Match file. If provided PopSIFT will attempt to match the two input-file with match-file.");
     
     }
     options_description parameters("Parameters");
@@ -107,29 +108,12 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     notify(vm);
 }
 
-
-int main(int argc, char **argv)
-{
-    cudaDeviceReset();
-
-    popsift::Config config;
-    string         inputFile = "";
-    const char*    appName   = argv[0];
-
-    try {
-        parseargs(argc, argv, config, inputFile); // Parse command line
-        std::cout << inputFile << std::endl;
-    }
-    catch (std::exception& e) {
-        std::cout << e.what() << std::endl;
-        exit(1);
-    }
-
+popsift::Features* extractFeatures(string& img, popsift::Config& config) {
     int w;
     int h;
-    unsigned char* image_data = readPGMfile( inputFile, w, h );
-    if( image_data == 0 ) {
-        exit( -1 );
+    unsigned char* image_data = readPGMfile(img, w, h);
+    if (image_data == 0) {
+        exit(-1);
     }
 
     // cerr << "Input image size: "
@@ -137,20 +121,49 @@ int main(int argc, char **argv)
     //      << " filename: " << boost::filesystem::path(inputFile).filename() << endl;
 
     popsift::cuda::device_prop_t deviceInfo;
-    deviceInfo.set( 0, print_dev_info );
-    if( print_dev_info ) deviceInfo.print( );
+    deviceInfo.set(0, print_dev_info);
+    if (print_dev_info) deviceInfo.print();
 
-    PopSift PopSift( config );
+    PopSift PopSift(config);
 
-    PopSift.init( 0, w, h, print_time_info );
-    popsift::Features* feature_list = PopSift.execute( 0, image_data, print_time_info );
-    PopSift.uninit( 0 );
+    PopSift.init(0, w, h, print_time_info);
+    popsift::Features* feature_list = PopSift.execute(0, image_data, print_time_info);
+    
+    PopSift.uninit(0);
+    delete[] image_data;
+
+    return feature_list;
+}
+
+int main(int argc, char **argv)
+{
+    cudaDeviceReset();
+
+    popsift::Config config;
+    string         inputFile = "";
+    string         matchFile = "";
+    const char*    appName   = argv[0];
+
+    try {
+        parseargs(argc, argv, config, inputFile, matchFile); // Parse command line
+        std::cout << inputFile << std::endl;
+    }
+    catch (std::exception& e) {
+        std::cout << e.what() << std::endl;
+        exit(1);
+    }
+    
+    
+    popsift::Features* feature_list1 = extractFeatures(inputFile, config);
 
     std::ofstream of( "output-features.txt" );
-    feature_list->print( of, write_as_uchar );
-    // of << *feature_list;
-    delete feature_list;
+    feature_list1->print( of, write_as_uchar );
+    delete feature_list1;
 
-    delete [] image_data;
+    if (!matchFile.empty()) {
+        popsift::Features* feature_list2 = extractFeatures(matchFile, config);
+        delete feature_list2;
+    }
+    
     return 0;
 }
