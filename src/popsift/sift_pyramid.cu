@@ -161,9 +161,14 @@ Features* Pyramid::find_extrema(const Config& conf,
     num_extrema = 0;
     num_descriptors = 0;
     for (int o = 0; o<_num_octaves; o++) {
-        Feature*    feature_base = &features->_features[num_extrema];
-        Descriptor* desc_base = &features->_desc_buffer[num_descriptors];
-        _octaves[o].copyExtrema(conf, feature_base, desc_base);
+        if (num_extrema < features->_features.size()) {
+            Feature*    feature_base = &features->_features[num_extrema];
+            Descriptor* desc_base = &features->_desc_buffer[num_descriptors];
+            _octaves[o].copyExtrema(conf, feature_base, desc_base);
+        }
+        else {
+            assert(_octaves[o].getExtremaCount() == 0);
+        }
 
         num_extrema += _octaves[o].getExtremaCount();
         num_descriptors += _octaves[o].getDescriptorCount();
