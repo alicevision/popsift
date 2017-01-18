@@ -5,13 +5,18 @@ FILE( GLOB_RECURSE
 FILE( GLOB_RECURSE
       src_files_cpp
       ./popsift/*.cpp)
+	  
+FILE( GLOB_RECURSE	
+	  src_files_h
+	  ./popsift/*.h)
 
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
 
 CUDA_ADD_LIBRARY(popsift STATIC
                  ${src_files_cu}
-                 ${src_files_cpp})
+                 ${src_files_cpp}
+				 ${src_files_h})
 
 # BUILD_INTERFACE allows to include the directory with source only when target is
 # built in the building tree (ie, not from an install location)
