@@ -78,16 +78,17 @@ void Pyramid::save_descriptors( const Config& conf, const char* basename, uint32
     }
     ostringstream ostr;
     ostr << "dir-desc/desc-" << basename << "-o-" << octave << ".txt";
-    ofstream of( ostr.str().c_str() );
-    _octaves[octave].writeDescriptor( conf, of, true );
+    ofstream of(ostr.str().c_str(), ios::binary);
+    _octaves[octave].writeDescriptor(conf, of, true);
+
 
     if (stat("dir-fpt", &st) == -1) {
         mkdir("dir-fpt", 0700);
     }
     ostringstream ostr2;
     ostr2 << "dir-fpt/desc-" << basename << "-o-" << octave << ".txt";
-    ofstream of2( ostr2.str().c_str() );
-    _octaves[octave].writeDescriptor( conf, of2, false );
+    ofstream of2(ostr2.str().c_str(), ios::binary);
+    _octaves[octave].writeDescriptor(conf, of2, false);
 }
 
 Pyramid::Pyramid( Config& config,
