@@ -163,9 +163,11 @@ int main(int argc, char **argv)
         popsift_ptr sift_b = extractFeatures(matchFile, config);
 
         popsift::Matching matcher(config);
-        matcher.Match(*sift_a, *sift_b);
+        //matcher.Match(*sift_a, *sift_b);
 
+        auto matches = popsift::cpu_matching(*sift_a->getFeatures(), *sift_b->getFeatures());
+        for (const auto& m : matches)
+            cout << std::get<0>(m) << " " << std::get<1>(m) << endl;
     }
-    system("Pause");
     return 0;
 }
