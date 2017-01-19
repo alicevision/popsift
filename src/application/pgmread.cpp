@@ -35,7 +35,7 @@
 
 using namespace std;
 
-unsigned char* readPGMfile( const string& filename, int& w, int& h )
+std::unique_ptr<unsigned char[]> readPGMfile( const string& filename, int& w, int& h )
 {
     boost::filesystem::path input_file( filename );
 
@@ -119,7 +119,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         }
     } while( *parse == '#' );
 
-    unsigned char* input_data = new unsigned char[ w * h ];
+    std::unique_ptr<unsigned char[]> input_data(new unsigned char[ w * h ]);
 
     switch( type )
     {
@@ -134,38 +134,32 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             }
             if( pgmfile.fail() ) {
                 cerr << "File " << input_file << " file too short" << endl;
-                delete [] input_data;
                 return 0;
             }
         }
         break;
     case 5 :
         if( maxval < 256 ) {
-            pgmfile.read( (char*)input_data, w*h );
+            pgmfile.read( (char*)input_data.get(), w*h );
         } else {
-            unsigned short* i2 = new unsigned short[ w * h ];
-            pgmfile.read( (char*)i2, w*h*2 );
+            std::unique_ptr<unsigned short[]> i2(new unsigned short[w * h]);
+            pgmfile.read( (char*)i2.get(), w*h*2 );
             if( pgmfile.fail() ) {
                 cerr << "File " << input_file << " file too short" << endl;
-                delete [] i2;
-                delete [] input_data;
                 return 0;
             }
             for( int i=0; i<w*h; i++ ) {
                 input_data[i] = (unsigned char)(i2[i] * 255.0 / maxval );
             }
-            delete [] i2;
         }
         break;
     case 6 :
         if( maxval < 256 ) {
-            unsigned char* i2 = new unsigned char[ w * h * 3 ];
-            unsigned char* src = i2;
-            pgmfile.read( (char*)i2, w*h*3 );
+            std::unique_ptr<unsigned char[]> i2(new unsigned char[w * h * 3]);
+            unsigned char* src = i2.get();
+            pgmfile.read( (char*)i2.get(), w*h*3 );
             if( pgmfile.fail() ) {
                 cerr << "File " << input_file << " file too short" << endl;
-                delete [] i2;
-                delete [] input_data;
                 return 0;
             }
             for( int i=0; i<w*h; i++ ) {
@@ -182,15 +176,12 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
                 input_data[i] = (unsigned char)( R_RATE*r+G_RATE*g+B_RATE*b );
 #endif // RGB2GRAY_IN_INT
             }
-            delete [] i2;
         } else {
-            unsigned short* i2 = new unsigned short[ w * h * 2 * 3 ];
-            unsigned short* src = i2;
-            pgmfile.read( (char*)i2, w*h*2*3 );
+            std::unique_ptr<unsigned short[]> i2(new unsigned short[w * h * 2 * 3]);
+            unsigned short* src = i2.get();
+            pgmfile.read( (char*)i2.get(), w*h*2*3 );
             if( pgmfile.fail() ) {
                 cerr << "File " << input_file << " file too short" << endl;
-                delete [] i2;
-                delete [] input_data;
                 return 0;
             }
             for( int i=0; i<w*h; i++ ) {
@@ -207,7 +198,6 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
                 input_data[i] = (unsigned char)( R_RATE*r+G_RATE*g+B_RATE*b );
 #endif // RGB2GRAY_IN_INT
             }
-            delete [] i2;
         }
         break;
     }

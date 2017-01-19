@@ -111,8 +111,8 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
 popsift::Features* extractFeatures(string& img, popsift::Config& config) {
     int w;
     int h;
-    unsigned char* image_data = readPGMfile(img, w, h);
-    if (image_data == 0) {
+    auto image_data = readPGMfile(img, w, h);
+    if (!image_data) {
         exit(-1);
     }
 
@@ -127,10 +127,9 @@ popsift::Features* extractFeatures(string& img, popsift::Config& config) {
     PopSift PopSift(config);
 
     PopSift.init(0, w, h, print_time_info);
-    popsift::Features* feature_list = PopSift.execute(0, image_data, print_time_info);
+    popsift::Features* feature_list = PopSift.execute(0, image_data.get(), print_time_info);
     
     PopSift.uninit(0);
-    delete[] image_data;
 
     return feature_list;
 }

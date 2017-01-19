@@ -7,7 +7,8 @@
  */
 #pragma once
 
+#include <memory>
 #include <string>
 
-unsigned char* readPGMfile( const std::string& filename, int& w, int& h );
+std::unique_ptr<unsigned char[]> readPGMfile( const std::string& filename, int& w, int& h );
 
