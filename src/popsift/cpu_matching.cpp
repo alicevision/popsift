@@ -42,7 +42,7 @@ struct best2_accumulator
             distance[1] = distance[0]; index[1] = index[0];
             distance[0] = d; index[0] = i;
         }
-        else if (d < distance[1]) {
+        else if (d != distance[0] && d < distance[1]) {
             distance[1] = d; index[1] = i;
         }
         assert(distance[0] < distance[1]);
