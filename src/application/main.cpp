@@ -22,6 +22,8 @@
 #include <popsift/common/device_prop.h>
 
 #include "pgmread.h"
+#include "popsift\sift_pyramid.h"
+#include "popsift\sift_matching.h"
 
 using namespace std;
 
@@ -108,7 +110,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     notify(vm);
 }
 
-popsift::Features* extractFeatures(string& img, popsift::Config& config) {
+popsift_ptr extractFeatures(string& img, popsift::Config& config) {
     int w;
     int h;
     auto image_data = readPGMfile(img, w, h);
@@ -124,14 +126,17 @@ popsift::Features* extractFeatures(string& img, popsift::Config& config) {
     deviceInfo.set(0, print_dev_info);
     if (print_dev_info) deviceInfo.print();
 
-    PopSift PopSift(config);
-
-    PopSift.init(0, w, h, print_time_info);
-    popsift::Features* feature_list = PopSift.execute(0, image_data.get(), print_time_info);
     
-    PopSift.uninit(0);
+    popsift_ptr popsift(new PopSift(config), popsift_deleter());
 
-    return feature_list;
+    popsift->init(0, w, h, print_time_info);
+    popsift->execute(0, image_data.get(), print_time_info);
+    
+    popsift::Features* feature_list = popsift->getFeatures();
+    std::ofstream of("output-features.txt");
+    feature_list->print(of, write_as_uchar);
+
+    return popsift;
 }
 
 int main(int argc, char **argv)
@@ -153,16 +158,14 @@ int main(int argc, char **argv)
     }
     
     
-    popsift::Features* feature_list1 = extractFeatures(inputFile, config);
-
-    std::ofstream of( "output-features.txt" );
-    feature_list1->print( of, write_as_uchar );
-    delete feature_list1;
-
+    popsift_ptr sift_a = extractFeatures(inputFile, config);
     if (!matchFile.empty()) {
-        popsift::Features* feature_list2 = extractFeatures(matchFile, config);
-        delete feature_list2;
+        popsift_ptr sift_b = extractFeatures(matchFile, config);
+
+        popsift::Matching matcher(config);
+        matcher.Match(*sift_a, *sift_b);
+
     }
-    
+    system("Pause");
     return 0;
 }

@@ -13,6 +13,8 @@
 #include <tuple>
 #include <vector>
 
+class PopSift;
+
 namespace popsift {
 
 using Pair = std::tuple<unsigned, unsigned>;
@@ -30,10 +32,12 @@ public:
     Matching(Config& config);
     ~Matching();
 
-    tmp_ret Match(Features* a, Features* b);
+    tmp_ret Match(PopSift& a, PopSift& b);
 
 private:
+    const Config& config;
 
+    void getFlatDeviceDesc(PopSift& ps, Descriptor*& desc_out_device, int* desc_count);
 };
 
 }

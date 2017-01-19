@@ -17,6 +17,7 @@
 using namespace std;
 
 PopSift::PopSift( const popsift::Config& config )
+    : features(NULL)
 {
     for( int i=0; i<MAX_PIPES; i++ ) {
         _pipe[i]._inputImage = 0;
@@ -27,6 +28,7 @@ PopSift::PopSift( const popsift::Config& config )
 }
 
 PopSift::PopSift( )
+    : features(NULL)
 {
     for( int i=0; i<MAX_PIPES; i++ ) {
         _pipe[i]._inputImage = 0;
@@ -35,7 +37,9 @@ PopSift::PopSift( )
 }
 
 PopSift::~PopSift()
-{ }
+{ 
+    delete features;
+}
 
 bool PopSift::configure( const popsift::Config& config, bool force )
 {
@@ -126,13 +130,13 @@ void PopSift::uninit( int pipe )
     _pipe[pipe]._pyramid    = 0;
 }
 
-popsift::Features* PopSift::execute( int                  pipe,
+void PopSift::execute( int                  pipe,
                                      const unsigned char* imageData,
                                      bool                 checktime )
 {
-    if( _pipe[pipe]._inputImage == 0 ) return 0;
+    if( _pipe[pipe]._inputImage == 0 ) return;
 
-    if( pipe < 0 && pipe >= MAX_PIPES ) return 0;
+    if( pipe < 0 && pipe >= MAX_PIPES ) return;
 
     cudaEvent_t start, end;
     if( checktime ) {
@@ -145,7 +149,7 @@ popsift::Features* PopSift::execute( int                  pipe,
 
     _pipe[pipe]._inputImage->load( _config, imageData );
 
-    popsift::Features* features = _pipe[pipe]._pyramid->find_extrema( _config, _pipe[pipe]._inputImage );
+    features = _pipe[pipe]._pyramid->find_extrema( _config, _pipe[pipe]._inputImage );
 
     cudaDeviceSynchronize();
 
@@ -177,7 +181,5 @@ popsift::Features* PopSift::execute( int                  pipe,
             _pipe[pipe]._pyramid->save_descriptors( _config, "pyramid", o );
         }
     }
-
-    return features;
 }
 

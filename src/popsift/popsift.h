@@ -9,7 +9,7 @@
 
 #include <cuda_runtime.h>
 #include <vector>
-
+#include <memory>
 #include "sift_conf.h"
 #include "sift_extremum.h"
 
@@ -19,7 +19,7 @@ namespace popsift
 {
     class Image;
     class Pyramid;
-    class Features;
+    class Features;    
 };
 
 class PopSift
@@ -48,7 +48,7 @@ public:
     void uninit( int pipe );
 
 #if 1
-    popsift::Features* execute( int                  pipe,
+    void execute(               int                  pipe,
                                 const unsigned char* imageData,
                                 bool                 checktime = false );
 #else
@@ -58,6 +58,8 @@ public:
                   std::vector<std::vector<popsift::Descriptor> >* descs = 0,
                   bool                                           checktime = false );
 #endif
+
+    popsift::Features* getFeatures() { return features; }
 
     inline popsift::Pyramid& pyramid(int pipe)
     {
@@ -72,5 +74,15 @@ private:
      * in configure()
      */
     popsift::Config _shadow_config;
+
+    popsift::Features* features;
 };
 
+struct popsift_deleter {
+    void operator()(PopSift* ptr) {
+        ptr->uninit(0);
+        delete ptr;
+    }
+};
+
+using popsift_ptr = std::unique_ptr<PopSift, popsift_deleter>;
