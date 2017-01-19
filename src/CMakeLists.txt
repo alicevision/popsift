@@ -25,6 +25,9 @@ target_include_directories(popsift
             PUBLIC ${CUDA_INCLUDE_DIRS}
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>")
 
+if(NOT WIN32)
+  target_compile_options(popsift INTERFACE -std=c++11)
+endif()
 
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
