@@ -10,8 +10,15 @@
 
 #include "sift_conf.h"
 #include "sift_extremum.h"
+#include <tuple>
+#include <vector>
 
 namespace popsift {
+
+using Pair = std::tuple<unsigned, unsigned>;
+using PairList = std::vector<Pair>;
+
+PairList cpu_matching(const Features& fa, const Features& fb);
 
 struct tmp_ret {
 
