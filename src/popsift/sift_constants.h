@@ -59,8 +59,9 @@ struct ConstInfo
 };
 
 extern                         ConstInfo h_consts;
+#ifdef __NVCC__
 extern __device__ __constant__ ConstInfo d_consts;
-
+#endif
 
 void init_constants( float sigma0, int levels, float threshold, float edge_limit, int max_extrema, int normalization_multiplier );
 
