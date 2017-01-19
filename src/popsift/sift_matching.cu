@@ -19,11 +19,13 @@ Matching::~Matching() {
 
 }
 
-__host__
 tmp_ret Matching::Match(Features* a, Features* b) {
+#if 0
     for (auto it = a->begin(); it != a->end(); it++) {
         
     }
+#endif
+    return tmp_ret();
 }
 
 }
