@@ -78,16 +78,8 @@ class Features
 public:
     Features( );
     ~Features( );
-
-    inline F_iterator       begin()       { return _features.begin(); }
-    inline F_const_iterator begin() const { return _features.begin(); }
-    inline F_iterator       end()         { return _features.end(); }
-    inline F_const_iterator end() const   { return _features.end(); }
-
-    inline unsigned int     size() const                { return _features.size(); }
-    inline unsigned int     getFeatureCount() const     { return _features.size(); }
-    inline unsigned int     getDescriptorCount() const  { return _num_descriptors; }
-
+    
+    const std::vector<Feature>& list() const { return _features; }
     void print( std::ostream& ostr, bool write_as_uchar ) const;
 
 protected:
