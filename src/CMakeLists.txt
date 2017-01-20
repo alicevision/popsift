@@ -26,7 +26,7 @@ target_include_directories(popsift
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>")
 
 if(NOT WIN32)
-  target_compile_options(popsift INTERFACE -std=c++11)
+  target_compile_options(popsift PUBLIC -std=c++11)
 endif()
 
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
