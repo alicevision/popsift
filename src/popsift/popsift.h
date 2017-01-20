@@ -20,7 +20,9 @@ namespace popsift
     class Image;
     class Pyramid;
     class Features;    
+    class Descriptor;
 };
+
 
 class PopSift
 {
@@ -38,6 +40,9 @@ public:
     PopSift( );
     PopSift( const popsift::Config& config );
     ~PopSift();
+
+    popsift::Descriptor* d_desc_flat = NULL;
+    size_t d_desc_flat_size = 0;
 
 public:
     /* provide the configuration if you used the PopSift constructor */

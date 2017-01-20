@@ -15,6 +15,7 @@
 #include "sift_extremum.h"
 #include "sift_constants.h"
 #include "sift_octave.h"
+#include "popsift.h"
 
 namespace popsift {
 
@@ -37,7 +38,8 @@ public:
     ~Pyramid( );
 
     Features* find_extrema( const Config& conf,
-                            Image*        base );
+                            Image*        base,
+                            PopSift& ps);
 
     void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
 

@@ -20,6 +20,7 @@
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
 #include "common/debug_macros.h"
+#include "popsift.h"
 
 #define PYRAMID_PRINT_DEBUG 0
 
@@ -68,7 +69,7 @@ void Pyramid::download_and_save_array(const char* basename, uint32_t octave, uin
 
 void Pyramid::download_descriptors(const Config& conf, uint32_t octave)
 {
-    _octaves[octave].downloadDescriptor(conf);
+    //_octaves[octave].downloadDescriptor(conf, );
 }
 
 void Pyramid::save_descriptors(const Config& conf, const char* basename, uint32_t octave)
@@ -124,7 +125,8 @@ Pyramid::~Pyramid()
 }
 
 Features* Pyramid::find_extrema(const Config& conf,
-    Image*        base)
+    Image*        base,
+    PopSift& ps)
 {
     reset_extrema_mgmt();
 
@@ -144,7 +146,7 @@ Features* Pyramid::find_extrema(const Config& conf,
         _octaves[o].readExtremaCount();
 
         // asynchronous download of extrema and descriptors (in stream 0)
-        _octaves[o].downloadDescriptor(conf);
+        _octaves[o].downloadDescriptor(conf, ps);
 
         num_extrema += _octaves[o].getExtremaCount();
         num_descriptors += _octaves[o].getDescriptorCount();

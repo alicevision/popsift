@@ -20,6 +20,7 @@
 #include "common/clamp.h"
 #include "common/write_plane_2d.h"
 #include "sift_octave.h"
+#include "popsift.h"
 
 /* Define this only for debugging the descriptor by writing
 * the dominent orientation in readable form (otherwise
@@ -158,8 +159,22 @@ int Octave::getDescriptorCount() const
     return ct;
 }
 
-void Octave::downloadDescriptor(const Config& conf)
+void Octave::downloadDescriptor(const Config& conf, PopSift& ps)
 {
+    
+    int offset = 0;
+    for (uint32_t l = 0; l<_levels; l++) {
+        int sz = _h_extrema_counter[l];
+        if (sz != 0) {
+            if (_h_extrema[l] == 0) continue;
+        }
+        sz = _h_featvec_counter[l];
+        if (sz != 0) {
+            ps.d_desc_flat_size  += sz;
+        }
+    }
+    if(!ps.d_desc_flat)
+        ps.d_desc_flat = popsift::cuda::malloc_devT<Descriptor>(ps.d_desc_flat_size, __FILE__, __LINE__);
     for (uint32_t l = 0; l<_levels; l++) {
         int sz = _h_extrema_counter[l];
         if (sz != 0) {
@@ -178,6 +193,13 @@ void Octave::downloadDescriptor(const Config& conf)
                 sz * sizeof(Descriptor),
                 cudaMemcpyDeviceToHost,
                 0);
+
+            popcuda_memcpy_async(ps.d_desc_flat + offset,
+                _d_desc[l],
+                sz * sizeof(Descriptor),
+                cudaMemcpyDeviceToDevice,
+                0);
+            offset += sz;
         }
     }
 

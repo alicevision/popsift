@@ -71,7 +71,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         "In extrema refinement, steps up to 0.6, levels remain unchanged, "
         "do not reject points when reaching max iterations, "
         "first contrast threshold is .8 * peak thresh.")
-        ("opencv-mode", bool_switch()->notifier([&](bool) { config.setMode(popsift::Config::OpenCV); }),
+        ("opencv-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::OpenCV); }),
         "During the initial upscale, shift pixels by 0.5. "
         "In extrema refinement, steps up to 0.5, "
         "reject points when reaching max iterations, "
@@ -163,11 +163,12 @@ int main(int argc, char **argv)
         popsift_ptr sift_b = extractFeatures(matchFile, config);
 
         popsift::Matching matcher(config);
-        //matcher.Match(*sift_a, *sift_b);
-
+        matcher.Match(*sift_a, *sift_b);
+        /*
         auto matches = popsift::cpu_matching(*sift_a->getFeatures(), *sift_b->getFeatures());
         for (const auto& m : matches)
             cout << std::get<0>(m) << " " << std::get<1>(m) << endl;
+        */
     }
     return 0;
 }

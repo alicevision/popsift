@@ -14,11 +14,16 @@
 #include "sift_conf.h"
 #include "sift_extremum.h"
 #include "sift_constants.h"
+#include "popsift.h"
 
 namespace popsift {
 
 class Octave
 {
+public:
+
+
+private:
         int _w;
         int _h;
         int _debug_octave_id;
@@ -166,7 +171,7 @@ class Octave
         int getDescriptorCount( ) const;
 
         Descriptor* getDescriptors( uint32_t level );
-        void        downloadDescriptor( const Config& conf );
+        void        downloadDescriptor( const Config& conf, PopSift& ps);
         void        writeDescriptor( const Config& conf, std::ostream& ostr, bool really );
         void        copyExtrema( const Config& conf, Feature* feature, Descriptor* descBuffer );
 

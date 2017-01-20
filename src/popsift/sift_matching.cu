@@ -44,13 +44,13 @@ float calc_distance(float* a, float* b) {
 __global__
 void test(Descriptor* d_desc_a, int desc_a_count, Descriptor* d_desc_b, int desc_b_count) {
     int tid = threadIdx.x;
-    
+    //printf("test");
     for (int i = tid; i < desc_a_count; i += blockDim.x) {
         Descriptor& a = d_desc_a[i];
         float min1 = FLT_MAX, min2 = FLT_MAX;
         for (int x = 0; x < desc_b_count; x++) {
             float dst = calc_distance(&a.features[0], &d_desc_b[x].features[0]);
-            
+            printf("%f", dst);
             if (dst < min1) {
                 min2 = min1;
                 min1 = dst;
@@ -60,6 +60,7 @@ void test(Descriptor* d_desc_a, int desc_a_count, Descriptor* d_desc_b, int desc
             }
             if (min1 / min2 < 0.8f) {
                 min1;
+                printf("%f ", min1);
             }
         }
 
@@ -71,17 +72,65 @@ void Matching::getFlatDeviceDesc(PopSift& ps, Descriptor*& desc_out_device, int*
     Pyramid& p = ps.pyramid(0);
     Features* feat = ps.getFeatures();
 
+#if 0
 
     int total_desc = 0;
     for (int octave = 0; octave < p.getNumOctaves(); octave++) {
         Octave& oct_obj = p.getOctave(octave);
-        total_desc += oct_obj.getDescriptorCount();
+        
+        for (int lvl = 0; lvl < oct_obj.getLevels(); lvl++) {
+            
+            Extremum* cand = oct_obj.getExtremaH(lvl);
+            Descriptor* desc = oct_obj.getDescriptors(lvl);
+
+            for (int s = 0; s < oct_obj.getExtremaCountH(lvl); s++) {
+                
+                for (int ori = 0; ori < cand[s].num_ori; ori++) {
+
+                    int feat_vec_index = cand[s].idx_ori + ori;
+                    for (int i = 0; i<128; i++) {
+                        total_desc++;
+                        //std::cout << desc[feat_vec_index].features[i] << std::endl;
+                    }
+                }
+            }
+        }
     }
     
     // + (1024 - (total_desc % 1024) 
     desc_out_device = popsift::cuda::malloc_devT<Descriptor>(total_desc, __FILE__, __LINE__);
     *desc_count = total_desc;
 
+    int pos = 0;
+    for (int octave = 0; octave < p.getNumOctaves(); octave++) {
+        Octave& oct_obj = p.getOctave(octave);
+
+        for (int lvl = 0; lvl < oct_obj.getLevels(); lvl++) {
+
+            Extremum* cand = oct_obj.getExtremaH(lvl);
+            Descriptor* desc = oct_obj.getDescriptors(lvl);
+
+            for (int s = 0; s < oct_obj.getExtremaCountH(lvl); s++) {
+
+                for (int ori = 0; ori < cand[s].num_ori; ori++) {
+
+                    cudaMemcpy(desc_out_device + pos,
+                        oct_obj.getDescriptors(lvl),
+                        desc_size,
+                        cudaMemcpyDeviceToDevice);
+
+                    int feat_vec_index = cand[s].idx_ori + ori;
+                    for (int i = 0; i<128; i++) {
+                        
+                        //total_desc++;
+                    }
+                }
+            }
+        }
+    }
+#endif
+    
+    /*
     int pos = 0;
     for (int octave = 0; octave < p.getNumOctaves(); octave++) {
         Octave& oct_obj = p.getOctave(octave);
@@ -98,9 +147,9 @@ void Matching::getFlatDeviceDesc(PopSift& ps, Descriptor*& desc_out_device, int*
             pos += desc_count;
         }
     }
+    */
 }
 
-__host__
 tmp_ret Matching::Match(PopSift& a, PopSift& b) {
     Pyramid& pa = a.pyramid(0);
     Pyramid& pb = b.pyramid(0);
@@ -113,9 +162,9 @@ tmp_ret Matching::Match(PopSift& a, PopSift& b) {
     dim3 threadsPerBlock(1024);
     dim3 numBlocks(1);
     //dim3 grid();
+    
     test <<<numBlocks, threadsPerBlock>>>
-        (flat_a, flat_a_size, flat_b, flat_b_size);
-
+        (a.d_desc_flat, a.d_desc_flat_size, b.d_desc_flat, b.d_desc_flat_size);
     cudaDeviceSynchronize();
         
     return tmp_ret();

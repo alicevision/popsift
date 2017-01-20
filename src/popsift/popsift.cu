@@ -149,7 +149,7 @@ void PopSift::execute( int                  pipe,
 
     _pipe[pipe]._inputImage->load( _config, imageData );
 
-    features = _pipe[pipe]._pyramid->find_extrema( _config, _pipe[pipe]._inputImage );
+    features = _pipe[pipe]._pyramid->find_extrema( _config, _pipe[pipe]._inputImage, *this);
 
     cudaDeviceSynchronize();
 
@@ -167,7 +167,7 @@ void PopSift::execute( int                  pipe,
         int octaves = _pipe[pipe]._pyramid->getNumOctaves();
 
         for( int o=0; o<octaves; o++ ) {
-            _pipe[pipe]._pyramid->download_descriptors( _config, o );
+            //_pipe[pipe]._pyramid->download_descriptors( _config, o );
         }
 
         int levels  = _pipe[pipe]._pyramid->getNumLevels();
