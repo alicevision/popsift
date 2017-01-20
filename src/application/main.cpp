@@ -35,8 +35,8 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     options_description options("Options");
     options.add_options()
         ("help,h", "Print usage")
-        ("verbose,v", bool_switch()->notifier([&](bool) {config.setVerbose(); }), "")
-        ("log,l", bool_switch()->notifier([&](bool) {config.setLogMode(popsift::Config::All); }), "Write debugging files")
+        ("verbose,v", bool_switch()->notifier([&](bool v) { if (v) config.setVerbose(); }), "")
+        ("log,l", bool_switch()->notifier([&](bool v) { if(v) config.setLogMode(popsift::Config::All); }), "Write debugging files")
 
         ("input-file,i", value<std::string>(&inputFile)->required(), "Input file");
     
@@ -54,30 +54,30 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     
     options_description modes("Modes");
     modes.add_options()
-        ("popsift-mode", bool_switch()->notifier([&](bool) {config.setMode(popsift::Config::PopSift); }),
+        ("popsift-mode", bool_switch()->notifier([&](bool v) { if(v) config.setMode(popsift::Config::PopSift); }),
             "During the initial upscale, shift pixels by 1. In extrema refinement, steps up to 0.6, do not reject points when reaching max iterations, "
             "first contrast threshold is .8 * peak thresh. Shift feature coords octave 0 back to original pos.")
-        ("vlfeat-mode", bool_switch()->notifier([&](bool) { config.setMode(popsift::Config::VLFeat); }),
+        ("vlfeat-mode", bool_switch()->notifier([&](bool v) { if (v) config.setMode(popsift::Config::VLFeat); }),
             "During the initial upscale, shift pixels by 1. That creates a sharper upscaled image. "
             "In extrema refinement, steps up to 0.6, levels remain unchanged, "
             "do not reject points when reaching max iterations, "
             "first contrast threshold is .8 * peak thresh.")
-        ("opencv-mode", bool_switch()->notifier([&](bool) { config.setMode(popsift::Config::OpenCV); }),
+        ("opencv-mode", bool_switch()->notifier([&](bool v) { if (v) config.setMode(popsift::Config::OpenCV); }),
             "During the initial upscale, shift pixels by 0.5. "
             "In extrema refinement, steps up to 0.5, "
             "reject points when reaching max iterations, "
             "first contrast threshold is floor(.5 * peak thresh). "
             "Computed filter width are lower than VLFeat/PopSift")
-        ("root-sift", bool_switch()->notifier([&](bool) { config.setUseRootSift(true); }),
+        ("root-sift", bool_switch()->notifier([&](bool v) { if (v) config.setUseRootSift(true); }),
             "Use the L1-based norm for OpenMVG rather than L2-based as in OpenCV")
         ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
-        ("dp-off", bool_switch()->notifier([&](bool) { config.setDPOrientation(false); config.setDPDescriptors(false); }), "Switch all CUDA Dynamic Parallelism off.")
-        ("dp-ori-off", bool_switch()->notifier([&](bool) { config.setDPOrientation(false); }), "Switch DP off for orientation computation")
-        ("dp-desc-off", bool_switch()->notifier([&](bool) { config.setDPDescriptors(false); }), "Switch DP off for descriptor computation");
+        ("dp-off", bool_switch()->notifier([&](bool v) { if (v) config.setDPOrientation(false); config.setDPDescriptors(false); }), "Switch all CUDA Dynamic Parallelism off.")
+        ("dp-ori-off", bool_switch()->notifier([&](bool v) { if (v) config.setDPOrientation(false); }), "Switch DP off for orientation computation")
+        ("dp-desc-off", bool_switch()->notifier([&](bool v) { if (v) config.setDPDescriptors(false); }), "Switch DP off for descriptor computation");
 
     options_description informational("Informational");
     informational.add_options()
-        ("print-gauss-tables", bool_switch()->notifier([&](bool) { config.setPrintGaussTables(); }), "A debug output printing Gauss filter size and tables")
+        ("print-gauss-tables", bool_switch()->notifier([&](bool v) { if (v) config.setPrintGaussTables(); }), "A debug output printing Gauss filter size and tables")
         ("print-dev-info", bool_switch(&print_dev_info)->default_value(false), "A debug output printing CUDA device information")
         ("print-time-info", bool_switch(&print_time_info)->default_value(false), "A debug output printing image processing time after load()")
         ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded to int Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar");
