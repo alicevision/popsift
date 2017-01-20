@@ -155,12 +155,11 @@ int main(int argc, char **argv)
 
         popsift::Matching matcher(config);
         matcher.Match(*sift_a, *sift_b);
-        /*
+
         auto matches = popsift::cpu_matching(*sift_a->getFeatures(), *sift_b->getFeatures());
-        for (const auto& m : matches)
-            cout << std::get<0>(m) << " " << std::get<1>(m) << endl;
-        */
+        for (size_t i = 0; i < matches.size(); ++i)
+        if (matches[i] != -1)
+            cout << i << ' ' << matches[i] << '\n';
     }
-    system("Pause");
     return 0;
 }

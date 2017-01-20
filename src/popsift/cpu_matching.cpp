@@ -27,14 +27,13 @@ static float l2_dist_sq(const Descriptor& a, const Descriptor& b)
 namespace {
 struct best2_accumulator
 {
-    static constexpr size_t no_index = size_t(-1);
     std::array<float, 2> distance;
-    std::array<size_t, 2> index;
+    std::array<int, 2> index;
 
     best2_accumulator()
     {
         distance.fill(FLT_MAX);
-        index.fill(no_index);
+        index.fill(-1);
     }
     
     void update(float d, size_t i)
@@ -51,11 +50,9 @@ struct best2_accumulator
     }
 };
 
-constexpr size_t best2_accumulator::no_index;
-
 }
 
-static size_t match_one(const Descriptor& d1, const std::vector<Feature>& vb)
+static int match_one(const Descriptor& d1, const std::vector<Feature>& vb)
 {
     best2_accumulator best2;
 
@@ -67,36 +64,37 @@ static size_t match_one(const Descriptor& d1, const std::vector<Feature>& vb)
         }
     }
 
-    assert(best2.index[0] != best2_accumulator::no_index);  // would happen on empty vb
+    assert(best2.index[0] != -1);                           // would happen on empty vb
     assert(best2.distance[1] != 0);                         // in that case it should be at index 0
-    if (best2.index[1] == best2_accumulator::no_index)      // happens on vb.size()==1
+    if (best2.index[1] == -1)                               // happens on vb.size()==1
         return best2.index[0];
     if (best2.distance[0] / best2.distance[1] < 0.8*0.8)    // Threshold from the paper, squared
         return best2.index[0];
-    return size_t(-1);
+    return -1;
 }
 
-PairList cpu_matching(const Features& ffa, const Features& ffb)
+std::vector<int> cpu_matching(const Features& ffa, const Features& ffb)
 {
     const auto& va = ffa.list();
-    PairList pairs;
+    std::vector<int> matches;
 
     if (ffa.list().empty() || ffb.list().empty())
-        return pairs;
+        return matches;
 
+    matches.resize(va.size(), -1);
     for (size_t ia = 0; ia < va.size(); ++ia) {
         const auto& fa = va[ia];
         for (int id = 0; id < fa.num_descs; ++id) {
-            size_t ib = match_one(*fa.desc[id], ffb.list());
+            int ib = match_one(*fa.desc[id], ffb.list());
             // Match only one orientation.
-            if (ib != size_t(-1)) {
-                pairs.push_back(Pair(ia, ib));
+            if (ib != -1) {
+                matches[ia] = ib;
                 break;
             }
         }
     }
 
-    return pairs;
+    return matches;
 }
 
 }   // popsift

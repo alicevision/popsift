@@ -10,17 +10,15 @@
 
 #include "sift_conf.h"
 #include "sift_extremum.h"
-#include <tuple>
 #include <vector>
 
 class PopSift;
 
 namespace popsift {
 
-using Pair = std::tuple<unsigned, unsigned>;
-using PairList = std::vector<Pair>;
-
-PairList cpu_matching(const Features& fa, const Features& fb);
+// Returns vector v indexed by features in fa s.t. v[i] is the best match in fb.
+// If a feature in fa has no match in fb, v[i] == -1.
+std::vector<int> cpu_matching(const Features& fa, const Features& fb);
 
 struct tmp_ret {
 
