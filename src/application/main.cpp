@@ -14,7 +14,6 @@
 #include <stdlib.h>
 
 #include <getopt.h>
-#include <boost/filesystem.hpp>
 
 #include <popsift/popsift.h>
 #include <popsift/sift_conf.h>
