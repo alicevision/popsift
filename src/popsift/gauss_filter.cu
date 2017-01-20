@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include <stdio.h>
-
+#include <algorithm>
 #include "gauss_filter.h"
 #include "common/debug_macros.h"
 
@@ -268,7 +268,7 @@ int GaussInfo::vlFeatSpan( float sigma )
     /* This is the VLFeat computation for choosing the Gaussian filter width.
      * In our case, we look at the half-sided filter including the center value.
      */
-    return min<int>( ceilf( 4.0f * sigma ) + 1, GAUSS_ALIGN - 1 );
+    return std::min<int>( ceilf( 4.0f * sigma ) + 1, GAUSS_ALIGN - 1 );
 }
 
 __host__
@@ -277,7 +277,7 @@ int GaussInfo::openCVSpan( float sigma )
     int span = int( roundf( 2.0f * 4.0f * sigma + 1.0f ) ) | 1;
     span >>= 1;
     span  += 1;
-    return min<int>( span, GAUSS_ALIGN - 1 );
+    return std::min<int>( span, GAUSS_ALIGN - 1 );
 }
 
 } // namespace popsift
