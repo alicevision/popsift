@@ -149,7 +149,7 @@ void PopSift::execute( int                  pipe,
 
     _pipe[pipe]._inputImage->load( _config, imageData );
 
-    features = _pipe[pipe]._pyramid->find_extrema( _config, _pipe[pipe]._inputImage, *this);
+    features = _pipe[pipe]._pyramid->find_extrema( _config, _pipe[pipe]._inputImage);
 
     cudaDeviceSynchronize();
 

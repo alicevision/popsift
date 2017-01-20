@@ -170,5 +170,6 @@ int main(int argc, char **argv)
             cout << std::get<0>(m) << " " << std::get<1>(m) << endl;
         */
     }
+    system("Pause");
     return 0;
 }

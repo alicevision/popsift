@@ -125,8 +125,7 @@ Pyramid::~Pyramid()
 }
 
 Features* Pyramid::find_extrema(const Config& conf,
-    Image*        base,
-    PopSift& ps)
+    Image*        base)
 {
     reset_extrema_mgmt();
 
@@ -146,7 +145,7 @@ Features* Pyramid::find_extrema(const Config& conf,
         _octaves[o].readExtremaCount();
 
         // asynchronous download of extrema and descriptors (in stream 0)
-        _octaves[o].downloadDescriptor(conf, ps);
+        _octaves[o].downloadDescriptor(conf);
 
         num_extrema += _octaves[o].getExtremaCount();
         num_descriptors += _octaves[o].getDescriptorCount();

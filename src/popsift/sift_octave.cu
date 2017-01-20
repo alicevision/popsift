@@ -159,22 +159,8 @@ int Octave::getDescriptorCount() const
     return ct;
 }
 
-void Octave::downloadDescriptor(const Config& conf, PopSift& ps)
+void Octave::downloadDescriptor(const Config& conf)
 {
-    
-    int offset = 0;
-    for (uint32_t l = 0; l<_levels; l++) {
-        int sz = _h_extrema_counter[l];
-        if (sz != 0) {
-            if (_h_extrema[l] == 0) continue;
-        }
-        sz = _h_featvec_counter[l];
-        if (sz != 0) {
-            ps.d_desc_flat_size  += sz;
-        }
-    }
-    if(!ps.d_desc_flat)
-        ps.d_desc_flat = popsift::cuda::malloc_devT<Descriptor>(ps.d_desc_flat_size, __FILE__, __LINE__);
     for (uint32_t l = 0; l<_levels; l++) {
         int sz = _h_extrema_counter[l];
         if (sz != 0) {
@@ -193,16 +179,8 @@ void Octave::downloadDescriptor(const Config& conf, PopSift& ps)
                 sz * sizeof(Descriptor),
                 cudaMemcpyDeviceToHost,
                 0);
-
-            popcuda_memcpy_async(ps.d_desc_flat + offset,
-                _d_desc[l],
-                sz * sizeof(Descriptor),
-                cudaMemcpyDeviceToDevice,
-                0);
-            offset += sz;
         }
     }
-
     cudaDeviceSynchronize();
 }
 
@@ -294,6 +272,23 @@ void Octave::copyExtrema(const Config& conf, Feature* feature, Descriptor* descB
         descBuffer += desc_sz;
     }
 
+}
+
+size_t  Octave::flattenDescOnDevice(Descriptor* d_dst) {
+
+    size_t total_count = 0;
+    for (int i = 0; i < _levels; i++) {
+        int count = _h_featvec_counter[i];
+        total_count += count;
+
+        cudaMemcpyAsync(d_dst,
+            _d_desc[i],
+            sizeof(Descriptor) * count,
+            cudaMemcpyDeviceToDevice,
+            0);
+        d_dst += count;
+    }
+    return total_count;
 }
 
 Descriptor* Octave::getDescriptors(uint32_t level)

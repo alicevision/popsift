@@ -58,7 +58,7 @@ void test(Descriptor* d_desc_a, int desc_a_count, Descriptor* d_desc_b, int desc
             else if (dst < min2) {
                 min2 = dst;
             }
-            if (min1 / min2 < 0.8f) {
+            if (min1 / min2 < 0.64f) {
                 min1;
                 printf("%f ", min1);
             }
@@ -148,6 +148,21 @@ void Matching::getFlatDeviceDesc(PopSift& ps, Descriptor*& desc_out_device, int*
         }
     }
     */
+
+    *desc_count = 0;
+    for (int octave = 0; octave < p.getNumOctaves(); octave++) {
+        Octave& oct_obj = p.getOctave(octave);
+        *desc_count += oct_obj.getDescriptorCount();
+    }
+    desc_out_device = popsift::cuda::malloc_devT<Descriptor>(*desc_count, __FILE__, __LINE__);
+    
+    size_t offset = 0;
+    for (int octave = 0; octave < p.getNumOctaves(); octave++) {
+        Octave& oct_obj = p.getOctave(octave);
+        size_t count = oct_obj.flattenDescOnDevice(desc_out_device + offset);
+        offset += count;
+    }
+    cudaDeviceSynchronize();
 }
 
 tmp_ret Matching::Match(PopSift& a, PopSift& b) {

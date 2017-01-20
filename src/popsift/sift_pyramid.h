@@ -37,9 +37,8 @@ public:
              int     h );
     ~Pyramid( );
 
-    Features* find_extrema( const Config& conf,
-                            Image*        base,
-                            PopSift& ps);
+    Features* find_extrema(const Config& conf,
+                           Image*        base);
 
     void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
 

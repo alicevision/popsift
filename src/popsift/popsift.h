@@ -41,6 +41,7 @@ public:
     PopSift( const popsift::Config& config );
     ~PopSift();
 
+    
     popsift::Descriptor* d_desc_flat = NULL;
     size_t d_desc_flat_size = 0;
 

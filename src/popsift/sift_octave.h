@@ -14,7 +14,6 @@
 #include "sift_conf.h"
 #include "sift_extremum.h"
 #include "sift_constants.h"
-#include "popsift.h"
 
 namespace popsift {
 
@@ -171,9 +170,11 @@ private:
         int getDescriptorCount( ) const;
 
         Descriptor* getDescriptors( uint32_t level );
-        void        downloadDescriptor( const Config& conf, PopSift& ps);
+        void        downloadDescriptor( const Config& conf);
         void        writeDescriptor( const Config& conf, std::ostream& ostr, bool really );
         void        copyExtrema( const Config& conf, Feature* feature, Descriptor* descBuffer );
+
+        size_t      flattenDescOnDevice(Descriptor* d_dst);
 
         /**
          * alloc() - allocates all GPU memories for one octave

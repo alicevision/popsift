@@ -49,6 +49,7 @@ void write_plane2Dunscaled( const char* filename, bool onDevice, Plane2D_float& 
 __host__
 void write_plane2D( const char* filename, Plane2D_float& f )
 {
+    return;
     // cerr << "Enter " << __FUNCTION__ << endl;
 
     int rows = f.getRows();
@@ -109,6 +110,7 @@ void write_plane2D( const char* filename, Plane2D_float& f )
 __host__
 void write_plane2Dunscaled( const char* filename, Plane2D_float& f, int offset )
 {
+    return;
     int rows = f.getRows();
     int cols = f.getCols();
 
