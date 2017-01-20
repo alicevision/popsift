@@ -16,7 +16,7 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 CUDA_ADD_LIBRARY(popsift STATIC
                  ${src_files_cu}
                  ${src_files_cpp}
-				 ${src_files_h})
+                 ${src_files_h})
 
 # BUILD_INTERFACE allows to include the directory with source only when target is
 # built in the building tree (ie, not from an install location)
@@ -26,7 +26,7 @@ target_include_directories(popsift
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>")
 
 if(NOT WIN32)
-  target_compile_options(popsift INTERFACE -std=c++11)
+  target_compile_options(popsift PUBLIC -std=c++11)
 endif()
 
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})

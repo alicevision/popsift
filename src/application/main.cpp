@@ -22,8 +22,8 @@
 #include <popsift/common/device_prop.h>
 
 #include "pgmread.h"
-#include "popsift\sift_pyramid.h"
-#include "popsift\sift_matching.h"
+#include "popsift/sift_pyramid.h"
+#include "popsift/sift_matching.h"
 
 using namespace std;
 
