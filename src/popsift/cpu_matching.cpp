@@ -51,6 +51,8 @@ struct best2_accumulator
     }
 };
 
+constexpr size_t best2_accumulator::no_index;
+
 }
 
 static size_t match_one(const Descriptor& d1, const std::vector<Feature>& vb)
