@@ -8,6 +8,7 @@
 
 #include "sift_matching.h"
 #include <assert.h>
+#include <float.h>
 #include <array>
 
 namespace popsift {
