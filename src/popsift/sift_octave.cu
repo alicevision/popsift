@@ -7,6 +7,12 @@
  */
 #include <sstream>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#define stat _stat
+#define mkdir(path, perm) _mkdir(path)
+#endif
+
 #include <new> // for placement new
 
 #include "sift_pyramid.h"

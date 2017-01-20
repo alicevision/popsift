@@ -11,6 +11,11 @@
 #include <vector>
 #include <stdio.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#define stat _stat
+#define mkdir(path, perm) _mkdir(path)
+#endif
 
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
