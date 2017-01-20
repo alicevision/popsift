@@ -91,7 +91,7 @@ void write_plane2D( const char* filename, Plane2D_float& f )
             cx++;
             of << val << " ";
         }
-        of << endl;
+        of << '\n';
     }
     delete [] c;
 #else
@@ -131,7 +131,7 @@ void write_plane2Dunscaled( const char* filename, Plane2D_float& f, int offset )
             cx++;
             of << val+offset << " ";
         }
-        of << endl;
+        of << '\n';
     }
     delete [] c;
 
