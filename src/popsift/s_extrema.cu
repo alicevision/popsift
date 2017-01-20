@@ -6,7 +6,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include <cuda_runtime.h>
+#include <texture_fetch_functions.h>
 #include <stdio.h>
+#include <iso646.h>
 
 #include "sift_pyramid.h"
 #include "sift_constants.h"
