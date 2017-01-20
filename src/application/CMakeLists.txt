@@ -12,12 +12,12 @@ else()
   find_package(PopSift CONFIG REQUIRED)
 endif()
 
-find_package(Boost 1.53.0 REQUIRED COMPONENTS filesystem)
+find_package(Boost 1.53.0 REQUIRED COMPONENTS program_options)
 
 add_executable(popsift-demo main.cpp pgmread.cpp)
 
 target_include_directories(popsift-demo PUBLIC ${Boost_INCLUDE_DIRS})
-
+target_compile_definitions(popsift-demo PRIVATE BOOST_ALL_NO_LIB BOOST_ALL_DYN_LINK)
 target_link_libraries(popsift-demo PUBLIC PopSift::popsift ${Boost_LIBRARIES})
 
 # set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
