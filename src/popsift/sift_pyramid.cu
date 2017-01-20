@@ -150,7 +150,7 @@ Features* Pyramid::find_extrema( const Config& conf,
         num_descriptors += _octaves[o].getDescriptorCount();
     }
 
-    features->_features.resize( num_extrema );
+    features->_features.resize( num_extrema+1 );
 
     features->_num_descriptors = num_descriptors;
     features->_desc_buffer = new Descriptor[ num_descriptors ];
