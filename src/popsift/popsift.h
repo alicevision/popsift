@@ -20,7 +20,7 @@ namespace popsift
     class Image;
     class Pyramid;
     class Features;    
-    class Descriptor;
+    struct Descriptor;
 };
 
 
