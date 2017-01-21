@@ -29,6 +29,8 @@ std::tuple<std::vector<unsigned>, Descriptor*> FlattenDescriptorsD(PopSift& ps)
         Octave& octave = pyramid.getOctave(o);
         for (int l = 0; l < octave.getLevels(); ++l) {
             size_t count = octave.getFeatVecCountH(l);
+            if (!count)
+                continue;
             
             assert(mapi + count <= d2e_map.size());
             assert(d_descriptors + count <= d_descriptors_orig + d2e_map.size());
