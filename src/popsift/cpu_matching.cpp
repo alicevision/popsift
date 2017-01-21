@@ -48,6 +48,8 @@ std::tuple<std::vector<unsigned>, Descriptor*> FlattenDescriptorsD(PopSift& ps)
         }
     }
 
+    assert(mapi == d2e_map.size());
+
     cudaDeviceSynchronize();
     return std::make_tuple(d2e_map, d_descriptors_orig);
 }
