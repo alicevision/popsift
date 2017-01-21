@@ -103,33 +103,29 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     notify(vm);
 }
 
-popsift_ptr extractFeatures(string& img, popsift::Config& config) {
-    int w;
-    int h;
+// Descriptor pointer is on-device flat list of all descriptors.
+std::tuple<std::vector<unsigned>, popsift::Features, popsift::Descriptor*>
+extractFeatures(string& img, popsift::Config& config) {
+    int w, h;
     auto image_data = readPGMfile(img, w, h);
-    if (!image_data) {
+    if (!image_data)
         exit(-1);
-    }
-
-    // cerr << "Input image size: "
-    //      << w << "X" << h
-    //      << " filename: " << boost::filesystem::path(inputFile).filename() << endl;
 
     popsift::cuda::device_prop_t deviceInfo;
     deviceInfo.set(0, print_dev_info);
     if (print_dev_info) deviceInfo.print();
-
     
-    popsift_ptr popsift(new PopSift(config), popsift_deleter());
+    PopSift popsift(config);
 
-    popsift->init(0, w, h, print_time_info);
-    popsift->execute(0, image_data.get(), print_time_info);
+    popsift.init(0, w, h, print_time_info);
+    popsift.execute(0, image_data.get(), print_time_info);
+    popsift::Features* feature_list = popsift.getFeatures();
+    auto flat = popsift::FlattenDescriptorsD(popsift);
     
-    popsift::Features* feature_list = popsift->getFeatures();
     std::ofstream of("output-features.txt");
     feature_list->print(of, write_as_uchar);
 
-    return popsift;
+    return std::make_tuple(std::get<0>(flat), *feature_list, std::get<1>(flat));
 }
 
 int main(int argc, char **argv)
@@ -151,14 +147,16 @@ int main(int argc, char **argv)
     }
     
     
-    popsift_ptr sift_a = extractFeatures(inputFile, config);
+    auto sift_a = extractFeatures(inputFile, config);
     if (!matchFile.empty()) {
-        popsift_ptr sift_b = extractFeatures(matchFile, config);
+        auto sift_b = extractFeatures(matchFile, config);
 
+#if false
         popsift::Matching matcher(config);
         matcher.Match(*sift_a, *sift_b);
+#endif
 
-        auto matches = popsift::Matching_CPU(*sift_a->getFeatures(), *sift_b->getFeatures());
+        auto matches = popsift::Matching_CPU(std::get<1>(sift_a), std::get<1>(sift_b));
         for (size_t i = 0; i < matches.size(); ++i)
         if (matches[i] != -1)
             cout << i << ' ' << matches[i] << '\n';
