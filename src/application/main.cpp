@@ -5,6 +5,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+#define BOOST_LIB_DIAGNOSTIC
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -156,7 +158,7 @@ int main(int argc, char **argv)
         popsift::Matching matcher(config);
         matcher.Match(*sift_a, *sift_b);
 
-        auto matches = popsift::cpu_matching(*sift_a->getFeatures(), *sift_b->getFeatures());
+        auto matches = popsift::Matching_CPU(*sift_a->getFeatures(), *sift_b->getFeatures());
         for (size_t i = 0; i < matches.size(); ++i)
         if (matches[i] != -1)
             cout << i << ' ' << matches[i] << '\n';

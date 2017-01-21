@@ -7,11 +7,53 @@
 */
 
 #include "sift_matching.h"
+#include "sift_pyramid.h"
+#include "common/debug_macros.h"
 #include <assert.h>
 #include <float.h>
 #include <array>
+#include <stdexcept>
 
 namespace popsift {
+
+std::tuple<std::vector<unsigned>, Descriptor*> FlattenDescriptorsD(PopSift& ps)
+{
+    std::vector<unsigned> d2e_map(ps.getFeatures()->list().size());
+    size_t mapi = 0;
+
+    Descriptor* d_descriptors = popsift::cuda::malloc_devT<Descriptor>(d2e_map.size(), __FILE__, __LINE__);
+    Descriptor* d_descriptors_orig = d_descriptors;
+
+    Pyramid& pyramid = ps.pyramid(0);
+    for (int o = 0; o < pyramid.getNumOctaves(); ++o) {
+        Octave& octave = pyramid.getOctave(o);
+        for (int l = 0; l < octave.getLevels(); ++l) {
+            size_t count = octave.getFeatVecCountH(l);
+            
+            assert(mapi + count <= d2e_map.size());
+            assert(d_descriptors + count <= d_descriptors_orig + d2e_map.size());
+
+            popcuda_memcpy_async(
+                d_descriptors,
+                octave.getDescriptors(l),       // Returns device pointer!
+                count * sizeof(Descriptor),
+                cudaMemcpyDeviceToDevice,
+                octave.getStream(l));
+            
+            int* f2emap = octave.getFeatToExtMapH(l);
+            std::copy(f2emap, f2emap + count, d2e_map.data() + mapi);
+
+            mapi += count;
+            d_descriptors += count;
+        }
+    }
+
+    cudaDeviceSynchronize();
+    return std::make_tuple(d2e_map, d_descriptors_orig);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
 
 static float l2_dist_sq(const Descriptor& a, const Descriptor& b)
 {
@@ -73,7 +115,7 @@ static int match_one(const Descriptor& d1, const std::vector<Feature>& vb)
     return -1;
 }
 
-std::vector<int> cpu_matching(const Features& ffa, const Features& ffb)
+std::vector<int> Matching_CPU(const Features& ffa, const Features& ffb)
 {
     const auto& va = ffa.list();
     std::vector<int> matches;
@@ -82,7 +124,10 @@ std::vector<int> cpu_matching(const Features& ffa, const Features& ffb)
         return matches;
 
     matches.resize(va.size(), -1);
-    for (size_t ia = 0; ia < va.size(); ++ia) {
+    const size_t vasz = va.size();
+
+#pragma loop(hint_parallel(8))
+    for (size_t ia = 0; ia < vasz; ++ia) {
         const auto& fa = va[ia];
         for (int id = 0; id < fa.num_descs; ++id) {
             int ib = match_one(*fa.desc[id], ffb.list());
