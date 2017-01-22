@@ -48,8 +48,7 @@ struct Feature
     float       xpos;
     float       ypos;
     float       sigma;     // scale;
-    int         num_descs; // number of this extremum's orientations
-                            // remaining entries in desc are 0
+    int         num_descs; // number of this extremum's orientations; remaining entries in desc are 0
     float       orientation[ORIENTATION_MAX_COUNT];
     Descriptor* desc[ORIENTATION_MAX_COUNT];
 
@@ -68,9 +67,6 @@ std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
  */
 class Features
 {
-    typedef std::vector<Feature>::iterator       F_iterator;
-    typedef std::vector<Feature>::const_iterator F_const_iterator;
-
     std::vector<Feature> _features;
     std::vector<Descriptor> _descriptors;
 
