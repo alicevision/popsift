@@ -18,7 +18,7 @@ namespace popsift {
 
 std::tuple<std::vector<unsigned>, Descriptor*> FlattenDescriptorsD(PopSift& ps)
 {
-    std::vector<unsigned> d2e_map(ps.getFeatures()->features().size());
+    std::vector<unsigned> d2e_map(ps.getFeatures()->descriptors().size());
     size_t mapi = 0;
 
     Descriptor* d_descriptors = popsift::cuda::malloc_devT<Descriptor>(d2e_map.size(), __FILE__, __LINE__);
