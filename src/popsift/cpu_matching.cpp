@@ -16,12 +16,10 @@
 
 namespace popsift {
 
-std::tuple<std::vector<unsigned>, Descriptor*> FlattenDescriptorsD(PopSift& ps)
+Descriptor* FlattenDescriptorsAsyncD(PopSift& ps)
 {
-    std::vector<unsigned> d2e_map(ps.getFeatures()->descriptors().size());
-    size_t mapi = 0;
-
-    Descriptor* d_descriptors = popsift::cuda::malloc_devT<Descriptor>(d2e_map.size(), __FILE__, __LINE__);
+    const size_t descriptor_count = ps.getFeatures()->descriptors().size();
+    Descriptor* d_descriptors = popsift::cuda::malloc_devT<Descriptor>(descriptor_count, __FILE__, __LINE__);
     Descriptor* d_descriptors_orig = d_descriptors;
 
     Pyramid& pyramid = ps.pyramid(0);
@@ -29,33 +27,40 @@ std::tuple<std::vector<unsigned>, Descriptor*> FlattenDescriptorsD(PopSift& ps)
         Octave& octave = pyramid.getOctave(o);
         for (int l = 0; l < octave.getLevels(); ++l) {
             size_t count = octave.getFeatVecCountH(l);
-            if (!count)
-                continue;
-            
-            assert(mapi + count <= d2e_map.size());
-            assert(d_descriptors + count <= d_descriptors_orig + d2e_map.size());
+            assert(d_descriptors + count <= d_descriptors_orig + descriptor_count);
+
+            // NB: getDescriptors returns device pointer.
+            // XXX: popcuda_memcpy_async should allow size==0.
+            if (!count) continue;
 
             popcuda_memcpy_async(
                 d_descriptors,
-                octave.getDescriptors(l),       // Returns device pointer!
+                octave.getDescriptors(l),
                 count * sizeof(Descriptor),
                 cudaMemcpyDeviceToDevice,
                 octave.getStream(l));
-            
-            int* f2emap = octave.getFeatToExtMapH(l);
-            std::copy(f2emap, f2emap + count, d2e_map.data() + mapi);
 
-            mapi += count;
             d_descriptors += count;
         }
     }
-
-    assert(mapi == d2e_map.size());
-
-    cudaDeviceSynchronize();
-    return std::make_tuple(d2e_map, d_descriptors_orig);
+    return d_descriptors_orig;
 }
 
+std::vector<unsigned> CreateFeatureToExtremaMap(PopSift& ps)
+{
+    const auto& fv = ps.getFeatures()->features();
+    const size_t descriptor_count = ps.getFeatures()->descriptors().size();
+    
+    std::vector<unsigned> map(descriptor_count);
+    auto b = map.begin();
+    for (size_t i = 0; i < fv.size(); ++i) {
+        size_t count = fv[i].num_descs;
+        std::fill(b, b + count, i);
+        b += count;
+    }
+
+    return map;
+}
 
 /////////////////////////////////////////////////////////////////////////////
 

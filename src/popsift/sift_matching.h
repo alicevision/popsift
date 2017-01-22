@@ -11,17 +11,17 @@
 #include "sift_conf.h"
 #include "sift_extremum.h"
 #include "popsift.h"
-#include <tuple>
 #include <vector>
 
 class PopSift;
 
 namespace popsift {
 
-// Flatten descriptors from all octaves on the device.  A new contiguous block
-// with sufficient space for all descriptors is allocated.  Returns a vector
-// mapping descriptors to extrema and the allocated GPU pointer.
-std::tuple<std::vector<unsigned>, Descriptor*> FlattenDescriptorsD(PopSift& ps);
+// Flatten descriptors from all octaves to a contiguous block on the device.
+Descriptor* FlattenDescriptorsAsyncD(PopSift& ps);
+
+// Create a descriptor -> extrema map.
+std::vector<unsigned> CreateFeatureToExtremaMap(PopSift& ps);
 
 // Returns vector v indexed by features in fa s.t. v[i] is the best match in fb.
 // If a feature in fa has no match in fb, v[i] == -1.

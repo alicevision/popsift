@@ -120,12 +120,15 @@ extractFeatures(string& img, popsift::Config& config) {
     popsift.init(0, w, h, print_time_info);
     popsift.execute(0, image_data.get(), print_time_info);
     popsift::Features *feature_list = popsift.getFeatures(); // copy out
-    auto flat = popsift::FlattenDescriptorsD(popsift);
+    
+    auto d_descriptors_flat = popsift::FlattenDescriptorsAsyncD(popsift);
+    auto f2e_map = popsift::CreateFeatureToExtremaMap(popsift);
+    cudaDeviceSynchronize();
     
     std::ofstream of("output-features.txt");
     feature_list->print(of, write_as_uchar);
 
-    return std::make_tuple(std::get<0>(flat), std::move(*feature_list), std::get<1>(flat));
+    return std::make_tuple(f2e_map, std::move(*feature_list), d_descriptors_flat);
 }
 
 int main(int argc, char **argv)
