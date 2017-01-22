@@ -17,7 +17,7 @@
 /* user parameters */
 namespace popsift
 {
-    class Image;
+    struct Image;
     class Pyramid;
     class Features;    
     struct Descriptor;
