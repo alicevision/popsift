@@ -23,8 +23,8 @@ Descriptor* FlattenDescriptorsAsyncD(PopSift& ps);
 // Create a descriptor -> extrema map.
 std::vector<unsigned> CreateFeatureToExtremaMap(PopSift& ps);
 
-// Returns vector v indexed by features in fa s.t. v[i] is the best match in fb.
-// If a feature in fa has no match in fb, v[i] == -1.
+// Returns vector v indexed by descriptors in fa s.t. v[i] is the best matching descriptor in fb.
+// If a descriptor in fa has no match in fb, v[i] == -1.
 std::vector<int> Matching_CPU(const Features& fa, const Features& fb);
 
 

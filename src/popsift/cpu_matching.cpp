@@ -103,16 +103,15 @@ struct best2_accumulator
 
 }
 
-static int match_one(const Descriptor& d1, const std::vector<Feature>& vb)
+static int match_one(const Descriptor& d1, const std::vector<Descriptor>& db)
 {
+    const size_t dbsz = db.size();
     best2_accumulator best2;
 
-    for (size_t ib = 0; ib < vb.size(); ++ib) {
-        const auto& fb = vb[ib];
-        for (int id = 0; id < fb.num_descs; ++id) {
-            float d = l2_dist_sq(d1, *fb.desc[id]);
-            best2.update(d, ib);
-        }
+#pragma loop(hint_parallel(8))
+    for (size_t ib = 0; ib < dbsz; ++ib) {
+        float d = l2_dist_sq(d1, db[ib]);
+        best2.update(d, ib);
     }
 
     assert(best2.index[0] != -1);                           // would happen on empty vb
@@ -124,29 +123,20 @@ static int match_one(const Descriptor& d1, const std::vector<Feature>& vb)
     return -1;
 }
 
-std::vector<int> Matching_CPU(const Features& ffa, const Features& ffb)
+std::vector<int> Matching_CPU(const Features& fa, const Features& fb)
 {
-    const auto& va = ffa.features();
+    const auto& da = fa.descriptors();
+    const auto& db = fb.descriptors();
     std::vector<int> matches;
 
-    if (ffa.features().empty() || ffb.features().empty())
+    if (da.empty() || db.empty())
         return matches;
 
-    matches.resize(va.size(), -1);
-    const size_t vasz = va.size();
+    matches.reserve(da.size());
+    const size_t dasz = da.size();
 
-#pragma loop(hint_parallel(8))
-    for (size_t ia = 0; ia < vasz; ++ia) {
-        const auto& fa = va[ia];
-        for (int id = 0; id < fa.num_descs; ++id) {
-            int ib = match_one(*fa.desc[id], ffb.features());
-            // Match only one orientation.
-            if (ib != -1) {
-                matches[ia] = ib;
-                break;
-            }
-        }
-    }
+    for (size_t ia = 0; ia < dasz; ++ia)
+        matches.push_back(match_one(da[ia], db));
 
     return matches;
 }
