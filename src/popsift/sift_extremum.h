@@ -71,6 +71,12 @@ class Features
     std::vector<Descriptor> _descriptors;
 
 public:
+    Features(const Features&) = delete;
+    Features& operator=(const Features&) = delete;
+
+    Features(Features&&) = default;
+    Features& operator=(Features&&) = default;
+
     const std::vector<Feature>& features() const { return _features; }
     const std::vector<Descriptor>& descriptors() const { return _descriptors;  }
     void print( std::ostream& ostr, bool write_as_uchar ) const;
