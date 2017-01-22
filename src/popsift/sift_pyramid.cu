@@ -152,9 +152,7 @@ Features* Pyramid::find_extrema(const Config& conf,
     }
 
     features->_features.resize(num_extrema);
-
-    features->_num_descriptors = num_descriptors;
-    features->_desc_buffer = new Descriptor[num_descriptors];
+    features->_descriptors.resize(num_descriptors);
 
     // ensure that asynchronous downloads are finished
     cudaDeviceSynchronize();
@@ -164,7 +162,7 @@ Features* Pyramid::find_extrema(const Config& conf,
     for (int o = 0; o<_num_octaves; o++) {
         if (num_extrema < features->_features.size()) {
             Feature*    feature_base = &features->_features[num_extrema];
-            Descriptor* desc_base = &features->_desc_buffer[num_descriptors];
+            Descriptor* desc_base = features->_descriptors.data() + num_descriptors;
             _octaves[o].copyExtrema(conf, feature_base, desc_base);
         }
         else {

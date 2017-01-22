@@ -18,7 +18,7 @@ namespace popsift {
 
 std::tuple<std::vector<unsigned>, Descriptor*> FlattenDescriptorsD(PopSift& ps)
 {
-    std::vector<unsigned> d2e_map(ps.getFeatures()->list().size());
+    std::vector<unsigned> d2e_map(ps.getFeatures()->features().size());
     size_t mapi = 0;
 
     Descriptor* d_descriptors = popsift::cuda::malloc_devT<Descriptor>(d2e_map.size(), __FILE__, __LINE__);
@@ -121,10 +121,10 @@ static int match_one(const Descriptor& d1, const std::vector<Feature>& vb)
 
 std::vector<int> Matching_CPU(const Features& ffa, const Features& ffb)
 {
-    const auto& va = ffa.list();
+    const auto& va = ffa.features();
     std::vector<int> matches;
 
-    if (ffa.list().empty() || ffb.list().empty())
+    if (ffa.features().empty() || ffb.features().empty())
         return matches;
 
     matches.resize(va.size(), -1);
@@ -134,7 +134,7 @@ std::vector<int> Matching_CPU(const Features& ffa, const Features& ffb)
     for (size_t ia = 0; ia < vasz; ++ia) {
         const auto& fa = va[ia];
         for (int id = 0; id < fa.num_descs; ++id) {
-            int ib = match_one(*fa.desc[id], ffb.list());
+            int ib = match_one(*fa.desc[id], ffb.features());
             // Match only one orientation.
             if (ib != -1) {
                 matches[ia] = ib;

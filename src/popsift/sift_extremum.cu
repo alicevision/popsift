@@ -10,16 +10,6 @@
 
 namespace popsift {
 
-Features::Features( )
-    : _desc_buffer( 0 )
-{ }
-
-Features::~Features( )
-{
-    _features.clear();
-    delete [] _desc_buffer;
-}
-
 void Features::print( std::ostream& ostr, bool write_as_uchar ) const
 {
     std::cout << "Num features: " << _features.size() << std::endl;

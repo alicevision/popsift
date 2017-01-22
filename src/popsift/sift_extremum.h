@@ -72,14 +72,11 @@ class Features
     typedef std::vector<Feature>::const_iterator F_const_iterator;
 
     std::vector<Feature> _features;
-    Descriptor*          _desc_buffer;
-    unsigned int         _num_descriptors;
+    std::vector<Descriptor> _descriptors;
 
 public:
-    Features( );
-    ~Features( );
-    
-    const std::vector<Feature>& list() const { return _features; }
+    const std::vector<Feature>& features() const { return _features; }
+    const std::vector<Descriptor>& descriptors() const { return _descriptors;  }
     void print( std::ostream& ostr, bool write_as_uchar ) const;
 
 protected:
