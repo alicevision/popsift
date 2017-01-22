@@ -71,6 +71,7 @@ class Features
     std::vector<Descriptor> _descriptors;
 
 public:
+    Features() = default;
     Features(const Features&) = delete;
     Features& operator=(const Features&) = delete;
 
