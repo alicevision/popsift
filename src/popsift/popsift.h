@@ -29,7 +29,7 @@ class PopSift
     struct Pipe
     {
         popsift::Image*   _inputImage;
-
+        
         popsift::Pyramid* _pyramid;
     };
 

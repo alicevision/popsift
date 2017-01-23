@@ -164,14 +164,19 @@ int main(int argc, char **argv)
             std::get<2>(sift_b), std::get<1>(sift_b).descriptors().size());
 
 #endif
-
+        for (int i = 0; i < 100; i++) {
+            cout << gpu_matches[i];
+        }
+        system("Pause");
         //auto cpu_matches = popsift::Matching_CPU(std::get<1>(sift_a), std::get<1>(sift_b));
         //assert(cpu_matches == gpu_matches);
 
+        /*
         for (size_t i = 0; i < gpu_matches.size(); ++i) {
             //cout << cpu_matches[i] << " " << gpu_matches[i] << "\n";
-            cout << i << " " << gpu_matches[i] << "\n";
+            //cout << i << " " << gpu_matches[i] << "\n";
         }
+        */
     }
     return 0;
 }
