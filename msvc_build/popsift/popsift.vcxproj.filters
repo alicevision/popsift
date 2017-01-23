@@ -27,6 +27,19 @@
     <ClInclude Include="..\..\src\popsift\common\write_plane_2d.h">
       <Filter>common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\popsift\assist.h" />
+    <ClInclude Include="..\..\src\popsift\clamp.h" />
+    <ClInclude Include="..\..\src\popsift\gauss_filter.h" />
+    <ClInclude Include="..\..\src\popsift\popsift.h" />
+    <ClInclude Include="..\..\src\popsift\sift_conf.h" />
+    <ClInclude Include="..\..\src\popsift\sift_constants.h" />
+    <ClInclude Include="..\..\src\popsift\sift_extremum.h" />
+    <ClInclude Include="..\..\src\popsift\sift_matching.h" />
+    <ClInclude Include="..\..\src\popsift\sift_octave.h" />
+    <ClInclude Include="..\..\src\popsift\sift_pyramid.h" />
+    <ClInclude Include="..\..\src\popsift\s_gradiant.h" />
+    <ClInclude Include="..\..\src\popsift\s_image.h" />
+    <ClInclude Include="..\..\src\popsift\s_solve.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\popsift\common\debug_macros.cpp">
@@ -35,6 +48,7 @@
     <ClCompile Include="..\..\src\popsift\common\device_prop.cpp">
       <Filter>common</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\popsift\cpu_matching.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\popsift\common\plane_2d.cu">
@@ -43,5 +57,20 @@
     <CudaCompile Include="..\..\src\popsift\common\write_plane_2d.cu">
       <Filter>common</Filter>
     </CudaCompile>
+    <CudaCompile Include="..\..\src\popsift\assist.cu" />
+    <CudaCompile Include="..\..\src\popsift\gauss_filter.cu" />
+    <CudaCompile Include="..\..\src\popsift\popsift.cu" />
+    <CudaCompile Include="..\..\src\popsift\sift_conf.cu" />
+    <CudaCompile Include="..\..\src\popsift\sift_constants.cu" />
+    <CudaCompile Include="..\..\src\popsift\sift_desc.cu" />
+    <CudaCompile Include="..\..\src\popsift\sift_extremum.cu" />
+    <CudaCompile Include="..\..\src\popsift\sift_matching.cu" />
+    <CudaCompile Include="..\..\src\popsift\sift_octave.cu" />
+    <CudaCompile Include="..\..\src\popsift\sift_pyramid.cu" />
+    <CudaCompile Include="..\..\src\popsift\s_extrema.cu" />
+    <CudaCompile Include="..\..\src\popsift\s_image.cu" />
+    <CudaCompile Include="..\..\src\popsift\s_orientation.cu" />
+    <CudaCompile Include="..\..\src\popsift\s_pyramid_build.cu" />
+    <CudaCompile Include="..\..\src\popsift\s_pyramid_fixed.cu" />
   </ItemGroup>
 </Project>
