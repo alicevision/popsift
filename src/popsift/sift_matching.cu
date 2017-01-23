@@ -90,38 +90,38 @@ void convert(Descriptor* d_desc, int count, u8desc* out) {
 
 __global__
 void u8_test(u8desc* d_desc_a, int desc_a_count, u8desc* d_desc_b, int desc_b_count, int* output) {
-    int tid = threadIdx.x;
+    int tid = threadIdx.x + (blockIdx.x * blockDim.x);
+    if (tid >= desc_a_count) return;
 
-    for (int i = tid; i < desc_a_count; i += blockDim.x) {
-        u8desc& a = d_desc_a[i];
-        float min1 = FLT_MAX, min2 = FLT_MAX;
-        int min_index;
+    u8desc& a = d_desc_a[tid];
+    float min1 = FLT_MAX, min2 = FLT_MAX;
+    int min_index;
 
-        for (int x = 0; x < desc_b_count; x++) {
-            float dst = calc_distance<unsigned char>(&a.features[0], &d_desc_b[x].features[0]);
-            if (dst < min1) {
-                min2 = min1;
-                min1 = dst;
-                min_index = x;
-            }
-            else if (dst < min2) {
-                min2 = dst;
-            }
+    for (int x = 0; x < desc_b_count; x++) {
+        float dst = calc_distance<unsigned char>(&a.features[0], &d_desc_b[x].features[0]);
+        if (dst < min1) {
+            min2 = min1;
+            min1 = dst;
+            min_index = x;
         }
-
-        if (min1 / min2 < 0.64f) {
-            output[i] = min_index;
-        }
-        else {
-            output[i] = -1;
+        else if (dst < min2) {
+            min2 = dst;
         }
     }
 
+    if (min1 / min2 < 0.64f) {
+        output[tid] = min_index;
+    }
+    else {
+        output[tid] = -1;
+    }
 }
+
+
 std::vector<int> Matching::Match(popsift::Descriptor* d_desc_a, size_t num_desc_a,
     popsift::Descriptor* d_desc_b, size_t num_desc_b) {
-    dim3 threadsPerBlock(1024);
-    dim3 numBlocks(1);
+    dim3 threadsPerBlock(128);
+    dim3 numBlocks((int)ceil(num_desc_a / 128.f));
     
     int* d_result = popsift::cuda::malloc_devT<int>(num_desc_a, __FILE__, __LINE__);
 
@@ -129,7 +129,7 @@ std::vector<int> Matching::Match(popsift::Descriptor* d_desc_a, size_t num_desc_
 #if 1
         u8desc* a_u8desc = popsift::cuda::malloc_devT<u8desc>(num_desc_a, __FILE__, __LINE__);
         u8desc* b_u8desc = popsift::cuda::malloc_devT<u8desc>(num_desc_b, __FILE__, __LINE__);
-        convert << <numBlocks, threadsPerBlock >> > (d_desc_a, num_desc_a, b_u8desc);
+        convert << <numBlocks, threadsPerBlock >> > (d_desc_a, num_desc_a, a_u8desc);
         convert << <numBlocks, threadsPerBlock >> > (d_desc_b, num_desc_b, b_u8desc);
         
         u8_test<<<numBlocks, threadsPerBlock >>>(a_u8desc, num_desc_a, b_u8desc, num_desc_b, d_result);

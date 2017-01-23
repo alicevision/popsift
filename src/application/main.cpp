@@ -164,10 +164,11 @@ int main(int argc, char **argv)
             std::get<2>(sift_b), std::get<1>(sift_b).descriptors().size());
 
 #endif
+        std::ofstream f("tmp.txt");
+
         for (int i = 0; i < 100; i++) {
-            cout << gpu_matches[i];
+            f << gpu_matches[i];
         }
-        system("Pause");
         //auto cpu_matches = popsift::Matching_CPU(std::get<1>(sift_a), std::get<1>(sift_b));
         //assert(cpu_matches == gpu_matches);
 
