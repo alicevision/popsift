@@ -27,23 +27,17 @@ std::vector<unsigned> CreateFeatureToExtremaMap(PopSift& ps);
 // If a descriptor in fa has no match in fb, v[i] == -1.
 std::vector<int> Matching_CPU(const Features& fa, const Features& fb);
 
-
-struct tmp_ret {
-
-};
-
 class Matching
 {
 public:
     Matching(Config& config);
     ~Matching();
 
-    tmp_ret Match(PopSift& a, PopSift& b);
+    std::vector<int> Match(popsift::Descriptor* d_desc_a, size_t num_desc_a, 
+                  popsift::Descriptor* d_desc_b, size_t num_desc_b);
 
 private:
     const Config& config;
-
-    void getFlatDeviceDesc(PopSift& ps, Descriptor*& desc_out_device, int* desc_count);
 };
 
 }

@@ -103,6 +103,8 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     notify(vm);
 }
 
+
+
 // Descriptor pointer is on-device flat list of all descriptors.
 std::tuple<std::vector<unsigned>, popsift::Features, popsift::Descriptor*>
 extractFeatures(string& img, popsift::Config& config) {
@@ -154,15 +156,22 @@ int main(int argc, char **argv)
     if (!matchFile.empty()) {
         auto sift_b = extractFeatures(matchFile, config);
 
-#if false
+#if 1
         popsift::Matching matcher(config);
-        matcher.Match(*sift_a, *sift_b);
+        //matcher.Match(*sift_a, *sift_b);
+        std::vector<int> gpu_matches = matcher.Match(
+            std::get<2>(sift_a), std::get<1>(sift_a).descriptors().size(), 
+            std::get<2>(sift_b), std::get<1>(sift_b).descriptors().size());
+
 #endif
 
-        auto matches = popsift::Matching_CPU(std::get<1>(sift_a), std::get<1>(sift_b));
-        for (size_t i = 0; i < matches.size(); ++i)
-        if (matches[i] != -1)
-            cout << i << ' ' << matches[i] << '\n';
+        //auto cpu_matches = popsift::Matching_CPU(std::get<1>(sift_a), std::get<1>(sift_b));
+        //assert(cpu_matches == gpu_matches);
+
+        for (size_t i = 0; i < gpu_matches.size(); ++i) {
+            //cout << cpu_matches[i] << " " << gpu_matches[i] << "\n";
+            cout << i << " " << gpu_matches[i] << "\n";
+        }
     }
     return 0;
 }
