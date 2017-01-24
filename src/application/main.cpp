@@ -152,12 +152,15 @@ static void CPU_Matching_Performance(const ExtractionResult& er_a, const Extract
     auto m_vector = popsift::Matching_CPU(hu8_a, hu8_b);
 
     assert(m_vector.size() == m_scalar.size());
-    if (m_vector != m_scalar)
+    if (m_vector == m_scalar) {
+        std::cout << "SCALAR AND VECTOR MATCHES MATCH\n";
+    }
+    else {
         std::cout << "SCALAR AND VECTOR MATCHES DIFFER\n";
-
-    for (size_t i = 0; i < m_scalar.size(); ++i)
-        if (m_scalar[i] != m_vector[i])
-            cout << i << " " << m_scalar[i] << " " << m_vector[i] << "\n";
+        for (size_t i = 0; i < m_scalar.size(); ++i)
+            if (m_scalar[i] != m_vector[i])
+                cout << i << " " << m_scalar[i] << " " << m_vector[i] << "\n";
+    }
 }
 
 int main(int argc, char **argv)
@@ -182,22 +185,20 @@ int main(int argc, char **argv)
     auto sift_a = extractFeatures(inputFile, config);
     if (!matchFile.empty()) {
         auto sift_b = extractFeatures(matchFile, config);
-
-#if 1
+        CPU_Matching_Performance(sift_a, sift_b);
+#if 0
         popsift::Matching matcher(config);
         //matcher.Match(*sift_a, *sift_b);
         std::vector<int> gpu_matches = matcher.Match(
             std::get<2>(sift_a), std::get<1>(sift_a).descriptors().size(), 
             std::get<2>(sift_b), std::get<1>(sift_b).descriptors().size());
 
-#endif
         std::ofstream f("tmp.txt");
 
         for (int i = 0; i < 100; i++) {
             f << gpu_matches[i];
         }
-        //auto cpu_matches = popsift::Matching_CPU(std::get<1>(sift_a), std::get<1>(sift_b));
-        //assert(cpu_matches == gpu_matches);
+#endif
 
         /*
         for (size_t i = 0; i < gpu_matches.size(); ++i) {
