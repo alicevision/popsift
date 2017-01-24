@@ -95,7 +95,12 @@ void test(Descriptor* d_desc_a, int desc_a_count, Descriptor* d_desc_b, int desc
     }
 }
 
-//~1,5sec execution
+__device__ inline unsigned int swar_sub(unsigned int a, unsigned int b) {
+    const unsigned int h = 0x80808080;
+    return ((a | h) - (b & ~h)) ^ ((a ^ ~b) & h);
+}
+
+//~1.2sec execution 128x1
 __global__
 void u8_test(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_desc_b, int desc_b_count, int* output) {
     int tid = threadIdx.x + (blockIdx.x * blockDim.x);
@@ -113,16 +118,23 @@ void u8_test(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_desc_b, i
         unsigned char* ap = &d_desc_b[x].features[0];
         unsigned char* bp = &cached[0].features[0];
         memcpy(bp + (threadIdx.x*skip_len), ap + (threadIdx.x*skip_len), sizeof(unsigned char) * skip_len);
-        //cached[threadIdx.x] = d_desc_b[x+threadIdx.x];
         for (int i = 0; i < cache_size; i++) {
-            //float dst = calc_distance<unsigned char>(&a.features[0], &cached[i].features[0], &min2);
             int dst = 0;
+#if 0
+            for (int s = 0; s < 128; s+=4) {
+                unsigned int tmp = swar_sub(*(unsigned int*)&a.features[s], *(unsigned int*)&cached[i].features[s]);     
+                #pragma unroll
+                for (int k = 0; k < 4; k++) {
+                    unsigned char v = (tmp >> (k * 8)) & 0xFF;
+                    dst += v*v;
+                }
+            }
+#else
             for (int s = 0; s < 128; s++) {
                 unsigned char sub = a.features[s] - cached[i].features[s];
                 dst += sub*sub;
-
-                //if (dst > min2) break;
             }
+#endif
             if (dst < min1) {
                 min2 = min1;
                 min1 = dst;
