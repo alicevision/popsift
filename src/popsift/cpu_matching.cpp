@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <float.h>
 #include <immintrin.h>
+#include <tbb/parallel_for.h>
 #include <array>
 #include <stdexcept>
 
@@ -95,6 +96,24 @@ struct best2_accumulator
 
 }
 
+template<typename DT, typename F>
+static std::vector<int> Matching_CPU(
+    const std::vector<DT>& da,
+    const std::vector<DT>& db,
+    F match_one)
+{
+    std::vector<int> matches;
+    if (da.empty() || db.empty())
+        return matches;
+
+    matches.reserve(da.size());
+    const size_t dasz = da.size();
+    for (size_t ia = 0; ia < dasz; ++ia)
+        matches.push_back(match_one(da[ia], db));
+    return matches;
+}
+
+
 // NON-VECTORIZED MATCHING OF FLOAT DESCRIPTORS /////////////////////////////
 
 // Plain implementation for float descriptors.
@@ -108,7 +127,7 @@ static float L2DistanceSquared(const Descriptor& a, const Descriptor& b)
     return sum;
 }
 
-static int match_one(const Descriptor& d1, const std::vector<Descriptor>& db)
+static int match_one_scalar(const Descriptor& d1, const std::vector<Descriptor>& db)
 {
     const size_t dbsz = db.size();
     best2_accumulator best2;
@@ -129,15 +148,7 @@ static int match_one(const Descriptor& d1, const std::vector<Descriptor>& db)
 
 std::vector<int> Matching_CPU(const std::vector<Descriptor>& da, const std::vector<Descriptor>& db)
 {
-    std::vector<int> matches;
-    if (da.empty() || db.empty())
-        return matches;
-
-    matches.reserve(da.size());
-    const size_t dasz = da.size();
-    for (size_t ia = 0; ia < dasz; ++ia)
-        matches.push_back(match_one(da[ia], db));
-    return matches;
+    return Matching_CPU(da, db, match_one_scalar);
 }
 
 // VECTORIZED/PARALLELIZED MATCHING OF U8 DESCRIPTORS ///////////////////////
@@ -184,5 +195,32 @@ static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
     unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
     return sum;
 }
+
+static int match_one_vector(const U8Descriptor& d1, const std::vector<U8Descriptor>& db)
+{
+#if 0
+    const size_t dbsz = db.size();
+    best2_accumulator best2;
+
+    for (size_t ib = 0; ib < dbsz; ++ib) {
+        float d = L2DistanceSquared(d1, db[ib]);
+        best2.update(d, ib);
+    }
+
+    assert(best2.index[0] != -1);                           // would happen on empty vb
+    assert(best2.distance[1] != 0);                         // in that case it should be at index 0
+    if (best2.index[1] == -1)                               // happens on vb.size()==1
+        return best2.index[0];
+    if (best2.distance[0] / best2.distance[1] < 0.8*0.8)    // Threshold from the paper, squared
+        return best2.index[0];
+#endif
+    return -1;
+}
+
+std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::vector<U8Descriptor>& db)
+{
+    return Matching_CPU(da, db, match_one_vector);
+}
+
 
 }   // popsift
