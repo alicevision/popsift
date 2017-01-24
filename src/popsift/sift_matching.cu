@@ -62,7 +62,7 @@ float calc_distance(const T* a, const T* b) {
     return sum;
 }
 
-//~1.9sec execution
+//~16+sec execution
 __global__
 void test(Descriptor* d_desc_a, int desc_a_count, Descriptor* d_desc_b, int desc_b_count, int* output) {
     int tid = threadIdx.x;
@@ -94,9 +94,39 @@ void test(Descriptor* d_desc_a, int desc_a_count, Descriptor* d_desc_b, int desc
     }
 }
 
-//~3sec execution
+//~1,9sec execution
 __global__
 void u8_test(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_desc_b, int desc_b_count, int* output) {
+    int tid = threadIdx.x + (blockIdx.x * blockDim.x);
+    if (tid >= desc_a_count) return;
+
+    U8Descriptor& a = d_desc_a[tid];
+    float min1 = FLT_MAX, min2 = FLT_MAX;
+    int min_index;
+
+    for (int x = 0; x < desc_b_count; x++) {
+        float dst = calc_distance<unsigned char>(&a.features[0], &d_desc_b[x].features[0]);
+        if (dst < min1) {
+            min2 = min1;
+            min1 = dst;
+            min_index = x;
+        }
+        else if (dst < min2) {
+            min2 = dst;
+        }
+    }
+
+    if (min1 / min2 < 0.64f) {
+        output[tid] = min_index;
+    }
+    else {
+        output[tid] = -1;
+    }
+}
+
+//~3sec execution
+__global__
+void u8_test_shared(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_desc_b, int desc_b_count, int* output) {
     int tid = threadIdx.x + (blockIdx.x * blockDim.x);
     if (tid >= desc_a_count) return;
 
@@ -138,7 +168,6 @@ __device__ void reduce(float* vals) {
     vals[tid] += vals[tid + 4];
     vals[tid] += vals[tid + 2];
     vals[tid] += vals[tid + 1];
-
 }
 
 //needs 32x1 blocksize ~5sec execution
@@ -192,8 +221,8 @@ void char_32thread_1desc(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor*
 std::vector<int> Matching::Match(popsift::Descriptor* d_desc_a, size_t num_desc_a,
     popsift::Descriptor* d_desc_b, size_t num_desc_b) {
         
-    dim3 threadsPerBlock(32,2);
-    dim3 numBlocks((int)ceil(num_desc_a / threadsPerBlock.x));
+    dim3 threadsPerBlock(128);
+    dim3 numBlocks((int)ceil(num_desc_a / (float)threadsPerBlock.x));
 
     int* d_result = popsift::cuda::malloc_devT<int>(num_desc_a, __FILE__, __LINE__);
 
@@ -201,7 +230,7 @@ std::vector<int> Matching::Match(popsift::Descriptor* d_desc_a, size_t num_desc_
 #if 1
     U8Descriptor* a_U8Descriptor = ConvertDescriptorsToU8(d_desc_a, num_desc_a);
     U8Descriptor* b_U8Descriptor = ConvertDescriptorsToU8(d_desc_b, num_desc_b);
-    char_32thread_1desc <<<numBlocks, threadsPerBlock >>>(a_U8Descriptor, num_desc_a, b_U8Descriptor, num_desc_b, d_result);
+    u8_test <<<numBlocks, threadsPerBlock >>>(a_U8Descriptor, num_desc_a, b_U8Descriptor, num_desc_b, d_result);
     std::vector<int> h_result(num_desc_a);
 
 #else
