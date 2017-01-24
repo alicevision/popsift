@@ -53,11 +53,12 @@ Matching::~Matching() {
 
 template<typename T>
 __device__
-float calc_distance(const T* a, const T* b) {
+float calc_distance(const T* a, const T* b, const float* min2) {
     float sum = 0.0f;
     for (int i = 0; i < 128; i++) {
         float sub = a[i] - b[i];
         sum += sub*sub;
+        if (sum > *min2) return sum;
     }
     return sum;
 }
@@ -73,7 +74,7 @@ void test(Descriptor* d_desc_a, int desc_a_count, Descriptor* d_desc_b, int desc
         int min_index;
 
         for (int x = 0; x < desc_b_count; x++) {
-            float dst = calc_distance<float>(&a.features[0], &d_desc_b[x].features[0]);
+            float dst = calc_distance<float>(&a.features[0], &d_desc_b[x].features[0], &min2);
             //printf("%f", dst);
             if (dst < min1) {
                 min2 = min1;
@@ -100,12 +101,29 @@ void u8_test(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_desc_b, i
     int tid = threadIdx.x + (blockIdx.x * blockDim.x);
     if (tid >= desc_a_count) return;
 
-    U8Descriptor& a = d_desc_a[tid];
+    __shared__ U8Descriptor a;
+    a = d_desc_a[tid];
     float min1 = FLT_MAX, min2 = FLT_MAX;
     int min_index;
-
+    __shared__ U8Descriptor cached[128];
+    
+    for (int x = 0; x < desc_b_count; x += 128) {
+        cached[threadIdx.x] = d_desc_b[x+threadIdx.x];
+        for (int i = 0; i < 128; i++) {
+            float dst = calc_distance<unsigned char>(&a.features[0], &cached[i].features[0], &min2);
+            if (dst < min1) {
+                min2 = min1;
+                min1 = dst;
+                min_index = x;
+            }
+            else if (dst < min2) {
+                min2 = dst;
+            }
+        }
+    }
+    /*
     for (int x = 0; x < desc_b_count; x++) {
-        float dst = calc_distance<unsigned char>(&a.features[0], &d_desc_b[x].features[0]);
+        float dst = calc_distance<unsigned char>(&a.features[0], &d_desc_b[x].features[0], &min2);
         if (dst < min1) {
             min2 = min1;
             min1 = dst;
@@ -121,7 +139,7 @@ void u8_test(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_desc_b, i
     }
     else {
         output[tid] = -1;
-    }
+    }*/
 }
 
 //~3sec execution
@@ -139,7 +157,7 @@ void u8_test_shared(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_de
         memcpy(b[threadIdx.x].features, d_desc_b[x + threadIdx.x].features, sizeof(U8Descriptor));
 
         for (int i = 0; i < 32; i++) {
-            float dst = calc_distance<unsigned char>(desc.features, b[i].features);
+            float dst = calc_distance<unsigned char>(desc.features, b[i].features, &min2);
             if (dst < min1) {
                 min2 = min1;
                 min1 = dst;
