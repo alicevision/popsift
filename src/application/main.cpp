@@ -156,7 +156,8 @@ static void CPU_Matching_Performance(const ExtractionResult& er_a, const Extract
         std::cout << "SCALAR AND VECTOR MATCHES DIFFER\n";
 
     for (size_t i = 0; i < m_scalar.size(); ++i)
-        cout << i << " " << m_scalar[i] << m_vector[i];
+        if (m_scalar[i] != m_vector[i])
+            cout << i << " " << m_scalar[i] << " " << m_vector[i] << "\n";
 }
 
 int main(int argc, char **argv)
