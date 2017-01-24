@@ -32,7 +32,8 @@ U8Descriptor* ConvertDescriptorsToU8(Descriptor* d_descriptors, int count);
 
 // Returns vector v indexed by descriptors in fa s.t. v[i] is the best matching descriptor in fb.
 // If a descriptor in fa has no match in fb, v[i] == -1.
-std::vector<int> Matching_CPU(const Features& fa, const Features& fb);
+std::vector<int> Matching_CPU(const std::vector<Descriptor>& da, const std::vector<Descriptor>& db);
+std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::vector<U8Descriptor>& db);
 
 class Matching
 {

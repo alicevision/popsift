@@ -65,6 +65,38 @@ std::vector<unsigned> CreateFeatureToExtremaMap(PopSift& ps)
 
 /////////////////////////////////////////////////////////////////////////////
 
+// Helper structure put in anon namespace to guard against ODR violations.
+// Used by both CPU matching implementations.
+namespace {
+struct best2_accumulator
+{
+    std::array<float, 2> distance;
+    std::array<int, 2> index;
+
+    best2_accumulator()
+    {
+        distance.fill(FLT_MAX);
+        index.fill(-1);
+    }
+
+    void update(float d, size_t i)
+    {
+        if (d < distance[0]) {
+            distance[1] = distance[0]; index[1] = index[0];
+            distance[0] = d; index[0] = i;
+        }
+        else if (d != distance[0] && d < distance[1]) {
+            distance[1] = d; index[1] = i;
+        }
+        assert(distance[0] < distance[1]);
+        assert(index[0] != index[1]);
+    }
+};
+
+}
+
+// NON-VECTORIZED MATCHING OF FLOAT DESCRIPTORS /////////////////////////////
+
 // Plain implementation for float descriptors.
 static float L2DistanceSquared(const Descriptor& a, const Descriptor& b)
 {
@@ -75,6 +107,40 @@ static float L2DistanceSquared(const Descriptor& a, const Descriptor& b)
     }
     return sum;
 }
+
+static int match_one(const Descriptor& d1, const std::vector<Descriptor>& db)
+{
+    const size_t dbsz = db.size();
+    best2_accumulator best2;
+
+    for (size_t ib = 0; ib < dbsz; ++ib) {
+        float d = L2DistanceSquared(d1, db[ib]);
+        best2.update(d, ib);
+    }
+
+    assert(best2.index[0] != -1);                           // would happen on empty vb
+    assert(best2.distance[1] != 0);                         // in that case it should be at index 0
+    if (best2.index[1] == -1)                               // happens on vb.size()==1
+        return best2.index[0];
+    if (best2.distance[0] / best2.distance[1] < 0.8*0.8)    // Threshold from the paper, squared
+        return best2.index[0];
+    return -1;
+}
+
+std::vector<int> Matching_CPU(const std::vector<Descriptor>& da, const std::vector<Descriptor>& db)
+{
+    std::vector<int> matches;
+    if (da.empty() || db.empty())
+        return matches;
+
+    matches.reserve(da.size());
+    const size_t dasz = da.size();
+    for (size_t ia = 0; ia < dasz; ++ia)
+        matches.push_back(match_one(da[ia], db));
+    return matches;
+}
+
+// VECTORIZED/PARALLELIZED MATCHING OF U8 DESCRIPTORS ///////////////////////
 
 #ifdef _MSC_VER
 #define ALIGNED16 __declspec(align(16))
@@ -117,72 +183,6 @@ static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
     _mm256_store_si256((__m256i*)buf, acc);
     unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
     return sum;
-}
-
-// Helper structure put in anon namespace to guard against ODR violations.
-namespace {
-struct best2_accumulator
-{
-    std::array<float, 2> distance;
-    std::array<int, 2> index;
-
-    best2_accumulator()
-    {
-        distance.fill(FLT_MAX);
-        index.fill(-1);
-    }
-    
-    void update(float d, size_t i)
-    {
-        if (d < distance[0]) {
-            distance[1] = distance[0]; index[1] = index[0];
-            distance[0] = d; index[0] = i;
-        }
-        else if (d != distance[0] && d < distance[1]) {
-            distance[1] = d; index[1] = i;
-        }
-        assert(distance[0] < distance[1]);
-        assert(index[0] != index[1]);
-    }
-};
-
-}
-
-static int match_one(const Descriptor& d1, const std::vector<Descriptor>& db)
-{
-    const size_t dbsz = db.size();
-    best2_accumulator best2;
-
-    for (size_t ib = 0; ib < dbsz; ++ib) {
-        float d = L2DistanceSquared(d1, db[ib]);
-        best2.update(d, ib);
-    }
-
-    assert(best2.index[0] != -1);                           // would happen on empty vb
-    assert(best2.distance[1] != 0);                         // in that case it should be at index 0
-    if (best2.index[1] == -1)                               // happens on vb.size()==1
-        return best2.index[0];
-    if (best2.distance[0] / best2.distance[1] < 0.8*0.8)    // Threshold from the paper, squared
-        return best2.index[0];
-    return -1;
-}
-
-std::vector<int> Matching_CPU(const Features& fa, const Features& fb)
-{
-    const auto& da = fa.descriptors();
-    const auto& db = fb.descriptors();
-    std::vector<int> matches;
-
-    if (da.empty() || db.empty())
-        return matches;
-
-    matches.reserve(da.size());
-    const size_t dasz = da.size();
-
-    for (size_t ia = 0; ia < dasz; ++ia)
-        matches.push_back(match_one(da[ia], db));
-
-    return matches;
 }
 
 }   // popsift
