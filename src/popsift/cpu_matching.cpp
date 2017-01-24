@@ -11,6 +11,7 @@
 #include "common/debug_macros.h"
 #include <assert.h>
 #include <float.h>
+#include <immintrin.h>
 #include <array>
 #include <stdexcept>
 
@@ -64,13 +65,57 @@ std::vector<unsigned> CreateFeatureToExtremaMap(PopSift& ps)
 
 /////////////////////////////////////////////////////////////////////////////
 
-static float l2_dist_sq(const Descriptor& a, const Descriptor& b)
+// Plain implementation for float descriptors.
+static float L2DistanceSquared(const Descriptor& a, const Descriptor& b)
 {
     float sum = 0;
     for (int i = 0; i < 128; ++i) {
         float d = a.features[i] - b.features[i];
         sum += d*d;
     }
+    return sum;
+}
+
+#ifdef _MSC_VER
+#define ALIGNED16 __declspec(align(16))
+#else
+#define ALIGNED16 __attribute__((aligned(16)))
+#endif
+
+// AVX2 implementation for U8 descriptors.
+// 128 components fit in 4 AVX2 registers.  Must expand components from 8-bit
+// to 16-bit in order to do arithmetic without overflow. Also, AVX2 doesn't
+// support vector multiplication of 8-bit elements.
+static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
+    const __m256i* af = reinterpret_cast<const __m256i*>(ad.features);
+    const __m256i* bf = reinterpret_cast<const __m256i*>(bd.features);
+    __m256i acc = _mm256_setzero_si256();
+
+    // 32 components per iteration.
+    for (int i = 0; i < 4; ++i) {
+        // Must compute absolute value after subtraction, otherwise we get wrong result
+        // after conversion to 16-bit. (E.g. -1 = 0xFF, after squaring we want to get 1).
+        // Max value after squaring is 65025.
+        __m256i d = _mm256_abs_epi8(_mm256_sub_epi8(af[i], bf[i]));
+        
+        // Squared elements, 0..15
+        __m256i dl = _mm256_unpacklo_epi8(d, _mm256_setzero_si256());
+        dl = _mm256_mullo_epi16(dl, dl);
+        
+        // Squared elements, 15..31
+        __m256i dh = _mm256_unpackhi_epi8(d, _mm256_setzero_si256());
+        dh = _mm256_mullo_epi16(dh, dh);
+
+        // Expand the squared elements to 32-bits and add to accumulator.
+        acc = _mm256_add_epi32(acc, _mm256_unpacklo_epi16(dl, _mm256_setzero_si256()));
+        acc = _mm256_add_epi32(acc, _mm256_unpackhi_epi16(dl, _mm256_setzero_si256()));
+        acc = _mm256_add_epi32(acc, _mm256_unpacklo_epi16(dh, _mm256_setzero_si256()));
+        acc = _mm256_add_epi32(acc, _mm256_unpackhi_epi16(dh, _mm256_setzero_si256()));
+    }
+
+    ALIGNED16 unsigned int buf[8];
+    _mm256_store_si256((__m256i*)buf, acc);
+    unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
     return sum;
 }
 
@@ -108,9 +153,8 @@ static int match_one(const Descriptor& d1, const std::vector<Descriptor>& db)
     const size_t dbsz = db.size();
     best2_accumulator best2;
 
-#pragma loop(hint_parallel(8))
     for (size_t ib = 0; ib < dbsz; ++ib) {
-        float d = l2_dist_sq(d1, db[ib]);
+        float d = L2DistanceSquared(d1, db[ib]);
         best2.update(d, ib);
     }
 
