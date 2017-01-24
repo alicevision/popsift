@@ -103,11 +103,10 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     notify(vm);
 }
 
-
+using ExtractionResult = std::tuple<std::vector<unsigned>, popsift::Features, popsift::Descriptor*>;
 
 // Descriptor pointer is on-device flat list of all descriptors.
-std::tuple<std::vector<unsigned>, popsift::Features, popsift::Descriptor*>
-extractFeatures(string& img, popsift::Config& config) {
+ExtractionResult extractFeatures(string& img, popsift::Config& config) {
     int w, h;
     auto image_data = readPGMfile(img, w, h);
     if (!image_data)
@@ -131,6 +130,11 @@ extractFeatures(string& img, popsift::Config& config) {
     feature_list->print(of, write_as_uchar);
 
     return std::make_tuple(f2e_map, std::move(*feature_list), d_descriptors_flat);
+}
+
+static void CPU_Matching_Performance()
+{
+
 }
 
 int main(int argc, char **argv)
