@@ -220,9 +220,16 @@ struct Combiner
     best2_accumulator operator()(const best2_accumulator& a1, const best2_accumulator& a2) const {
         best2_accumulator r;
 
-        if (a1.distance[0] < a2.distance[0]) {
+        if (a1.distance[0] == a2.distance[0]) {
             r.distance[0] = a1.distance[0];
-            r.index = a1.distance[0];
+            r.index = a1.index;
+
+            if (a1.distance[1] < a2.distance[1]) r.distance[1] = a1.distance[1];
+            else r.distance[1] = a2.distance[1];
+        }
+        else if (a1.distance[0] < a2.distance[0]) {
+            r.distance[0] = a1.distance[0];
+            r.index = a1.index;
             
             if (a2.distance[0] < a1.distance[1]) r.distance[1] = a2.distance[0];
             else r.distance[1] = a1.distance[1];
