@@ -151,7 +151,7 @@ std::vector<int> Matching_CPU(const std::vector<Descriptor>& da, const std::vect
     auto t0 = tbb::tick_count::now();
     auto v = Matching_CPU(da, db, match_one_scalar);
     auto t1 = tbb::tick_count::now();
-    std::clog << "CPU MATCHING, SCALAR: " << (t1 - t0).seconds();
+    std::clog << "CPU MATCHING, SCALAR: " << (t1 - t0).seconds() << std::endl;
     return v;
 }
 
@@ -226,7 +226,7 @@ std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::ve
     auto t0 = tbb::tick_count::now();
     auto v = Matching_CPU(da, db, match_one_vector);
     auto t1 = tbb::tick_count::now();
-    std::clog << "CPU MATCHING, VECTOR: " << (t1 - t0).seconds();
+    std::clog << "CPU MATCHING, VECTOR: " << (t1 - t0).seconds() << std::endl;
     return v;
 }
 
