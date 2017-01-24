@@ -64,10 +64,9 @@ std::vector<unsigned> CreateFeatureToExtremaMap(PopSift& ps)
     return map;
 }
 
-/////////////////////////////////////////////////////////////////////////////
+// NON-VECTORIZED MATCHING OF FLOAT DESCRIPTORS /////////////////////////////
 
 // Helper structure put in anon namespace to guard against ODR violations.
-// Used by both CPU matching implementations.
 namespace {
 struct best2_accumulator
 {
@@ -95,26 +94,6 @@ struct best2_accumulator
 };
 
 }
-
-template<typename DT, typename F>
-static std::vector<int> Matching_CPU(
-    const std::vector<DT>& da,
-    const std::vector<DT>& db,
-    F match_one)
-{
-    std::vector<int> matches;
-    if (da.empty() || db.empty())
-        return matches;
-
-    matches.reserve(da.size());
-    const size_t dasz = da.size();
-    for (size_t ia = 0; ia < dasz; ++ia)
-        matches.push_back(match_one(da[ia], db));
-    return matches;
-}
-
-
-// NON-VECTORIZED MATCHING OF FLOAT DESCRIPTORS /////////////////////////////
 
 // Plain implementation for float descriptors.
 static float L2DistanceSquared(const Descriptor& a, const Descriptor& b)
@@ -148,11 +127,20 @@ static int match_one_scalar(const Descriptor& d1, const std::vector<Descriptor>&
 
 std::vector<int> Matching_CPU(const std::vector<Descriptor>& da, const std::vector<Descriptor>& db)
 {
+    std::vector<int> matches;
+    if (da.empty() || db.empty())
+        return matches;
+
+    matches.reserve(da.size());
+    const size_t dasz = da.size();
+
     auto t0 = tbb::tick_count::now();
-    auto v = Matching_CPU(da, db, match_one_scalar);
+    for (size_t ia = 0; ia < dasz; ++ia)
+        matches.push_back(match_one_scalar(da[ia], db));
     auto t1 = tbb::tick_count::now();
+
     std::clog << "CPU MATCHING, SCALAR: " << (t1 - t0).seconds() << std::endl;
-    return v;
+    return matches;
 }
 
 // VECTORIZED/PARALLELIZED MATCHING OF U8 DESCRIPTORS ///////////////////////
@@ -203,52 +191,87 @@ static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
     return sum;
 }
 
-static int match_one_vector(const U8Descriptor& d1, const std::vector<U8Descriptor>& db)
+// Anon-namespace, ODR violations.
+namespace
 {
-#if 0
-    best2_accumulator best2;
-    tbb::spin_mutex mtx;
+
+struct Reducer
+{
+    const U8Descriptor& da;
+    const U8Descriptor* base;
+
+    Reducer(const U8Descriptor& da, const U8Descriptor* base) : da(da), base(base) {}
     
-    tbb::parallel_for(size_t(0), db.size(), [&](size_t i) {
-        float d = L2DistanceSquared(d1, db[i]);
-        tbb::spin_mutex::scoped_lock lk(mtx);
-        best2.update(d, i);
-    });
-
-    assert(best2.index[0] != -1);                           // would happen on empty vb
-    assert(best2.distance[1] != 0);                         // in that case it should be at index 0
-    if (best2.index[1] == -1)                               // happens on vb.size()==1
-        return best2.index[0];
-    if (best2.distance[0] / best2.distance[1] < 0.8*0.8)    // Threshold from the paper, squared
-        return best2.index[0];
-
-    return -1;
-#else
-    const size_t dbsz = db.size();
-    best2_accumulator best2;
-
-    for (size_t ib = 0; ib < dbsz; ++ib) {
-        float d = L2DistanceSquared(d1, db[ib]);
-        best2.update(d, ib);
+    best2_accumulator operator()(const tbb::blocked_range<const U8Descriptor*>& r, best2_accumulator init) const {
+        for (auto it = r.begin(); it != r.end(); ++it) {
+            float d = L2DistanceSquared(da, *it);
+            init.update(d, &*it - base);
+        }
+        return init;
     }
 
+};
+
+struct Combiner
+{
+    best2_accumulator operator()(const best2_accumulator& a1, const best2_accumulator& a2) const {
+        best2_accumulator r;
+
+        if (a1.distance[0] < a2.distance[0]) {
+            r.distance[0] = a1.distance[0];
+            r.index[0] = a1.distance[0];
+            if (a2.distance[0] < a1.distance[1]) r.distance[1] = a2.distance[0];
+            else r.distance[1] = a1.distance[1];
+        }
+        else {
+            r.distance[0] = a2.distance[0];
+            r.index[0] = a2.index[0];
+            if (a1.distance[0] < a2.distance[1]) r.distance[1] = a1.distance[0];
+            else r.distance[1] = a2.distance[1];
+        }
+
+        assert(r.distance[0] < r.distance[1]);
+        return r;
+    }
+};
+
+}
+
+static int match_one_vector(const U8Descriptor& d1, const std::vector<U8Descriptor>& db)
+{
+    tbb::blocked_range<const U8Descriptor*> range(db.data(), db.data() + db.size());
+    best2_accumulator best2 = tbb::parallel_reduce(
+        range,
+        best2_accumulator(),
+        Reducer(d1, db.data()),
+        Combiner());
+    
     assert(best2.index[0] != -1);                           // would happen on empty vb
     assert(best2.distance[1] != 0);                         // in that case it should be at index 0
     if (best2.index[1] == -1)                               // happens on vb.size()==1
         return best2.index[0];
     if (best2.distance[0] / best2.distance[1] < 0.8*0.8)    // Threshold from the paper, squared
         return best2.index[0];
+
     return -1;
-#endif
 }
 
 std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::vector<U8Descriptor>& db)
 {
+    std::vector<int> matches;
+    if (da.empty() || db.empty())
+        return matches;
+
+    matches.reserve(da.size());
+    const size_t dasz = da.size();
+
     auto t0 = tbb::tick_count::now();
-    auto v = Matching_CPU(da, db, match_one_vector);
+    for (size_t ia = 0; ia < dasz; ++ia)
+        matches.push_back(match_one_vector(da[ia], db));
     auto t1 = tbb::tick_count::now();
-    std::clog << "CPU MATCHING, VECTOR: " << (t1 - t0).seconds() << std::endl;
-    return v;
+
+    std::clog << "CPU MATCHING, SCALAR: " << (t1 - t0).seconds() << std::endl;
+    return matches;
 }
 
 
