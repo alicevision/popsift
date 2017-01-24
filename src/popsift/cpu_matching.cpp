@@ -12,7 +12,7 @@
 #include <assert.h>
 #include <float.h>
 #include <immintrin.h>
-#include <tbb/parallel_for.h>
+#include <tbb/tbb.h>
 #include <array>
 #include <stdexcept>
 
@@ -148,7 +148,11 @@ static int match_one_scalar(const Descriptor& d1, const std::vector<Descriptor>&
 
 std::vector<int> Matching_CPU(const std::vector<Descriptor>& da, const std::vector<Descriptor>& db)
 {
-    return Matching_CPU(da, db, match_one_scalar);
+    auto t0 = tbb::tick_count::now();
+    auto v = Matching_CPU(da, db, match_one_scalar);
+    auto t1 = tbb::tick_count::now();
+    std::clog << "CPU MATCHING, SCALAR: " << (t1 - t0).seconds();
+    return v;
 }
 
 // VECTORIZED/PARALLELIZED MATCHING OF U8 DESCRIPTORS ///////////////////////
@@ -198,14 +202,14 @@ static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
 
 static int match_one_vector(const U8Descriptor& d1, const std::vector<U8Descriptor>& db)
 {
-#if 0
-    const size_t dbsz = db.size();
     best2_accumulator best2;
-
-    for (size_t ib = 0; ib < dbsz; ++ib) {
-        float d = L2DistanceSquared(d1, db[ib]);
-        best2.update(d, ib);
-    }
+    tbb::spin_mutex mtx;
+    
+    tbb::parallel_for(size_t(0), db.size(), [&](size_t i) {
+        float d = L2DistanceSquared(d1, db[i]);
+        tbb::spin_mutex::scoped_lock lk(mtx);
+        best2.update(d, i);
+    });
 
     assert(best2.index[0] != -1);                           // would happen on empty vb
     assert(best2.distance[1] != 0);                         // in that case it should be at index 0
@@ -213,13 +217,17 @@ static int match_one_vector(const U8Descriptor& d1, const std::vector<U8Descript
         return best2.index[0];
     if (best2.distance[0] / best2.distance[1] < 0.8*0.8)    // Threshold from the paper, squared
         return best2.index[0];
-#endif
+
     return -1;
 }
 
 std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::vector<U8Descriptor>& db)
 {
-    return Matching_CPU(da, db, match_one_vector);
+    auto t0 = tbb::tick_count::now();
+    auto v = Matching_CPU(da, db, match_one_vector);
+    auto t1 = tbb::tick_count::now();
+    std::clog << "CPU MATCHING, VECTOR: " << (t1 - t0).seconds();
+    return v;
 }
 
 
