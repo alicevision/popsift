@@ -22,6 +22,7 @@
 #include <popsift/popsift.h>
 #include <popsift/sift_conf.h>
 #include <popsift/common/device_prop.h>
+#include <popsift/common/debug_macros.h>
 
 #include "pgmread.h"
 #include "popsift/sift_pyramid.h"
@@ -103,11 +104,10 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     notify(vm);
 }
 
-
+using ExtractionResult = std::tuple<std::vector<unsigned>, popsift::Features, popsift::Descriptor*>;
 
 // Descriptor pointer is on-device flat list of all descriptors.
-std::tuple<std::vector<unsigned>, popsift::Features, popsift::Descriptor*>
-extractFeatures(string& img, popsift::Config& config) {
+ExtractionResult extractFeatures(string& img, popsift::Config& config) {
     int w, h;
     auto image_data = readPGMfile(img, w, h);
     if (!image_data)
@@ -131,6 +131,32 @@ extractFeatures(string& img, popsift::Config& config) {
     feature_list->print(of, write_as_uchar);
 
     return std::make_tuple(f2e_map, std::move(*feature_list), d_descriptors_flat);
+}
+
+static void CPU_Matching_Performance(const ExtractionResult& er_a, const ExtractionResult& er_b)
+{
+    size_t count_a = std::get<1>(er_a).descriptors().size();
+    size_t count_b = std::get<1>(er_b).descriptors().size();
+
+    auto m_scalar = Matching_CPU(std::get<1>(er_a).descriptors(), std::get<1>(er_b).descriptors());
+
+    auto du8_a = popsift::ConvertDescriptorsToU8(std::get<2>(er_a), count_a);
+    auto du8_b = popsift::ConvertDescriptorsToU8(std::get<2>(er_b), count_b);
+
+    std::vector<popsift::U8Descriptor> hu8_a(count_a);
+    std::vector<popsift::U8Descriptor> hu8_b(count_b);
+
+    popcuda_memcpy_sync(hu8_a.data(), du8_a, count_a * sizeof(popsift::U8Descriptor), cudaMemcpyDeviceToHost);
+    popcuda_memcpy_sync(hu8_b.data(), du8_b, count_b * sizeof(popsift::U8Descriptor), cudaMemcpyDeviceToHost);
+
+    auto m_vector = popsift::Matching_CPU(hu8_a, hu8_b);
+
+    assert(m_vector.size() == m_scalar.size());
+    if (m_vector != m_scalar)
+        std::cout << "SCALAR AND VECTOR MATCHES DIFFER\n";
+
+    for (size_t i = 0; i < m_scalar.size(); ++i)
+        cout << i << " " << m_scalar[i] << m_vector[i];
 }
 
 int main(int argc, char **argv)
