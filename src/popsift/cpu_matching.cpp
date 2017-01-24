@@ -177,7 +177,10 @@ static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
         // Must compute absolute value after subtraction, otherwise we get wrong result
         // after conversion to 16-bit. (E.g. -1 = 0xFF, after squaring we want to get 1).
         // Max value after squaring is 65025.
-        __m256i d = _mm256_abs_epi8(_mm256_sub_epi8(af[i], bf[i]));
+        //__m256i d = _mm256_abs_epi8(_mm256_sub_epi8(af[i], bf[i]));
+        __m256i d = _mm256_abs_epi8(_mm256_sub_epi8(
+            _mm256_load_si256(af + i),
+            _mm256_load_si256(bf + i)));
         
         // Squared elements, 0..15
         __m256i dl = _mm256_unpacklo_epi8(d, _mm256_setzero_si256());
@@ -202,6 +205,7 @@ static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
 
 static int match_one_vector(const U8Descriptor& d1, const std::vector<U8Descriptor>& db)
 {
+#if 0
     best2_accumulator best2;
     tbb::spin_mutex mtx;
     
@@ -219,6 +223,23 @@ static int match_one_vector(const U8Descriptor& d1, const std::vector<U8Descript
         return best2.index[0];
 
     return -1;
+#else
+    const size_t dbsz = db.size();
+    best2_accumulator best2;
+
+    for (size_t ib = 0; ib < dbsz; ++ib) {
+        float d = L2DistanceSquared(d1, db[ib]);
+        best2.update(d, ib);
+    }
+
+    assert(best2.index[0] != -1);                           // would happen on empty vb
+    assert(best2.distance[1] != 0);                         // in that case it should be at index 0
+    if (best2.index[1] == -1)                               // happens on vb.size()==1
+        return best2.index[0];
+    if (best2.distance[0] / best2.distance[1] < 0.8*0.8)    // Threshold from the paper, squared
+        return best2.index[0];
+    return -1;
+#endif
 }
 
 std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::vector<U8Descriptor>& db)
