@@ -71,25 +71,22 @@ namespace {
 struct best2_accumulator
 {
     std::array<float, 2> distance;
-    std::array<int, 2> index;
+    int index;
 
     best2_accumulator()
     {
         distance.fill(FLT_MAX);
-        index.fill(-1);
     }
 
     void update(float d, size_t i)
     {
         if (d < distance[0]) {
-            distance[1] = distance[0]; index[1] = index[0];
-            distance[0] = d; index[0] = i;
+            distance[1] = distance[0]; distance[0] = d; index = i;
         }
         else if (d != distance[0] && d < distance[1]) {
-            distance[1] = d; index[1] = i;
+            distance[1] = d;
         }
         assert(distance[0] < distance[1]);
-        assert(index[0] != index[1]);
     }
 };
 
@@ -116,12 +113,12 @@ static int match_one_scalar(const Descriptor& d1, const std::vector<Descriptor>&
         best2.update(d, ib);
     }
 
-    assert(best2.index[0] != -1);                           // would happen on empty vb
-    assert(best2.distance[1] != 0);                         // in that case it should be at index 0
-    if (best2.index[1] == -1)                               // happens on vb.size()==1
-        return best2.index[0];
+    assert(best2.index != -1);                          // would happen on empty vb
+    assert(best2.distance[1] != 0);                     // in that case it should be at index 0
+    if (best2.distance[1] == FLT_MAX)                   // happens on vb.size()==1
+        return best2.index;
     if (best2.distance[0] / best2.distance[1] < 0.8*0.8)    // Threshold from the paper, squared
-        return best2.index[0];
+        return best2.index;
     return -1;
 }
 
@@ -166,9 +163,15 @@ static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
         // after conversion to 16-bit. (E.g. -1 = 0xFF, after squaring we want to get 1).
         // Max value after squaring is 65025.
         //__m256i d = _mm256_abs_epi8(_mm256_sub_epi8(af[i], bf[i]));
+#ifndef _DEBUG
         __m256i d = _mm256_abs_epi8(_mm256_sub_epi8(
             _mm256_load_si256(af + i),
             _mm256_load_si256(bf + i)));
+#else
+        __m256i d = _mm256_abs_epi8(_mm256_sub_epi8(
+            _mm256_loadu_si256(af + i),
+            _mm256_loadu_si256(bf + i)));
+#endif
         
         // Squared elements, 0..15
         __m256i dl = _mm256_unpacklo_epi8(d, _mm256_setzero_si256());
@@ -219,13 +222,15 @@ struct Combiner
 
         if (a1.distance[0] < a2.distance[0]) {
             r.distance[0] = a1.distance[0];
-            r.index[0] = a1.distance[0];
+            r.index = a1.distance[0];
+            
             if (a2.distance[0] < a1.distance[1]) r.distance[1] = a2.distance[0];
             else r.distance[1] = a1.distance[1];
         }
         else {
             r.distance[0] = a2.distance[0];
-            r.index[0] = a2.index[0];
+            r.index = a2.index;
+            
             if (a1.distance[0] < a2.distance[1]) r.distance[1] = a1.distance[0];
             else r.distance[1] = a2.distance[1];
         }
@@ -246,12 +251,12 @@ static int match_one_vector(const U8Descriptor& d1, const std::vector<U8Descript
         Reducer(d1, db.data()),
         Combiner());
     
-    assert(best2.index[0] != -1);                           // would happen on empty vb
+    assert(best2.index != -1);                              // would happen on empty vb
     assert(best2.distance[1] != 0);                         // in that case it should be at index 0
-    if (best2.index[1] == -1)                               // happens on vb.size()==1
-        return best2.index[0];
+    if (best2.distance[1] == FLT_MAX)                       // happens on vb.size()==1
+        return best2.index;
     if (best2.distance[0] / best2.distance[1] < 0.8*0.8)    // Threshold from the paper, squared
-        return best2.index[0];
+        return best2.index;
 
     return -1;
 }
