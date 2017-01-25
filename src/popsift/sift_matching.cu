@@ -53,7 +53,7 @@ Matching::~Matching() {
 
 template<typename T>
 __device__
-float calc_distance(const T* a, const T* b, const float* min2) {
+float calc_distance_minret(const T* a, const T* b, const float* min2) {
     float sum = 0.0f;
     for (int i = 0; i < 128; i++) {
         float sub = a[i] - b[i];
@@ -61,6 +61,40 @@ float calc_distance(const T* a, const T* b, const float* min2) {
         if (sum > *min2) return sum;
     }
     return sum;
+}
+
+__device__ inline unsigned int swar_sub(unsigned int a, unsigned int b) {
+    const unsigned int h = 0x80808080;
+    return ((a | h) - (b & ~h)) ^ ((a ^ ~b) & h);
+}
+
+__device__ inline void update_sum(unsigned& sum, unsigned &d)
+{
+    unsigned v = d & 0xFF; d >>= 8;
+    sum += v*v;
+}
+
+__device__
+float calc_distance(const U8Descriptor aa, const U8Descriptor bb) {
+    unsigned sum = 0;
+    for (int i = 0; i < 128; i++) {
+        unsigned a = aa.features[i] - bb.features[i];
+        a *= a;
+        sum += sum;
+    }
+    return sum;
+    /*
+    for (int i = 0; i < 32; i += 4) {
+        unsigned a = *(const unsigned*)(aa.features + 4 * i);
+        unsigned b = *(const unsigned*)(bb.features + 4 * i);
+        unsigned d = swar_sub(a, b);
+        update_sum(sum, d);
+        update_sum(sum, d);
+        update_sum(sum, d);
+        update_sum(sum, d);
+    }
+    return sum;
+    */
 }
 
 //~16+sec execution
@@ -74,7 +108,7 @@ void test(Descriptor* d_desc_a, int desc_a_count, Descriptor* d_desc_b, int desc
         int min_index;
 
         for (int x = 0; x < desc_b_count; x++) {
-            float dst = calc_distance<float>(&a.features[0], &d_desc_b[x].features[0], &min2);
+            float dst = calc_distance_minret<float>(&a.features[0], &d_desc_b[x].features[0], &min2);
             //printf("%f", dst);
             if (dst < min1) {
                 min2 = min1;
@@ -95,29 +129,31 @@ void test(Descriptor* d_desc_a, int desc_a_count, Descriptor* d_desc_b, int desc
     }
 }
 
-__device__ inline unsigned int swar_sub(unsigned int a, unsigned int b) {
-    const unsigned int h = 0x80808080;
-    return ((a | h) - (b & ~h)) ^ ((a ^ ~b) & h);
-}
+
 
 //~1.2sec execution 128x1
 __global__
-void u8_test(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_desc_b, int desc_b_count, int* output) {
-    int tid = threadIdx.x + (blockIdx.x * blockDim.x);
-    if (tid >= desc_a_count) return;
+    void u8_test(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_desc_b, int desc_b_count, int* output) {
+        int tid = threadIdx.x + (blockIdx.x * blockDim.x);
+        if (tid >= desc_a_count) return;
 
     __shared__ U8Descriptor a;
     a = d_desc_a[tid];
     float min1 = FLT_MAX, min2 = FLT_MAX;
     int min_index;
-    const int cache_size = 32;
+    const int cache_size = 128;
     const int skip_len = cache_size;// *2;
     __shared__ U8Descriptor cached[cache_size];
-    
-    for (int x = 0; x < desc_b_count; x += cache_size) {
+
+    for (int x = 0; x < desc_b_count-cache_size; x += cache_size) {
+        //memcpy(cached[threadIdx.x].features, d_desc_b[threadIdx.x + x].features, sizeof(U8Descriptor));
+        //cached[threadIdx.x] = d_desc_b[threadIdx.x + x];
+        /*
         unsigned char* ap = &d_desc_b[x].features[0];
         unsigned char* bp = &cached[0].features[0];
         memcpy(bp + (threadIdx.x*skip_len), ap + (threadIdx.x*skip_len), sizeof(unsigned char) * skip_len);
+        */
+        /*
         for (int i = 0; i < cache_size; i++) {
             int dst = 0;
 #if 0
@@ -144,6 +180,7 @@ void u8_test(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_desc_b, i
                 min2 = dst;
             }
         }
+        */
     }
     /*
     for (int x = 0; x < desc_b_count; x++) {
@@ -181,7 +218,7 @@ void u8_test_shared(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_de
         memcpy(b[threadIdx.x].features, d_desc_b[x + threadIdx.x].features, sizeof(U8Descriptor));
 
         for (int i = 0; i < 32; i++) {
-            float dst = calc_distance<unsigned char>(desc.features, b[i].features, &min2);
+            float dst = calc_distance_minret<unsigned char>(desc.features, b[i].features, &min2);
             if (dst < min1) {
                 min2 = min1;
                 min1 = dst;
@@ -221,18 +258,21 @@ void char_32thread_1desc(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor*
     float min1 = FLT_MAX, min2 = FLT_MAX;
     int min_index;
     
-    __shared__ U8Descriptor a;
-    __shared__ U8Descriptor b;
-
+    U8Descriptor a;
     memcpy(&a.features[threadIdx.x * 4], &d_desc_a[tid].features[threadIdx.x * 4], sizeof(unsigned char) * 4);
+
+    __shared__ U8Descriptor b[32];
     __shared__ float sums[32];
 
-    for (int i = 0; i < desc_b_count; i++) {                   
-        memcpy(&b.features[threadIdx.x * 4], &d_desc_b[i].features[threadIdx.x * 4], sizeof(unsigned char) * 4);
-        
+    //could it be benefitial if different blocks started on different B's?
+    for (int i = 0; i < desc_b_count; i+=32) {                   
+        //memcpy(&b.features[threadIdx.x * 4], &d_desc_b[i].features[threadIdx.x * 4], sizeof(unsigned char) * 4);
+        memcpy(&b[threadIdx.x].features[0], &d_desc_b[threadIdx.x + i].features[0], sizeof(U8Descriptor));
+
+
         sums[threadIdx.x] = 0.0f;
         for (int x = threadIdx.x*4; x < 128; x++) {
-            float sub = a.features[x] - b.features[x];
+            float sub;// = a.features[x] - b.features[x];
             sub = sub*sub;
             sums[threadIdx.x] += sub;
         }
@@ -260,26 +300,103 @@ void char_32thread_1desc(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor*
 }
 
 
+struct MinDiff {
+    float m[2];
+    int idx;
+};
+
+__global__
+void char_32x32(U8Descriptor* d_desc_a, int desc_a_count, 
+    U8Descriptor* d_desc_b, int desc_b_count, int* output) {
+
+    
+    __shared__ U8Descriptor a[32]; //4096B
+    __shared__ U8Descriptor b[32]; //4096B
+    __shared__ MinDiff c[32]; //check if enough registers to remove shared
+
+    int ltid = threadIdx.y * blockDim.x + threadIdx.x; // 0, 1023
+    int gtid = ltid + blockIdx.x + (blockIdx.y*gridDim.x);
+    //if (blockDim.x*blockIdx.x + threadIdx.y > desc_a_count) return; //add with ceil in blockdim on launch
+    
+    memcpy(&a[threadIdx.y].features[threadIdx.x * 4], &d_desc_a[blockIdx.x*blockDim.x].features[threadIdx.x * 4], sizeof(unsigned));
+    memcpy(&b[threadIdx.y].features[threadIdx.x * 4], &d_desc_b[blockIdx.x*blockDim.x].features[threadIdx.x * 4], sizeof(unsigned));
+
+    *(unsigned int*)(&a[threadIdx.y].features[threadIdx.x * 4]) = *(unsigned int*)(&d_desc_a[blockIdx.x*blockDim.x].features[threadIdx.x * 4]);
+    *(unsigned int*)(&b[threadIdx.y].features[threadIdx.x * 4]) = *(unsigned int*)(&d_desc_b[blockIdx.y*blockDim.y].features[threadIdx.x * 4]);
+    __syncthreads();
+
+    //float dst = calc_distance(a[threadIdx.x], b[threadIdx.y]);
+    /*
+    if (dst < c[threadIdx.y].m[0]) {
+        c[threadIdx.y].m[1] = c[threadIdx.y].m[0];
+        c[threadIdx.y].m[0]  = dst;
+        c[threadIdx.y].idx = gtid;
+    }
+    else if (dst < c[threadIdx.y].m[1]) {
+        c[threadIdx.y].m[1] = dst;
+    }
+    */
+
+    //memcpy(&a[threadIdx.y].features[threadIdx.x], &d_desc_a[]
+
+}
+
+
+__global__ 
+void distance_test(int* output) {
+    int tid = threadIdx.y * blockDim.x + threadIdx.x; // 0, 1023
+    int gtid = tid + blockIdx.x + (blockIdx.y*gridDim.x);
+    __shared__ U8Descriptor a;
+    __shared__ U8Descriptor b;
+    if (tid < 128) {
+        a.features[tid] = tid;
+        b.features[tid] = tid;
+    }
+    float dst = calc_distance(a, b);
+    if(tid==0)
+        output[gtid] = (int)dst;
+    if (gtid > 14000) printf("asd");
+
+}
+
 std::vector<int> Matching::Match(popsift::Descriptor* d_desc_a, size_t num_desc_a,
     popsift::Descriptor* d_desc_b, size_t num_desc_b) {
         
-    dim3 threadsPerBlock(128);
-    dim3 numBlocks((int)ceil(num_desc_a / (float)threadsPerBlock.x));
+    
 
+    //dim3 numBlocks((int)ceil(num_desc_a / (float)(threadsPerBlock.x*threadsPerBlock.y)));
+    //dim3 numBlocks((int)ceil(num_desc_a / (float)threadsPerBlock.y));
     int* d_result = popsift::cuda::malloc_devT<int>(num_desc_a, __FILE__, __LINE__);
 
-    std::cout << "starting test";
+    std::cout << "starting test\n";
 #if 1
+
+    dim3 threadsPerBlock(32, 32);
+    dim3 numBlocks(num_desc_a / threadsPerBlock.x, num_desc_a / threadsPerBlock.y);
+    distance_test<<<numBlocks, threadsPerBlock >>>(d_result);
+#endif
+
+#if 0
     U8Descriptor* a_U8Descriptor = ConvertDescriptorsToU8(d_desc_a, num_desc_a);
     U8Descriptor* b_U8Descriptor = ConvertDescriptorsToU8(d_desc_b, num_desc_b);
-    u8_test <<<numBlocks, threadsPerBlock >>>(a_U8Descriptor, num_desc_a, b_U8Descriptor, num_desc_b, d_result);
+#endif
+
+#if 0
+    dim3 threadsPerBlock(32, 32);
+    dim3 numBlocks(num_desc_a / threadsPerBlock.x, num_desc_b / threadsPerBlock.y); //need ceiling
+    char_32x32<<<numBlocks,threadsPerBlock>>>(a_U8Descriptor, num_desc_a, b_U8Descriptor, num_desc_b, d_result);
+#endif
+
+#if 0
+    dim3 threadsPerBlock(128, 1);
+    dim3 numBlocks(num_desc_a / threadsPerBlock.x); //need ceiling
+    u8_test<< <numBlocks, threadsPerBlock >> >(a_U8Descriptor, num_desc_a, b_U8Descriptor, num_desc_b, d_result);
+#endif
+
+    //char_32thread_1desc <<<numBlocks, threadsPerBlock >>>(a_U8Descriptor, num_desc_a, b_U8Descriptor, num_desc_b, d_result);
     std::vector<int> h_result(num_desc_a);
 
-#else
-    test << <numBlocks, threadsPerBlock >> >(d_desc_a, num_desc_a, d_desc_b, num_desc_b, d_result);
-    std::vector<int> h_result(num_desc_a);
-#endif
-    cudaMemcpyAsync(h_result.data(), d_result, num_desc_a * sizeof(int), cudaMemcpyDeviceToHost);
+    //cudaMemcpyAsync(h_result.data(), d_result, num_desc_a * sizeof(int), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     std::cout << "test done";
     
