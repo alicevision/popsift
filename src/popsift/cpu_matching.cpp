@@ -13,7 +13,6 @@
 #include <float.h>
 #include <immintrin.h>
 #include <tbb/tbb.h>
-#include <array>
 #include <stdexcept>
 
 namespace popsift {
@@ -70,12 +69,13 @@ std::vector<unsigned> CreateFeatureToExtremaMap(PopSift& ps)
 namespace {
 struct best2_accumulator
 {
-    std::array<float, 2> distance;
+    float distance[2];
     int index;
 
     best2_accumulator()
     {
-        distance.fill(FLT_MAX);
+        distance[0] = distance[1] = FLT_MAX;
+        index = -1;
     }
 
     void update(float d, size_t i)
@@ -268,6 +268,8 @@ static int match_one_vector(const U8Descriptor& d1, const std::vector<U8Descript
     return -1;
 }
 
+#if 0
+
 std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::vector<U8Descriptor>& db)
 {
     std::vector<int> matches;
@@ -282,9 +284,45 @@ std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::ve
         matches.push_back(match_one_vector(da[ia], db));
     auto t1 = tbb::tick_count::now();
 
-    std::clog << "CPU MATCHING, SCALAR: " << (t1 - t0).seconds() << std::endl;
+    std::clog << "CPU MATCHING, VECTOR: " << (t1 - t0).seconds() << std::endl;
     return matches;
 }
+
+#else
+
+std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::vector<U8Descriptor>& db)
+{
+    const size_t dasz = da.size();
+    std::vector<int> matches(dasz);
+    std::vector<best2_accumulator> tmp_matches(dasz);
+
+    if (da.empty() || db.empty())
+        return matches;
+
+    auto t0 = tbb::tick_count::now();
+
+    // Adjusted to 64kB cache. 16x64x32 = 32kB L1 cache for descriptor data.
+    tbb::blocked_range2d<size_t> range(size_t(0), da.size(), 32, size_t(0), db.size(), 128);
+    tbb::parallel_for(range, [&](const tbb::blocked_range2d<size_t> r) {
+        for (size_t ia = r.rows().begin(); ia != r.rows().end(); ++ia) {
+            best2_accumulator acc;
+            for (size_t ib = r.cols().begin(); ib != r.cols().end(); ++ib) {
+                float d = L2DistanceSquared(da[ia], db[ib]);
+                acc.update(d, ib);
+            }
+            tmp_matches[ia] = Combiner()(tmp_matches[ia], acc);
+        }
+    });
+
+    auto t1 = tbb::tick_count::now();
+    std::transform(tmp_matches.begin(), tmp_matches.end(), matches.begin(),
+        [](const best2_accumulator& b2a) { return b2a.index; });
+
+    std::clog << "CPU MATCHING, VECTOR, TILED: " << (t1 - t0).seconds() << std::endl;
+    return matches;
+}
+
+#endif
 
 
 }   // popsift
