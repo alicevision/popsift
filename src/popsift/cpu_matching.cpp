@@ -90,6 +90,35 @@ struct best2_accumulator
     }
 };
 
+best2_accumulator combine(const best2_accumulator& a1, const best2_accumulator& a2) {
+    best2_accumulator r;
+
+    if (a1.distance[0] == a2.distance[0]) {
+        r.distance[0] = a1.distance[0];
+        r.index = a1.index;
+
+        if (a1.distance[1] < a2.distance[1]) r.distance[1] = a1.distance[1];
+        else r.distance[1] = a2.distance[1];
+    }
+    else if (a1.distance[0] < a2.distance[0]) {
+        r.distance[0] = a1.distance[0];
+        r.index = a1.index;
+
+        if (a2.distance[0] < a1.distance[1]) r.distance[1] = a2.distance[0];
+        else r.distance[1] = a1.distance[1];
+    }
+    else {
+        r.distance[0] = a2.distance[0];
+        r.index = a2.index;
+
+        if (a1.distance[0] < a2.distance[1]) r.distance[1] = a1.distance[0];
+        else r.distance[1] = a2.distance[1];
+    }
+
+    assert(r.distance[0] < r.distance[1]);
+    return r;
+}
+
 }
 
 // Plain implementation for float descriptors.
@@ -194,101 +223,30 @@ static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
     return sum;
 }
 
-// Anon-namespace, ODR violations.
-namespace
-{
+static float L1Distance(const U8Descriptor& ad, const U8Descriptor& bd) {
+    const __m256i* af = reinterpret_cast<const __m256i*>(ad.features);
+    const __m256i* bf = reinterpret_cast<const __m256i*>(bd.features);
+    __m256i acc = _mm256_setzero_si256();
 
-struct Reducer
-{
-    const U8Descriptor& da;
-    const U8Descriptor* base;
-
-    Reducer(const U8Descriptor& da, const U8Descriptor* base) : da(da), base(base) {}
-    
-    best2_accumulator operator()(const tbb::blocked_range<const U8Descriptor*>& r, best2_accumulator init) const {
-        for (auto it = r.begin(); it != r.end(); ++it) {
-            float d = L2DistanceSquared(da, *it);
-            init.update(d, &*it - base);
-        }
-        return init;
-    }
-
-};
-
-struct Combiner
-{
-    best2_accumulator operator()(const best2_accumulator& a1, const best2_accumulator& a2) const {
-        best2_accumulator r;
-
-        if (a1.distance[0] == a2.distance[0]) {
-            r.distance[0] = a1.distance[0];
-            r.index = a1.index;
-
-            if (a1.distance[1] < a2.distance[1]) r.distance[1] = a1.distance[1];
-            else r.distance[1] = a2.distance[1];
-        }
-        else if (a1.distance[0] < a2.distance[0]) {
-            r.distance[0] = a1.distance[0];
-            r.index = a1.index;
-            
-            if (a2.distance[0] < a1.distance[1]) r.distance[1] = a2.distance[0];
-            else r.distance[1] = a1.distance[1];
-        }
-        else {
-            r.distance[0] = a2.distance[0];
-            r.index = a2.index;
-            
-            if (a1.distance[0] < a2.distance[1]) r.distance[1] = a1.distance[0];
-            else r.distance[1] = a2.distance[1];
-        }
-
-        assert(r.distance[0] < r.distance[1]);
-        return r;
-    }
-};
-
-}
-
-static int match_one_vector(const U8Descriptor& d1, const std::vector<U8Descriptor>& db)
-{
-    tbb::blocked_range<const U8Descriptor*> range(db.data(), db.data() + db.size());
-    best2_accumulator best2 = tbb::parallel_reduce(
-        range,
-        best2_accumulator(),
-        Reducer(d1, db.data()),
-        Combiner());
-    
-    assert(best2.index != -1);                              // would happen on empty vb
-    assert(best2.distance[1] != 0);                         // in that case it should be at index 0
-    if (best2.distance[1] == FLT_MAX)                       // happens on vb.size()==1
-        return best2.index;
-    if (best2.distance[0] / best2.distance[1] < 0.8*0.8)    // Threshold from the paper, squared
-        return best2.index;
-
-    return -1;
-}
-
-#if 0
-
-std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::vector<U8Descriptor>& db)
-{
-    std::vector<int> matches;
-    if (da.empty() || db.empty())
-        return matches;
-
-    matches.reserve(da.size());
-    const size_t dasz = da.size();
-
-    auto t0 = tbb::tick_count::now();
-    for (size_t ia = 0; ia < dasz; ++ia)
-        matches.push_back(match_one_vector(da[ia], db));
-    auto t1 = tbb::tick_count::now();
-
-    std::clog << "CPU MATCHING, VECTOR: " << (t1 - t0).seconds() << std::endl;
-    return matches;
-}
-
+    // 32 components per iteration.
+    for (int i = 0; i < 4; ++i) {
+#ifndef _DEBUG
+        __m256i d = _mm256_sad_epu8(
+            _mm256_load_si256(af + i),
+            _mm256_load_si256(bf + i));
 #else
+        __m256i d = _mm256_sad_epu8(
+            _mm256_loadu_si256(af + i),
+            _mm256_loadu_si256(bf + i));
+#endif
+        acc = _mm256_add_epi64(acc, d);
+    }
+
+    ALIGNED16 uint64_t buf[4];
+    _mm256_store_si256((__m256i*)buf, acc);
+    unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3];
+    return sum;
+}
 
 std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::vector<U8Descriptor>& db)
 {
@@ -307,10 +265,11 @@ std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::ve
         for (size_t ia = r.rows().begin(); ia != r.rows().end(); ++ia) {
             best2_accumulator acc;
             for (size_t ib = r.cols().begin(); ib != r.cols().end(); ++ib) {
-                float d = L2DistanceSquared(da[ia], db[ib]);
+                //float d = L2DistanceSquared(da[ia], db[ib]);
+                float d = L1Distance(da[ia], db[ib]);
                 acc.update(d, ib);
             }
-            tmp_matches[ia] = Combiner()(tmp_matches[ia], acc);
+            tmp_matches[ia] = combine(tmp_matches[ia], acc);
         }
     });
 
@@ -321,8 +280,5 @@ std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::ve
     std::clog << "CPU MATCHING, VECTOR, TILED: " << (t1 - t0).seconds() << std::endl;
     return matches;
 }
-
-#endif
-
 
 }   // popsift

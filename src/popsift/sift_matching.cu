@@ -76,15 +76,15 @@ __device__ inline void update_sum(unsigned& sum, unsigned &d)
 }
 
 __device__
-unsigned calc_distance(const U8Descriptor& aa, const U8Descriptor& bb) {
+float calc_distance(const U8Descriptor& aa, const U8Descriptor& bb) {
     unsigned sum = 0;
+#if 1
     for (int i = 0; i < 128; i++) {
         unsigned a = aa.features[i] - bb.features[i];
-        a *= a;
-        sum += sum;
+        sum += a*a;
     }
     return sum;
-    /*
+#else
     for (int i = 0; i < 32; i += 4) {
         unsigned a = *(const unsigned*)(aa.features + 4 * i);
         unsigned b = *(const unsigned*)(bb.features + 4 * i);
@@ -95,7 +95,7 @@ unsigned calc_distance(const U8Descriptor& aa, const U8Descriptor& bb) {
         update_sum(sum, d);
     }
     return sum;
-    */
+#endif
 }
 
 //~16+sec execution
