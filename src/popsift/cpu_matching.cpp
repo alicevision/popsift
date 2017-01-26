@@ -265,7 +265,8 @@ std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::ve
         for (size_t ia = r.rows().begin(); ia != r.rows().end(); ++ia) {
             best2_accumulator acc;
             for (size_t ib = r.cols().begin(); ib != r.cols().end(); ++ib) {
-                float d = L2DistanceSquared(da[ia], db[ib]);
+                //float d = L2DistanceSquared(da[ia], db[ib]);
+                float d = L1Distance(da[ia], db[ib]);
                 acc.update(d, ib);
             }
             tmp_matches[ia] = combine(tmp_matches[ia], acc);
