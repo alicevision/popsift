@@ -13,8 +13,7 @@
 #include <iomanip>
 #include <stdlib.h>
 
-#include <getopt.h>
-#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
 
 #include <popsift/popsift.h>
 #include <popsift/sift_conf.h>
@@ -26,155 +25,75 @@ using namespace std;
 
 static void validate( const char* appName, popsift::Config& config );
 
-static void usage( const char* argv )
-{
-    cout << argv
-         << " [options] <filename>"
-         << endl << endl
-         << "* Options *" << endl
-         << " --help / -h / -?            Print usage" << endl
-         << " --verbose / -v" << endl
-         << " --log / -l                  Write debugging files" << endl
-         << endl
-         << "* Parameters *" << endl
-         << " --octaves=<int>             Number of octaves" << endl
-         << " --levels=<int>              Number of levels per octave" << endl
-         << " --sigma=<float>             Initial sigma value" << endl
-         << " --threshold=<float>         Constrast threshold" << endl
-         << " --edge-threshold=<float> or" << endl
-         << " --edge-limit=<float>        On-edge threshold" << endl
-         << " --downsampling=<float>      Downscale width and height of input by 2^N (default N=-1)" << endl
-         << " --initial-blur=<float>      Assume initial blur, subtract when blurring first time" << endl
-         << endl
-         << "* Modes *" << endl
-         << " --popsift-mode (default)    During the initial upscale, shift pixels by 1." << endl
-         << "                             In extrema refinement, steps up to 0.6," << endl
-         << "                             do not reject points when reaching max iterations," << endl
-         << "                             first contrast threshold is .8 * peak thresh." << endl
-         << "                             Shift feature coords octave 0 back to original pos." << endl
-         << " --vlfeat-mode               During the initial upscale, shift pixels by 1." << endl
-         << "                             That creates a sharper upscaled image. " << endl
-         << "                             In extrema refinement, steps up to 0.6, levels remain unchanged," << endl
-         << "                             do not reject points when reaching max iterations," << endl
-         << "                             first contrast threshold is .8 * peak thresh." << endl
-         << " --opencv-mode               During the initial upscale, shift pixels by 0.5." << endl
-         << "                             In extrema refinement, steps up to 0.5," << endl
-         << "                             reject points when reaching max iterations," << endl
-         << "                             first contrast threshold is floor(.5 * peak thresh)." << endl
-         << "                             Computed filter width are lower than VLFeat/PopSift" << endl
-         << " --root-sift                 Use the L1-based norm for OpenMVG rather than" << endl
-         << "                             L2-based as in OpenCV" << endl
-         << " --norm-multi=<int>          Multiply the descriptor by pow(2,<int>), default 0" << endl
-         << " --dp-off                    Switch all CUDA Dynamic Parallelism off" << endl
-         << " --dp-ori-off                Switch DP off for orientation computation" << endl
-         << " --dp-desc-off               Switch DP off for descriptor computation" << endl
-         << endl
-         << "* Informational *" << endl
-         << " --print-gauss-tables        A debug output printing Gauss filter size and tables" << endl
-         << " --print-dev-info            A debug output printing CUDA device information" << endl
-         << " --print-time-info           A debug output printing image processing time after load()" << endl
-#if 0
-         << " --test-direct-scaling       Direct each octave from upscaled orig instead of blurred level." << endl
-         << "                             Does not work yet." << endl
-         << " --group-gauss=<int>         Gauss-filter N levels at once (N=2, 3 or 8)" << endl
-         << "                             3 is accurate for default sigmas of VLFeat and OpenCV mode" << endl
-         << "                             Does not work yet." << endl
-#endif
-         << endl;
-    exit(0);
-}
-
-static struct option longopts[] = {
-    { "help",                no_argument,            NULL, 'h' },
-    { "verbose",             no_argument,            NULL, 'v' },
-    { "log",                 no_argument,            NULL, 'l' },
-    { "print-info",          no_argument,            NULL, 'p' },
-
-    { "octaves",             required_argument,      NULL, 1000 },
-    { "levels",              required_argument,      NULL, 1001 },
-    { "downsampling",        required_argument,      NULL, 1002 },
-    { "threshold",           required_argument,      NULL, 1003 },
-    { "edge-threshold",      required_argument,      NULL, 1004 },
-    { "edge-limit",          required_argument,      NULL, 1004 },
-    { "sigma",               required_argument,      NULL, 1005 },
-    { "initial-blur",        required_argument,      NULL, 1006 },
-
-    { "vlfeat-mode",         no_argument,            NULL, 1100 },
-    { "opencv-mode",         no_argument,            NULL, 1101 },
-    { "popsift-mode",        no_argument,            NULL, 1102 },
-    { "test-direct-scaling", no_argument,            NULL, 1103 },
-    { "group-gauss",         required_argument,      NULL, 1104 },
-    { "dp-off",              no_argument,            NULL, 1105 },
-    { "dp-ori-off",          no_argument,            NULL, 1106 },
-    { "dp-desc-off",         no_argument,            NULL, 1107 },
-    { "root-sift",           no_argument,            NULL, 1108 },
-    { "norm-multi",          required_argument,      NULL, 1109 },
-
-    { "print-gauss-tables",  no_argument,            NULL, 1200 },
-    { "print-dev-info",      no_argument,            NULL, 1201 },
-    { "print-time-info",     no_argument,            NULL, 1202 },
-
-    { NULL,                  0,                      NULL, 0  }
-};
-
 static bool print_dev_info  = false;
 static bool print_time_info = false;
+static bool write_as_uchar = false;
 
-static void parseargs( int argc, char**argv, popsift::Config& config, string& inputFile )
-{
-    const char* appName = argv[0];
-    if( argc == 0 ) usage( "<program>" );
-    if( argc == 1 ) usage( argv[0] );
+static void parseargs(int argc, char** argv, popsift::Config& config, string& inputFile) {
+    using namespace boost::program_options;
 
-    int opt;
-    bool applySigma = false;
-    float sigma;
+    options_description options("Options");
+    options.add_options()
+        ("help,h", "Print usage")
+        ("verbose,v", bool_switch()->notifier([&](bool v) { if (v) config.setVerbose(); }), "")
+        ("log,l", bool_switch()->notifier([&](bool v) { if(v) config.setLogMode(popsift::Config::All); }), "Write debugging files")
 
-    while( (opt = getopt_long(argc, argv, "?hvlp", longopts, NULL)) != -1 )
-    {
-        switch (opt)
-        {
-        case '?' :
-        case 'h' : usage( appName ); break;
-        case 'v' : config.setVerbose(); break;
-        case 'l' : config.setLogMode( popsift::Config::All ); break;
+        ("input-file,i", value<std::string>(&inputFile)->required(), "Input file");
+    
+    options_description parameters("Parameters");
+    parameters.add_options()
+        ("octaves", value<int>(&config.octaves), "Number of octaves")
+        ("levels", value<int>(&config.levels), "Number of levels per octave")
+        ("sigma", value<float>()->notifier([&](float f) { config.setSigma(f); }), "Initial sigma value")
 
-        case 1000 : config.setOctaves( strtol( optarg, NULL, 0 ) ); break;
-        case 1001 : config.setLevels(  strtol( optarg, NULL, 0 ) ); break;
-        case 1002 : config.setDownsampling( strtof( optarg, NULL ) ); break;
-        case 1003 : config.setThreshold(  strtof( optarg, NULL ) ); break;
-        case 1004 : config.setEdgeLimit(  strtof( optarg, NULL ) ); break;
-        case 1005 : applySigma = true; sigma = strtof( optarg, NULL ); break;
-        case 1006 : config.setInitialBlur( strtof( optarg, NULL ) ); break;
+        ("threshold", value<float>()->notifier([&](float f) { config.setThreshold(f); }), "Contrast threshold")
+        ("edge-threshold", value<float>()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
+        ("edge-limit", value<float>()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
+        ("downsampling", value<float>()->notifier([&](float f) { config.setDownsampling(f); }), "Downscale width and height of input by 2^N")
+        ("initial-blur", value<float>()->notifier([&](float f) {config.setInitialBlur(f); }), "Assume initial blur, subtract when blurring first time");
+    
+    options_description modes("Modes");
+    modes.add_options()
+        ("popsift-mode", bool_switch()->notifier([&](bool v) { if(v) config.setMode(popsift::Config::PopSift); }),
+            "During the initial upscale, shift pixels by 1. In extrema refinement, steps up to 0.6, do not reject points when reaching max iterations, "
+            "first contrast threshold is .8 * peak thresh. Shift feature coords octave 0 back to original pos.")
+        ("vlfeat-mode", bool_switch()->notifier([&](bool v) { if (v) config.setMode(popsift::Config::VLFeat); }),
+            "During the initial upscale, shift pixels by 1. That creates a sharper upscaled image. "
+            "In extrema refinement, steps up to 0.6, levels remain unchanged, "
+            "do not reject points when reaching max iterations, "
+            "first contrast threshold is .8 * peak thresh.")
+        ("opencv-mode", bool_switch()->notifier([&](bool v) { if (v) config.setMode(popsift::Config::OpenCV); }),
+            "During the initial upscale, shift pixels by 0.5. "
+            "In extrema refinement, steps up to 0.5, "
+            "reject points when reaching max iterations, "
+            "first contrast threshold is floor(.5 * peak thresh). "
+            "Computed filter width are lower than VLFeat/PopSift")
+        ("root-sift", bool_switch()->notifier([&](bool v) { if (v) config.setUseRootSift(true); }),
+            "Use the L1-based norm for OpenMVG rather than L2-based as in OpenCV")
+        ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
+        ("dp-off", bool_switch()->notifier([&](bool v) { if (v) config.setDPOrientation(false); config.setDPDescriptors(false); }), "Switch all CUDA Dynamic Parallelism off.")
+        ("dp-ori-off", bool_switch()->notifier([&](bool v) { if (v) config.setDPOrientation(false); }), "Switch DP off for orientation computation")
+        ("dp-desc-off", bool_switch()->notifier([&](bool v) { if (v) config.setDPDescriptors(false); }), "Switch DP off for descriptor computation");
 
-        case 1100 : config.setMode( popsift::Config::VLFeat ); break;
-        case 1101 : config.setMode( popsift::Config::OpenCV ); break;
-        case 1102 : config.setMode( popsift::Config::PopSift ); break;
-        case 1103 : config.setScalingMode( popsift::Config::ScaleDirect ); break;
-        case 1104 : config.setGaussGroup( strtol( optarg, NULL, 0 ) ); break;
-        case 1105 : config.setDPOrientation( false ); config.setDPDescriptors( false ); break;
-        case 1106 : config.setDPOrientation( false ); break;
-        case 1107 : config.setDPDescriptors( false ); break;
-        case 1108 : config.setUseRootSift( true ); break;
-        case 1109 : config.setNormalizationMultiplier( strtol( optarg, NULL, 0 ) ); break;
+    options_description informational("Informational");
+    informational.add_options()
+        ("print-gauss-tables", bool_switch()->notifier([&](bool v) { if (v) config.setPrintGaussTables(); }), "A debug output printing Gauss filter size and tables")
+        ("print-dev-info", bool_switch(&print_dev_info)->default_value(false), "A debug output printing CUDA device information")
+        ("print-time-info", bool_switch(&print_time_info)->default_value(false), "A debug output printing image processing time after load()")
+        ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded to int Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar");
+        //("test-direct-scaling")
 
-        case 1200 : config.setPrintGaussTables( ); break;
-        case 1201 : print_dev_info  = true; break;
-        case 1202 : print_time_info = true; break;
-        default   : usage( appName );
-        }
+    options_description all("Allowed options");
+    all.add(options).add(parameters).add(modes).add(informational);
+    variables_map vm;
+    store(parse_command_line(argc, argv, all), vm);
+
+    if (vm.count("help")) {
+        std::cout << all << '\n';
+        exit(1);
     }
-
-    if( applySigma ) config.setSigma( sigma );
-
-    validate( appName, config );
-
-    argc -= optind;
-    argv += optind;
-
-    if( argc == 0 ) usage( appName );
-
-    inputFile = argv[0];
+    
+    notify(vm); // Notify does processing (e.g., raise exceptions if required args are missing)
 }
 
 int main(int argc, char **argv)
@@ -185,11 +104,13 @@ int main(int argc, char **argv)
     string         inputFile = "";
     const char*    appName   = argv[0];
 
-    parseargs( argc, argv, config, inputFile ); // Parse command line
-
-    if( inputFile == "" ) {
-        cerr << "No input filename given" << endl;
-        usage( appName );
+    try {
+        parseargs(argc, argv, config, inputFile);   // Parse command line
+        std::cout << inputFile << std::endl;
+    }
+    catch (std::exception& e) {
+        std::cout << e.what() << std::endl;
+        exit(1);
     }
 
     int w;
@@ -232,7 +153,6 @@ static void validate( const char* appName, popsift::Config& config )
         break;
     default :
         cerr << "Only 2, 3 or 8 Gauss levels can be combined at this time" << endl;
-        usage( appName );
         exit( -1 );
     }
 }

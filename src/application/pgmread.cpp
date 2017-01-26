@@ -6,6 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include <stdlib.h>
+#include <iso646.h>
 #include <iostream>
 #include <fstream>
 #include <boost/filesystem.hpp>
@@ -43,7 +44,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         return 0;
     }
 
-    ifstream pgmfile( filename.c_str() );
+    ifstream pgmfile( filename.c_str(), ios::binary );
     if( not pgmfile.is_open() ) {
         cerr << "File " << input_file << " could not be opened for reading" << endl;
         return 0;

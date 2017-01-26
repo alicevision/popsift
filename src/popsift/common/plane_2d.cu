@@ -8,7 +8,14 @@
 #include <iostream>
 #include <string.h>
 #include <stdlib.h>
+#ifndef _WIN32
 #include <unistd.h>
+#else
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <malloc.h>
+#endif
 
 #include <cuda_runtime.h>
 
@@ -39,6 +46,18 @@ void PlaneBase::freeDev2D( void* data )
 }
 
 __host__
+static long GetPageSize()
+{
+#ifdef _WIN32
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return si.dwPageSize;
+#else
+    return sysconf(_SC_PAGESIZE);
+#endif
+}
+
+__host__
 void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
 {
     int sz = w * h * elemSize;
@@ -52,8 +71,7 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
         char b[100];
         const char* buf = strerror_r( errno, b, 100 );
 #else
-        char buf[100];
-        strerror_r( errno, buf, 100 );
+        const char *buf = strerror(errno);
 #endif
         cerr << __FILE__ << ":" << __LINE__ << endl
              << "    Failed to allocate " << sz << " bytes of unaligned host memory." << endl
@@ -61,17 +79,20 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
         exit( -1 );
     } else if( m == PageAligned ) {
         void* ptr;
-        long  pagesize = sysconf(_SC_PAGESIZE);
-        int   retval = posix_memalign( &ptr, pagesize, sz );
 
+#ifdef _WIN32
+        ptr = _aligned_malloc(sz, GetPageSize());
+        if (ptr) return ptr;
+#else
+        int retval = posix_memalign( &ptr, GetPageSize(), sz );
         if( retval == 0 ) return ptr;
+#endif
 
 #ifdef _GNU_SOURCE
         char b[100];
         const char* buf = strerror_r( errno, b, 100 );
 #else
-        char buf[100];
-        strerror_r( errno, buf, 100 );
+        const char* buf = strerror(errno);
 #endif
         cerr << __FILE__ << ":" << __LINE__ << endl
              << "    Failed to allocate " << sz << " bytes of page-aligned host memory." << endl
@@ -95,14 +116,25 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
 __host__
 void PlaneBase::freeHost2D( void* data, PlaneMapMode m )
 {
-    if( data != 0 ) {
-        if( m != CudaAllocated ) {
-            free( data );
-        } else {
-            cudaFreeHost( data );
-        }
-        data = 0;
+    if (!data)
+        return;
+    if (m == CudaAllocated) {
+        cudaFreeHost(data);
+        return;
     }
+    if (m == Unaligned) {
+        free(data);
+        return;
+    }
+    if (m == PageAligned) {
+#ifdef _WIN32
+        _aligned_free(data);
+#else
+        free(data);
+#endif
+        return;
+    }
+    assert(!"Invalid PlaneMapMode");
 }
 
 __host__

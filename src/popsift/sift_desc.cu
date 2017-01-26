@@ -7,6 +7,7 @@
  */
 #include <iostream>
 #include <stdio.h>
+#include <iso646.h>
 
 #include "sift_pyramid.h"
 #include "sift_constants.h"
@@ -422,6 +423,7 @@ void Pyramid::descriptors( const Config& conf )
             // async copy of extrema from device to host
             oct_obj.readExtremaCount( );
         }
+        cudaDeviceSynchronize(); //make sure extrama count device->host is finished
 
         for( int octave=0; octave<_num_octaves; octave++ ) {
             Octave&      oct_obj = _octaves[octave];
