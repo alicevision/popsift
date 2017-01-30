@@ -44,6 +44,8 @@ public:
     std::vector<int> Match(popsift::Descriptor* d_desc_a, size_t num_desc_a, 
                   popsift::Descriptor* d_desc_b, size_t num_desc_b);
 
+	std::vector<int> PipelineMatch();
+
 private:
     const Config& config;
 };

@@ -5,6 +5,7 @@
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
+#if 1
 
 #include "sift_matching.h"
 #include "sift_pyramid.h"
@@ -282,3 +283,5 @@ std::vector<int> Matching_CPU(const std::vector<U8Descriptor>& da, const std::ve
 }
 
 }   // popsift
+
+#endif

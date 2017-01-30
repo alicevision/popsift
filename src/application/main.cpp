@@ -181,12 +181,16 @@ int main(int argc, char **argv)
         exit(1);
     }
     
+	popsift::Matching matcher(config);
+	auto ret = matcher.PipelineMatch();
+
     
+#if 0
     auto sift_a = extractFeatures(inputFile, config);
     if (!matchFile.empty()) {
         auto sift_b = extractFeatures(matchFile, config);
-        CPU_Matching_Performance(sift_a, sift_b);
-#if 0
+        //CPU_Matching_Performance(sift_a, sift_b);
+#if 1
         popsift::Matching matcher(config);
         //matcher.Match(*sift_a, *sift_b);
         std::vector<int> gpu_matches = matcher.Match(
@@ -195,8 +199,8 @@ int main(int argc, char **argv)
 
         std::ofstream f("tmp.txt");
 
-        for (int i = 0; i < 100; i++) {
-            f << gpu_matches[i];
+        for (int i = 0; i < gpu_matches.size(); i++) {
+            f << gpu_matches[i] << std::endl;
         }
 #endif
 
@@ -207,5 +211,6 @@ int main(int argc, char **argv)
         }
         */
     }
+#endif
     return 0;
 }

@@ -178,7 +178,7 @@ void u8_test(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_desc_b, i
     U8Descriptor a;
     a = d_desc_a[tid];
     float min1 = FLT_MAX, min2 = FLT_MAX;
-    int min_index;
+	int min_index = -1;
     const int cache_size = 128;
     const int skip_len = cache_size;// *2;
     __shared__ U8Descriptor cached[cache_size];
@@ -186,36 +186,25 @@ void u8_test(U8Descriptor* d_desc_a, int desc_a_count, U8Descriptor* d_desc_b, i
     for (int x = 0; x < desc_b_count; x += cache_size) {
         //#pragma unroll
         //for (int i = 0; i < 128; i++) {
-            ///cached[i].features[threadIdx.x] = d_desc_b[threadIdx.x*blockDim.x + threadIdx.x].features[threadIdx.x];
+           //cached[i].features[threadIdx.x] = d_desc_b[threadIdx.x*blockDim.x + threadIdx.x].features[threadIdx.x];
         //}
 
         memcpy(cached[threadIdx.x].features, d_desc_b[threadIdx.x + x].features, sizeof(U8Descriptor));
         //cached[threadIdx.x] = d_desc_b[threadIdx.x + x];
         __syncthreads();
-        dst = calc_distance(a, cached[threadIdx.x]);
-#if 0  
-        dst = 0;
-        for (int x = 0; x < 128; x++) {
-            dst += abs(a.features[x] - cached[threadIdx.x].features[x]);
-        }
-#endif
-#if 0
-        dst = 0;
-        dst = calc_distance(a, cached[threadIdx.x]);
-
-        
-#endif
-#if 1
-        if (dst < min1) {
-            min2 = min1;
-            min1 = dst;
-            min_index = x;
-        }
-        else if (dst < min2) {
-            min2 = dst;
-        }
-#endif
+		for (int i = 0; i < 32; i++) {
+			dst = calc_distance(a, cached[i]);
+			if (dst < min1) {
+				min2 = min1;
+				min1 = dst;
+				min_index = x;
+			}
+			else if (dst < min2) {
+				min2 = dst;
+			}
+		}
     }
+
 #if 1
     if (min1 / min2 < 0.64f) {
         output[tid] = min_index;
@@ -429,13 +418,14 @@ void char_32x32t_32d(U8Descriptor* d_desc_a, int desc_a_count,
 std::vector<int> Matching::Match(popsift::Descriptor* d_desc_a, size_t num_desc_a,
     popsift::Descriptor* d_desc_b, size_t num_desc_b) {
 
+	std::cout << "starting test" << std::endl;
 #if 1
     U8Descriptor* a_U8Descriptor = ConvertDescriptorsToU8(d_desc_a, num_desc_a);
     U8Descriptor* b_U8Descriptor = ConvertDescriptorsToU8(d_desc_b, num_desc_b);
 #endif
     int* d_result = popsift::cuda::malloc_devT<int>(num_desc_a, __FILE__, __LINE__);
 
-    std::cout << "starting test\n";
+    
 
 #if 0
     dim3 threadsPerBlock(32, 32);
@@ -476,11 +466,127 @@ std::vector<int> Matching::Match(popsift::Descriptor* d_desc_a, size_t num_desc_
     //char_32thread_1desc <<<numBlocks, threadsPerBlock >>>(a_U8Descriptor, num_desc_a, b_U8Descriptor, num_desc_b, d_result);
     std::vector<int> h_result(num_desc_a);
 
-    //cudaMemcpyAsync(h_result.data(), d_result, num_desc_a * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpyAsync(h_result.data(), d_result, num_desc_a * sizeof(int), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     cudaError_t r = cudaGetLastError();
     std::cout << "test done";
     return h_result;
 }
 
+// 5.2ms
+__global__
+void float_pipeline_32x1(Descriptor* d_a, Descriptor* d_b, int num_a, int num_b, int* result) {
+	Descriptor a;
+	memcpy(&a.features[threadIdx.x*4], &d_a->features[threadIdx.x*4], sizeof(float) * 4);
+
+	Descriptor b;
+	memcpy(&b.features[threadIdx.x * 4], &d_b[blockIdx.x].features[threadIdx.x * 4], sizeof(float) * 4);
+
+	__shared__ float res[32];
+	res[threadIdx.x] = 0.0f;
+	res[threadIdx.x] += a.features[threadIdx.x] * b.features[threadIdx.x];
+	res[threadIdx.x] += a.features[threadIdx.x+1] * b.features[threadIdx.x+1];
+	res[threadIdx.x] += a.features[threadIdx.x+2] * b.features[threadIdx.x+2];
+	res[threadIdx.x] += a.features[threadIdx.x+3] * b.features[threadIdx.x+3];
+
+	reduce(res);
+	if (threadIdx.x == 0) {
+		result[threadIdx.x + blockIdx.x*blockDim.x] = res[0];
+	}
 }
+
+//14.2ms
+__global__
+void float_pipeline_128x1(Descriptor* d_a, Descriptor* d_b, int num_a, int num_b, int* result) {
+	Descriptor a;
+	memcpy(&a.features[threadIdx.x], &d_a->features[threadIdx.x], sizeof(float));
+
+	Descriptor b;
+	memcpy(&b.features[threadIdx.x], &d_b[blockIdx.x].features[threadIdx.x], sizeof(float));
+
+	__shared__ float res[128];
+	res[threadIdx.x] = a.features[threadIdx.x] * b.features[threadIdx.x];
+	
+	int tid = threadIdx.x;
+	if (tid < 64) res[tid] += res[tid + 64]; __syncthreads(); 
+	if (tid < 32) res[tid] += res[tid + 32]; __syncthreads();
+	reduce(res);
+
+	if (threadIdx.x == 0) {
+		result[threadIdx.x + blockIdx.x*blockDim.x] = res[0];
+	}
+}
+
+__global__
+void float_pipeline_32x32(Descriptor* d_a, Descriptor* d_b, int num_a, int num_b, int* result) {
+	
+	__shared__ Descriptor a;
+	__shared__ Descriptor b[32];
+	__shared__ float dots[32][32];
+	int tid = threadIdx.x + threadIdx.y*blockDim.x;
+
+	if (tid < 128) {
+		memcpy(&a.features[tid], &d_a->features[threadIdx.x], sizeof(float));
+	}
+	memcpy(&b[threadIdx.y].features[threadIdx.x * 4], &d_b[blockIdx.x].features[threadIdx.x * 4], sizeof(float) * 4);
+	__syncthreads();
+
+	dots[threadIdx.y][threadIdx.x] = 0.0f;
+	for (int i = 0; i < 4; i++) {
+		dots[threadIdx.y][threadIdx.x] += a.features[threadIdx.x+i] * b[threadIdx.y].features[threadIdx.x+i];
+	}
+	reduce(&dots[threadIdx.y][0]);
+	if (threadIdx.x == 0) {
+		result[threadIdx.y + blockDim.x*32] = dots[threadIdx.y][0];
+	}
+}
+
+std::vector<int> Matching::PipelineMatch() {
+	
+	const int num_db = 20000;
+	Descriptor* b = new Descriptor[num_db];
+	for (int x = 0; x < num_db; x++) {
+		for (int i = 0; i < 128; i++) {
+			b[x].features[i] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+		}
+	}
+
+	Descriptor* d_b = (Descriptor*)popsift::cuda::malloc_devT<float>(sizeof(Descriptor)*num_db, __FILE__, __LINE__);
+	cudaMemcpyAsync(d_b, b, sizeof(Descriptor)*num_db, cudaMemcpyHostToDevice);
+
+	Descriptor a;
+	for (int i = 0; i < 128; i++) {
+		a.features[i] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+	}
+	Descriptor* d_a = (Descriptor*)popsift::cuda::malloc_devT<float>(sizeof(Descriptor), __FILE__, __LINE__);
+	cudaMemcpyAsync(d_a, &a, sizeof(Descriptor), cudaMemcpyHostToDevice);
+
+	std::vector<int> result(num_db);
+	int* d_res = popsift::cuda::malloc_devT<int>(num_db, __FILE__, __LINE__);
+	cudaMemcpyAsync(result.data(), d_res, sizeof(int)*result.size(), cudaMemcpyDeviceToHost);
+	
+#if 0
+	dim3 threadsPerBlock(32);
+	dim3 numBlocks(num_db); //need ceiling
+	float_pipeline_32x1 <<<numBlocks, threadsPerBlock >>>(d_a, d_b, 1, num_db, d_res);
+#endif
+#if 0
+	dim3 threadsPerBlock(128);
+	dim3 numBlocks(num_db); //need ceiling
+	float_pipeline_128x1 <<<numBlocks, threadsPerBlock >>>(d_a, d_b, 1, num_db, d_res);
+#endif
+#if 1
+	dim3 threadsPerBlock(32,32);
+	dim3 numBlocks(num_db/32); //need ceiling
+	float_pipeline_32x32 <<<numBlocks, threadsPerBlock >>>(d_a, d_b, 1, num_db, d_res);
+#endif
+	cudaDeviceSynchronize();
+
+	cudaFree(d_b);
+	cudaFree(d_a);
+	return result;
+}
+
+}
+
+
