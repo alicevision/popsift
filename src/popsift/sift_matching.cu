@@ -578,13 +578,37 @@ void float_pipeline_32x32_2(Descriptor* d_a, Descriptor* d_b, int num_a, int num
 	*/
 }
 
+//1.2Mms
 __global__
 void float_pipeline_128x1_noshared(Descriptor* d_a, Descriptor* d_b, int num_a, int num_b, int* result) {
 	int tid = threadIdx.x;
-	
+
 	__shared__ float res[128];
 	res[tid] = d_a->features[tid] * d_b[blockIdx.x].features[tid];
 
+	/*
+	if (tid < 64) res[tid] += res[tid + 64]; __syncthreads();
+	if (tid < 32) res[tid] += res[tid + 32]; __syncthreads();
+	reduce(res);
+	*/
+	if (threadIdx.x == 0) {
+		result[blockIdx.x] = res[0];
+	}
+}
+
+//1.2Mms
+__global__
+void float_pipeline_128x8_noshared(Descriptor* d_a, Descriptor* d_b, int num_a, int num_b, int* result) {
+	int tid = threadIdx.x;
+	
+	__shared__ Descriptor a;
+	if (threadIdx.y == 0) a.features[tid] = d_a->features[tid];
+	__syncthreads();
+	/*
+	__shared__ float res[128];
+	res[tid] = a.features[tid] * d_b[8*blockIdx.x].features[tid];
+
+	
 	if (tid < 64) res[tid] += res[tid + 64]; __syncthreads();
 	if (tid < 32) res[tid] += res[tid + 32]; __syncthreads();
 	reduce(res);
@@ -592,10 +616,12 @@ void float_pipeline_128x1_noshared(Descriptor* d_a, Descriptor* d_b, int num_a, 
 	if (threadIdx.x == 0) {
 		result[blockIdx.x] = res[0];
 	}
+	*/
+	
 }
 
 __global__
-void float_pipeline_32x4_noshared(Descriptor* d_a, Descriptor* d_b, int num_a, int num_b, int* result) {
+void float_pipeline_32x1_noshared(Descriptor* d_a, Descriptor* d_b, int num_a, int num_b, int* result) {
 	int tid = threadIdx.x;
 	float a[4];
 	float b[4];
@@ -615,6 +641,7 @@ void float_pipeline_32x4_noshared(Descriptor* d_a, Descriptor* d_b, int num_a, i
 		result[blockIdx.x] = share_res[0];
 	}
 }
+
 
 
 std::vector<int> Matching::PipelineMatch() 
@@ -656,15 +683,20 @@ std::vector<int> Matching::PipelineMatch()
 	dim3 numBlocks(num_db/32); //need ceiling
 	float_pipeline_32x32_2 <<<numBlocks, threadsPerBlock >>>(d_a, d_b, 1, num_db, d_res);
 #endif
-#if 0
+#if 1
 	dim3 threadsPerBlock(128);
 	dim3 numBlocks(num_db); //need ceiling
 	float_pipeline_128x1_noshared << <numBlocks, threadsPerBlock >> >(d_a, d_b, 1, num_db, d_res);
 #endif
-#if 1
+#if 0
 	dim3 threadsPerBlock(32);
 	dim3 numBlocks(num_db); //need ceiling
 	float_pipeline_32x1_noshared << <numBlocks, threadsPerBlock >> >(d_a, d_b, 1, num_db, d_res);
+#endif
+#if 0
+	dim3 threadsPerBlock(128, 8);
+	dim3 numBlocks(num_db/8); //need ceiling
+	float_pipeline_128x8_noshared << <numBlocks, threadsPerBlock >> >(d_a, d_b, 1, num_db, d_res);
 #endif
 	cudaDeviceSynchronize();
 
