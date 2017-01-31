@@ -185,7 +185,10 @@ std::vector<int> Matching_CPU(const std::vector<Descriptor>& da, const std::vect
 static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
     const __m256i* af = reinterpret_cast<const __m256i*>(ad.features);
     const __m256i* bf = reinterpret_cast<const __m256i*>(bd.features);
-    __m256i acc = _mm256_setzero_si256();
+    __m256i acc1 = _mm256_setzero_si256();
+    __m256i acc2 = _mm256_setzero_si256();
+    __m256i acc3 = _mm256_setzero_si256();
+    __m256i acc4 = _mm256_setzero_si256();
 
     // 32 components per iteration.
     for (int i = 0; i < 4; ++i) {
@@ -202,26 +205,34 @@ static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
             _mm256_loadu_si256(af + i),
             _mm256_loadu_si256(bf + i)));
 #endif
-        
+
         // Squared elements, 0..15
         __m256i dl = _mm256_unpacklo_epi8(d, _mm256_setzero_si256());
         dl = _mm256_mullo_epi16(dl, dl);
-        
+
         // Squared elements, 15..31
         __m256i dh = _mm256_unpackhi_epi8(d, _mm256_setzero_si256());
         dh = _mm256_mullo_epi16(dh, dh);
 
         // Expand the squared elements to 32-bits and add to accumulator.
-        acc = _mm256_add_epi32(acc, _mm256_unpacklo_epi16(dl, _mm256_setzero_si256()));
-        acc = _mm256_add_epi32(acc, _mm256_unpackhi_epi16(dl, _mm256_setzero_si256()));
-        acc = _mm256_add_epi32(acc, _mm256_unpacklo_epi16(dh, _mm256_setzero_si256()));
-        acc = _mm256_add_epi32(acc, _mm256_unpackhi_epi16(dh, _mm256_setzero_si256()));
+        acc1 = _mm256_add_epi32(acc1, _mm256_unpacklo_epi16(dl, _mm256_setzero_si256()));
+        acc2 = _mm256_add_epi32(acc2, _mm256_unpackhi_epi16(dl, _mm256_setzero_si256()));
+        acc3 = _mm256_add_epi32(acc3, _mm256_unpacklo_epi16(dh, _mm256_setzero_si256()));
+        acc4 = _mm256_add_epi32(acc4, _mm256_unpackhi_epi16(dh, _mm256_setzero_si256()));
+
     }
+    acc1 = _mm256_add_epi32(acc1, acc2);
+    acc3 = _mm256_add_epi32(acc3, acc4);
+    acc1 = _mm256_add_epi32(acc1, acc3);
+
+    acc1 = _mm256_hadd_epi32(acc1, acc1);
+    acc1 = _mm256_hadd_epi32(acc1, acc1);
 
     ALIGNED16 unsigned int buf[8];
-    _mm256_store_si256((__m256i*)buf, acc);
-    unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
-    return sum;
+    _mm256_store_si256((__m256i*)buf, acc1);
+    return buf[0] + buf[4];
+    //unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
+    //return sum;
 }
 
 static float L1Distance(const U8Descriptor& ad, const U8Descriptor& bd) {

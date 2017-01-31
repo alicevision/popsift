@@ -138,7 +138,7 @@ static void CPU_Matching_Performance(const ExtractionResult& er_a, const Extract
     size_t count_a = std::get<1>(er_a).descriptors().size();
     size_t count_b = std::get<1>(er_b).descriptors().size();
 
-    auto m_scalar = Matching_CPU(std::get<1>(er_a).descriptors(), std::get<1>(er_b).descriptors());
+    //auto m_scalar = Matching_CPU(std::get<1>(er_a).descriptors(), std::get<1>(er_b).descriptors());
 
     auto du8_a = popsift::ConvertDescriptorsToU8(std::get<2>(er_a), count_a);
     auto du8_b = popsift::ConvertDescriptorsToU8(std::get<2>(er_b), count_b);
@@ -151,6 +151,7 @@ static void CPU_Matching_Performance(const ExtractionResult& er_a, const Extract
 
     auto m_vector = popsift::Matching_CPU(hu8_a, hu8_b);
 
+    /*
     assert(m_vector.size() == m_scalar.size());
     if (m_vector == m_scalar) {
         std::cout << "SCALAR AND VECTOR MATCHES MATCH\n";
@@ -161,6 +162,7 @@ static void CPU_Matching_Performance(const ExtractionResult& er_a, const Extract
             if (m_scalar[i] != m_vector[i])
                 cout << i << " " << m_scalar[i] << " " << m_vector[i] << "\n";
     }
+    */
 }
 
 int main(int argc, char **argv)
@@ -182,15 +184,15 @@ int main(int argc, char **argv)
     }
     
 	popsift::Matching matcher(config);
-	auto ret = matcher.PipelineMatch();
+	//auto ret = matcher.PipelineMatch();
 
     
-#if 0
+#if 1
     auto sift_a = extractFeatures(inputFile, config);
     if (!matchFile.empty()) {
         auto sift_b = extractFeatures(matchFile, config);
-        //CPU_Matching_Performance(sift_a, sift_b);
-#if 1
+        CPU_Matching_Performance(sift_a, sift_b);
+#if 0
         popsift::Matching matcher(config);
         //matcher.Match(*sift_a, *sift_b);
         std::vector<int> gpu_matches = matcher.Match(
