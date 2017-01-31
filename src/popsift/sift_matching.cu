@@ -1,3 +1,4 @@
+
 /*
 * Copyright 2017, Simula Research Laboratory
 *
@@ -20,7 +21,7 @@
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-
+#include "cublas.h"
 namespace popsift {
 
 __global__
@@ -578,19 +579,19 @@ void float_pipeline_32x32_2(Descriptor* d_a, Descriptor* d_b, int num_a, int num
 	*/
 }
 
-//1.2Mms
+//~520us
 __global__
-void float_pipeline_128x1_noshared(Descriptor* d_a, Descriptor* d_b, int num_a, int num_b, int* result) {
+void float_pipeline_128x1_noshared(const Descriptor* __restrict__ d_a, const Descriptor* __restrict__ d_b, int num_a, int num_b, int* result) {
 	int tid = threadIdx.x;
 
 	__shared__ float res[128];
 	res[tid] = d_a->features[tid] * d_b[blockIdx.x].features[tid];
 
-	/*
+	
 	if (tid < 64) res[tid] += res[tid + 64]; __syncthreads();
 	if (tid < 32) res[tid] += res[tid + 32]; __syncthreads();
 	reduce(res);
-	*/
+	
 	if (threadIdx.x == 0) {
 		result[blockIdx.x] = res[0];
 	}
@@ -621,7 +622,7 @@ void float_pipeline_128x8_noshared(Descriptor* d_a, Descriptor* d_b, int num_a, 
 }
 
 __global__
-void float_pipeline_32x1_noshared(Descriptor* d_a, Descriptor* d_b, int num_a, int num_b, int* result) {
+void float_pipeline_32x1_noshared(const Descriptor* __restrict__ d_a, const Descriptor* __restrict__ d_b, int num_a, int num_b, int* result) {
 	int tid = threadIdx.x;
 	float a[4];
 	float b[4];
@@ -637,37 +638,289 @@ void float_pipeline_32x1_noshared(Descriptor* d_a, Descriptor* d_b, int num_a, i
 
 	reduce(share_res);
 
-	if (tid) {
+	if (tid == 0) {
 		result[blockIdx.x] = share_res[0];
 	}
 }
 
+//550us
+__global__
+void float_pipeline_32x4_noshared(const Descriptor* __restrict__ d_a, const Descriptor* __restrict__ d_b, int num_a, int num_b, int* result) {
+    int tid = threadIdx.x;
+    __shared__ Descriptor a;
+    a.features[threadIdx.x + threadIdx.y * 32] = d_a->features[threadIdx.x + threadIdx.y * 32];
+    //memcpy(a, &d_a->features[tid * 4], sizeof(float) * 4);
 
+    float b[4];
+    memcpy(b, &d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 4], sizeof(float) * 4);
+
+    __shared__ float share_res[32][4];
+    float res = a.features[tid * 4] * b[0];
+    res += a.features[tid * 4 + 1] * b[1];
+    res += a.features[tid * 4 + 2] * b[2];
+    res += a.features[tid * 4 + 3] * b[3];
+    share_res[tid][threadIdx.y] = res;
+
+    reduce(&share_res[0][threadIdx.y]);
+
+    if (tid == 0) {
+        result[threadIdx.y + blockIdx.x*blockDim.y] = share_res[0][threadIdx.y];
+    }
+
+}
+
+//510us
+__global__
+void float_pipeline_16x8_noshared(const Descriptor* __restrict__ d_a, const Descriptor* __restrict__ d_b, int num_a, int num_b, int* result) {
+    int tid = threadIdx.x;
+    __shared__ Descriptor a;
+    a.features[threadIdx.x + threadIdx.y*blockDim.x] = d_a->features[threadIdx.x + threadIdx.y*blockDim.x];
+
+    float b[8];
+    memcpy(b, &d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 8], sizeof(float) * 8);
+
+    __shared__ float share_res[16][8];
+    float res = a.features[tid * 8] * b[0];
+    res += a.features[tid * 8 + 1] * b[1];
+    res += a.features[tid * 8 + 2] * b[2];
+    res += a.features[tid * 8 + 3] * b[3];
+    res += a.features[tid * 8 + 4] * b[4];
+    res += a.features[tid * 8 + 5] * b[5];
+    res += a.features[tid * 8 + 6] * b[6];
+    res += a.features[tid * 8 + 7] * b[7];
+    share_res[tid][threadIdx.y] = res;
+
+    if (tid < 8) {
+        share_res[tid][threadIdx.y] += share_res[tid + 8][threadIdx.y];
+        share_res[tid][threadIdx.y] += share_res[tid + 4][threadIdx.y];
+        share_res[tid][threadIdx.y] += share_res[tid + 2][threadIdx.y];
+        share_res[tid][threadIdx.y] += share_res[tid + 1][threadIdx.y];
+    }
+    if (tid == 0) {
+        result[threadIdx.y + blockIdx.x*8] = share_res[0][threadIdx.y];
+    }
+
+}
+
+__global__
+void float_pipeline_8x16_noshared(const Descriptor* __restrict__ d_a, const Descriptor* __restrict__ d_b, int num_a, int num_b, int* result) {
+    int tid = threadIdx.x;
+    __shared__ Descriptor a;
+    a.features[threadIdx.x + threadIdx.y*blockDim.x] = d_a->features[threadIdx.x + threadIdx.y*blockDim.x];
+
+    float b[16];
+    memcpy(b, &d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 16], sizeof(float) * 16);
+
+    __shared__ float share_res[8][16];
+    float res = a.features[tid * 8] * b[0];
+    res += a.features[tid * 16 + 1] * b[1];
+    res += a.features[tid * 16 + 2] * b[2];
+    res += a.features[tid * 16 + 3] * b[3];
+    res += a.features[tid * 16 + 4] * b[4];
+    res += a.features[tid * 16 + 5] * b[5];
+    res += a.features[tid * 16 + 6] * b[6];
+    res += a.features[tid * 16 + 7] * b[7];
+    res += a.features[tid * 16 + 8] * b[8];
+    res += a.features[tid * 16 + 9] * b[9];
+    res += a.features[tid * 16 + 10] * b[10];
+    res += a.features[tid * 16 + 11] * b[11];
+    res += a.features[tid * 16 + 12] * b[12];
+    res += a.features[tid * 16 + 13] * b[13];
+    res += a.features[tid * 16 + 14] * b[14];
+    res += a.features[tid * 16 + 15] * b[15];
+    share_res[tid][threadIdx.y] = res;
+
+    if (tid < 4) {
+        share_res[tid][threadIdx.y] += share_res[tid + 4][threadIdx.y];
+        share_res[tid][threadIdx.y] += share_res[tid + 2][threadIdx.y];
+        share_res[tid][threadIdx.y] += share_res[tid + 1][threadIdx.y];
+    }
+    if (tid == 0) {
+        result[threadIdx.y + blockIdx.x * blockDim.y] = share_res[0][threadIdx.y];
+    }
+
+}
+
+__global__
+void float_pipeline_4x32_noshared(const Descriptor* __restrict__ d_a, const Descriptor* __restrict__ d_b, int num_a, int num_b, int* result) {
+    int tid = threadIdx.x;
+    __shared__ Descriptor a;
+    a.features[threadIdx.x + threadIdx.y*blockDim.x] = d_a->features[threadIdx.x + threadIdx.y*blockDim.x];
+
+    float b[16];
+    memcpy(b, &d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 32], sizeof(float) * 32);
+
+    __shared__ float share_res[4][32];
+    float res = a.features[tid * 8] * b[0];
+    res += a.features[tid * 32 + 1] * b[1];
+    res += a.features[tid * 32 + 2] * b[2];
+    res += a.features[tid * 32 + 3] * b[3];
+    res += a.features[tid * 32 + 4] * b[4];
+    res += a.features[tid * 32 + 5] * b[5];
+    res += a.features[tid * 32 + 6] * b[6];
+    res += a.features[tid * 32 + 7] * b[7];
+    res += a.features[tid * 32 + 8] * b[8];
+    res += a.features[tid * 32 + 9] * b[9];
+    res += a.features[tid * 32 + 10] * b[10];
+    res += a.features[tid * 32 + 11] * b[11];
+    res += a.features[tid * 32 + 12] * b[12];
+    res += a.features[tid * 32 + 13] * b[13];
+    res += a.features[tid * 32 + 14] * b[14];
+    res += a.features[tid * 32 + 15] * b[15];
+    res += a.features[tid * 32 + 16] * b[16];
+    res += a.features[tid * 32 + 17] * b[17];
+    res += a.features[tid * 32 + 18] * b[18];
+    res += a.features[tid * 32 + 19] * b[19];
+    res += a.features[tid * 32 + 20] * b[20];
+    res += a.features[tid * 32 + 21] * b[21];
+    res += a.features[tid * 32 + 22] * b[22];
+    res += a.features[tid * 32 + 23] * b[23];
+    res += a.features[tid * 32 + 24] * b[24];
+    res += a.features[tid * 32 + 25] * b[25];
+    res += a.features[tid * 32 + 26] * b[26];
+    res += a.features[tid * 32 + 27] * b[27];
+    res += a.features[tid * 32 + 28] * b[28];
+    res += a.features[tid * 32 + 29] * b[29];
+    res += a.features[tid * 32 + 30] * b[30];
+    res += a.features[tid * 32 + 31] * b[31];
+    share_res[tid][threadIdx.y] = res;
+
+    if (tid < 2) {
+        share_res[tid][threadIdx.y] += share_res[tid + 2][threadIdx.y];
+        share_res[tid][threadIdx.y] += share_res[tid + 1][threadIdx.y];
+    }
+    if (tid == 0) {
+        result[threadIdx.y + blockIdx.x * blockDim.y] = share_res[0][threadIdx.y];
+    }
+}
+
+__global__
+void float_pipeline_1x128_noshared(const Descriptor* __restrict__ d_a, const Descriptor* __restrict__ d_b, int num_a, int num_b, int* result) {
+    int tid = threadIdx.x;
+    __shared__ Descriptor a;
+    a.features[threadIdx.y] = d_a->features[threadIdx.y];
+
+    float b[128];
+    memcpy(b, &d_b[threadIdx.y + blockIdx.x*blockDim.y].features[0], sizeof(float) * 128);
+
+    #pragma unroll
+    float res = a.features[0] * b[0];
+    for (int i = 1; i < 128; i++) {
+        res += a.features[i] * b[i];
+    }
+    result[threadIdx.y + blockIdx.x * blockDim.y] = res;
+}
+
+//~550us
+__global__
+void char_pipeline_128x1_noshared(const U8Descriptor* __restrict__ d_a, const U8Descriptor* __restrict__ d_b, int num_a, int num_b, int* result) {
+    int tid = threadIdx.x;
+
+    __shared__ float res[128];
+    res[tid] = (float)d_a->features[tid] * (float)d_b[blockIdx.x].features[tid];
+
+
+    if (tid < 64) res[tid] += res[tid + 64]; __syncthreads();
+    if (tid < 32) res[tid] += res[tid + 32]; __syncthreads();
+    reduce(res);
+
+    if (threadIdx.x == 0) {
+        result[blockIdx.x] = res[0];
+    }
+}
+
+__global__
+void char_pipeline_16x8_noshared(const U8Descriptor* __restrict__ d_a, const U8Descriptor* __restrict__ d_b, int num_a, int num_b, int* result) {
+    int tid = threadIdx.x;
+    __shared__ Descriptor a;
+    //a.features[threadIdx.x + threadIdx.y*blockDim.x] = d_a->features[threadIdx.x + threadIdx.y*blockDim.x];
+
+    float b[8];
+    b[0] = d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 8];
+    b[1] = d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 8 + 1];
+    /*
+    b[2] = d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 8 + 2];
+    b[3] = d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 8 + 3];
+    b[4] = d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 8 + 4];
+    b[5] = d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 8 + 5];
+    b[6] = d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 8 + 6];
+    b[7] = d_b[threadIdx.y + blockIdx.x*blockDim.y].features[tid * 8 + 7];
+    */
+    
+    __shared__ float share_res[8][16];
+    float res = a.features[tid * 8] * b[0];
+    res += a.features[tid * 8 + 1] * b[1];
+    res += a.features[tid * 8 + 2] * b[2];
+    res += a.features[tid * 8 + 3] * b[3];
+    res += a.features[tid * 8 + 4] * b[4];
+    res += a.features[tid * 8 + 5] * b[5];
+    res += a.features[tid * 8 + 6] * b[6];
+    res += a.features[tid * 8 + 7] * b[7];
+    share_res[threadIdx.y][tid] = res;
+    
+    if (tid < 8) {
+        share_res[threadIdx.y][tid] += share_res[threadIdx.y][tid + 8];
+        share_res[threadIdx.y][tid] += share_res[threadIdx.y][tid + 4];
+        share_res[threadIdx.y][tid] += share_res[threadIdx.y][tid + 2];
+        share_res[threadIdx.y][tid] += share_res[threadIdx.y][tid + 1];
+    }
+    if (tid == 0) {
+        result[threadIdx.y + blockIdx.x * 8] = share_res[threadIdx.y][0];
+    }
+    
+}
 
 std::vector<int> Matching::PipelineMatch() 
 {
-	const int num_db = 20000;
+ 
+    
+	const int num_db = 15000;
 	Descriptor* b = new Descriptor[num_db];
 	for (int x = 0; x < num_db; x++) {
 		for (int i = 0; i < 128; i++) {
-			b[x].features[i] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+			b[x].features[i] = static_cast<unsigned char>(rand()) / static_cast<unsigned char>(RAND_MAX);
 		}
 	}
+	
+        U8Descriptor* d_b = (U8Descriptor*)popsift::cuda::malloc_devT<float>(sizeof(U8Descriptor)*num_db, __FILE__, __LINE__);
+	cudaMemcpyAsync(d_b, b, sizeof(U8Descriptor)*num_db, cudaMemcpyHostToDevice);
 
-	Descriptor* d_b = (Descriptor*)popsift::cuda::malloc_devT<float>(sizeof(Descriptor)*num_db, __FILE__, __LINE__);
-	cudaMemcpyAsync(d_b, b, sizeof(Descriptor)*num_db, cudaMemcpyHostToDevice);
-
-	Descriptor a;
+        U8Descriptor a;
 	for (int i = 0; i < 128; i++) {
-		a.features[i] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+		a.features[i] = static_cast<unsigned char>(rand()) / static_cast<unsigned char>(RAND_MAX);
 	}
-	Descriptor* d_a = (Descriptor*)popsift::cuda::malloc_devT<float>(sizeof(Descriptor), __FILE__, __LINE__);
-	cudaMemcpyAsync(d_a, &a, sizeof(Descriptor), cudaMemcpyHostToDevice);
+        U8Descriptor* d_a = (U8Descriptor*)popsift::cuda::malloc_devT<unsigned char>(sizeof(U8Descriptor), __FILE__, __LINE__);
+	cudaMemcpyAsync(d_a, &a, sizeof(U8Descriptor), cudaMemcpyHostToDevice);
 
 	std::vector<int> result(num_db);
 	int* d_res = popsift::cuda::malloc_devT<int>(num_db, __FILE__, __LINE__);
 	cudaMemcpyAsync(result.data(), d_res, sizeof(int)*result.size(), cudaMemcpyDeviceToHost);
-	
+        
+        Descriptor* da = popsift::cuda::malloc_devT<Descriptor>(1, __FILE__, __LINE__);
+        Descriptor* db = popsift::cuda::malloc_devT<Descriptor>(num_db, __FILE__, __LINE__);
+        float* d_test = popsift::cuda::malloc_devT<float>(num_db, __FILE__, __LINE__);
+        /*cublasStatus_t cublasSgemv(cublasHandle_t handle,
+        cublasOperation_t trans,
+        int m, int n,
+        const float *alpha,
+        const float *A,
+        int lda,
+        const float *x, int incx, const float *beta, float *y, int incy);
+        */
+
+        cublasHandle_t handle;
+        cublasCreate_v2(&handle);
+        const float scalar = 1.0f;
+        cudaStream_t streams[10000];
+        for (int i = 0; i < 10000; i++) {
+            //cudaStreamCreate(&streams[i]);
+        }
+        //for (int i = 0; i < 10000; i++) {
+            ///cublasSetStream_v2(handle, streams[i]);
+            cublasSgemv_v2(handle, CUBLAS_OP_N, num_db, 128, &scalar, &db[0].features[0], num_db, 
+                &da[0].features[0], 1, &scalar, d_test, 1);
+        //}
+
 #if 0
 	dim3 threadsPerBlock(32);
 	dim3 numBlocks(num_db); //need ceiling
@@ -683,10 +936,20 @@ std::vector<int> Matching::PipelineMatch()
 	dim3 numBlocks(num_db/32); //need ceiling
 	float_pipeline_32x32_2 <<<numBlocks, threadsPerBlock >>>(d_a, d_b, 1, num_db, d_res);
 #endif
-#if 1
+#if 0
 	dim3 threadsPerBlock(128);
 	dim3 numBlocks(num_db); //need ceiling
 	float_pipeline_128x1_noshared << <numBlocks, threadsPerBlock >> >(d_a, d_b, 1, num_db, d_res);
+#endif
+#if 0
+        dim3 threadsPerBlock(128);
+        dim3 numBlocks(num_db); //need ceiling
+        char_pipeline_128x1_noshared << <numBlocks, threadsPerBlock >> >(d_a, d_b, 1, num_db, d_res);
+#endif
+#if 0
+        dim3 threadsPerBlock(16,8);
+        dim3 numBlocks(num_db/8); //need ceiling
+        char_pipeline_16x8_noshared << <numBlocks, threadsPerBlock >> >(d_a, d_b, 1, num_db, d_res);
 #endif
 #if 0
 	dim3 threadsPerBlock(32);
@@ -697,6 +960,26 @@ std::vector<int> Matching::PipelineMatch()
 	dim3 threadsPerBlock(128, 8);
 	dim3 numBlocks(num_db/8); //need ceiling
 	float_pipeline_128x8_noshared << <numBlocks, threadsPerBlock >> >(d_a, d_b, 1, num_db, d_res);
+#endif
+#if 0
+        dim3 threadsPerBlock(32, 4);
+        dim3 numBlocks(num_db / 4); //need ceiling
+        float_pipeline_32x4_noshared << <numBlocks, threadsPerBlock >> >(d_a, d_b, 1, num_db, d_res);
+#endif
+#if 0
+        dim3 threadsPerBlock(16, 8);
+        dim3 numBlocks(num_db / 8); //need ceiling
+        float_pipeline_16x8_noshared << <numBlocks, threadsPerBlock >> >(d_a, d_b, 1, num_db, d_res);
+#endif
+#if 0
+        dim3 threadsPerBlock(8, 16);
+        dim3 numBlocks(num_db / 16); //need ceiling
+        float_pipeline_8x16_noshared << <numBlocks, threadsPerBlock >> >(d_a, d_b, 1, num_db, d_res);
+#endif
+#if 0
+        dim3 threadsPerBlock(1, 128);
+        dim3 numBlocks(num_db / 128); //need ceiling
+        float_pipeline_1x128_noshared << <numBlocks, threadsPerBlock >> >(d_a, d_b, 1, num_db, d_res);
 #endif
 	cudaDeviceSynchronize();
 
