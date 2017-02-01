@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "popsift", "popsift\popsift.
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "popsift-demo", "popsift-demo\popsift-demo.vcxproj", "{950899ED-3E2C-42F7-92C5-28DF832B7731}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lsh_evaluation", "lsh_evaluation\lsh_evaluation.vcxproj", "{716EDF41-5C9D-441B-83B4-1AED5DB9AB17}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{950899ED-3E2C-42F7-92C5-28DF832B7731}.Release|x64.Build.0 = Release|x64
 		{950899ED-3E2C-42F7-92C5-28DF832B7731}.Release|x86.ActiveCfg = Release|Win32
 		{950899ED-3E2C-42F7-92C5-28DF832B7731}.Release|x86.Build.0 = Release|Win32
+		{716EDF41-5C9D-441B-83B4-1AED5DB9AB17}.Debug|x64.ActiveCfg = Debug|x64
+		{716EDF41-5C9D-441B-83B4-1AED5DB9AB17}.Debug|x64.Build.0 = Debug|x64
+		{716EDF41-5C9D-441B-83B4-1AED5DB9AB17}.Debug|x86.ActiveCfg = Debug|Win32
+		{716EDF41-5C9D-441B-83B4-1AED5DB9AB17}.Debug|x86.Build.0 = Debug|Win32
+		{716EDF41-5C9D-441B-83B4-1AED5DB9AB17}.Release|x64.ActiveCfg = Release|x64
+		{716EDF41-5C9D-441B-83B4-1AED5DB9AB17}.Release|x64.Build.0 = Release|x64
+		{716EDF41-5C9D-441B-83B4-1AED5DB9AB17}.Release|x86.ActiveCfg = Release|Win32
+		{716EDF41-5C9D-441B-83B4-1AED5DB9AB17}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
