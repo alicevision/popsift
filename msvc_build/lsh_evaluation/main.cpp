@@ -3,6 +3,6 @@
 
 int main()
 {
-    LSHFunction f(1024);
+    LSHFunction f(2 << 20, 1024);
     return 0;
 }
