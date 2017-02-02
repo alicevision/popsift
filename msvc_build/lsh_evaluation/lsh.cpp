@@ -55,6 +55,7 @@ size_t LSHFunction::map1(unsigned dim, unsigned val)
     unsigned short* b = &_bits[_dproj[dim]];
     unsigned short* e = &_bits[_dproj[dim + 1]];
     // XXX: TODO
+    return -1;
 }
 
 size_t LSHFunction::operator()(const Descirptor& desc)
@@ -62,4 +63,5 @@ size_t LSHFunction::operator()(const Descirptor& desc)
     size_t h = 0;
     for (int i = 0; i < 128; ++i)
         h = (h + map1(i, desc[i])) % _m;
+    return -1;  // XXX: TODO
 }
