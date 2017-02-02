@@ -870,56 +870,90 @@ void char_pipeline_16x8_noshared(const U8Descriptor* __restrict__ d_a, const U8D
     
 }
 
+Descriptor* randDescs(const int num) {
+    Descriptor* d = new Descriptor[num];
+    for (int i = 0; i < num; i++) {
+        for (int x = 0; x < 128; x++) {
+            d[i].features[x] = static_cast<float>(rand() % 20 - 10);
+        }
+    }
+    return d;
+}
+
+void calcDistMat(Descriptor* a, Descriptor* b, int numA, int numB, float* res) {
+    for (int ai = 0; ai < numA; ai++) {
+        for (int bi = 0; bi < numB; bi++) {
+            size_t outi = ai + numB*bi;
+            res[outi] = 0.0;
+            for (int i = 0; i < 128; i++) {
+                res[outi] += a[ai].features[i] * b[bi].features[i];
+            }
+        }
+    }
+}
+
 std::vector<int> Matching::PipelineMatch() 
 {
- 
-    
-	const int num_db = 15000;
-	Descriptor* b = new Descriptor[num_db];
-	for (int x = 0; x < num_db; x++) {
-		for (int i = 0; i < 128; i++) {
-			b[x].features[i] = static_cast<unsigned char>(rand()) / static_cast<unsigned char>(RAND_MAX);
-		}
-	}
-	
-        U8Descriptor* d_b = (U8Descriptor*)popsift::cuda::malloc_devT<float>(sizeof(U8Descriptor)*num_db, __FILE__, __LINE__);
-	cudaMemcpyAsync(d_b, b, sizeof(U8Descriptor)*num_db, cudaMemcpyHostToDevice);
-
-        U8Descriptor a;
-	for (int i = 0; i < 128; i++) {
-		a.features[i] = static_cast<unsigned char>(rand()) / static_cast<unsigned char>(RAND_MAX);
-	}
-        U8Descriptor* d_a = (U8Descriptor*)popsift::cuda::malloc_devT<unsigned char>(sizeof(U8Descriptor), __FILE__, __LINE__);
-	cudaMemcpyAsync(d_a, &a, sizeof(U8Descriptor), cudaMemcpyHostToDevice);
-
-	std::vector<int> result(num_db);
-	int* d_res = popsift::cuda::malloc_devT<int>(num_db, __FILE__, __LINE__);
-	cudaMemcpyAsync(result.data(), d_res, sizeof(int)*result.size(), cudaMemcpyDeviceToHost);
+	const int num_db = 10000;
+        Descriptor* b = randDescs(num_db);
+        Descriptor* a = randDescs(num_db);
         
-        Descriptor* da = popsift::cuda::malloc_devT<Descriptor>(1, __FILE__, __LINE__);
-        Descriptor* db = popsift::cuda::malloc_devT<Descriptor>(num_db, __FILE__, __LINE__);
-        float* d_test = popsift::cuda::malloc_devT<float>(num_db, __FILE__, __LINE__);
-        /*cublasStatus_t cublasSgemv(cublasHandle_t handle,
-        cublasOperation_t trans,
-        int m, int n,
-        const float *alpha,
-        const float *A,
-        int lda,
-        const float *x, int incx, const float *beta, float *y, int incy);
-        */
-
+        Descriptor* d_b = popsift::cuda::malloc_devT<Descriptor>(num_db, __FILE__, __LINE__);
+        Descriptor* d_a = popsift::cuda::malloc_devT<Descriptor>(num_db, __FILE__, __LINE__);
+	
+        cudaMemcpyAsync(d_b, b, sizeof(Descriptor)*num_db, cudaMemcpyHostToDevice);
+	cudaMemcpyAsync(d_a, a, sizeof(Descriptor)*num_db, cudaMemcpyHostToDevice);
+      
+        float* d_res = popsift::cuda::malloc_devT<float>(num_db*num_db, __FILE__, __LINE__);
         cublasHandle_t handle;
         cublasCreate_v2(&handle);
+
         const float scalar = 1.0f;
-        cudaStream_t streams[10000];
-        for (int i = 0; i < 10000; i++) {
-            //cudaStreamCreate(&streams[i]);
+        cudaStream_t streams[1024];
+        for (int i = 0; i < 1024; i++) {
+            cudaStreamCreate(&streams[i]);
         }
-        //for (int i = 0; i < 10000; i++) {
-            ///cublasSetStream_v2(handle, streams[i]);
+#if 0
+        for (int i = 0; i < 1024; i++) {
+            cublasSetStream_v2(handle, streams[i]);
             cublasSgemv_v2(handle, CUBLAS_OP_N, num_db, 128, &scalar, &db[0].features[0], num_db, 
                 &da[0].features[0], 1, &scalar, d_test, 1);
-        //}
+        }
+#endif
+        for (int i = 0; i < 1; i++) {
+            cublasSetStream_v2(handle, streams[i]);
+            cublasSgemm_v2(
+                handle, 
+                CUBLAS_OP_T, 
+                CUBLAS_OP_N,
+                num_db,     //m
+                num_db,     //n
+                128,        //k
+                &scalar,    //alpha
+                (float*)d_a,//A
+                128,     //lda
+                (float*)d_b,//B
+                128,    //ldb
+                &scalar,    //beta
+                d_res,      //C
+                num_db      //ldc
+            );
+            
+            float* gpu_res = popsift::cuda::malloc_hstT<float>(num_db*num_db, __FILE__, __LINE__);
+            cudaMemcpyAsync(gpu_res, d_res, sizeof(float)*num_db*num_db, cudaMemcpyDeviceToHost, streams[i]);
+
+            float* cpu_res = popsift::cuda::malloc_hstT<float>(num_db*num_db, __FILE__, __LINE__);
+            calcDistMat(a, b, num_db, num_db, cpu_res);
+            cudaDeviceSynchronize();
+            
+            int num_match = 0;
+            for (int x = 0; x < num_db*num_db; x++) {
+                if (cpu_res[x] == gpu_res[x])
+                    num_match++;
+            }
+            std::cout << num_match << std::endl;
+            system("Pause");
+        }
 
 #if 0
 	dim3 threadsPerBlock(32);
@@ -985,7 +1019,7 @@ std::vector<int> Matching::PipelineMatch()
 
 	cudaFree(d_b);
 	cudaFree(d_a);
-	return result;
+	return std::vector<int>();
 }
 
 }
