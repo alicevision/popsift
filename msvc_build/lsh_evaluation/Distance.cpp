@@ -1,7 +1,14 @@
 #include "KDTree.h"
 #include <stdint.h>
+#include <algorithm>
+#include <valarray>
+#include <vector>
+#include <tuple>
 
 namespace popsift {
+
+static_assert(sizeof(U8Descriptor) == 128, "Invalid U8Descriptor size");
+static_assert(SPLIT_DIMENSION_COUNT < 128, "Invalid split dimension count");
 
 unsigned L1Distance::operator()(const U8Descriptor& ad, const U8Descriptor& bd) {
     const __m256i* af = ad.features;
@@ -74,6 +81,40 @@ unsigned L2DistanceSquared::operator()(const U8Descriptor& ad, const U8Descripto
     unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
     return sum;
 
+}
+
+template<typename T>
+static std::valarray<T> ConvertU8To(const U8Descriptor& descriptor) {
+    std::valarray<T> tmp(128);
+    std::transform(descriptor.ufeatures.begin(), descriptor.ufeatures.end(), &tmp[0],
+        [](unsigned char ch) { return static_cast<T>(ch); });
+    return tmp;
+}
+
+std::array<int, SPLIT_DIMENSION_COUNT> GetSplitDimensions(const U8Descriptor* descriptors, size_t count) {
+    std::valarray<double> mean(0.f, 128);
+    for (size_t i = 0; i < count; ++i)
+        mean += ConvertU8To<double>(descriptors[i]);
+
+    std::valarray<double> var(0.f, 128);
+    for (size_t i = 0; i < count; ++i) {
+        auto d = mean - ConvertU8To<double>(descriptors[i]);
+        var += d*d;
+    }
+    var /= (double)count;
+
+    using vd_tup = std::tuple<double, int>;
+    std::array<vd_tup, 128> vardim;
+    for (int i = 0; i < 128; ++i)
+        vardim[i] = std::make_tuple(var[i], i);
+    std::sort(vardim.begin(), vardim.end(), [](const vd_tup& v1, const vd_tup& v2) {
+        return std::get<0>(v1) > std::get<0>(v2);
+    });
+
+    std::array<int, SPLIT_DIMENSION_COUNT> ret;
+    std::transform(vardim.data(), vardim.data() + SPLIT_DIMENSION_COUNT, ret.begin(),
+        [](const vd_tup& v) { return std::get<1>(v); });
+    return ret;
 }
 
 }   // popsift

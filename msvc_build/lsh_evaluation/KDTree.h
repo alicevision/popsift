@@ -1,5 +1,6 @@
 #pragma once
 #include <immintrin.h>
+#include <array>
 
 #ifdef _MSC_VER
 #define ALIGNED64 __declspec(align(64))
@@ -10,7 +11,10 @@
 namespace popsift {
 
 struct U8Descriptor {
-    __m256i features[4];
+    union {
+        __m256i features[4];
+        std::array<unsigned char, 128> ufeatures;
+    };
 };
 
 struct L1Distance {
@@ -21,6 +25,11 @@ struct L2DistanceSquared {
     unsigned operator()(const U8Descriptor&, const U8Descriptor&);
 };
 
+/////////////////////////////////////////////////////////////////////////////
+
+constexpr int SPLIT_DIMENSION_COUNT = 5;    // Count of dimensions with highest variance to randomly split against
+
+std::array<int, SPLIT_DIMENSION_COUNT> GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
 
 
 }   // popsift
