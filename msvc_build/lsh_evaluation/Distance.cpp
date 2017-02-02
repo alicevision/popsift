@@ -6,6 +6,7 @@
 #include <tuple>
 
 namespace popsift {
+namespace kdtree {
 
 static_assert(sizeof(U8Descriptor) == 128, "Invalid U8Descriptor size");
 static_assert(SPLIT_DIMENSION_COUNT < 128, "Invalid split dimension count");
@@ -117,4 +118,23 @@ std::array<int, SPLIT_DIMENSION_COUNT> GetSplitDimensions(const U8Descriptor* de
     return ret;
 }
 
+//! Compute BB of descriptors referenced by count indexes.
+BoundingBox GetBoundingBox(const U8Descriptor* descriptors, unsigned* indexes, size_t count) {
+    U8Descriptor min, max;
+
+    for (int i = 0; i < 4; i++) {
+        min.features[i] = _mm256_set1_epi8(0xFF);
+        max.features[i] = _mm256_setzero_si256();
+    }
+
+    for (size_t i = 0; i < count; ++i)
+    for (int j = 0; j < 4; ++j) {
+        min.features[j] = _mm256_min_epu8(min.features[j], descriptors[i].features[j]);
+        max.features[j] = _mm256_max_epu8(max.features[j], descriptors[i].features[j]);
+    }
+
+    return BoundingBox{ min, max };
+}
+
+}   // kdtree
 }   // popsift
