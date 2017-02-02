@@ -8,7 +8,9 @@
 */
 
 #include <float.h>
-
+#include <mkl.h>
+#include <mkl_cblas.h>
+#include <tbb/tbb.h>
 
 #include "sift_matching.h"
 #include "assist.h"
@@ -881,6 +883,8 @@ Descriptor* randDescs(const int num) {
 }
 
 void calcDistMat(Descriptor* a, Descriptor* b, int numA, int numB, float* res) {
+    static double t_1 = dsecnd();
+#if 0
     for (int ai = 0; ai < numA; ai++) {
         for (int bi = 0; bi < numB; bi++) {
             size_t outi = ai + numB*bi;
@@ -890,6 +894,45 @@ void calcDistMat(Descriptor* a, Descriptor* b, int numA, int numB, float* res) {
             }
         }
     }
+#elif 0
+    //mkl_set_num_threads(16);
+    double t0 = dsecnd();
+    cblas_sgemm(CblasColMajor,
+        CblasTrans,
+        CblasNoTrans,
+        numA,     //m
+        numB,     //n
+        128,      //k
+        1.0f,     //alpha
+        (float*)a,//A
+        128,     //lda
+        (float*)b,//B
+        128,    //ldb
+        1.0f,    //beta
+        res,      //C
+        numA      //ldc
+    );
+    double t1 = dsecnd();
+    cout << "MKL TIMING: " << (t1 - t0) / 10;
+#else
+    double t0 = dsecnd();
+    tbb::parallel_for(0, numA, [&](int i) {
+        //for (int i = 0; i < numA; ++i)
+        cblas_sgemv(CblasRowMajor,
+            CblasNoTrans,
+            numB,
+            128,
+            1.0f,
+            &b[0].features[0],
+            128,
+            &a[i].features[0],
+            1,
+            1.0f,
+            res + i*numB,
+            1); });
+    double t1 = dsecnd();
+    cout << "MKL TIMING: " << (t1 - t0) / 10;
+#endif
 }
 
 std::vector<int> Matching::PipelineMatch() 
@@ -902,26 +945,53 @@ std::vector<int> Matching::PipelineMatch()
         Descriptor* d_a = popsift::cuda::malloc_devT<Descriptor>(num_db, __FILE__, __LINE__);
 	
         cudaMemcpyAsync(d_b, b, sizeof(Descriptor)*num_db, cudaMemcpyHostToDevice);
-	cudaMemcpyAsync(d_a, a, sizeof(Descriptor)*num_db, cudaMemcpyHostToDevice);
+	    cudaMemcpyAsync(d_a, a, sizeof(Descriptor)*num_db, cudaMemcpyHostToDevice);
       
         float* d_res = popsift::cuda::malloc_devT<float>(num_db*num_db, __FILE__, __LINE__);
+        float* cpu_res = popsift::cuda::malloc_hstT<float>(num_db*num_db, __FILE__, __LINE__);
+        float* gpu_res = popsift::cuda::malloc_hstT<float>(num_db*num_db, __FILE__, __LINE__);
+
         cublasHandle_t handle;
         cublasCreate_v2(&handle);
 
         const float scalar = 1.0f;
-        cudaStream_t streams[1024];
-        for (int i = 0; i < 1024; i++) {
+        const int num_streams = 16;
+        cudaStream_t streams[num_streams];
+        for (int i = 0; i < num_streams; i++) {
             cudaStreamCreate(&streams[i]);
         }
-#if 0
-        for (int i = 0; i < 1024; i++) {
-            cublasSetStream_v2(handle, streams[i]);
-            cublasSgemv_v2(handle, CUBLAS_OP_N, num_db, 128, &scalar, &db[0].features[0], num_db, 
-                &da[0].features[0], 1, &scalar, d_test, 1);
+
+        double t1 = dsecnd();
+        cudaMemcpyAsync(d_a, a, sizeof(Descriptor)*num_db, cudaMemcpyHostToDevice);
+        for (int i = 0; i < num_db; i++) {
+            cublasSetStream_v2(handle, streams[i%num_streams]);
+            
+            cudaMemcpyAsync(d_b, b, sizeof(Descriptor)*num_db,  cudaMemcpyHostToDevice, streams[i % num_streams]);
+            
+            cublasSgemv_v2(handle, 
+                CUBLAS_OP_T, 
+                num_db, 
+                128,
+                &scalar, 
+                &d_b[0].features[0], 
+                num_db, 
+                &d_a[0].features[0], 
+                1, 
+                &scalar, 
+                &d_res[i*num_db], 
+                1);
+
+            cudaMemcpyAsync(&gpu_res[i*num_db], &d_res[i*num_db], sizeof(float)*num_db, cudaMemcpyDeviceToHost, streams[i % num_streams]);
         }
-#endif
+        cudaDeviceSynchronize();
+        double t2 = dsecnd();
+        cout << "GPU TIMING: " << t2 - t1 << endl;
+
+#if 0
         for (int i = 0; i < 1; i++) {
             cublasSetStream_v2(handle, streams[i]);
+
+            double t0 = dsecnd();
             cublasSgemm_v2(
                 handle, 
                 CUBLAS_OP_T, 
@@ -938,13 +1008,15 @@ std::vector<int> Matching::PipelineMatch()
                 d_res,      //C
                 num_db      //ldc
             );
-            
-            float* gpu_res = popsift::cuda::malloc_hstT<float>(num_db*num_db, __FILE__, __LINE__);
             cudaMemcpyAsync(gpu_res, d_res, sizeof(float)*num_db*num_db, cudaMemcpyDeviceToHost, streams[i]);
-
-            float* cpu_res = popsift::cuda::malloc_hstT<float>(num_db*num_db, __FILE__, __LINE__);
-            calcDistMat(a, b, num_db, num_db, cpu_res);
             cudaDeviceSynchronize();
+            double t1 = dsecnd();
+            cout << "CUDA TIMING WITH SYNC: " << t1 - t0;
+        }
+
+#endif       
+            
+            calcDistMat(a, b, num_db, num_db, cpu_res);
             
             int num_match = 0;
             for (int x = 0; x < num_db*num_db; x++) {
@@ -953,7 +1025,7 @@ std::vector<int> Matching::PipelineMatch()
             }
             std::cout << num_match << std::endl;
             system("Pause");
-        }
+            
 
 #if 0
 	dim3 threadsPerBlock(32);
