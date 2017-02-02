@@ -149,6 +149,7 @@
   <ItemGroup>
     <ClCompile Include="dataio.cpp" />
     <ClCompile Include="Distance.cpp" />
+    <ClCompile Include="KDTree.cpp" />
     <ClCompile Include="lsh.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
