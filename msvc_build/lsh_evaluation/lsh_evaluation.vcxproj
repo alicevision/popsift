@@ -143,10 +143,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="dataio.h" />
+    <ClInclude Include="KDTree.h" />
     <ClInclude Include="lsh.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dataio.cpp" />
+    <ClCompile Include="Distance.cpp" />
     <ClCompile Include="lsh.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
