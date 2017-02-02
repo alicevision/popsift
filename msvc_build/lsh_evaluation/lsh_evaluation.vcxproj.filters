@@ -18,12 +18,18 @@
     <ClInclude Include="lsh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="dataio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lsh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="dataio.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
