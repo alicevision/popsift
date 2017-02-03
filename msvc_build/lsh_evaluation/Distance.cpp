@@ -136,5 +136,13 @@ BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* inde
     return BoundingBox{ min, max };
 }
 
+BoundingBox Union(BoundingBox a, const BoundingBox& b) {
+    for (int i = 0; i < 4; ++i) {
+        a.min.features[i] = _mm256_min_epu8(a.min.features[i], b.min.features[i]);
+        a.max.features[i] = _mm256_max_epu8(a.max.features[i], b.max.features[i]);
+    }
+    return a;
+}
+
 }   // kdtree
 }   // popsift

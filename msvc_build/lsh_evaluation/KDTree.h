@@ -44,6 +44,7 @@ struct BoundingBox {
 
 SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
 BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
+BoundingBox Union(BoundingBox a, const BoundingBox& b);
 
 //! KDTree.  Node 0 is the root node.
 class KDTree {
@@ -82,6 +83,8 @@ private:
     unsigned _leaf_size;                // Used by Build()
 
     unsigned Build(unsigned l, unsigned r);
+    unsigned CreateNode(unsigned l, unsigned r);
+    unsigned Partition(unsigned l, unsigned r);
     
     std::pair<const unsigned*, const unsigned*> List(unsigned l, unsigned r) const {
         return std::make_pair(_list.data() + l, _list.data() + r);
