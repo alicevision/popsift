@@ -92,7 +92,7 @@ static std::valarray<T> ConvertU8To(const U8Descriptor& descriptor) {
     return tmp;
 }
 
-std::array<unsigned, SPLIT_DIMENSION_COUNT> GetSplitDimensions(const U8Descriptor* descriptors, size_t count) {
+SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count) {
     std::valarray<double> mean(0.f, 128);
     for (size_t i = 0; i < count; ++i)
         mean += ConvertU8To<double>(descriptors[i]);
@@ -104,7 +104,7 @@ std::array<unsigned, SPLIT_DIMENSION_COUNT> GetSplitDimensions(const U8Descripto
     }
     var /= (double)count;
 
-    using vd_tup = std::tuple<double, int>;
+    using vd_tup = std::tuple<double, unsigned>;
     std::array<vd_tup, 128> vardim;
     for (int i = 0; i < 128; ++i)
         vardim[i] = std::make_tuple(var[i], i);
@@ -112,7 +112,7 @@ std::array<unsigned, SPLIT_DIMENSION_COUNT> GetSplitDimensions(const U8Descripto
         return std::get<0>(v1) > std::get<0>(v2);
     });
 
-    std::array<unsigned, SPLIT_DIMENSION_COUNT> ret;
+    SplitDimensions ret;
     std::transform(vardim.data(), vardim.data() + SPLIT_DIMENSION_COUNT, ret.begin(),
         [](const vd_tup& v) { return std::get<1>(v); });
     return ret;

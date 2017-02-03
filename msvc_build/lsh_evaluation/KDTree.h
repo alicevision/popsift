@@ -35,12 +35,14 @@ struct L2DistanceSquared {
 
 constexpr int SPLIT_DIMENSION_COUNT = 5;    // Count of dimensions with highest variance to randomly split against
 
+using SplitDimensions = std::array<unsigned char, SPLIT_DIMENSION_COUNT>;
+
 struct BoundingBox {
     U8Descriptor min;
     U8Descriptor max;
 };
 
-std::array<unsigned, SPLIT_DIMENSION_COUNT> GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
+SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
 BoundingBox GetBoundingBox(const U8Descriptor* descriptors, unsigned* indexes, size_t count);
 
 //! KDTree.  Node 0 is the root node.
