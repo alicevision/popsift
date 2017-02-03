@@ -72,6 +72,9 @@ public:
             throw std::logic_error("KDTree::List: node is not a leaf");
         return List(node.left, node.right);
     }
+    const U8Descriptor* Descriptors() const {
+        return _descriptors;
+    }
 
 private:
     const std::uniform_int_distribution<int> _split_dim_gen;
