@@ -10,7 +10,7 @@ KDTree::KDTree(const U8Descriptor* descriptors, size_t dcount) :
     _split_dim_gen(0, SPLIT_DIMENSION_COUNT-1),
     _split_val_gen(0, 255),
     _descriptors(descriptors),
-    _dcount(dcount),
+    _dcount(static_cast<unsigned>(dcount)),
     _list(dcount)
 {
     if (dcount > std::numeric_limits<unsigned>::max() / 2)
@@ -52,7 +52,7 @@ void KDTree::Build(Node& node)
 
     // NB! Partition returns index from [0,n) where 0 maps to left, n maps to right.
     const unsigned m = Partition(node) + node.left;
-    const unsigned lc = _nodes.size(), rc = lc + 1;
+    const unsigned lc = static_cast<unsigned>(_nodes.size()), rc = lc + 1;
 
     // Left child to split.
     _nodes.emplace_back();
@@ -102,12 +102,12 @@ unsigned KDTree::TryPartition(Node& node)
     });
 
     if (mit == list.first || mit == list.second)
-        return _list.size();
+        return static_cast<unsigned>(_list.size());
 
     node.dim = split_dim;
     node.val = split_val;
     node.leaf = 0;
-    return mit - list.first;
+    return static_cast<unsigned>(mit - list.first);
 }
 
 // We also check that every element is referenced exactly once by some leaf node.
