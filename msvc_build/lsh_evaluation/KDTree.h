@@ -60,13 +60,13 @@ public:
     KDTree(const KDTree&) = delete;
     KDTree& operator=(const KDTree&) = delete;
     
-    void Build(const SplitDimensions& sdim);
+    void Build(const SplitDimensions& sdim, unsigned leaf_size);
     void Validate();
 
     const Node& Link(unsigned i) const { return _nodes[i]; }
     const BoundingBox& BB(unsigned i) const { return _bb[i]; }
     std::pair<const unsigned*, const unsigned*> List(const Node& node) const {
-        if (node.leaf)
+        if (!node.leaf)
             throw std::logic_error("KDTree::List: node is not a leaf");
         return std::make_pair(_list.data() + node.left, _list.data() + node.right);
     }
@@ -82,6 +82,9 @@ private:
     std::vector<BoundingBox> _bb;       // BBs of all nodes; packed linearly to not waste cache lines
     std::vector<Node> _nodes;           // Link nodes
     std::vector<unsigned> _list;        // Elements in leaf nodes; consecutive in range [left,right)
+    unsigned _leaf_size;                // Used by Build()
+
+    unsigned Build(unsigned l, unsigned r);
 };
 
 
