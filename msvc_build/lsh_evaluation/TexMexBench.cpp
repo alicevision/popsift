@@ -23,10 +23,11 @@ enum Counters {
 static const int NUM_HASH_TABLES = 8;  // 10-ish is a good start
 static const int NUM_HASH_BITS = 22;   // should be about log2(n_points); but memory usage is proportional with that!
 
+//http://corpus-texmex.irisa.fr/ ANN_SIFT1M set
 static std::string G_DataPrefix = "C:/LOCAL/texmex_sift1M_corpus";
-static std::vector<float> G_Base;
-static std::vector<float> G_Query;
-static std::vector<int> G_GroundTruth;
+static std::vector<float> G_Base; // 1million descriptors database
+static std::vector<float> G_Query; // query descriptors
+static std::vector<int> G_GroundTruth; // 100x10k, 100 nearest neighbours for each desc in G_Query
 static std::unique_ptr<LSHNearestNeighborTable<SiftPoint>> G_LSH;
 static size_t G_Counters[COUNTERS_COUNT];
 
