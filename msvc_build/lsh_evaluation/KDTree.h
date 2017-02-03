@@ -43,11 +43,13 @@ struct BoundingBox {
 };
 
 SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
-BoundingBox GetBoundingBox(const U8Descriptor* descriptors, unsigned* indexes, size_t count);
+BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
+BoundingBox Union(BoundingBox a, const BoundingBox& b);
 
 //! KDTree.  Node 0 is the root node.
 class KDTree {
 public:
+    // XXX: Can save space; left node index is always parent_index+1
     struct Node {
         unsigned left;      // left link, or begin list index if leaf == 1
         unsigned right;     // right link or end list index if leaf ==1
@@ -68,7 +70,7 @@ public:
     std::pair<const unsigned*, const unsigned*> List(const Node& node) const {
         if (!node.leaf)
             throw std::logic_error("KDTree::List: node is not a leaf");
-        return std::make_pair(_list.data() + node.left, _list.data() + node.right);
+        return List(node.left, node.right);
     }
     const U8Descriptor* Descriptors() const {
         return _descriptors;
@@ -82,9 +84,26 @@ private:
     std::vector<BoundingBox> _bb;       // BBs of all nodes; packed linearly to not waste cache lines
     std::vector<Node> _nodes;           // Link nodes
     std::vector<unsigned> _list;        // Elements in leaf nodes; consecutive in range [left,right)
-    unsigned _leaf_size;                // Used by Build()
+    
+    // Used by Build
+    unsigned _leaf_size;
+    SplitDimensions _split_dimensions;
 
-    unsigned Build(unsigned l, unsigned r);
+    void Build(Node& node);
+    unsigned Partition(Node& node);
+    unsigned TryPartition(Node& node);
+    
+    std::pair<unsigned*, unsigned*> List(unsigned l, unsigned r) const {
+        return std::make_pair(
+            const_cast<unsigned*>(_list.data() + l),
+            const_cast<unsigned*>(_list.data() + r));
+    }
+
+    unsigned Index(Node& node) const {
+        if (&node < &_nodes.front() || &node > &_nodes.back())
+            throw std::logic_error("KDTree::Index: Node reference out of range");
+        return static_cast<unsigned>(&node - &_nodes.front());
+    }
 };
 
 

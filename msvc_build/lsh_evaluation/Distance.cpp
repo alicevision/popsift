@@ -119,7 +119,7 @@ SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count
 }
 
 //! Compute BB of descriptors referenced by count indexes.
-BoundingBox GetBoundingBox(const U8Descriptor* descriptors, unsigned* indexes, size_t count) {
+BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count) {
     U8Descriptor min, max;
 
     for (int i = 0; i < 4; i++) {
@@ -134,6 +134,14 @@ BoundingBox GetBoundingBox(const U8Descriptor* descriptors, unsigned* indexes, s
     }
 
     return BoundingBox{ min, max };
+}
+
+BoundingBox Union(BoundingBox a, const BoundingBox& b) {
+    for (int i = 0; i < 4; ++i) {
+        a.min.features[i] = _mm256_min_epu8(a.min.features[i], b.min.features[i]);
+        a.max.features[i] = _mm256_max_epu8(a.max.features[i], b.max.features[i]);
+    }
+    return a;
 }
 
 }   // kdtree
