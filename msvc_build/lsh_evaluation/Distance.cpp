@@ -1,17 +1,22 @@
 #include "KDTree.h"
 #include <stdint.h>
 #include <algorithm>
-#include <valarray>
+#include <Eigen/Core>
 #include <vector>
 #include <tuple>
 
 namespace popsift {
 namespace kdtree {
 
+// "Column" vector.
+template<typename Scalar>
+using SiftPoint = Eigen::Matrix<Scalar, 128, 1>;
+
 static_assert(sizeof(U8Descriptor) == 128, "Invalid U8Descriptor size");
 static_assert(SPLIT_DIMENSION_COUNT < 128, "Invalid split dimension count");
 
-unsigned L1Distance::operator()(const U8Descriptor& ad, const U8Descriptor& bd) {
+unsigned L1Distance::operator()(const U8Descriptor& ad, const U8Descriptor& bd)
+{
     const __m256i* af = ad.features;
     const __m256i* bf = bd.features;
     __m256i acc = _mm256_setzero_si256();
@@ -41,7 +46,8 @@ unsigned L1Distance::operator()(const U8Descriptor& ad, const U8Descriptor& bd) 
 // 128 components fit in 4 AVX2 registers.  Must expand components from 8-bit
 // to 16-bit in order to do arithmetic without overflow. Also, AVX2 doesn't
 // support vector multiplication of 8-bit elements.
-unsigned L2DistanceSquared::operator()(const U8Descriptor& ad, const U8Descriptor& bd) {
+unsigned L2DistanceSquared::operator()(const U8Descriptor& ad, const U8Descriptor& bd)
+{
     const __m256i* af = ad.features;
     const __m256i* bf = bd.features;
     __m256i acc = _mm256_setzero_si256();
@@ -84,25 +90,18 @@ unsigned L2DistanceSquared::operator()(const U8Descriptor& ad, const U8Descripto
 
 }
 
-template<typename T>
-static std::valarray<T> ConvertU8To(const U8Descriptor& descriptor) {
-    std::valarray<T> tmp(128);
-    std::transform(descriptor.ufeatures.begin(), descriptor.ufeatures.end(), &tmp[0],
-        [](unsigned char ch) { return static_cast<T>(ch); });
-    return tmp;
-}
+SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count)
+{
+    using namespace Eigen;
 
-SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count) {
-    std::valarray<double> mean(0.f, 128);
-    for (size_t i = 0; i < count; ++i)
-        mean += ConvertU8To<double>(descriptors[i]);
+    Map<Matrix<unsigned char, Dynamic, 128, RowMajor>, Aligned32> u8data((unsigned char*)descriptors, count, 128);
+    auto mean = u8data.cast<double>().colwise().sum() / count;
 
-    std::valarray<double> var(0.f, 128);
+    SiftPoint<double> var = SiftPoint<double>::Zero();
     for (size_t i = 0; i < count; ++i) {
-        auto d = mean - ConvertU8To<double>(descriptors[i]);
-        var += d*d;
+        auto v = (u8data.row(i).cast<double>() - mean).array();
+        var += (v*v).matrix();
     }
-    var /= (double)count;
 
     using vd_tup = std::tuple<double, unsigned>;
     std::array<vd_tup, 128> vardim;
@@ -119,7 +118,8 @@ SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count
 }
 
 //! Compute BB of descriptors referenced by count indexes.
-BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count) {
+BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count)
+{
     U8Descriptor min, max;
 
     for (int i = 0; i < 4; i++) {
@@ -136,12 +136,14 @@ BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* inde
     return BoundingBox{ min, max };
 }
 
-BoundingBox Union(BoundingBox a, const BoundingBox& b) {
+BoundingBox Union(const BoundingBox& a, const BoundingBox& b)
+{
+    BoundingBox r;
     for (int i = 0; i < 4; ++i) {
-        a.min.features[i] = _mm256_min_epu8(a.min.features[i], b.min.features[i]);
-        a.max.features[i] = _mm256_max_epu8(a.max.features[i], b.max.features[i]);
+        r.min.features[i] = _mm256_min_epu8(a.min.features[i], b.min.features[i]);
+        r.max.features[i] = _mm256_max_epu8(a.max.features[i], b.max.features[i]);
     }
-    return a;
+    return r;
 }
 
 }   // kdtree

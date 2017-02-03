@@ -14,9 +14,7 @@
 namespace popsift {
 namespace kdtree {
 
-static_assert(sizeof(unsigned) == 4, "Unsupported unsigned int size.");
-
-struct U8Descriptor {
+ALIGNED64 struct U8Descriptor {
     union {
         __m256i features[4];
         std::array<unsigned char, 128> ufeatures;
@@ -31,6 +29,9 @@ struct L2DistanceSquared {
     unsigned operator()(const U8Descriptor&, const U8Descriptor&);
 };
 
+static_assert(sizeof(unsigned) == 4, "Unsupported unsigned int size.");
+static_assert(alignof(U8Descriptor) >= 32, "Invalid U8Descriptor alignment.");
+
 /////////////////////////////////////////////////////////////////////////////
 
 constexpr int SPLIT_DIMENSION_COUNT = 5;    // Count of dimensions with highest variance to randomly split against
@@ -44,7 +45,7 @@ struct BoundingBox {
 
 SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
 BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
-BoundingBox Union(BoundingBox a, const BoundingBox& b);
+BoundingBox Union(const BoundingBox& a, const BoundingBox& b);
 
 //! KDTree.  Node 0 is the root node.
 class KDTree {
