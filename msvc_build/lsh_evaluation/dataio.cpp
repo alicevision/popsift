@@ -113,7 +113,7 @@ unsigned MapDescriptorToImage(const std::vector<unsigned>& image_d_counts, unsig
 {
     auto it = std::lower_bound(image_d_counts.begin(), image_d_counts.end(), di);
     auto i = it - image_d_counts.begin();
-    return i;
+    return static_cast<unsigned>(i);
 }
 
 /////////////////////////////////////////////////////////////////////////////
