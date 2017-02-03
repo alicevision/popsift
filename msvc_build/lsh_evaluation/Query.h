@@ -45,7 +45,7 @@ private:
 class Query {
 public:
     Query(const U8Descriptor* qDescriptors, size_t dcount,
-        std::vector<std::unique_ptr<KDTree>> trees);
+        std::vector<std::unique_ptr<KDTree>> trees, unsigned num_threads);
 
     struct PC {
         unsigned treeIndex;

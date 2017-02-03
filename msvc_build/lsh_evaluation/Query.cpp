@@ -91,7 +91,7 @@ unsigned TreeQuery::BBDistance(const BoundingBox& bb, const U8Descriptor & q)
 }
 
 Query::Query(const U8Descriptor * qDescriptors, size_t dcount,
-    std::vector<std::unique_ptr<KDTree>> trees)
+    std::vector<std::unique_ptr<KDTree>> trees, unsigned num_threads)
 {
     for (int i = 0; i < trees.size(); i++) {
         TreeQuery q(qDescriptors, dcount, i, this);
