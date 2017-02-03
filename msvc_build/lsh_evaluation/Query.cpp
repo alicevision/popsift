@@ -5,7 +5,7 @@ namespace popsift {
 namespace kdtree {
 
 TreeQuery::TreeQuery(const U8Descriptor * qDescriptors, size_t dcount, 
-                    unsigned treeIndex, Query * query)
+                    unsigned treeIndex, Query* query)
     :_qDescriptors(qDescriptors),
     _dcount(dcount),
     _initialTreeIndex(treeIndex),
@@ -17,7 +17,6 @@ void TreeQuery::FindCandidates()
 {
     for (int i = 0; i < _dcount; i++) {
         const U8Descriptor& desc = _qDescriptors[i];
-        KDTree* tree = _query->Tree(_initialTreeIndex);
 
         //initial traverse from root-node
         traverse(desc, 0, _initialTreeIndex);
@@ -51,25 +50,20 @@ void TreeQuery::traverse(const U8Descriptor & q, unsigned nodeIndex, unsigned tr
 
     if (n.leaf) {
         auto candidates = _tree->List(n);
-        while (candidates.first != candidates.second) {
-            unsigned candidate = *candidates.first++;
-            _candidates.push_back(candidate);
-            //todo: can potentially calc dist between q and tree-desc here.
-        }
+        _candidates.insert(_candidates.end(), candidates.first, candidates.second);
+        //todo: can potentially calc dist between q and tree-desc here.
     }
     else {
         if (n.val < q.ufeatures[n.dim]) {
-            traverse(q, n.left, treeIndex);
             const BoundingBox& rightBB = _tree->BB(n.right);
             unsigned right_dist = BBDistance(rightBB, q);
-            
             {
                 std::lock_guard<std::mutex>(_query->pq_mutex);
                 _query->priority_queue.push(Query::PC{ treeIndex, n.right, right_dist });
             }
+            traverse(q, n.left, treeIndex);
         }
         else {
-            traverse(q, n.right, treeIndex);
             const BoundingBox& leftBB = _tree->BB(n.left);
             unsigned left_dist = BBDistance(leftBB, q);
             
@@ -77,6 +71,7 @@ void TreeQuery::traverse(const U8Descriptor & q, unsigned nodeIndex, unsigned tr
                 std::lock_guard<std::mutex>(_query->pq_mutex);
                 _query->priority_queue.push(Query::PC{ treeIndex, n.right, left_dist });
             }
+            traverse(q, n.right, treeIndex);
         }
     }
 }
@@ -95,7 +90,7 @@ unsigned TreeQuery::BBDistance(const BoundingBox& bb, const U8Descriptor & q)
     return sum;
 }
 
-popsift::kdtree::Query::Query(const U8Descriptor * qDescriptors, size_t dcount,
+Query::Query(const U8Descriptor * qDescriptors, size_t dcount,
     std::vector<std::unique_ptr<KDTree>> trees)
 {
     for (int i = 0; i < trees.size(); i++) {
