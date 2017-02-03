@@ -119,7 +119,7 @@ SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count
 }
 
 //! Compute BB of descriptors referenced by count indexes.
-BoundingBox GetBoundingBox(const U8Descriptor* descriptors, unsigned* indexes, size_t count) {
+BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count) {
     U8Descriptor min, max;
 
     for (int i = 0; i < 4; i++) {
