@@ -47,6 +47,7 @@ BoundingBox GetBoundingBox(const U8Descriptor* descriptors, unsigned* indexes, s
 
 //! KDTree.  Node 0 is the root node.
 class KDTree {
+public:
     struct Node {
         unsigned left;      // left link, or begin list index if leaf == 1
         unsigned right;     // right link or end list index if leaf ==1
@@ -55,20 +56,11 @@ class KDTree {
         unsigned leaf : 1;  // 1 for leaf nodes
     };
 
-    const std::uniform_int_distribution<int> _split_dim_gen;
-    const std::uniform_int_distribution<unsigned> _split_val_gen;
-    const U8Descriptor *_descriptors;   // Descriptor data
-    const unsigned _dcount;             // Count of descriptors
-    std::vector<BoundingBox> _bb;       // BBs of all nodes; packed linearly to not waste cache lines
-    std::vector<Node> _nodes;           // Link nodes
-    std::vector<unsigned> _list;        // Elements in leaf nodes; consecutive in range [left,right)
-
-public:
     KDTree(const U8Descriptor* descriptors, size_t dcount);
     KDTree(const KDTree&) = delete;
     KDTree& operator=(const KDTree&) = delete;
     
-    void Build();
+    void Build(const SplitDimensions& sdim);
     void Validate();
 
     const Node& Link(unsigned i) const { return _nodes[i]; }
@@ -78,6 +70,15 @@ public:
             throw std::logic_error("KDTree::List: node is not a leaf");
         return std::make_pair(_list.data() + node.left, _list.data() + node.right);
     }
+
+private:
+    const std::uniform_int_distribution<int> _split_dim_gen;
+    const std::uniform_int_distribution<unsigned> _split_val_gen;
+    const U8Descriptor *_descriptors;   // Descriptor data
+    const unsigned _dcount;             // Count of descriptors
+    std::vector<BoundingBox> _bb;       // BBs of all nodes; packed linearly to not waste cache lines
+    std::vector<Node> _nodes;           // Link nodes
+    std::vector<unsigned> _list;        // Elements in leaf nodes; consecutive in range [left,right)
 };
 
 
