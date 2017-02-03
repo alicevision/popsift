@@ -151,6 +151,7 @@
     <ClInclude Include="dataio.h" />
     <ClInclude Include="KDTree.h" />
     <ClInclude Include="lsh.h" />
+    <ClInclude Include="Query.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dataio.cpp" />
@@ -158,6 +159,7 @@
     <ClCompile Include="KDTree.cpp" />
     <ClCompile Include="lsh.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Query.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
