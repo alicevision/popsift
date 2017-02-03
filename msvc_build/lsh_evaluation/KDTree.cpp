@@ -13,8 +13,7 @@ KDTree::KDTree(const U8Descriptor* descriptors, size_t dcount) :
     _dcount(static_cast<unsigned>(dcount)),
     _list(dcount)
 {
-    if (dcount > std::numeric_limits<unsigned>::max() / 2)
-        throw std::length_error("KDTree: too many descriptors");
+    POPSIFT_KDASSERT(dcount < std::numeric_limits<unsigned>::max() / 2);
     for (unsigned i = 0; i < _dcount; ++i)
         _list[i] = i;
 }
@@ -39,10 +38,8 @@ void KDTree::Build(const SplitDimensions& sdim, unsigned leaf_size)
 // as well as l/r pointers to children.  BB will also be computed.
 void KDTree::Build(Node& node)
 {
-    if (!node.leaf)
-        throw std::logic_error("KDTree::Build: not a leaf node");
-    if (node.right <= node.left)
-        throw std::logic_error("KDTree::Build: invalid bounds");
+    POPSIFT_KDASSERT(node.leaf);
+    POPSIFT_KDASSERT(node.left < node.right);
 
     if (node.right - node.left <= _leaf_size) {
         auto list = List(node.left, node.right);
@@ -91,8 +88,7 @@ unsigned KDTree::TryPartition(Node& node)
 {
     static std::mt19937_64 rng_engine;  // XXX! NOT MT-SAFE!
 
-    if (!node.leaf)
-        throw std::logic_error("KDTree::TryPartition: not a leaf node");
+    POPSIFT_KDASSERT(node.leaf);
 
     const unsigned split_dim = _split_dimensions[_split_dim_gen(rng_engine)];
     const unsigned split_val = _split_val_gen(rng_engine);
@@ -119,24 +115,20 @@ void KDTree::Validate()
 
     for (const Node& n : _nodes) {
         const size_t lim = n.leaf ? _list.size() : _nodes.size();
-        if (n.left <= n.right)
-            throw std::logic_error("KDTree: unordered links");
-        if (n.left >= lim || n.right >= lim)
-            throw std::logic_error("KDTree: links out of range");
-        if (n.dim >= 128)
-            throw std::logic_error("KDTree: invalid split dimension");
+
+        POPSIFT_KDASSERT(n.left < n.right);
+        POPSIFT_KDASSERT(n.left < lim && n.right <= lim);
+        POPSIFT_KDASSERT(n.dim < 128);
 
         if (n.leaf)
         for (auto range = List(n); range.first != range.second; ++range.first) {
-            if (*range.first >= _dcount)
-                throw std::logic_error("KDTree: list element out of range");
+            POPSIFT_KDASSERT(*range.first < _dcount);
             sum += *range.first;
         }
     }
 
     // Constructor limits count to 2^31, so multiplication won't overflow here.
-    if (sum != (size_t(_dcount) - 1) * size_t(_dcount) / 2)
-        throw std::logic_error("KDTree: not all elements referenced");
+    POPSIFT_KDASSERT(sum == (size_t(_dcount) - 1) * size_t(_dcount) / 2);
 }
 
 }   // kdtree

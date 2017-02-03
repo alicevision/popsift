@@ -4,6 +4,7 @@
 #include <vector>
 #include <random>
 #include <utility>
+#include <string>
 
 #ifdef _MSC_VER
 #define ALIGNED64 __declspec(align(64))
@@ -11,14 +12,25 @@
 #define ALIGNED64 __attribute__((aligned(64)))
 #endif
 
+#define POPSIFT_KDASSERT(x) if (!(x)) ::popsift::kdtree::assert_fail(#x, __FILE__, __LINE__)
+
 namespace popsift {
 namespace kdtree {
+
+inline void assert_fail(const char* expr, const char* file, int line) {
+    throw std::logic_error(std::string("KDTree assertion failed: ") + expr + " @ " + file + std::to_string(line));
+}
 
 ALIGNED64 struct U8Descriptor {
     union {
         __m256i features[4];
         std::array<unsigned char, 128> ufeatures;
     };
+};
+
+struct BoundingBox {
+    U8Descriptor min;
+    U8Descriptor max;
 };
 
 struct L1Distance {
@@ -38,14 +50,11 @@ constexpr int SPLIT_DIMENSION_COUNT = 5;    // Count of dimensions with highest 
 
 using SplitDimensions = std::array<unsigned char, SPLIT_DIMENSION_COUNT>;
 
-struct BoundingBox {
-    U8Descriptor min;
-    U8Descriptor max;
-};
-
 SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
 BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
 BoundingBox Union(const BoundingBox& a, const BoundingBox& b);
+
+/////////////////////////////////////////////////////////////////////////////
 
 //! KDTree.  Node 0 is the root node.
 class KDTree {
@@ -69,8 +78,7 @@ public:
     const Node& Link(unsigned i) const { return _nodes[i]; }
     const BoundingBox& BB(unsigned i) const { return _bb[i]; }
     std::pair<const unsigned*, const unsigned*> List(const Node& node) const {
-        if (!node.leaf)
-            throw std::logic_error("KDTree::List: node is not a leaf");
+        POPSIFT_KDASSERT(node.leaf);
         return List(node.left, node.right);
     }
     const U8Descriptor* Descriptors() const {
@@ -101,8 +109,7 @@ private:
     }
 
     unsigned Index(Node& node) const {
-        if (&node < &_nodes.front() || &node > &_nodes.back())
-            throw std::logic_error("KDTree::Index: Node reference out of range");
+        POPSIFT_KDASSERT(&node >= &_nodes.front() && &node <= &_nodes.back());
         return static_cast<unsigned>(&node - &_nodes.front());
     }
 };
