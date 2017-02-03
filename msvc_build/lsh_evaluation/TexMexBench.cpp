@@ -1,14 +1,24 @@
 #include "dataio.h"
+#include "KDTree.h"
+#include <Eigen/Core>
 #include <iostream>
 #include <chrono>
-#include <falconn/lsh_nn_table.h>
+#include <memory>
 
-using namespace falconn;
+using namespace popsift::kdtree;
+
+using Eigen::Map;
+using Eigen::Matrix;
+using Eigen::Dynamic;
+using Eigen::RowMajor;
+
 using std::clog;
 using std::endl;
-using SiftPoint = falconn::DenseVector<float>;
-using SiftMatrix = Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>;
-using GroundTruthMatrix = Eigen::Map<Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>;
+
+// http://corpus-texmex.irisa.fr/ ANN_SIFT1M set
+using SiftPoint = Matrix<unsigned char, 128, 1>;
+using SiftMatrix = Map<Matrix<unsigned char, Dynamic, 128, RowMajor>, Eigen::Aligned64>;
+using GroundTruthMatrix = Map<Matrix<int, Dynamic, 100, RowMajor>, Eigen::Aligned64>;
 
 enum Counters {
     FALSE_ACCEPTS,
@@ -20,51 +30,35 @@ enum Counters {
     COUNTERS_COUNT
 };
 
-static const int NUM_HASH_TABLES = 8;  // 10-ish is a good start
-static const int NUM_HASH_BITS = 22;   // should be about log2(n_points); but memory usage is proportional with that!
 
-//http://corpus-texmex.irisa.fr/ ANN_SIFT1M set
-static std::string G_DataPrefix = "C:/LOCAL/texmex_sift1M_corpus";
-static std::vector<float> G_Base; // 1million descriptors database
-static std::vector<float> G_Query; // query descriptors
+static std::string G_DataPrefix = "E:/texmex_sift1M_corpus";
+static std::vector<U8Descriptor> G_Base; // 1million descriptors database
+static std::vector<U8Descriptor> G_Query; // query descriptors
 static std::vector<int> G_GroundTruth; // 100x10k, 100 nearest neighbours for each desc in G_Query
-static std::unique_ptr<LSHNearestNeighborTable<SiftPoint>> G_LSH;
+static std::unique_ptr<KDTree> G_kdtree;
 static size_t G_Counters[COUNTERS_COUNT];
 
 static void ReadData();
-static void NormalizeDataSet(SiftMatrix&);
-static void BuildLSH();
+static void BuildKDTree(unsigned leaf_size);
 static void EvaluateQuery(size_t qi, const SiftMatrix& base_vectors, const SiftMatrix& query_vectors, const GroundTruthMatrix gt_vectors);
 
 void TexMexBench()
 {
     ReadData();
-    BuildLSH();
-    G_LSH->set_num_probes(NUM_HASH_TABLES); // This is minimal acceptable value
+    BuildKDTree(50);    // XXX: guess for leaf size.
 
-    SiftMatrix base_vectors(G_Base.data(), G_Base.size() / 128, 128);
-    SiftMatrix query_vectors(G_Query.data(), G_Query.size() / 128, 128);
+    SiftMatrix base_vectors(reinterpret_cast<unsigned char*>(G_Base.data()), G_Base.size() / 128, 128);
+    SiftMatrix query_vectors(reinterpret_cast<unsigned char*>(G_Query.data()), G_Query.size() / 128, 128);
     GroundTruthMatrix gt_vectors(G_GroundTruth.data(), G_GroundTruth.size() / 100, 100);
 
     {
         clog << "\nQUERYING; #VECTORS=" << query_vectors.rows() << " " << std::flush;
         auto t0 = std::chrono::high_resolution_clock::now();
-        for (size_t qi = 0; qi < query_vectors.rows(); ++qi)
+        for (int qi = 0; qi < query_vectors.rows(); ++qi)
             EvaluateQuery(qi, base_vectors, query_vectors, gt_vectors);
         auto t1 = std::chrono::high_resolution_clock::now();
         clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
         ReportMemoryUsage();
-    }
-
-    {
-        auto st = G_LSH->get_query_statistics();
-        clog << "\nLSH AVERAGES:" << endl;
-        clog << "total query time: " << st.average_total_query_time << endl;
-        clog << "lsh time: " << st.average_lsh_time << endl;
-        clog << "hash table time: " << st.average_hash_table_time << endl;
-        clog << "distance time: " << st.average_distance_time << endl;
-        clog << "#candidates: " << st.average_num_candidates << endl;
-        clog << "#unique_cand: " << st.average_num_unique_candidates << endl;
     }
 
     clog << "\n\nSTATISTICS:\nFALSE ACCEPTS: " << G_Counters[FALSE_ACCEPTS] << endl;
@@ -83,44 +77,33 @@ static void ReadData()
 
     clog << "\nREADING DATA: " << std::flush;
     t0 = std::chrono::high_resolution_clock::now();
-    G_Base = ReadTexMex<float>(G_DataPrefix + "/sift_base.fvecs");
-    G_Query = ReadTexMex<float>(G_DataPrefix + "/sift_query.fvecs");
+    auto base = ReadTexMex<float>(G_DataPrefix + "/sift_base.fvecs");
+    auto query = ReadTexMex<float>(G_DataPrefix + "/sift_query.fvecs");
     G_GroundTruth = ReadTexMex<int>(G_DataPrefix + "/sift_groundtruth.ivecs");
     t1 = std::chrono::high_resolution_clock::now();
     clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
     ReportMemoryUsage();
 
-    clog << "NORMALIZING DATA (base set and queries): " << std::flush;
+    G_Base.resize(base.size());
+    G_Query.resize(query.size());
+
+    clog << "\nCONVERTING TO U8: " << std::flush;
     t0 = std::chrono::high_resolution_clock::now();
-    NormalizeDataSet(SiftMatrix(G_Base.data(), G_Base.size() / 128, 128));
-    NormalizeDataSet(SiftMatrix(G_Query.data(), G_Query.size() / 128, 128));
-    t1 = std::chrono::high_resolution_clock::now();
+    auto conv_fn = [](float x) { return (unsigned char)x; };
+    std::transform(base.begin(), base.end(), reinterpret_cast<unsigned char*>(G_Base.data()), conv_fn);
+    std::transform(query.begin(), query.end(), reinterpret_cast<unsigned char*>(G_Query.data()), conv_fn);
     clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
+    t1 = std::chrono::high_resolution_clock::now();
 }
 
-static void NormalizeDataSet(SiftMatrix& siftm)
+static void BuildKDTree(unsigned leaf_size)
 {
-    auto norms = siftm.rowwise().norm().array();
-    auto sifta = siftm.array();
-    sifta.colwise() /= norms;
-}
+    auto sdim = GetSplitDimensions(G_Base.data(), G_Base.size());
+    G_kdtree.reset(new KDTree(G_Base.data(), G_Base.size()));
 
-static void BuildLSH()
-{
-    LSHConstructionParameters params;
-    params.dimension = 128;
-    params.lsh_family = LSHFamily::CrossPolytope;
-    params.l = NUM_HASH_TABLES;
-    params.distance_function = DistanceFunction::NegativeInnerProduct;
-    compute_number_of_hash_functions<SiftPoint>(NUM_HASH_BITS, &params);
-    params.num_rotations = 2;       // 1 for dense, 2 for sparse data
-    params.num_setup_threads = 0;   // use all available
-    params.storage_hash_table = StorageHashTable::BitPackedFlatHashTable;
-
-    clog << "\nBUILDING TABLE: " << std::flush;
+    clog << "\nBUILDING KDTREE: " << std::flush;
     auto t0 = std::chrono::high_resolution_clock::now();
-    auto pas = PlainArrayPointSet<float>{ G_Base.data(), static_cast<int>(G_Base.size() / 128), 128 };
-    G_LSH = construct_table<SiftPoint>(pas, params);
+    G_kdtree->Build(sdim, leaf_size);
     auto t1 = std::chrono::high_resolution_clock::now();
     clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
     ReportMemoryUsage();
@@ -128,6 +111,7 @@ static void BuildLSH()
 
 static void EvaluateQuery(size_t qi, const SiftMatrix& base_vectors, const SiftMatrix& query_vectors, const GroundTruthMatrix gt_vectors)
 {
+#if 0
     static std::vector<int_fast32_t> knn;
     auto q_v = query_vectors.row(qi);
 
@@ -158,6 +142,5 @@ static void EvaluateQuery(size_t qi, const SiftMatrix& base_vectors, const SiftM
         if (gt_vectors(qi, 1) == knn[1])
             ++G_Counters[CORRECT_2_MATCHES];
     }
+#endif
 }
-
-
