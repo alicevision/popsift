@@ -40,7 +40,7 @@ struct BoundingBox {
     U8Descriptor max;
 };
 
-std::array<int, SPLIT_DIMENSION_COUNT> GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
+std::array<unsigned, SPLIT_DIMENSION_COUNT> GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
 BoundingBox GetBoundingBox(const U8Descriptor* descriptors, unsigned* indexes, size_t count);
 
 //! KDTree.  Node 0 is the root node.
