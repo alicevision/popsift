@@ -1,5 +1,6 @@
 #include "KDTree.h"
 #include <limits>
+#include <random>
 
 namespace popsift {
 namespace kdtree {
