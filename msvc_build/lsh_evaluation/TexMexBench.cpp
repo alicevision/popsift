@@ -84,16 +84,16 @@ static void ReadData()
     clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
     ReportMemoryUsage();
 
-    G_Base.resize(base.size());
-    G_Query.resize(query.size());
+    G_Base.resize(base.size() / 128);
+    G_Query.resize(query.size() / 128);
 
     clog << "\nCONVERTING TO U8: " << std::flush;
     t0 = std::chrono::high_resolution_clock::now();
     auto conv_fn = [](float x) { return (unsigned char)x; };
     std::transform(base.begin(), base.end(), reinterpret_cast<unsigned char*>(G_Base.data()), conv_fn);
     std::transform(query.begin(), query.end(), reinterpret_cast<unsigned char*>(G_Query.data()), conv_fn);
-    clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
     t1 = std::chrono::high_resolution_clock::now();
+    clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
 }
 
 static void BuildKDTree(unsigned leaf_size)
