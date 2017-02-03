@@ -79,6 +79,8 @@ private:
     std::vector<BoundingBox> _bb;       // BBs of all nodes; packed linearly to not waste cache lines
     std::vector<Node> _nodes;           // Link nodes
     std::vector<unsigned> _list;        // Elements in leaf nodes; consecutive in range [left,right)
+
+    unsigned Build(unsigned l, unsigned r);
 };
 
 

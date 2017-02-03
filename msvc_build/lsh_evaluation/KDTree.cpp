@@ -18,16 +18,19 @@ KDTree::KDTree(const U8Descriptor* descriptors, size_t dcount) :
         _list[i] = i;
 }
 
-void KDTree::Build()
-{
+void KDTree::Build(const SplitDimensions& sdim) {
+    if (Build(0, _dcount) != 0)
+        throw std::logic_error("KDTree: root node index != 0");
+}
 
+unsigned KDTree::Build(unsigned l, unsigned r) {
+    
 }
 
 // We also check that every element is referenced exactly once by some leaf node.
 // This is done in somewhat hacky way by summing element indices withing a leaf
 // node and comparing the total sum with the expected sum of 0 + 1 + ... + dcount-1.
-void KDTree::Validate()
-{
+void KDTree::Validate() {
     size_t sum = 0;
 
     for (const Node& n : _nodes) {
