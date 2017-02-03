@@ -49,6 +49,7 @@ class KDTree {
         unsigned left;      // left link, or begin list index if leaf == 1
         unsigned right;     // right link or end list index if leaf ==1
         unsigned dim : 8;   // splitting dimension
+        unsigned val : 8;   // splitting value
         unsigned leaf : 1;  // 1 for leaf nodes
     };
 
