@@ -84,7 +84,7 @@ unsigned TreeQuery::BBDistance(const BoundingBox& bb, const U8Descriptor & q)
             sum += bb.min.ufeatures[i] - q.ufeatures[i];
         }
         else if (q.ufeatures[i] > bb.max.ufeatures[i]) {
-            sum += bb.max.ufeatures[i] - q.ufeatures[i];
+            sum += q.ufeatures[i] - bb.max.ufeatures[i];
         }
     }
     return sum;
