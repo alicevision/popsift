@@ -18,7 +18,7 @@ using std::endl;
 // http://corpus-texmex.irisa.fr/ ANN_SIFT1M set
 using SiftPoint = Matrix<unsigned char, 128, 1>;
 using SiftMatrix = Map<Matrix<unsigned char, Dynamic, 128, RowMajor>, Eigen::Aligned64>;
-using GroundTruthMatrix = Map<Matrix<int, Dynamic, 100, RowMajor>, Eigen::Aligned64>;
+using GroundTruthMatrix = Map<Matrix<int, Dynamic, 100, RowMajor>>;
 
 enum Counters {
     FALSE_ACCEPTS,
