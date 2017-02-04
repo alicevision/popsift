@@ -94,7 +94,7 @@ SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count
     using namespace Eigen;
 
     Map<Matrix<unsigned char, Dynamic, 128, RowMajor>, Aligned32> u8data((unsigned char*)descriptors, count, 128);
-    auto mean = u8data.cast<double>().colwise().sum() / count;
+    auto mean = (u8data.cast<double>().colwise().sum() / count).eval();
 
     SiftPoint<double> var = SiftPoint<double>::Zero();
     for (size_t i = 0; i < count; ++i) {
