@@ -45,33 +45,32 @@ void TreeQuery::FindCandidates()
 
 void TreeQuery::traverse(const U8Descriptor & q, unsigned nodeIndex, unsigned treeIndex)
 {
-    const KDTree* tree = _query->Tree(treeIndex);
-    const KDTree::Node& n = _tree->Link(nodeIndex);
+    const KDTree& tree = _query->Tree(treeIndex);
 
-    if (n.leaf) {
-        auto candidates = _tree->List(n);
+    if (tree.IsLeaf(nodeIndex)) {
+        auto candidates = _tree->List(nodeIndex);
         _candidates.insert(_candidates.end(), candidates.first, candidates.second);
         //todo: can potentially calc dist between q and tree-desc here.
     }
     else {
-        if (n.val < q.ufeatures[n.dim]) {
-            const BoundingBox& rightBB = _tree->BB(n.right);
+        if (tree.Val(nodeIndex) < q.ufeatures[tree.Dim(nodeIndex)]) {
+            const BoundingBox& rightBB = _tree->BB(_tree->Right(nodeIndex));
             unsigned right_dist = BBDistance(rightBB, q);
             {
                 std::lock_guard<std::mutex>(_query->pq_mutex);
-                _query->priority_queue.push(Query::PC{ treeIndex, n.right, right_dist });
+                _query->priority_queue.push(Query::PC{ treeIndex, _tree->Right(nodeIndex), right_dist });
             }
-            traverse(q, n.left, treeIndex);
+            traverse(q, _tree->Left(nodeIndex), treeIndex);
         }
         else {
-            const BoundingBox& leftBB = _tree->BB(n.left);
+            const BoundingBox& leftBB = _tree->BB(_tree->Left(nodeIndex));
             unsigned left_dist = BBDistance(leftBB, q);
             
             {
                 std::lock_guard<std::mutex>(_query->pq_mutex);
-                _query->priority_queue.push(Query::PC{ treeIndex, n.right, left_dist });
+                _query->priority_queue.push(Query::PC{ treeIndex, _tree->Right(nodeIndex), left_dist });
             }
-            traverse(q, n.right, treeIndex);
+            traverse(q, _tree->Right(nodeIndex), treeIndex);
         }
     }
 }

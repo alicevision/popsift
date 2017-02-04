@@ -59,7 +59,7 @@ public:
     std::mutex pq_mutex;
     std::priority_queue<PC,std::vector<PC>, std::greater<PC>> priority_queue;
 
-    KDTree* Tree(size_t t) { return _trees.at(t).get(); }
+    const KDTree& Tree(size_t t) const { return *_trees.at(t); }
 
 private:
     std::vector<std::unique_ptr<KDTree>> _trees;

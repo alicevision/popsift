@@ -5,6 +5,7 @@
 #include <random>
 #include <utility>
 #include <string>
+#include <memory>
 
 #ifdef _MSC_VER
 #define ALIGNED32 __declspec(align(32))
@@ -13,6 +14,8 @@
 #endif
 
 #define POPSIFT_KDASSERT(x) if (!(x)) ::popsift::kdtree::assert_fail(#x, __FILE__, __LINE__)
+
+/////////////////////////////////////////////////////////////////////////////
 
 namespace popsift {
 namespace kdtree {
@@ -33,6 +36,9 @@ struct BoundingBox {
     U8Descriptor max;
 };
 
+constexpr int SPLIT_DIMENSION_COUNT = 5;    // Count of dimensions with highest variance to randomly split against
+using SplitDimensions = std::array<unsigned char, SPLIT_DIMENSION_COUNT>;
+
 // The code crashes unless this is correct.
 static_assert(sizeof(unsigned) == 4, "Unsupported unsigned int size.");
 static_assert(alignof(U8Descriptor) >= 32 && alignof(BoundingBox) >= 32, "Invalid alignment.");
@@ -40,64 +46,109 @@ static_assert(sizeof(U8Descriptor) == 128 && sizeof(BoundingBox) == 256, "Invali
 
 /////////////////////////////////////////////////////////////////////////////
 
-constexpr int SPLIT_DIMENSION_COUNT = 5;    // Count of dimensions with highest variance to randomly split against
-
-using SplitDimensions = std::array<unsigned char, SPLIT_DIMENSION_COUNT>;
-
-SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
-BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
-BoundingBox Union(const BoundingBox& a, const BoundingBox& b);
-
-unsigned L1Distance(const U8Descriptor&, const U8Descriptor&);
-unsigned L1Distance(const U8Descriptor&, const BoundingBox&);
-unsigned L2DistanceSquared(const U8Descriptor&, const U8Descriptor&);   // Unused ATM
-
-/////////////////////////////////////////////////////////////////////////////
-
 //! KDTree.  Node 0 is the root node.
 class KDTree {
+    friend std::unique_ptr<KDTree> Build(const U8Descriptor* descriptors, size_t dcount, const SplitDimensions& sdim, unsigned leaf_size);
 public:
-    // XXX: Can save space; left node index is always parent_index+1
-    struct Node {
-        unsigned left;      // left link, or begin list index if leaf == 1
-        unsigned right;     // right link or end list index if leaf ==1
-        unsigned dim : 8;   // splitting dimension
-        unsigned val : 8;   // splitting value
-        unsigned leaf : 1;  // 1 for leaf nodes
-    };
-
-    KDTree(const U8Descriptor* descriptors, size_t dcount);
     KDTree(const KDTree&) = delete;
     KDTree& operator=(const KDTree&) = delete;
-    
-    void Build(const SplitDimensions& sdim, unsigned leaf_size);
-    void Validate();
 
-    const Node& Link(unsigned i) const { return _nodes[i]; }
-    const BoundingBox& BB(unsigned i) const { return _bb[i]; }
-    std::pair<const unsigned*, const unsigned*> List(const Node& node) const {
-        POPSIFT_KDASSERT(node.leaf);
-        return List(node.left, node.right);
+    unsigned Root() const
+    {
+        return 0;
     }
-    const U8Descriptor* Descriptors() const {
+
+    unsigned NodeCount() const
+    {
+        return static_cast<unsigned>(_nodes.size());
+    }
+
+    bool IsLeaf(unsigned n) const
+    {
+        return  _nodes.at(n).leaf;
+    }
+
+    unsigned Left(unsigned n) const
+    {
+        POPSIFT_KDASSERT(!_nodes.at(n).leaf);
+        return n + 1;
+    }
+
+    unsigned Right(unsigned n) const
+    {
+        POPSIFT_KDASSERT(!_nodes.at(n).leaf);
+        return _nodes.at(n).index;
+    }
+
+    unsigned Dim(unsigned n) const
+    {
+        POPSIFT_KDASSERT(!_nodes.at(n).leaf);
+        return _nodes.at(n).dim();
+    }
+
+    unsigned Val(unsigned n) const
+    {
+        POPSIFT_KDASSERT(!_nodes.at(n).leaf);
+        return _nodes.at(n).val();
+    }
+    
+    const BoundingBox& BB(unsigned n) const
+    {
+        return _bb.at(n);
+    }
+
+    std::pair<const unsigned*, const unsigned*> List(unsigned n) const {
+        POPSIFT_KDASSERT(n < _nodes.size() && _nodes[n].leaf);
+        POPSIFT_KDASSERT(_nodes[n].index < _nodes[n].end);
+        POPSIFT_KDASSERT(_nodes[n].end <= _list.size());
+        return List(_nodes.at(n).index, _nodes.at(n).end);
+    }
+    
+    const U8Descriptor* Descriptors() const
+    {
         return _descriptors;
     }
 
+    size_t DescriptorCount() const
+    {
+        return _dcount;
+    }
+
 private:
+    // There's no left link: if the parent is at index i, the left child is always at i+1 due to the way we build the tree.
+    struct Node {
+        unsigned index : 31;        // right link or begin list index if leaf == 1
+        unsigned leaf : 1;          // 1 for leaf nodes
+        union {
+            unsigned char dv[2];    // splitting dimension and value if internal node
+            unsigned end;           // end list index if leaf node
+        };
+
+        unsigned char& dim() { return dv[0]; }
+        unsigned char& val() { return dv[1]; }
+
+        unsigned char dim() const { return dv[0]; }
+        unsigned char val() const { return dv[1]; }
+    };
+
+    static_assert(sizeof(Node) == 8, "Invalid size.");
+
     const std::uniform_int_distribution<int> _split_dim_gen;
     const U8Descriptor *_descriptors;   // Descriptor data
     const unsigned _dcount;             // Count of descriptors
     std::vector<BoundingBox> _bb;       // BBs of all nodes; packed linearly to not waste cache lines
     std::vector<Node> _nodes;           // Link nodes
     std::vector<unsigned> _list;        // Elements in leaf nodes; consecutive in range [left,right)
-    
+
     // Used by Build
     unsigned _leaf_size;
     SplitDimensions _split_dimensions;
 
-    void Build(unsigned node_index);
-    unsigned Partition(Node& node);
-    
+    KDTree(const U8Descriptor* descriptors, size_t dcount);
+    void Build(const SplitDimensions& sdim, unsigned leaf_size);
+    void Build(unsigned node_index,  unsigned lelem, unsigned relem);
+    unsigned Partition(Node& node, unsigned lelem, unsigned relem);
+
     std::pair<unsigned*, unsigned*> List(unsigned l, unsigned r) const {
         return std::make_pair(
             const_cast<unsigned*>(_list.data() + l),
@@ -105,6 +156,16 @@ private:
     }
 };
 
+/////////////////////////////////////////////////////////////////////////////
+
+unsigned L1Distance(const U8Descriptor&, const U8Descriptor&);
+unsigned L1Distance(const U8Descriptor&, const BoundingBox&);
+unsigned L2DistanceSquared(const U8Descriptor&, const U8Descriptor&);   // Unused ATM
+
+SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
+BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
+BoundingBox Union(const BoundingBox& a, const BoundingBox& b);
+std::unique_ptr<KDTree> Build(const U8Descriptor* descriptors, size_t dcount, const SplitDimensions& sdim, unsigned leaf_size);
 
 }   // kdtree
 }   // popsift

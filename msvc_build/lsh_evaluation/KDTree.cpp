@@ -6,6 +6,47 @@
 namespace popsift {
 namespace kdtree {
 
+static void Validate(const KDTree& kdt, unsigned n, size_t& sum)
+{
+    POPSIFT_KDASSERT(n < kdt.NodeCount());
+
+    {
+        const BoundingBox& bb = kdt.BB(n);
+        for (int i = 0; i < 128; ++i)
+            POPSIFT_KDASSERT(bb.min.ufeatures[i] <= bb.max.ufeatures[i]);
+    }
+
+    if (kdt.IsLeaf(n)) {
+        for (auto range = kdt.List(n); range.first != range.second; ++range.first) {
+            POPSIFT_KDASSERT(*range.first < kdt.DescriptorCount());
+            sum += *range.first;
+        }
+    }
+    else {
+        POPSIFT_KDASSERT(kdt.Dim(n) < 128);
+        Validate(kdt, kdt.Left(n), sum);
+        Validate(kdt, kdt.Right(n), sum);
+    }
+}
+
+std::unique_ptr<KDTree> Build(const U8Descriptor* descriptors, size_t dcount, const SplitDimensions& sdim, unsigned leaf_size)
+{
+    auto ret = std::unique_ptr<KDTree>(new KDTree(descriptors, dcount));
+    ret->Build(sdim, leaf_size);
+
+    // Always validate, it's cheap.
+    {
+        size_t sum = 0;
+        Validate(*ret, 0, sum);
+        // KDT limits count to 2^31, so multiplication won't overflow here.
+        POPSIFT_KDASSERT(sum == (size_t(dcount) - 1) * size_t(dcount) / 2);
+    }
+    
+    return ret;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+
 KDTree::KDTree(const U8Descriptor* descriptors, size_t dcount) :
     _split_dim_gen(0, SPLIT_DIMENSION_COUNT-1),
     _descriptors(descriptors),
@@ -27,65 +68,61 @@ void KDTree::Build(const SplitDimensions& sdim, unsigned leaf_size)
     // Generate root node as a leaf containing all points.
     _nodes.emplace_back();
     _bb.emplace_back();
- 
-    _nodes.back().left = 0;
-    _nodes.back().right = _dcount;
     _nodes.back().leaf = 1;
-    Build(0);
+    
+    Build(0, 0, _dcount);
+    POPSIFT_KDASSERT(_nodes.size() == _bb.size());
 }
 
-// On entry, node.left and node.right is read to determine the range; node must be a leaf.
-// On exit, node is potentially converted to internal node, and dim,val are filled in
-// as well as l/r pointers to children.  BB will also be computed.
-void KDTree::Build(unsigned node_index)
+// On entry, [lelem, relem) is the element range; node must be a leaf. On exit, node is potentially
+// converted to internal node, and dim,val are filled in as well as pointers to children. 
+// BB will also be computed.
+void KDTree::Build(unsigned node_index, unsigned lelem, unsigned relem)
 {
     POPSIFT_KDASSERT(_nodes.size() == _bb.size());
-    unsigned m, l, r;
+    unsigned melem;
 
     {
         Node& node = _nodes[node_index];
 
         POPSIFT_KDASSERT(node.leaf);
-        POPSIFT_KDASSERT(node.left < node.right);
+        POPSIFT_KDASSERT(lelem < relem);
 
-        if (node.right - node.left <= _leaf_size) {
-            auto list = List(node.left, node.right);
+        if (relem - lelem <= _leaf_size) {
+            auto list = List(lelem, relem);
+            node.index = lelem;
+            node.end = relem;
             _bb[node_index] = GetBoundingBox(_descriptors, list.first, list.second - list.first);
             return;
         }
         
-        l = node.left;
-        r = node.right;
-        m = Partition(node) + l;    // NB! Partition returns index from [0,n) where 0 maps to left, n maps to right.
+        // NB! Partition returns index from [0,n) where 0 maps to left, n maps to right.
+        melem = Partition(node, lelem, relem) + lelem;
     }
 
     // Left child to split.
     const unsigned lc = static_cast<unsigned>(_nodes.size());
     _nodes.emplace_back();
     _bb.emplace_back();
-    _nodes.back().left = l;
-    _nodes.back().right = m;
     _nodes.back().leaf = 1;
-    Build(lc);
+    Build(lc, lelem, melem);
 
     // Right child to split.
     const unsigned rc = static_cast<unsigned>(_nodes.size());
     _nodes.emplace_back();
     _bb.emplace_back();
-    _nodes.back().left = m;
-    _nodes.back().right = r;
     _nodes.back().leaf = 1;
-    Build(rc);
+    Build(rc, melem, relem);
 
-    _nodes[node_index].left = lc;     // dim, val, leaf are filled in by successful Partition()
-    _nodes[node_index].right = rc;
+    POPSIFT_KDASSERT(lc == node_index + 1);
+    _nodes[node_index].index = rc;
     _nodes[node_index].leaf = 0;
     _bb[node_index] = Union(_bb[lc], _bb[rc]);
 }
 
 // Returns _list.size() if the partitioning fails (i.e. all elements have constant value along the dimension)
 // Otherwise returns the partition index and fills in partitioning data in node, marking it internal.
-unsigned KDTree::Partition(Node& node)
+unsigned KDTree::Partition(Node& node, unsigned lelem, unsigned relem)
 {
     static std::mt19937_64 rng_engine;  // XXX! NOT MT-SAFE!
 
@@ -93,7 +130,7 @@ unsigned KDTree::Partition(Node& node)
 
     unsigned split_dim = _split_dimensions[_split_dim_gen(rng_engine)];
     const auto proj = [&split_dim, this](unsigned di) { return _descriptors[di].ufeatures[split_dim]; };
-    const auto list = List(node.left, node.right);
+    const auto list = List(lelem, relem);
 
     // Try partitioning several times.
     for (int retry_count = 0; retry_count < 16; ++retry_count) {
@@ -112,42 +149,11 @@ unsigned KDTree::Partition(Node& node)
         if (mit == list.first || mit == list.second)
             goto retry;
 
-        node.dim = split_dim;
-        node.val = split_val;
+        node.dim() = split_dim;
+        node.val() = split_val;
         return static_cast<unsigned>(mit - list.first);
     }
     throw std::runtime_error("KDTree: partitioning failed.");
-}
-
-// We also check that every element is referenced exactly once by some leaf node.
-// This is done in somewhat hacky way by summing element indices withing a leaf
-// node and comparing the total sum with the expected sum of 0 + 1 + ... + dcount-1.
-void KDTree::Validate()
-{
-    size_t sum = 0;
-
-    POPSIFT_KDASSERT(_nodes.size() == _bb.size());
-
-    for (size_t ni = 0; ni < _nodes.size(); ++ni) {
-        const Node& n = _nodes[ni];
-        const size_t lim = n.leaf ? _list.size() : _nodes.size();
-
-        POPSIFT_KDASSERT(n.left < n.right);
-        POPSIFT_KDASSERT(n.left < lim && n.right <= lim);
-        POPSIFT_KDASSERT(n.dim < 128);
-
-        const BoundingBox& bb = _bb[ni];
-        for (int i = 0; i < 128; ++i) POPSIFT_KDASSERT(bb.min.ufeatures[i] <= bb.max.ufeatures[i]);
-
-        if (n.leaf)
-        for (auto range = List(n); range.first != range.second; ++range.first) {
-            POPSIFT_KDASSERT(*range.first < _dcount);
-            sum += *range.first;
-        }
-    }
-
-    // Constructor limits count to 2^31, so multiplication won't overflow here.
-    POPSIFT_KDASSERT(sum == (size_t(_dcount) - 1) * size_t(_dcount) / 2);
 }
 
 }   // kdtree

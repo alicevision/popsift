@@ -46,7 +46,6 @@ void TexMexBench()
 {
     ReadData();
     BuildKDTree(50);    // XXX: guess for leaf size.
-    G_kdtree->Validate();
 
     SiftMatrix base_vectors(reinterpret_cast<unsigned char*>(G_Base.data()), G_Base.size() / 128, 128);
     SiftMatrix query_vectors(reinterpret_cast<unsigned char*>(G_Query.data()), G_Query.size() / 128, 128);
@@ -100,11 +99,9 @@ static void ReadData()
 static void BuildKDTree(unsigned leaf_size)
 {
     auto sdim = GetSplitDimensions(G_Base.data(), G_Base.size());
-    G_kdtree.reset(new KDTree(G_Base.data(), G_Base.size()));
-
     clog << "\nBUILDING KDTREE: " << std::flush;
     auto t0 = std::chrono::high_resolution_clock::now();
-    G_kdtree->Build(sdim, leaf_size);
+    G_kdtree = Build(G_Base.data(), G_Base.size(), sdim, leaf_size);
     auto t1 = std::chrono::high_resolution_clock::now();
     clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
     ReportMemoryUsage();

@@ -1,8 +1,9 @@
-#include "lsh.h"
 #include <iostream>
+
+void TexMexBench();
 
 int main()
 {
-    LSHFunction f(2 << 20, 1024);
+    TexMexBench();
     return 0;
 }
