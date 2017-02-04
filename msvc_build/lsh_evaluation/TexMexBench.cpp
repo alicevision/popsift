@@ -46,6 +46,7 @@ void TexMexBench()
 {
     ReadData();
     BuildKDTree(50);    // XXX: guess for leaf size.
+    G_kdtree->Validate();
 
     SiftMatrix base_vectors(reinterpret_cast<unsigned char*>(G_Base.data()), G_Base.size() / 128, 128);
     SiftMatrix query_vectors(reinterpret_cast<unsigned char*>(G_Query.data()), G_Query.size() / 128, 128);
