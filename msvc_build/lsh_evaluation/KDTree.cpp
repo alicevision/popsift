@@ -31,47 +31,56 @@ void KDTree::Build(const SplitDimensions& sdim, unsigned leaf_size)
     _nodes.back().left = 0;
     _nodes.back().right = _dcount;
     _nodes.back().leaf = 1;
-    Build(_nodes.back());
+    Build(0);
 }
 
 // On entry, node.left and node.right is read to determine the range; node must be a leaf.
 // On exit, node is potentially converted to internal node, and dim,val are filled in
 // as well as l/r pointers to children.  BB will also be computed.
-void KDTree::Build(Node& node)
+void KDTree::Build(unsigned node_index)
 {
-    POPSIFT_KDASSERT(node.leaf);
-    POPSIFT_KDASSERT(node.left < node.right);
+    POPSIFT_KDASSERT(_nodes.size() == _bb.size());
+    unsigned m, l, r;
 
-    if (node.right - node.left <= _leaf_size) {
-        auto list = List(node.left, node.right);
-        _bb[Index(node)] = GetBoundingBox(_descriptors, list.first, list.second - list.first);
-        return;
+    {
+        Node& node = _nodes[node_index];
+
+        POPSIFT_KDASSERT(node.leaf);
+        POPSIFT_KDASSERT(node.left < node.right);
+
+        if (node.right - node.left <= _leaf_size) {
+            auto list = List(node.left, node.right);
+            _bb[node_index] = GetBoundingBox(_descriptors, list.first, list.second - list.first);
+            return;
+        }
+        
+        l = node.left;
+        r = node.right;
+        m = Partition(node) + l;    // NB! Partition returns index from [0,n) where 0 maps to left, n maps to right.
     }
 
-    // NB! Partition returns index from [0,n) where 0 maps to left, n maps to right.
-    const unsigned m = Partition(node) + node.left;
-    const unsigned lc = static_cast<unsigned>(_nodes.size()), rc = lc + 1;
+    unsigned lc = static_cast<unsigned>(_nodes.size()), rc = lc + 1;
 
     // Left child to split.
     _nodes.emplace_back();
     _bb.emplace_back();
-    _nodes.back().left = node.left;
+    _nodes.back().left = l;
     _nodes.back().right = m;
     _nodes.back().leaf = 1;
-    Build(_nodes.back());
+    Build(lc);
 
     // Right child to split.
     _nodes.emplace_back();
     _bb.emplace_back();
     _nodes.back().left = m;
-    _nodes.back().right = node.right;
+    _nodes.back().right = r;
     _nodes.back().leaf = 1;
-    Build(_nodes.back());
+    Build(rc);
 
-    node.left = lc;     // dim, val, leaf are filled in by successful Partition()
-    node.right = rc;
-    node.leaf = 0;
-    _bb[Index(node)] = Union(_bb[lc], _bb[rc]);
+    _nodes[node_index].left = lc;     // dim, val, leaf are filled in by successful Partition()
+    _nodes[node_index].right = rc;
+    _nodes[node_index].leaf = 0;
+    _bb[node_index] = Union(_bb[lc], _bb[rc]);
 }
 
 // Returns _list.size() if the partitioning fails (i.e. all elements have constant value along the dimension)

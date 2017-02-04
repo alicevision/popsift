@@ -98,18 +98,13 @@ private:
     unsigned _leaf_size;
     SplitDimensions _split_dimensions;
 
-    void Build(Node& node);
+    void Build(unsigned node_index);
     unsigned Partition(Node& node);
     
     std::pair<unsigned*, unsigned*> List(unsigned l, unsigned r) const {
         return std::make_pair(
             const_cast<unsigned*>(_list.data() + l),
             const_cast<unsigned*>(_list.data() + r));
-    }
-
-    unsigned Index(Node& node) const {
-        POPSIFT_KDASSERT(&node >= &_nodes.front() && &node <= &_nodes.back());
-        return static_cast<unsigned>(&node - &_nodes.front());
     }
 };
 
