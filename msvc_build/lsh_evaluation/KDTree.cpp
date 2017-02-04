@@ -8,7 +8,6 @@ namespace kdtree {
 
 KDTree::KDTree(const U8Descriptor* descriptors, size_t dcount) :
     _split_dim_gen(0, SPLIT_DIMENSION_COUNT-1),
-    _split_val_gen(0, 255),
     _descriptors(descriptors),
     _dcount(static_cast<unsigned>(dcount)),
     _list(dcount)
@@ -69,40 +68,36 @@ void KDTree::Build(Node& node)
 
     node.left = lc;     // dim, val, leaf are filled in by successful Partition()
     node.right = rc;
+    node.leaf = 0;
     _bb[Index(node)] = Union(_bb[lc], _bb[rc]);
-}
-
-unsigned KDTree::Partition(Node& node)
-{
-    unsigned m;
-    for (unsigned trycount = 0; trycount < 4 * SPLIT_DIMENSION_COUNT; ++trycount)
-    if ((m = TryPartition(node)) != _list.size())
-        return m;
-    // TODO: could create a leaf node in this case instead
-    throw std::runtime_error("KDTree: partitioning failed");
 }
 
 // Returns _list.size() if the partitioning fails (i.e. all elements have constant value along the dimension)
 // Otherwise returns the partition index and fills in partitioning data in node, marking it internal.
-unsigned KDTree::TryPartition(Node& node)
+unsigned KDTree::Partition(Node& node)
 {
     static std::mt19937_64 rng_engine;  // XXX! NOT MT-SAFE!
 
     POPSIFT_KDASSERT(node.leaf);
 
     const unsigned split_dim = _split_dimensions[_split_dim_gen(rng_engine)];
-    const unsigned split_val = _split_val_gen(rng_engine);
     const auto list = List(node.left, node.right);
-    const unsigned* mit = std::partition(list.first, list.second, [&, this](unsigned di) {
-        return _descriptors[di].ufeatures[split_dim] < split_val;
-    });
+    const auto proj = [split_dim, this](unsigned di) { return _descriptors[di].ufeatures[split_dim]; };
+    const auto mm = std::minmax_element(list.first, list.second, [&](unsigned a, unsigned b) { return proj(a) < proj(b); });
+    
+    std::uniform_int_distribution<unsigned> dist(proj(*mm.first), proj(*mm.second));
+    const unsigned split_val = dist(rng_engine);
 
+    //std::vector<unsigned> tmp(list.second - list.first);
+    //std::transform(list.first, list.second, tmp.begin(), [&, this](unsigned di) { return proj(di); });
+
+    const unsigned* mit = std::partition(list.first, list.second, [&, this](unsigned di) { return proj(di) < split_val; });
     if (mit == list.first || mit == list.second)
-        return static_cast<unsigned>(_list.size());
+        throw std::runtime_error("KDTree: partitioning failed");
+
 
     node.dim = split_dim;
     node.val = split_val;
-    node.leaf = 0;
     return static_cast<unsigned>(mit - list.first);
 }
 

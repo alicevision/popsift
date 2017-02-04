@@ -43,6 +43,7 @@ struct L2DistanceSquared {
 
 static_assert(sizeof(unsigned) == 4, "Unsupported unsigned int size.");
 static_assert(alignof(U8Descriptor) >= 32, "Invalid U8Descriptor alignment.");
+static_assert(sizeof(U8Descriptor) == 128, "Invalid U8Descriptor size.");
 
 /////////////////////////////////////////////////////////////////////////////
 
@@ -87,7 +88,6 @@ public:
 
 private:
     const std::uniform_int_distribution<int> _split_dim_gen;
-    const std::uniform_int_distribution<unsigned> _split_val_gen;
     const U8Descriptor *_descriptors;   // Descriptor data
     const unsigned _dcount;             // Count of descriptors
     std::vector<BoundingBox> _bb;       // BBs of all nodes; packed linearly to not waste cache lines
@@ -100,7 +100,6 @@ private:
 
     void Build(Node& node);
     unsigned Partition(Node& node);
-    unsigned TryPartition(Node& node);
     
     std::pair<unsigned*, unsigned*> List(unsigned l, unsigned r) const {
         return std::make_pair(
