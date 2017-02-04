@@ -7,9 +7,9 @@
 #include <string>
 
 #ifdef _MSC_VER
-#define ALIGNED64 __declspec(align(64))
+#define ALIGNED32 __declspec(align(32))
 #else
-#define ALIGNED64 __attribute__((aligned(64)))
+#define ALIGNED32 __attribute__((aligned(32)))
 #endif
 
 #define POPSIFT_KDASSERT(x) if (!(x)) ::popsift::kdtree::assert_fail(#x, __FILE__, __LINE__)
@@ -21,7 +21,7 @@ inline void assert_fail(const char* expr, const char* file, int line) {
     throw std::logic_error(std::string("KDTree assertion failed: ") + expr + " @ " + file + std::to_string(line));
 }
 
-ALIGNED64 struct U8Descriptor {
+ALIGNED32 struct U8Descriptor {
     union {
         __m256i features[4];
         std::array<unsigned char, 128> ufeatures;
@@ -33,9 +33,10 @@ struct BoundingBox {
     U8Descriptor max;
 };
 
+// The code crashes unless this is correct.
 static_assert(sizeof(unsigned) == 4, "Unsupported unsigned int size.");
-static_assert(alignof(U8Descriptor) >= 32, "Invalid U8Descriptor alignment.");
-static_assert(sizeof(U8Descriptor) == 128, "Invalid U8Descriptor size.");
+static_assert(alignof(U8Descriptor) >= 32 && alignof(BoundingBox) >= 32, "Invalid alignment.");
+static_assert(sizeof(U8Descriptor) == 128 && sizeof(BoundingBox) == 256, "Invalid size.");
 
 /////////////////////////////////////////////////////////////////////////////
 

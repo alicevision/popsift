@@ -28,7 +28,7 @@ unsigned L1Distance(const U8Descriptor& ad, const U8Descriptor& bd)
         acc = _mm256_add_epi64(acc, d);
     }
 
-    ALIGNED64 uint64_t buf[4];
+    ALIGNED32 uint64_t buf[4];
     _mm256_store_si256((__m256i*)buf, acc);
     unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3];
     return sum;
@@ -51,7 +51,7 @@ unsigned L1Distance(const U8Descriptor& d, const BoundingBox& bb)
         acc = _mm256_add_epi64(acc, _mm256_add_epi64(d1, d2));
     }
 
-    ALIGNED64 uint64_t buf[4];
+    ALIGNED32 uint64_t buf[4];
     _mm256_store_si256((__m256i*)buf, acc);
     unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3];
     return sum;
@@ -92,7 +92,7 @@ unsigned L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd)
         acc = _mm256_add_epi32(acc, _mm256_unpackhi_epi16(dh, _mm256_setzero_si256()));
     }
 
-    ALIGNED64 unsigned int buf[8];
+    ALIGNED32 unsigned int buf[8];
     _mm256_store_si256((__m256i*)buf, acc);
     unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
     return sum;
