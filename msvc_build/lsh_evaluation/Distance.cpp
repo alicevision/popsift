@@ -12,7 +12,6 @@ namespace kdtree {
 template<typename Scalar>
 using SiftPoint = Eigen::Matrix<Scalar, 128, 1>;
 
-static_assert(sizeof(U8Descriptor) == 128, "Invalid U8Descriptor size");
 static_assert(SPLIT_DIMENSION_COUNT < 128, "Invalid split dimension count");
 
 unsigned L1Distance::operator()(const U8Descriptor& ad, const U8Descriptor& bd)
