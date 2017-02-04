@@ -59,9 +59,8 @@ void KDTree::Build(unsigned node_index)
         m = Partition(node) + l;    // NB! Partition returns index from [0,n) where 0 maps to left, n maps to right.
     }
 
-    unsigned lc = static_cast<unsigned>(_nodes.size()), rc = lc + 1;
-
     // Left child to split.
+    const unsigned lc = _nodes.size();
     _nodes.emplace_back();
     _bb.emplace_back();
     _nodes.back().left = l;
@@ -70,12 +69,13 @@ void KDTree::Build(unsigned node_index)
     Build(lc);
 
     // Right child to split.
+    const unsigned rc = _nodes.size();
     _nodes.emplace_back();
     _bb.emplace_back();
     _nodes.back().left = m;
     _nodes.back().right = r;
     _nodes.back().leaf = 1;
-    Build(rc);
+    Build(_nodes.size() - 1);
 
     _nodes[node_index].left = lc;     // dim, val, leaf are filled in by successful Partition()
     _nodes[node_index].right = rc;
