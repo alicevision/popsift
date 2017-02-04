@@ -14,7 +14,7 @@ using SiftPoint = Eigen::Matrix<Scalar, 128, 1>;
 
 static_assert(SPLIT_DIMENSION_COUNT < 128, "Invalid split dimension count");
 
-unsigned L1Distance::operator()(const U8Descriptor& ad, const U8Descriptor& bd)
+unsigned L1Distance(const U8Descriptor& ad, const U8Descriptor& bd)
 {
     const __m256i* af = ad.features;
     const __m256i* bf = bd.features;
@@ -45,7 +45,7 @@ unsigned L1Distance::operator()(const U8Descriptor& ad, const U8Descriptor& bd)
 // 128 components fit in 4 AVX2 registers.  Must expand components from 8-bit
 // to 16-bit in order to do arithmetic without overflow. Also, AVX2 doesn't
 // support vector multiplication of 8-bit elements.
-unsigned L2DistanceSquared::operator()(const U8Descriptor& ad, const U8Descriptor& bd)
+unsigned L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd)
 {
     const __m256i* af = ad.features;
     const __m256i* bf = bd.features;

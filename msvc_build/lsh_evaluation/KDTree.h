@@ -33,14 +33,6 @@ struct BoundingBox {
     U8Descriptor max;
 };
 
-struct L1Distance {
-    unsigned operator()(const U8Descriptor&, const U8Descriptor&);
-};
-
-struct L2DistanceSquared {
-    unsigned operator()(const U8Descriptor&, const U8Descriptor&);
-};
-
 static_assert(sizeof(unsigned) == 4, "Unsupported unsigned int size.");
 static_assert(alignof(U8Descriptor) >= 32, "Invalid U8Descriptor alignment.");
 static_assert(sizeof(U8Descriptor) == 128, "Invalid U8Descriptor size.");
@@ -54,6 +46,10 @@ using SplitDimensions = std::array<unsigned char, SPLIT_DIMENSION_COUNT>;
 SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
 BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
 BoundingBox Union(const BoundingBox& a, const BoundingBox& b);
+
+unsigned L1Distance(const U8Descriptor&, const U8Descriptor&);
+unsigned L1Distance(const U8Descriptor&, const BoundingBox&);
+unsigned L2DistanceSquared(const U8Descriptor&, const U8Descriptor&);   // Unused ATM
 
 /////////////////////////////////////////////////////////////////////////////
 
