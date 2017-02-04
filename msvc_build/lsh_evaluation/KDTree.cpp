@@ -29,9 +29,9 @@ static void Validate(const KDTree& kdt, unsigned n, size_t& sum)
     }
 }
 
-std::unique_ptr<KDTree> Build(const U8Descriptor* descriptors, size_t dcount, const SplitDimensions& sdim, unsigned leaf_size)
+KDTreePtr Build(const U8Descriptor* descriptors, size_t dcount, const SplitDimensions& sdim, unsigned leaf_size)
 {
-    auto ret = std::unique_ptr<KDTree>(new KDTree(descriptors, dcount));
+    KDTreePtr ret(new KDTree(descriptors, dcount));
     ret->Build(sdim, leaf_size);
 
     // Always validate, it's cheap.
@@ -42,6 +42,17 @@ std::unique_ptr<KDTree> Build(const U8Descriptor* descriptors, size_t dcount, co
         POPSIFT_KDASSERT(sum == (size_t(dcount) - 1) * size_t(dcount) / 2);
     }
     
+    return ret;
+}
+
+std::vector<KDTreePtr> Build(const U8Descriptor* descriptors, size_t descriptor_count, size_t tree_count, unsigned leaf_size)
+{
+    std::vector<KDTreePtr> ret;
+    ret.reserve(tree_count);
+
+    auto sdim = GetSplitDimensions(descriptors, descriptor_count);
+    for (size_t i = 0; i < tree_count; ++i)
+        ret.push_back(Build(descriptors, descriptor_count, sdim, leaf_size));
     return ret;
 }
 
@@ -58,6 +69,7 @@ KDTree::KDTree(const U8Descriptor* descriptors, size_t dcount) :
         _list[i] = i;
 }
 
+// XXX: TODO: Partition() has a static random_engine.  We should explicitly pass it to build.
 void KDTree::Build(const SplitDimensions& sdim, unsigned leaf_size)
 {
     _leaf_size = leaf_size + 16;    // Don't make too small leafs

@@ -156,6 +156,8 @@ private:
     }
 };
 
+using KDTreePtr = std::unique_ptr<KDTree>;
+
 /////////////////////////////////////////////////////////////////////////////
 
 unsigned L1Distance(const U8Descriptor&, const U8Descriptor&);
@@ -165,7 +167,8 @@ unsigned L2DistanceSquared(const U8Descriptor&, const U8Descriptor&);   // Unuse
 SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
 BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
 BoundingBox Union(const BoundingBox& a, const BoundingBox& b);
-std::unique_ptr<KDTree> Build(const U8Descriptor* descriptors, size_t dcount, const SplitDimensions& sdim, unsigned leaf_size);
+KDTreePtr Build(const U8Descriptor* descriptors, size_t dcount, const SplitDimensions& sdim, unsigned leaf_size);
+std::vector<KDTreePtr> Build(const U8Descriptor* descriptors, size_t descriptor_count, size_t tree_count, unsigned leaf_size);
 
 }   // kdtree
 }   // popsift
