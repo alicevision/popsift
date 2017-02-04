@@ -169,6 +169,8 @@ BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* inde
 BoundingBox Union(const BoundingBox& a, const BoundingBox& b);
 KDTreePtr Build(const U8Descriptor* descriptors, size_t dcount, const SplitDimensions& sdim, unsigned leaf_size);
 std::vector<KDTreePtr> Build(const U8Descriptor* descriptors, size_t descriptor_count, size_t tree_count, unsigned leaf_size);
+std::vector<KDTree::Leaf> Query2NNLeafs(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors);
+std::pair<unsigned, unsigned> Query2NN(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors);
 
 }   // kdtree
 }   // popsift

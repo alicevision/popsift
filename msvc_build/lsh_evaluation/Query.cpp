@@ -1,8 +1,187 @@
 #include "Query.h"
 #include "KDTree.h"
+#include <tbb/tbb.h>
+#undef min
+#undef max
 
 namespace popsift {
 namespace kdtree {
+
+namespace {
+
+struct Q2NNAccumulator
+{
+    unsigned distance[2];
+    unsigned index;
+
+    Q2NNAccumulator()
+    {
+        distance[0] = distance[1] = std::numeric_limits<unsigned>::max();
+        index = -1;
+    }
+
+    void update(unsigned d, unsigned i)
+    {
+        if (d < distance[0]) {
+            distance[1] = distance[0]; distance[0] = d; index = i;
+        }
+        else if (d != distance[0] && d < distance[1]) {
+            distance[1] = d;
+        }
+        POPSIFT_KDASSERT(distance[0] < distance[1]);
+    }
+};
+
+Q2NNAccumulator Combine(const Q2NNAccumulator& a1, const Q2NNAccumulator& a2)
+{
+    Q2NNAccumulator r;
+
+    if (a1.distance[0] == a2.distance[0]) {
+        r.distance[0] = a1.distance[0];
+        r.index = a1.index;
+
+        if (a1.distance[1] < a2.distance[1]) r.distance[1] = a1.distance[1];
+        else r.distance[1] = a2.distance[1];
+    }
+    else if (a1.distance[0] < a2.distance[0]) {
+        r.distance[0] = a1.distance[0];
+        r.index = a1.index;
+
+        if (a2.distance[0] < a1.distance[1]) r.distance[1] = a2.distance[0];
+        else r.distance[1] = a1.distance[1];
+    }
+    else {
+        r.distance[0] = a2.distance[0];
+        r.index = a2.index;
+
+        if (a1.distance[0] < a2.distance[1]) r.distance[1] = a1.distance[0];
+        else r.distance[1] = a2.distance[1];
+    }
+
+    POPSIFT_KDASSERT(r.distance[0] < r.distance[1]);
+    return r;
+}
+
+class Q2NNpq    // std::priority_queue doesn't support preallocation
+{
+public:
+    struct Entry {
+        unsigned short distance;    // max L1 distance is 255*128 = 32640
+        unsigned short tree;
+        unsigned node;
+        friend bool operator<(const Entry& e1, const Entry& e2) {
+            return e1.distance > e2.distance;   // Reverse heap ordering; smallest on top
+        }
+    };
+
+    Q2NNpq()
+    {
+        _pq.reserve(4096);  // Should be more than #trees * #levels to avoid allocations on Push/Pop
+    }
+
+    template<typename Mutex>
+    void Push(const Entry& e, Mutex& mtx)
+    {
+        Mutex::scoped_lock lk(mtx);
+        Push(e);
+    }
+
+    template<typename Mutex>
+    bool Pop(Entry& e, Mutex& mtx)
+    {
+        Mutex::scoped_lock lk(mtx);
+        return Pop(e);
+    }
+
+private:
+    void Push(const Entry& e)
+    {
+        _pq.push_back(e);
+        std::push_heap(_pq.begin(), _pq.end());
+    }
+
+    bool Pop(Entry& e)
+    {
+        if (_pq.empty())
+            return false;
+        e = _pq.front();
+        std::pop_heap(_pq.begin(), _pq.end());
+        _pq.pop_back();
+        return true;
+    }
+
+    std::vector<Entry> _pq;
+};
+
+class Candidate2NNQuery
+{
+    const std::vector<KDTreePtr>& _trees;
+    const U8Descriptor& _descriptor;
+    const size_t _max_descriptors;
+
+    Q2NNpq _pq;
+    tbb::null_mutex _pqmtx;
+    std::vector<KDTree::Leaf> _leafs;
+    size_t _found_descriptors;
+
+    bool ProcessPQ();
+
+public:
+    Candidate2NNQuery(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors);
+    std::vector<KDTree::Leaf> operator()();
+};
+
+Candidate2NNQuery::Candidate2NNQuery(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors) :
+    _trees(trees), _descriptor(descriptor), _max_descriptors(max_descriptors), _found_descriptors(0)
+{
+    _leafs.reserve(_max_descriptors / 32);
+}
+
+std::vector<KDTree::Leaf> Candidate2NNQuery::operator()()
+{
+    for (unsigned short i = 0; i < _trees.size(); ++i) {
+        unsigned short d = L1Distance(_descriptor, _trees[i]->BB(0));
+        _pq.Push(Q2NNpq::Entry{ d, i, 0 }, _pqmtx);
+    }
+
+    while (_found_descriptors < _max_descriptors && ProcessPQ())
+        ;
+
+    return std::move(_leafs);
+}
+
+bool Candidate2NNQuery::ProcessPQ()
+{
+    Q2NNpq::Entry pqe;
+    if (!_pq.Pop(pqe, _pqmtx))
+        return false;
+    
+    const KDTree& tree = *_trees[pqe.tree];
+    
+    if (tree.IsLeaf(pqe.node)) {
+        auto list = tree.List(pqe.node);
+        _leafs.push_back(list);
+        _found_descriptors += list.second - list.first;
+    }
+    else {
+        unsigned short l = tree.Left(pqe.node), dl = L1Distance(_descriptor, tree.BB(l));
+        unsigned short r = tree.Right(pqe.node), dr = L1Distance(_descriptor, tree.BB(r));
+        _pq.Push(Q2NNpq::Entry{ dl, pqe.tree, l }, _pqmtx);
+        _pq.Push(Q2NNpq::Entry{ dr, pqe.tree, r }, _pqmtx);
+    }
+
+    return true;
+}
+
+}   // anon ns
+
+std::vector<KDTree::Leaf> Query2NNLeafs(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors)
+{
+    Candidate2NNQuery q(trees, descriptor, max_descriptors);
+    return q();
+}
+
+/////////////////////////////////////////////////////////////////////////////
 
 TreeQuery::TreeQuery(const U8Descriptor * qDescriptors, size_t dcount, 
                     unsigned treeIndex, Query* query)
