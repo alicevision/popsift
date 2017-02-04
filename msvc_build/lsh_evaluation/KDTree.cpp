@@ -126,12 +126,18 @@ void KDTree::Validate()
 {
     size_t sum = 0;
 
-    for (const Node& n : _nodes) {
+    POPSIFT_KDASSERT(_nodes.size() == _bb.size());
+
+    for (size_t ni = 0; ni < _nodes.size(); ++ni) {
+        const Node& n = _nodes[ni];
         const size_t lim = n.leaf ? _list.size() : _nodes.size();
 
         POPSIFT_KDASSERT(n.left < n.right);
         POPSIFT_KDASSERT(n.left < lim && n.right <= lim);
         POPSIFT_KDASSERT(n.dim < 128);
+
+        const BoundingBox& bb = _bb[ni];
+        for (int i = 0; i < 128; ++i) POPSIFT_KDASSERT(bb.min.ufeatures[i] <= bb.max.ufeatures[i]);
 
         if (n.leaf)
         for (auto range = List(n); range.first != range.second; ++range.first) {
