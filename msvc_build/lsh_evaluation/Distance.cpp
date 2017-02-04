@@ -32,7 +32,29 @@ unsigned L1Distance(const U8Descriptor& ad, const U8Descriptor& bd)
     _mm256_store_si256((__m256i*)buf, acc);
     unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3];
     return sum;
+}
 
+// Returns the least possible distance between descriptor and BB.  The code uses the following:
+// ----X1----m----X2-------M-----X3--- ; bb.min <= bb.max (componentwise)
+// We observe that
+//                 / 0, when x >= m                         / 0, when x <= M
+// m - min(m,X) = |                         max(M,x) - x = |
+//                 \ m-x, when x < m                        \ x-M when x > M
+//
+unsigned L1Distance(const U8Descriptor& d, const BoundingBox& bb)
+{
+    __m256i acc = _mm256_setzero_si256();
+    
+    for (int i = 0; i < 4; ++i) {
+        __m256i d1 = _mm256_sad_epu8(bb.min.features[i], _mm256_min_epu8(bb.min.features[i], d.features[i]));
+        __m256i d2 = _mm256_sad_epu8(bb.max.features[i], _mm256_max_epu8(bb.max.features[i], d.features[i]));
+        acc = _mm256_add_epi64(acc, _mm256_add_epi64(d1, d2));
+    }
+
+    ALIGNED64 uint64_t buf[4];
+    _mm256_store_si256((__m256i*)buf, acc);
+    unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3];
+    return sum;
 }
 
 // AVX2 implementation for U8 descriptors.
@@ -110,7 +132,7 @@ BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* inde
     U8Descriptor min, max;
 
     for (int i = 0; i < 4; i++) {
-        min.features[i] = _mm256_set1_epi8(0xFF);
+        min.features[i] = _mm256_set1_epi8(-1);
         max.features[i] = _mm256_setzero_si256();
     }
 
