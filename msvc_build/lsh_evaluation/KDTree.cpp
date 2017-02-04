@@ -17,7 +17,9 @@ static void Validate(const KDTree& kdt, unsigned n, size_t& sum)
     }
 
     if (kdt.IsLeaf(n)) {
-        for (auto range = kdt.List(n); range.first != range.second; ++range.first) {
+        auto range = kdt.List(n);
+        POPSIFT_KDASSERT(range.first < range.second);
+        for (; range.first != range.second; ++range.first) {
             POPSIFT_KDASSERT(*range.first < kdt.DescriptorCount());
             sum += *range.first;
         }

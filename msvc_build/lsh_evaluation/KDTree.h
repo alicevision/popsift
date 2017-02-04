@@ -53,6 +53,8 @@ public:
     KDTree(const KDTree&) = delete;
     KDTree& operator=(const KDTree&) = delete;
 
+    using Leaf = std::pair<const unsigned*, const unsigned*>;
+
     unsigned Root() const
     {
         return 0;
@@ -97,10 +99,8 @@ public:
         return _bb.at(n);
     }
 
-    std::pair<const unsigned*, const unsigned*> List(unsigned n) const {
-        POPSIFT_KDASSERT(n < _nodes.size() && _nodes[n].leaf);
-        POPSIFT_KDASSERT(_nodes[n].index < _nodes[n].end);
-        POPSIFT_KDASSERT(_nodes[n].end <= _list.size());
+    Leaf List(unsigned n) const {
+        POPSIFT_KDASSERT(_nodes.at(n).leaf && _nodes.at(n).end <= _list.size());
         return List(_nodes.at(n).index, _nodes.at(n).end);
     }
     
