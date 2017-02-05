@@ -8,10 +8,6 @@
 namespace popsift {
 namespace kdtree {
 
-// "Column" vector.
-template<typename Scalar>
-using SiftPoint = Eigen::Array<Scalar, 128, 1>;
-
 static_assert(SPLIT_DIMENSION_COUNT < 128, "Invalid split dimension count");
 
 unsigned L1Distance(const U8Descriptor& ad, const U8Descriptor& bd)
@@ -103,10 +99,11 @@ SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count
 {
     using namespace Eigen;
 
+    using SiftPoint = Array<double, 1, 128>;
     Map<Array<unsigned char, Dynamic, 128, RowMajor>, Aligned32> u8data((unsigned char*)descriptors, count, 128);
-    Array<double, 1, 128> mean = u8data.cast<double>().colwise().sum() / count;
-
-    SiftPoint<double> var = SiftPoint<double>::Zero();
+    
+    SiftPoint mean = u8data.cast<double>().colwise().sum() / count;
+    SiftPoint var = SiftPoint::Zero();
     for (size_t i = 0; i < count; ++i) {
         auto v = u8data.row(i).cast<double>() - mean;
         var += v * v;
