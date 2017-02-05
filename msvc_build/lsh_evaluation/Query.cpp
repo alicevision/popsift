@@ -7,58 +7,85 @@
 namespace popsift {
 namespace kdtree {
 
-namespace {
-
 struct Q2NNAccumulator
 {
     unsigned distance[2];
-    unsigned index;
+    unsigned index[2];
 
     Q2NNAccumulator()
     {
         distance[0] = distance[1] = std::numeric_limits<unsigned>::max();
-        index = -1;
+        index[0] = index[1] = -1;
     }
 
-    void update(unsigned d, unsigned i)
+    inline void Update(unsigned d, unsigned i);
+    Q2NNAccumulator Combine(const Q2NNAccumulator& other) const;
+
+    void Validate() const
     {
-        if (d < distance[0]) {
-            distance[1] = distance[0]; distance[0] = d; index = i;
-        }
-        else if (d != distance[0] && d < distance[1]) {
-            distance[1] = d;
-        }
         POPSIFT_KDASSERT(distance[0] < distance[1]);
+        POPSIFT_KDASSERT(index[0] != index[1]);
     }
 };
 
-Q2NNAccumulator Combine(const Q2NNAccumulator& a1, const Q2NNAccumulator& a2)
+inline void Q2NNAccumulator::Update(unsigned d, unsigned i)
+{
+    if (d < distance[0]) {
+        distance[1] = distance[0]; distance[0] = d;
+        index[1] = index[0]; index[0] = i;
+    }
+    else if (d != distance[0] && d < distance[1]) {
+        distance[1] = d;
+        index[1] = i;
+    }
+    Validate();
+}
+
+Q2NNAccumulator Q2NNAccumulator::Combine(const Q2NNAccumulator& other) const
 {
     Q2NNAccumulator r;
 
-    if (a1.distance[0] == a2.distance[0]) {
-        r.distance[0] = a1.distance[0];
-        r.index = a1.index;
+    if (distance[0] == other.distance[0]) {
+        r.distance[0] = distance[0];
+        r.index[0] = index[0];
 
-        if (a1.distance[1] < a2.distance[1]) r.distance[1] = a1.distance[1];
-        else r.distance[1] = a2.distance[1];
+        if (distance[1] < other.distance[1]) {
+            r.distance[1] = distance[1];
+            r.index[1] = index[1];
+        }
+        else {
+            r.distance[1] = other.distance[1];
+            r.index[1] = other.index[1];
+        }
     }
-    else if (a1.distance[0] < a2.distance[0]) {
-        r.distance[0] = a1.distance[0];
-        r.index = a1.index;
+    else if (distance[0] < other.distance[0]) {
+        r.distance[0] = distance[0];
+        r.index[0] = index[0];
 
-        if (a2.distance[0] < a1.distance[1]) r.distance[1] = a2.distance[0];
-        else r.distance[1] = a1.distance[1];
+        if (other.distance[0] < distance[1]) {
+            r.distance[1] = other.distance[0];
+            r.index[1] = other.index[0];
+        }
+        else {
+            r.distance[1] = distance[1];
+            r.index[1] = index[1];
+        }
     }
     else {
-        r.distance[0] = a2.distance[0];
-        r.index = a2.index;
+        r.distance[0] = other.distance[0];
+        r.index[0] = other.index[0];
 
-        if (a1.distance[0] < a2.distance[1]) r.distance[1] = a1.distance[0];
-        else r.distance[1] = a2.distance[1];
+        if (distance[0] < other.distance[1]) {
+            r.distance[1] = distance[0];
+            r.index[1] = index[0];
+        }
+        else {
+            r.distance[1] = other.distance[1];
+            r.index[1] = other.index[1];
+        }
     }
 
-    POPSIFT_KDASSERT(r.distance[0] < r.distance[1]);
+    r.Validate();
     return r;
 }
 
@@ -173,12 +200,26 @@ bool Candidate2NNQuery::ProcessPQ()
     return true;
 }
 
-}   // anon ns
-
 std::vector<KDTree::Leaf> Query2NNLeafs(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors)
 {
     Candidate2NNQuery q(trees, descriptor, max_descriptors);
     return q();
+}
+
+std::pair<unsigned, unsigned> Query2NN(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors)
+{
+    const U8Descriptor* descriptors = trees.front()->Descriptors();
+    auto leafs = Query2NNLeafs(trees, descriptor, max_descriptors);
+    Q2NNAccumulator acc;
+
+    for (auto leaf : leafs) {
+        for (; leaf.first != leaf.second; ++leaf.first) {
+            unsigned d = L1Distance(descriptor, descriptors[*leaf.first]);
+            acc.Update(d, *leaf.first);
+        }
+    }
+
+    return std::make_pair(acc.index[0], acc.index[1]);
 }
 
 /////////////////////////////////////////////////////////////////////////////
