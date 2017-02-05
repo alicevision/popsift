@@ -65,13 +65,10 @@ unsigned L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd)
 
     // 32 components per iteration.
     for (int i = 0; i < 4; ++i) {
-        // Must compute absolute value after subtraction, otherwise we get wrong result
-        // after conversion to 16-bit. (E.g. -1 = 0xFF, after squaring we want to get 1).
-        // Max value after squaring is 65025.
-        //__m256i d = _mm256_abs_epi8(_mm256_sub_epi8(af[i], bf[i]));
-        __m256i d = _mm256_abs_epi8(_mm256_sub_epi8(
-            _mm256_load_si256(af + i),
-            _mm256_load_si256(bf + i)));
+        // Must avoid overflow. Max value after squaring is 65025.
+        __m256i min = _mm256_min_epu8(ad.features[i], bd.features[i]);
+        __m256i max = _mm256_max_epu8(ad.features[i], bd.features[i]);
+        __m256i d = _mm256_sub_epi8(max, min);
 
         // Squared elements, 0..15
         __m256i dl = _mm256_unpacklo_epi8(d, _mm256_setzero_si256());
