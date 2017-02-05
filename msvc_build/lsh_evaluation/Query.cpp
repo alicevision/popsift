@@ -140,7 +140,7 @@ private:
     std::vector<Entry> _pq;
 };
 
-class Candidate2NNQuery
+class Q2NNquery
 {
     const std::vector<KDTreePtr>& _trees;
     const U8Descriptor& _descriptor;
@@ -148,78 +148,79 @@ class Candidate2NNQuery
 
     Q2NNpq _pq;
     tbb::null_mutex _pqmtx;
-    std::vector<KDTree::Leaf> _leafs;
     size_t _found_descriptors;
+    Q2NNAccumulator _result;
 
-    bool ProcessPQ();
+    void TraverseToLeaf(Q2NNpq::Entry pqe);
+    void ProcessLeaf(const KDTree& tree, unsigned node);
 
 public:
-    Candidate2NNQuery(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors);
-    std::vector<KDTree::Leaf> operator()();
+    Q2NNquery(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors);
+    std::pair<unsigned, unsigned> operator()();
 };
 
-Candidate2NNQuery::Candidate2NNQuery(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors) :
+Q2NNquery::Q2NNquery(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors) :
     _trees(trees), _descriptor(descriptor), _max_descriptors(max_descriptors), _found_descriptors(0)
-{
-    _leafs.reserve(_max_descriptors / 32);
-}
+{ }
 
-std::vector<KDTree::Leaf> Candidate2NNQuery::operator()()
+std::pair<unsigned, unsigned> Q2NNquery::operator()()
 {
     for (unsigned short i = 0; i < _trees.size(); ++i) {
         unsigned short d = L1Distance(_descriptor, _trees[i]->BB(0));
         _pq.Push(Q2NNpq::Entry{ d, i, 0 }, _pqmtx);
     }
 
-    while (_found_descriptors < _max_descriptors && ProcessPQ())
-        ;
-
-    return std::move(_leafs);
-}
-
-bool Candidate2NNQuery::ProcessPQ()
-{
     Q2NNpq::Entry pqe;
-    if (!_pq.Pop(pqe, _pqmtx))
-        return false;
-    
-    const KDTree& tree = *_trees[pqe.tree];
-    
-    if (tree.IsLeaf(pqe.node)) {
-        auto list = tree.List(pqe.node);
-        _leafs.push_back(list);
-        _found_descriptors += list.second - list.first;
-    }
-    else {
-        unsigned short l = tree.Left(pqe.node), dl = L1Distance(_descriptor, tree.BB(l));
-        unsigned short r = tree.Right(pqe.node), dr = L1Distance(_descriptor, tree.BB(r));
-        _pq.Push(Q2NNpq::Entry{ dl, pqe.tree, l }, _pqmtx);
-        _pq.Push(Q2NNpq::Entry{ dr, pqe.tree, r }, _pqmtx);
-    }
+    while (_found_descriptors < _max_descriptors && _pq.Pop(pqe, _pqmtx))
+    if (pqe.distance <= _result.distance[1])    // We're searching 2NN, so test 2nd-best distance
+        TraverseToLeaf(pqe);
 
-    return true;
+    return std::make_pair(_result.index[0], _result.index[1]);
 }
 
-std::vector<KDTree::Leaf> Query2NNLeafs(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors)
+void Q2NNquery::TraverseToLeaf(Q2NNpq::Entry pqe)
 {
-    Candidate2NNQuery q(trees, descriptor, max_descriptors);
-    return q();
+    const KDTree& tree = *_trees[pqe.tree];
+    unsigned node = pqe.node;
+
+    while (!tree.IsLeaf(node)) {
+        unsigned l = tree.Left(node), dl = L1Distance(_descriptor, tree.BB(l));
+        unsigned r = tree.Right(node), dr = L1Distance(_descriptor, tree.BB(r));
+
+        if (dl <= dr) {
+            node = l;
+            pqe.node = r; pqe.distance = dr;
+            _pq.Push(pqe, _pqmtx);
+        }
+        else {
+            node = r;
+            pqe.node = l; pqe.distance = dl;
+            _pq.Push(pqe, _pqmtx);
+        }
+    }
+    ProcessLeaf(tree, node);
+}
+
+void Q2NNquery::ProcessLeaf(const KDTree& tree, unsigned node)
+{
+    auto list = tree.List(node);
+    _found_descriptors += list.second - list.first;
+
+    Q2NNAccumulator acc;
+    for (; list.first != list.second; ++list.first) {
+        unsigned d = L1Distance(_descriptor, tree.Descriptors()[*list.first]);
+        acc.Update(d, *list.first);
+    }
+    
+    _result = _result.Combine(acc);
 }
 
 std::pair<unsigned, unsigned> Query2NN(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors)
 {
     const U8Descriptor* descriptors = trees.front()->Descriptors();
-    auto leafs = Query2NNLeafs(trees, descriptor, max_descriptors);
-    Q2NNAccumulator acc;
-
-    for (auto leaf : leafs) {
-        for (; leaf.first != leaf.second; ++leaf.first) {
-            unsigned d = L1Distance(descriptor, descriptors[*leaf.first]);
-            acc.Update(d, *leaf.first);
-        }
-    }
-
-    return std::make_pair(acc.index[0], acc.index[1]);
+    for (const auto& t : trees) POPSIFT_KDASSERT(t->Descriptors() == descriptors);
+    Q2NNquery q(trees, descriptor, max_descriptors);
+    return q();
 }
 
 /////////////////////////////////////////////////////////////////////////////
