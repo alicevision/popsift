@@ -66,11 +66,12 @@ void TexMexBench()
         ReportMemoryUsage();
     }
 
-    clog << "\n\nSTATISTICS:\nFALSE ACCEPTS: " << G_Counters[FALSE_ACCEPTS] << endl;
-    clog << "FALSE REJECTS: " << G_Counters[FALSE_REJECTS] << endl;
-    clog << "TRUE REJECTS: " << G_Counters[TRUE_REJECTS] << endl;
-    clog << "TRUE ACCEPTS: " << G_Counters[TRUE_ACCEPTS] << endl;
+    clog << "\n\nSTATISTICS:\n";
     clog << "GT ACCEPTS: " << G_Counters[GT_ACCEPTS] << endl;
+    clog << "TRUE ACCEPTS: " << G_Counters[TRUE_ACCEPTS] << endl;
+    clog << "TRUE REJECTS: " << G_Counters[TRUE_REJECTS] << endl;
+    clog << "FALSE ACCEPTS : " << G_Counters[FALSE_ACCEPTS] << endl;
+    clog << "FALSE REJECTS: " << G_Counters[FALSE_REJECTS] << endl;
     clog << "DISTANCE SWAPS: " << G_Counters[DISTANCE_SWAPS] << endl;
     clog << "CORRECT 1-MATCHES: " << G_Counters[CORRECT_1_MATCHES] << endl;
     clog << "CORRECT 2-MATCHES: " << G_Counters[CORRECT_2_MATCHES] << endl;
