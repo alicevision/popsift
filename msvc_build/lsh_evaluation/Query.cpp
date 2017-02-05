@@ -205,14 +205,10 @@ void Q2NNquery::ProcessLeaf(const KDTree& tree, unsigned node)
 {
     auto list = tree.List(node);
     _found_descriptors += list.second - list.first;
-
-    Q2NNAccumulator acc;
     for (; list.first != list.second; ++list.first) {
         unsigned d = L1Distance(_descriptor, tree.Descriptors()[*list.first]);
-        acc.Update(d, *list.first);
+        _result.Update(d, *list.first);
     }
-    
-    _result = _result.Combine(acc);
 }
 
 std::pair<unsigned, unsigned> Query2NN(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors)
