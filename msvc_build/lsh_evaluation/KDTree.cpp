@@ -25,7 +25,15 @@ static void Validate(const KDTree& kdt, unsigned n, size_t& sum)
         }
     }
     else {
-        POPSIFT_KDASSERT(kdt.Dim(n) < 128);
+        unsigned dim = kdt.Dim(n);
+        unsigned val = kdt.Val(n);
+        const auto& lbb = kdt.BB(kdt.Left(n));
+        const auto& rbb = kdt.BB(kdt.Right(n));
+        
+        POPSIFT_KDASSERT(dim < 128);
+        POPSIFT_KDASSERT(lbb.max.ufeatures[dim] < val);
+        POPSIFT_KDASSERT(rbb.min.ufeatures[dim] >= val);
+
         Validate(kdt, kdt.Left(n), sum);
         Validate(kdt, kdt.Right(n), sum);
     }
@@ -94,14 +102,11 @@ void KDTree::Build(const SplitDimensions& sdim, unsigned leaf_size)
 void KDTree::Build(unsigned node_index, unsigned lelem, unsigned relem)
 {
     POPSIFT_KDASSERT(_nodes.size() == _bb.size());
-    unsigned melem;
+    POPSIFT_KDASSERT(lelem < relem);
 
     {
         Node& node = _nodes[node_index];
-
         POPSIFT_KDASSERT(node.leaf);
-        POPSIFT_KDASSERT(lelem < relem);
-
         if (relem - lelem <= _leaf_size) {
             auto list = List(lelem, relem);
             node.index = lelem;
@@ -109,10 +114,10 @@ void KDTree::Build(unsigned node_index, unsigned lelem, unsigned relem)
             _bb[node_index] = GetBoundingBox(_descriptors, list.first, list.second - list.first);
             return;
         }
-        
-        // NB! Partition returns index from [0,n) where 0 maps to left, n maps to right.
-        melem = Partition(node, lelem, relem) + lelem;
     }
+
+    const unsigned melem = Partition(_nodes[node_index], lelem, relem);
+    POPSIFT_KDASSERT(melem > lelem && melem < relem);
 
     // Left child to split.
     const unsigned lc = static_cast<unsigned>(_nodes.size());
@@ -165,7 +170,7 @@ unsigned KDTree::Partition(Node& node, unsigned lelem, unsigned relem)
 
         node.dim() = split_dim;
         node.val() = split_val;
-        return static_cast<unsigned>(mit - list.first);
+        return static_cast<unsigned>(mit - list.first) + lelem;
     }
     throw std::runtime_error("KDTree: partitioning failed.");
 }
