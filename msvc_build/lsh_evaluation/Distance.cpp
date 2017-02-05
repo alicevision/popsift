@@ -135,8 +135,8 @@ BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* inde
 
     for (size_t i = 0; i < count; ++i)
     for (int j = 0; j < 4; ++j) {
-        min.features[j] = _mm256_min_epu8(min.features[j], descriptors[i].features[j]);
-        max.features[j] = _mm256_max_epu8(max.features[j], descriptors[i].features[j]);
+        min.features[j] = _mm256_min_epu8(min.features[j], descriptors[indexes[i]].features[j]);
+        max.features[j] = _mm256_max_epu8(max.features[j], descriptors[indexes[i]].features[j]);
     }
 
     return BoundingBox{ min, max };
