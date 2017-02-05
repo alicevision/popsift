@@ -10,7 +10,7 @@ namespace kdtree {
 
 // "Column" vector.
 template<typename Scalar>
-using SiftPoint = Eigen::Matrix<Scalar, 128, 1>;
+using SiftPoint = Eigen::Array<Scalar, 128, 1>;
 
 static_assert(SPLIT_DIMENSION_COUNT < 128, "Invalid split dimension count");
 
@@ -103,13 +103,13 @@ SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count
 {
     using namespace Eigen;
 
-    Map<Matrix<unsigned char, Dynamic, 128, RowMajor>, Aligned32> u8data((unsigned char*)descriptors, count, 128);
-    auto mean = (u8data.cast<double>().colwise().sum() / count).eval();
+    Map<Array<unsigned char, Dynamic, 128, RowMajor>, Aligned32> u8data((unsigned char*)descriptors, count, 128);
+    Array<double, 1, 128> mean = u8data.cast<double>().colwise().sum() / count;
 
     SiftPoint<double> var = SiftPoint<double>::Zero();
     for (size_t i = 0; i < count; ++i) {
-        auto v = (u8data.row(i).cast<double>() - mean).array();
-        var += (v*v).matrix();
+        auto v = u8data.row(i).cast<double>() - mean;
+        var += v * v;
     }
 
     using vd_tup = std::tuple<double, unsigned>;
