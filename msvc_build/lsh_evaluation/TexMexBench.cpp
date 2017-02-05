@@ -21,12 +21,14 @@ using SiftMatrix = Map<Matrix<unsigned char, Dynamic, 128, RowMajor>, Eigen::Ali
 using GroundTruthMatrix = Map<Matrix<int, Dynamic, 100, RowMajor>>;
 
 enum Counters {
+    GT_ACCEPTS,
     FALSE_ACCEPTS,
     FALSE_REJECTS,
     TRUE_ACCEPTS,
     TRUE_REJECTS,
     CORRECT_1_MATCHES,
     CORRECT_2_MATCHES,
+    DISTANCE_SWAPS,
     COUNTERS_COUNT
 };
 
@@ -41,6 +43,7 @@ static size_t G_Counters[COUNTERS_COUNT];
 static void ReadData();
 static void BuildKDTree(unsigned leaf_size);
 static void EvaluateQuery(const U8Descriptor& q, const std::pair<unsigned, unsigned>& gt);
+static bool SiftMatch(const U8Descriptor& dq, const U8Descriptor& dn1, const U8Descriptor& dn2);
 
 void TexMexBench()
 {
@@ -63,6 +66,8 @@ void TexMexBench()
     clog << "FALSE REJECTS: " << G_Counters[FALSE_REJECTS] << endl;
     clog << "TRUE REJECTS: " << G_Counters[TRUE_REJECTS] << endl;
     clog << "TRUE ACCEPTS: " << G_Counters[TRUE_ACCEPTS] << endl;
+    clog << "GT ACCEPTS: " << G_Counters[GT_ACCEPTS] << endl;
+    clog << "DISTANCE SWAPS: " << G_Counters[DISTANCE_SWAPS] << endl;
     clog << "CORRECT 1-MATCHES: " << G_Counters[CORRECT_1_MATCHES] << endl;
     clog << "CORRECT 2-MATCHES: " << G_Counters[CORRECT_2_MATCHES] << endl;
 }
@@ -106,14 +111,11 @@ static void BuildKDTree(unsigned leaf_size)
 static void EvaluateQuery(const U8Descriptor& q, const std::pair<unsigned, unsigned>& gt)
 {
     auto knn = Query2NN(G_trees, q, 1000);
-    
-    unsigned gt0_d = L2DistanceSquared(q, G_Base[gt.first]);
-    unsigned gt1_d = L2DistanceSquared(q, G_Base[gt.second]);
-    bool gt_sift_accept = (float)gt0_d / (float)gt1_d < 0.64;
+    bool gt_sift_accept = SiftMatch(q, G_Base[gt.first], G_Base[gt.second]);
+    bool q_sift_accept = SiftMatch(q, G_Base[knn.first], G_Base[knn.second]);
 
-    unsigned kd0_d = L2DistanceSquared(q, G_Base[knn.first]);
-    unsigned kd1_d = L2DistanceSquared(q, G_Base[knn.second]);
-    bool q_sift_accept = (float)kd0_d / (float)kd1_d < 0.64;
+    if (gt_sift_accept)
+        ++G_Counters[GT_ACCEPTS];
 
     if (gt_sift_accept == q_sift_accept) {
         if (gt_sift_accept) ++G_Counters[TRUE_ACCEPTS];
@@ -129,4 +131,16 @@ static void EvaluateQuery(const U8Descriptor& q, const std::pair<unsigned, unsig
         if (gt.second == knn.second)
             ++G_Counters[CORRECT_2_MATCHES];
     }
+}
+
+static bool SiftMatch(const U8Descriptor& dq, const U8Descriptor& dn1, const U8Descriptor& dn2)
+{
+    unsigned d1 = L2DistanceSquared(dq, dn1);
+    unsigned d2 = L2DistanceSquared(dq, dn2);
+    if (d1 > d2) {  // Search is with L1-norm, so this can happen
+        ++G_Counters[DISTANCE_SWAPS];
+        std::swap(d1, d2);
+    }
+
+    return (float)d1 / (float)d2 < 0.64;
 }
