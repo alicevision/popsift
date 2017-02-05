@@ -41,14 +41,18 @@ static std::vector<KDTreePtr> G_trees;
 static size_t G_Counters[COUNTERS_COUNT];
 
 static void ReadData();
-static void BuildKDTree(unsigned leaf_size);
+static void BuildKDTree();
 static void EvaluateQuery(const U8Descriptor& q, const std::pair<unsigned, unsigned>& gt);
 static bool SiftMatch(const U8Descriptor& dq, const U8Descriptor& dn1, const U8Descriptor& dn2);
+
+static constexpr unsigned LEAF_SIZE = 50;
+static constexpr unsigned TREE_COUNT = 1;
+static constexpr unsigned QUERY_DESCRIPTOR_LIMIT = 1000;
 
 void TexMexBench()
 {
     ReadData();
-    BuildKDTree(50);    // XXX: guess for leaf size.
+    BuildKDTree();
 
     GroundTruthMatrix gt_vectors(G_GroundTruth.data(), G_GroundTruth.size() / 100, 100);
 
@@ -97,12 +101,12 @@ static void ReadData()
     clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
 }
 
-static void BuildKDTree(unsigned leaf_size)
+static void BuildKDTree()
 {
     auto sdim = GetSplitDimensions(G_Base.data(), G_Base.size());
     clog << "\nBUILDING KDTREE: " << std::flush;
     auto t0 = std::chrono::high_resolution_clock::now();
-    G_trees = Build(G_Base.data(), G_Base.size(), 1, leaf_size);
+    G_trees = Build(G_Base.data(), G_Base.size(), TREE_COUNT, LEAF_SIZE);
     auto t1 = std::chrono::high_resolution_clock::now();
     clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
     ReportMemoryUsage();
@@ -110,7 +114,7 @@ static void BuildKDTree(unsigned leaf_size)
 
 static void EvaluateQuery(const U8Descriptor& q, const std::pair<unsigned, unsigned>& gt)
 {
-    auto knn = Query2NN(G_trees, q, 1000);
+    auto knn = Query2NN(G_trees, q, QUERY_DESCRIPTOR_LIMIT);
     bool gt_sift_accept = SiftMatch(q, G_Base[gt.first], G_Base[gt.second]);
     bool q_sift_accept = SiftMatch(q, G_Base[knn.first], G_Base[knn.second]);
 
