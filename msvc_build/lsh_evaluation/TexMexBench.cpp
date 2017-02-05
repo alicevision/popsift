@@ -31,31 +31,29 @@ enum Counters {
 };
 
 
-static std::string G_DataPrefix = "E:/texmex_sift1M_corpus";
+static std::string G_DataPrefix = "C:/LOCAL/texmex_sift1M_corpus";
 static std::vector<U8Descriptor> G_Base; // 1million descriptors database
 static std::vector<U8Descriptor> G_Query; // query descriptors
 static std::vector<int> G_GroundTruth; // 100x10k, 100 nearest neighbours for each desc in G_Query
-static std::unique_ptr<KDTree> G_kdtree;
+static std::vector<KDTreePtr> G_trees;
 static size_t G_Counters[COUNTERS_COUNT];
 
 static void ReadData();
 static void BuildKDTree(unsigned leaf_size);
-static void EvaluateQuery(size_t qi, const SiftMatrix& base_vectors, const SiftMatrix& query_vectors, const GroundTruthMatrix gt_vectors);
+static void EvaluateQuery(const U8Descriptor& q, const std::pair<unsigned, unsigned>& gt);
 
 void TexMexBench()
 {
     ReadData();
     BuildKDTree(50);    // XXX: guess for leaf size.
 
-    SiftMatrix base_vectors(reinterpret_cast<unsigned char*>(G_Base.data()), G_Base.size() / 128, 128);
-    SiftMatrix query_vectors(reinterpret_cast<unsigned char*>(G_Query.data()), G_Query.size() / 128, 128);
     GroundTruthMatrix gt_vectors(G_GroundTruth.data(), G_GroundTruth.size() / 100, 100);
 
     {
-        clog << "\nQUERYING; #VECTORS=" << query_vectors.rows() << " " << std::flush;
+        clog << "\nQUERYING; #VECTORS=" << G_Query.size() << " " << std::flush;
         auto t0 = std::chrono::high_resolution_clock::now();
-        for (int qi = 0; qi < query_vectors.rows(); ++qi)
-            EvaluateQuery(qi, base_vectors, query_vectors, gt_vectors);
+        for (int qi = 0; qi < G_Query.size(); ++qi)
+            EvaluateQuery(G_Query[qi], std::make_pair(gt_vectors(qi, 0), gt_vectors(qi, 1)));
         auto t1 = std::chrono::high_resolution_clock::now();
         clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
         ReportMemoryUsage();
@@ -71,8 +69,6 @@ void TexMexBench()
 
 static void ReadData()
 {
-    using namespace Eigen;
-
     std::chrono::high_resolution_clock::time_point t0, t1;
 
     clog << "\nREADING DATA: " << std::flush;
@@ -101,44 +97,36 @@ static void BuildKDTree(unsigned leaf_size)
     auto sdim = GetSplitDimensions(G_Base.data(), G_Base.size());
     clog << "\nBUILDING KDTREE: " << std::flush;
     auto t0 = std::chrono::high_resolution_clock::now();
-    G_kdtree = Build(G_Base.data(), G_Base.size(), sdim, leaf_size);
+    G_trees = Build(G_Base.data(), G_Base.size(), 1, leaf_size);
     auto t1 = std::chrono::high_resolution_clock::now();
     clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
     ReportMemoryUsage();
 }
 
-static void EvaluateQuery(size_t qi, const SiftMatrix& base_vectors, const SiftMatrix& query_vectors, const GroundTruthMatrix gt_vectors)
+static void EvaluateQuery(const U8Descriptor& q, const std::pair<unsigned, unsigned>& gt)
 {
-#if 0
-    static std::vector<int_fast32_t> knn;
-    auto q_v = query_vectors.row(qi);
+    auto knn = Query2NN(G_trees, q, 1000);
+    
+    unsigned gt0_d = L2DistanceSquared(q, G_Base[gt.first]);
+    unsigned gt1_d = L2DistanceSquared(q, G_Base[gt.second]);
+    bool gt_sift_accept = (float)gt0_d / (float)gt1_d < 0.64;
 
-    auto gt0_v = base_vectors.row(gt_vectors(qi, 0));
-    auto gt1_v = base_vectors.row(gt_vectors(qi, 1));
-    float gt0_d = (gt0_v - q_v).norm();
-    float gt1_d = (gt1_v - q_v).norm();
-    bool gt_sift_accept = gt0_d / gt1_d < 0.8f;
+    unsigned kd0_d = L2DistanceSquared(q, G_Base[knn.first]);
+    unsigned kd1_d = L2DistanceSquared(q, G_Base[knn.second]);
+    bool q_sift_accept = (float)kd0_d / (float)kd1_d < 0.64;
 
-    G_LSH->find_k_nearest_neighbors(q_v, 2, &knn);
-    auto lsh0_v = base_vectors.row(knn[0]);
-    auto lsh1_v = base_vectors.row(knn[1]);
-    float lsh0_d = (lsh0_v - q_v).norm();
-    float lsh1_d = (lsh1_v - q_v).norm();
-    bool lsh_sift_accept = lsh0_d / lsh1_d < 0.8f;
-
-    if (gt_sift_accept == lsh_sift_accept) {
+    if (gt_sift_accept == q_sift_accept) {
         if (gt_sift_accept) ++G_Counters[TRUE_ACCEPTS];
         else ++G_Counters[TRUE_REJECTS];
     }
     else {
-        if (lsh_sift_accept) ++G_Counters[FALSE_ACCEPTS];
+        if (q_sift_accept) ++G_Counters[FALSE_ACCEPTS];
         else ++G_Counters[FALSE_REJECTS];
     }
 
-    if (gt_vectors(qi, 0) == knn[0]) {
+    if (gt.first == knn.first) {
         ++G_Counters[CORRECT_1_MATCHES];
-        if (gt_vectors(qi, 1) == knn[1])
+        if (gt.second == knn.second)
             ++G_Counters[CORRECT_2_MATCHES];
     }
-#endif
 }
