@@ -1,5 +1,6 @@
 #include "Query.h"
 #include "KDTree.h"
+#include <boost/container/flat_set.hpp>
 #include <tbb/tbb.h>
 #undef min
 #undef max
@@ -148,7 +149,8 @@ class Q2NNquery
 
     Q2NNpq _pq;
     tbb::null_mutex _pqmtx;
-    size_t _found_descriptors;
+    boost::container::flat_set<unsigned> _found_descriptors;
+    std::vector<unsigned> _leaf_new_descriptors;
     Q2NNAccumulator _result;
 
     void TraverseToLeaf(Q2NNpq::Entry pqe);
@@ -160,8 +162,11 @@ public:
 };
 
 Q2NNquery::Q2NNquery(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors) :
-    _trees(trees), _descriptor(descriptor), _max_descriptors(max_descriptors), _found_descriptors(0)
-{ }
+    _trees(trees), _descriptor(descriptor), _max_descriptors(max_descriptors)
+{
+    _found_descriptors.reserve(_max_descriptors + 16);
+    _leaf_new_descriptors.reserve(2048);
+}
 
 std::pair<unsigned, unsigned> Q2NNquery::operator()()
 {
@@ -171,7 +176,7 @@ std::pair<unsigned, unsigned> Q2NNquery::operator()()
     }
 
     Q2NNpq::Entry pqe;
-    while (_found_descriptors < _max_descriptors && _pq.Pop(pqe, _pqmtx))
+    while (_found_descriptors.size() < _max_descriptors && _pq.Pop(pqe, _pqmtx))
     if (pqe.distance <= _result.distance[1])    // We're searching 2NN, so test 2nd-best distance
         TraverseToLeaf(pqe);
 
@@ -203,12 +208,20 @@ void Q2NNquery::TraverseToLeaf(Q2NNpq::Entry pqe)
 
 void Q2NNquery::ProcessLeaf(const KDTree& tree, unsigned node)
 {
+    _leaf_new_descriptors.clear();
     auto list = tree.List(node);
-    _found_descriptors += list.second - list.first;
-    for (; list.first != list.second; ++list.first) {
-        unsigned d = L1Distance(_descriptor, tree.Descriptors()[*list.first]);
-        _result.Update(d, *list.first);
+    std::set_difference(list.first, list.second, _found_descriptors.begin(), _found_descriptors.end(),
+        std::back_inserter(_leaf_new_descriptors));
+    
+    // TODO: The two can run in parallel.
+
+    for (unsigned di : _leaf_new_descriptors) {
+        unsigned d = L1Distance(_descriptor, tree.Descriptors()[di]);
+        _result.Update(d, di);
     }
+
+    _found_descriptors.insert(boost::container::ordered_unique_range,
+        _leaf_new_descriptors.begin(), _leaf_new_descriptors.end());
 }
 
 std::pair<unsigned, unsigned> Query2NN(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors)
