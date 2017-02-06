@@ -47,5 +47,8 @@
     <ClCompile Include="Query.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TexMexBench.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
