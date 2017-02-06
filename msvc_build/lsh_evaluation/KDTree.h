@@ -163,10 +163,11 @@ using KDTreePtr = std::unique_ptr<KDTree>;
 unsigned L1Distance(const U8Descriptor&, const U8Descriptor&);
 unsigned L1Distance(const U8Descriptor&, const BoundingBox&);
 unsigned L2DistanceSquared(const U8Descriptor&, const U8Descriptor&);   // Unused ATM
+
 unsigned L1Distance_scalar(const U8Descriptor& ad, const U8Descriptor& bd);
-unsigned L2Distance_scalar(const U8Descriptor& ad, const U8Descriptor& bd);
 unsigned L1Distance_scalar(const U8Descriptor&, const BoundingBox&);
-unsigned L2Distance_scalar(const U8Descriptor& d, const BoundingBox& bb);
+unsigned L2DistanceSquared_scalar(const U8Descriptor& ad, const U8Descriptor& bd);
+unsigned L2DistanceSquared_scalar(const U8Descriptor& d, const BoundingBox& bb);
 
 SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
 BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);

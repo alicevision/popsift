@@ -38,7 +38,7 @@ unsigned L1Distance_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
     return sum;
 }
 
-unsigned L2Distance_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
+unsigned L2DistanceSquared_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
     unsigned sum = 0;
     
     for (int i = 0; i < 128; i++) {
@@ -83,7 +83,7 @@ unsigned L1Distance_scalar(const U8Descriptor& d, const BoundingBox& bb) {
     }
     return sum;
 }
-unsigned L2Distance_scalar(const U8Descriptor& d, const BoundingBox& bb) {
+unsigned L2DistanceSquared_scalar(const U8Descriptor& d, const BoundingBox& bb) {
     unsigned sum = 0;
     for (int i = 0; i < 128; i++) {
         int a = 0;
