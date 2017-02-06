@@ -44,7 +44,7 @@ static std::vector<unsigned> ReservoirSample(unsigned n, unsigned k, size_t seed
 }
 
 // Select a sample of k descriptors from the CD covers data set and write it out to a file.
-void SampleCDCoversDataSet(const std::string& in_fname, const std::string& out_fname, unsigned k, size_t seed)
+static void SampleCDCoversDataSet(const std::string& in_fname, const std::string& out_fname, unsigned k, size_t seed)
 {
     using namespace std;
 
@@ -98,7 +98,7 @@ std::vector<std::pair<unsigned, unsigned>> ReadCDCoversGT(const std::string& fna
 }
 
 //! Outputs a binary file containing 2 unsigned ints with nearest neighbors in the database for each test vector.
-void CalculateGroundTruth(const std::string& db_fname, const std::string& test_fname, const std::string& out_fname)
+static void CalculateGroundTruth(const std::string& db_fname, const std::string& test_fname, const std::string& out_fname)
 {
     using namespace std;
 
