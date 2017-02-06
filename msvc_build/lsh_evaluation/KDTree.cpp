@@ -98,7 +98,7 @@ void KDTree::Build(const SplitDimensions& sdim, unsigned leaf_size)
 
 // On entry, [lelem, relem) is the element range; node must be a leaf. On exit, node is potentially
 // converted to internal node, and dim,val are filled in as well as pointers to children. 
-// BB will also be computed.
+// BB will also be computed.  Element indexes in leafs are sorted in ascending order.
 void KDTree::Build(unsigned node_index, unsigned lelem, unsigned relem)
 {
     POPSIFT_KDASSERT(_nodes.size() == _bb.size());
@@ -111,6 +111,7 @@ void KDTree::Build(unsigned node_index, unsigned lelem, unsigned relem)
             auto list = List(lelem, relem);
             node.index = lelem;
             node.end = relem;
+            std::sort(list.first, list.second);
             _bb[node_index] = GetBoundingBox(_descriptors, list.first, list.second - list.first);
             return;
         }
