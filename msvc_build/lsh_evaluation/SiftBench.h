@@ -13,11 +13,7 @@ class SiftBench {
 public:
     SiftBench(const std::vector<std::pair<unsigned, unsigned>>& groundTruth,
         const std::vector<U8Descriptor>& database,
-        const std::vector<U8Descriptor>& queries) :
-        groundTruth(groundTruth),
-        database(database),
-        query(queries)
-    { }
+        const std::vector<U8Descriptor>& queries);
     
     void BuildKDTree(unsigned leafSize, unsigned treeCount);
     void Bench(unsigned maxCandidates);

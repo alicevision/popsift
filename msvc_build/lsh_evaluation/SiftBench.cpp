@@ -11,6 +11,17 @@ namespace kdtree {
 using std::clog;
 using std::endl;
 
+SiftBench::SiftBench(const std::vector<std::pair<unsigned, unsigned>>& groundTruth, const std::vector<U8Descriptor>& database, const std::vector<U8Descriptor>& queries)
+  : groundTruth(groundTruth),
+    database(database),
+    query(queries)
+{
+    for (int i = 0; i < COUNTERS_COUNT; i++) {
+        G_Counters[i] = 0;
+    }
+}
+
+
 void SiftBench::Bench(unsigned maxCandidates)
 {
     this->maxCandidates = maxCandidates;
@@ -36,8 +47,6 @@ void SiftBench::Bench(unsigned maxCandidates)
     clog << "CORRECT 2-MATCHES: " << G_Counters[CORRECT_2_MATCHES] << endl;
 }
 
-
-
 void SiftBench::BuildKDTree(unsigned leafSize, unsigned treeCount)
 {
     this->leafSize = leafSize;
@@ -46,7 +55,7 @@ void SiftBench::BuildKDTree(unsigned leafSize, unsigned treeCount)
     auto sdim = GetSplitDimensions(database.data(), database.size());
     clog << "\nBUILDING KDTREE: " << std::flush;
     auto t0 = std::chrono::high_resolution_clock::now();
-    trees = Build(database.data(), groundTruth.size(), treeCount, leafSize);
+    trees = Build(database.data(), database.size(), treeCount, leafSize);
     auto t1 = std::chrono::high_resolution_clock::now();
     clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
     
@@ -90,7 +99,7 @@ bool SiftBench::SiftMatch(const U8Descriptor & dq, const U8Descriptor & dn1, con
         std::swap(d1, d2);
     }
 
-    return (float)d1 / (float)d2 < 0.8;
+    return (float)d1 / (float)d2 < 0.64;
 }
 
 }
