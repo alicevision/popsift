@@ -1,14 +1,13 @@
+#include "dataio.h"
 #include <fstream>
 #include <random>
 #include <vector>
 #include <limits>
 #include <algorithm>
 #include <iterator>
+#include <tbb/parallel_for.h>
 
-namespace popsift {
-namespace kdtree {
-
-static unsigned GetDescriptorCount(std::ifstream& ifs)
+static unsigned GetItemCount(std::ifstream& ifs, size_t item_size)
 {
     if (ifs.tellg())
         throw std::logic_error("Not at beginning of file");
@@ -17,10 +16,10 @@ static unsigned GetDescriptorCount(std::ifstream& ifs)
     size_t fsz = ifs.tellg();
     ifs.seekg(0, std::ios::beg);
 
-    if (fsz % 128)
+    if (fsz % item_size)
         throw std::runtime_error("invalid file size");
 
-    size_t ret = fsz / 128;
+    size_t ret = fsz / item_size;
     if (ret >= std::numeric_limits<unsigned>::max())
         throw std::length_error("Too many descriptors in file");
 
@@ -43,6 +42,7 @@ static std::vector<unsigned> ReservoirSample(unsigned n, unsigned k, size_t seed
     return sample;
 }
 
+// Select a sample of k descriptors from the CD covers data set and write it out to a file.
 void SampleCDCoversDataSet(const std::string& in_fname, const std::string& out_fname, unsigned k, size_t seed)
 {
     using namespace std;
@@ -51,7 +51,7 @@ void SampleCDCoversDataSet(const std::string& in_fname, const std::string& out_f
     ifs.exceptions(ios::failbit | ios::badbit | ios::eofbit);
     ifs.open(in_fname, ios::binary);
 
-    unsigned dcount = GetDescriptorCount(ifs);
+    unsigned dcount = GetItemCount(ifs, 128);
     if (dcount >= std::numeric_limits<unsigned>::max())
         throw std::length_error("Too many descriptors in file");
     if (k >= dcount)
@@ -71,5 +71,46 @@ void SampleCDCoversDataSet(const std::string& in_fname, const std::string& out_f
     }
 }
 
-}   // kdtree
-}   // popsift
+template<typename T>
+static std::vector<T> SlurpBinaryFile(const std::string& fname)
+{
+    using namespace std;
+
+    ifstream ifs;
+    ifs.exceptions(ios::failbit | ios::badbit | ios::eofbit);
+    ifs.open(fname, ios::binary);
+
+    unsigned count = GetItemCount(ifs, sizeof(T));
+    std::vector<T> ret(count);
+    ifs.read(reinterpret_cast<char*>(ret.data()), sizeof(T) * count);
+    return ret;
+}
+
+std::vector<popsift::kdtree::U8Descriptor> ReadCDCoversVectors(const std::string& fname)
+{
+    return SlurpBinaryFile<popsift::kdtree::U8Descriptor>(fname);
+}
+
+std::vector<std::pair<unsigned, unsigned>> ReadCDCoversGT(const std::string& fname)
+{
+    return SlurpBinaryFile<std::pair<unsigned, unsigned>>(fname);
+}
+
+//! Outputs a binary file containing 2 unsigned ints with nearest neighbors in the database for each test vector.
+void CalculateGroundTruth(const std::string& db_fname, const std::string& test_fname, const std::string& out_fname)
+{
+    using namespace std;
+
+    auto dbv = ReadCDCoversVectors(db_fname);
+    auto qv = ReadCDCoversVectors(test_fname);
+
+    ofstream ofs;
+    ofs.exceptions(ios::failbit | ios::badbit | ios::eofbit);
+    ofs.open(out_fname, ios::binary);
+
+    std::vector<std::pair<unsigned, unsigned>> gt(qv.size());
+    
+    // TODO: fill in
+    
+    ofs.write(reinterpret_cast<const char*>(gt.data()), gt.size() * sizeof(gt.front()));
+}
