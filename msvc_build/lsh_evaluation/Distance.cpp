@@ -30,6 +30,24 @@ unsigned L1Distance(const U8Descriptor& ad, const U8Descriptor& bd)
     return sum;
 }
 
+unsigned L1Distance_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
+    unsigned sum = 0;
+    for (int i = 0; i < 128; i++) {
+        sum += abs((int)ad.ufeatures[i] - (int)bd.ufeatures[i]);
+    }
+    return sum;
+}
+
+unsigned L2Distance_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
+    unsigned sum = 0;
+    
+    for (int i = 0; i < 128; i++) {
+        int a = (int)ad.ufeatures[i] - (int)bd.ufeatures[i];
+        sum += a*a;
+    }
+    return sqrt(sum);
+}
+
 // Returns the least possible distance between descriptor and BB.  The code uses the following:
 // ----X1----m----X2-------M-----X3--- ; bb.min <= bb.max (componentwise)
 // We observe that
