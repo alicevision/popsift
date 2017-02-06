@@ -27,6 +27,9 @@
     <ClInclude Include="Query.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SiftBench.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lsh.cpp">
@@ -51,6 +54,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CDCoversPreprocessor.cpp">
+	<Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SiftBench.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

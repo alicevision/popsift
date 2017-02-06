@@ -147,5 +147,5 @@ static bool SiftMatch(const U8Descriptor& dq, const U8Descriptor& dn1, const U8D
         std::swap(d1, d2);
     }
 
-    return (float)d1 / (float)d2 < 0.64;
+    return (float)d1 / (float)d2 < 0.8;
 }

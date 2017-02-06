@@ -102,7 +102,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\eigen-eigen-da9b4e14c255;C:\LOCAL\tbb2017_20161128oss\include;C:\LOCAL\boost_1_62_0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -138,7 +138,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\eigen-eigen-da9b4e14c255;C:\LOCAL\tbb2017_20161128oss\include;C:\LOCAL\boost_1_62_0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -154,6 +154,7 @@
     <ClInclude Include="KDTree.h" />
     <ClInclude Include="lsh.h" />
     <ClInclude Include="Query.h" />
+    <ClInclude Include="SiftBench.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CDCoversPreprocessor.cpp" />
@@ -163,6 +164,7 @@
     <ClCompile Include="lsh.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Query.cpp" />
+    <ClCompile Include="SiftBench.cpp" />
     <ClCompile Include="TexMexBench.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
