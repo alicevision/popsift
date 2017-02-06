@@ -4,6 +4,8 @@
 #undef min
 #undef max
 
+#define DISTANCE_CHECK(a, b) L2Distance_scalar(a, b);
+
 namespace popsift {
 namespace kdtree {
 
@@ -166,7 +168,7 @@ Q2NNquery::Q2NNquery(const std::vector<KDTreePtr>& trees, const U8Descriptor& de
 std::pair<unsigned, unsigned> Q2NNquery::operator()()
 {
     for (unsigned short i = 0; i < _trees.size(); ++i) {
-        unsigned short d = L1Distance(_descriptor, _trees[i]->BB(0));
+        unsigned short d = DISTANCE_CHECK(_descriptor, _trees[i]->BB(0));
         _pq.Push(Q2NNpq::Entry{ d, i, 0 }, _pqmtx);
     }
 
@@ -184,8 +186,8 @@ void Q2NNquery::TraverseToLeaf(Q2NNpq::Entry pqe)
     unsigned node = pqe.node;
 
     while (!tree.IsLeaf(node)) {
-        unsigned l = tree.Left(node), dl = L1Distance(_descriptor, tree.BB(l));
-        unsigned r = tree.Right(node), dr = L1Distance(_descriptor, tree.BB(r));
+        unsigned l = tree.Left(node), dl = DISTANCE_CHECK(_descriptor, tree.BB(l));
+        unsigned r = tree.Right(node), dr = DISTANCE_CHECK(_descriptor, tree.BB(r));
 
         if (dl <= dr) {
             node = l;
@@ -206,7 +208,7 @@ void Q2NNquery::ProcessLeaf(const KDTree& tree, unsigned node)
     auto list = tree.List(node);
     _found_descriptors += list.second - list.first;
     for (; list.first != list.second; ++list.first) {
-        unsigned d = L1Distance(_descriptor, tree.Descriptors()[*list.first]);
+        unsigned d = DISTANCE_CHECK(_descriptor, tree.Descriptors()[*list.first]);
         _result.Update(d, *list.first);
     }
 }

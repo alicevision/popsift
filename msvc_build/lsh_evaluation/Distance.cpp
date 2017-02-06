@@ -45,7 +45,7 @@ unsigned L2Distance_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
         int a = (int)ad.ufeatures[i] - (int)bd.ufeatures[i];
         sum += a*a;
     }
-    return sqrt(sum);
+    return sum;
 }
 
 // Returns the least possible distance between descriptor and BB.  The code uses the following:
@@ -68,6 +68,33 @@ unsigned L1Distance(const U8Descriptor& d, const BoundingBox& bb)
     ALIGNED32 uint64_t buf[4];
     _mm256_store_si256((__m256i*)buf, acc);
     unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3];
+    return sum;
+}
+
+unsigned L1Distance_scalar(const U8Descriptor& d, const BoundingBox& bb) {
+    unsigned sum = 0;
+    for (int i = 0; i < 128; i++) {
+        if (d.ufeatures[i] < bb.min.ufeatures[i]) {
+            sum += bb.min.ufeatures[i] - d.ufeatures[i];
+        }
+        else if (d.ufeatures[i] > bb.max.ufeatures[i]) {
+            sum += d.ufeatures[i] - bb.max.ufeatures[i];
+        }
+    }
+    return sum;
+}
+unsigned L2Distance_scalar(const U8Descriptor& d, const BoundingBox& bb) {
+    unsigned sum = 0;
+    for (int i = 0; i < 128; i++) {
+        int a = 0;
+        if (d.ufeatures[i] < bb.min.ufeatures[i]) {
+            a = (int)bb.min.ufeatures[i] - (int)d.ufeatures[i];
+        }
+        else if (d.ufeatures[i] > bb.max.ufeatures[i]) {
+            a = (int)d.ufeatures[i] - (int)bb.max.ufeatures[i];
+        }
+        sum += a*a;
+    }
     return sum;
 }
 
@@ -143,27 +170,44 @@ BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* inde
 {
     U8Descriptor min, max;
 
+#ifdef __AVX2__
     for (int i = 0; i < 4; i++) {
         min.features[i] = _mm256_set1_epi8(-1);
         max.features[i] = _mm256_setzero_si256();
     }
-
     for (size_t i = 0; i < count; ++i)
     for (int j = 0; j < 4; ++j) {
         min.features[j] = _mm256_min_epu8(min.features[j], descriptors[indexes[i]].features[j]);
         max.features[j] = _mm256_max_epu8(max.features[j], descriptors[indexes[i]].features[j]);
     }
-
+#else
+    for (int x = 0; x < 128; x++) {
+        min.ufeatures[x] = -1;
+        max.ufeatures[x] = 0;
+    }
+    for (size_t i = 0; i < count; ++i)
+    for (int j = 0; j < 128; ++j) {
+        min.ufeatures[j] = std::min(min.ufeatures[j], descriptors[indexes[i]].ufeatures[j]);
+        max.ufeatures[j] = std::max(max.ufeatures[j], descriptors[indexes[i]].ufeatures[j]);
+    }
+#endif
     return BoundingBox{ min, max };
 }
 
 BoundingBox Union(const BoundingBox& a, const BoundingBox& b)
 {
     BoundingBox r;
+#ifdef __AVX2__
     for (int i = 0; i < 4; ++i) {
         r.min.features[i] = _mm256_min_epu8(a.min.features[i], b.min.features[i]);
         r.max.features[i] = _mm256_max_epu8(a.max.features[i], b.max.features[i]);
     }
+#else
+    for (int i = 0; i < 128; i++) {
+        r.min.ufeatures[i] = std::min(a.min.ufeatures[i], b.min.ufeatures[i]);
+        r.max.ufeatures[i] = std::max(a.max.ufeatures[i], b.max.ufeatures[i]);
+    }
+#endif
     return r;
 }
 
