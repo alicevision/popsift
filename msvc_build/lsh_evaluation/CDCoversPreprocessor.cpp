@@ -62,7 +62,7 @@ void SampleCDCoversDataSet(const std::string& in_fname, const std::string& out_f
 
     ofstream ofs;
     ofs.exceptions(ios::failbit | ios::badbit | ios::eofbit);
-    ofs.open(in_fname, ios::binary);
+    ofs.open(out_fname, ios::binary);
 
     std::vector<unsigned char> descriptor(128);
 
@@ -122,4 +122,13 @@ void CalculateGroundTruth(const std::string& db_fname, const std::string& test_f
         gt[i].second = acc.index[1];
     });
     ofs.write(reinterpret_cast<const char*>(gt.data()), gt.size() * sizeof(gt.front()));
+}
+
+void PrepareCDCoversDataSet()
+{
+    SampleCDCoversDataSet("C:/LOCAL/sift_cdcovers/sift_dump_cd.txt", "C:/LOCAL/sift_cdcovers/sift_dump_1M_3319.txt", 1000000, 3319);
+    SampleCDCoversDataSet("C:/LOCAL/sift_cdcovers/sift_dump_ukbench_normal.txt", "C:/LOCAL/sift_cdcovers/sift_dump_ukbench_normal_10K_3319.txt", 10000, 3319);
+    CalculateGroundTruth("C:/LOCAL/sift_cdcovers/sift_dump_1M_3319.txt",
+        "C:/LOCAL/sift_cdcovers/sift_dump_ukbench_normal_10K_3319.txt",
+        "C:/LOCAL/sift_cdcovers/GT_3319.txt");
 }
