@@ -155,7 +155,7 @@ unsigned KDTree::Partition(Node& node, unsigned lelem, unsigned relem)
     // Try partitioning several times.
     for (int retry_count = 0; retry_count < 16; ++retry_count) {
         const auto mm = std::minmax_element(list.first, list.second, [&](unsigned a, unsigned b) { return proj(a) < proj(b); });
-        if (proj(*mm.second) - proj(*mm.first) <= 1) {
+        if (proj(*mm.second) == proj(*mm.first)) {
         retry:
             std::uniform_int_distribution<int> dd(0, 127);
             split_dim = dd(rng_engine);

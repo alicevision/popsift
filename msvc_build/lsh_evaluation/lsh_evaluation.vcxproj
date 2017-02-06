@@ -156,6 +156,7 @@
     <ClInclude Include="Query.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CDCoversPreprocessor.cpp" />
     <ClCompile Include="dataio.cpp" />
     <ClCompile Include="Distance.cpp" />
     <ClCompile Include="KDTree.cpp" />
