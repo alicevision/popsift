@@ -1,4 +1,5 @@
 #include "dataio.h"
+#include "KDTree.h"
 #include <fstream>
 #include <random>
 #include <vector>
@@ -110,7 +111,15 @@ void CalculateGroundTruth(const std::string& db_fname, const std::string& test_f
 
     std::vector<std::pair<unsigned, unsigned>> gt(qv.size());
     
-    // TODO: fill in
-    
+    using namespace popsift::kdtree;
+    tbb::parallel_for((size_t)0, qv.size(), [&](size_t i) {
+        Q2NNAccumulator acc;
+        for (int x = 0; x < dbv.size(); x++) {
+            unsigned dist = L2DistanceSquared(qv[i], dbv[x]);
+            acc.Update(dist, x);
+        }
+        gt[i].first = acc.index[0];
+        gt[i].second = acc.index[1];
+    });
     ofs.write(reinterpret_cast<const char*>(gt.data()), gt.size() * sizeof(gt.front()));
 }
