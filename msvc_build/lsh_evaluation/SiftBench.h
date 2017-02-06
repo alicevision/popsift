@@ -1,9 +1,6 @@
 #pragma once
 
 #include "KDTree.h"
-
-#include <Eigen/Core>
-
 #include <vector>
 #include <utility>
 #include <string>
