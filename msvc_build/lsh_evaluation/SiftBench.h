@@ -14,7 +14,13 @@ namespace kdtree {
 
 class SiftBench {
 public:
-    SiftBench(const std::string& queryPath, const std::string& dbPath, const std::string& groundTruthPath);
+    SiftBench(const std::vector<std::pair<unsigned, unsigned>>& groundTruth,
+        const std::vector<U8Descriptor>& database,
+        const std::vector<U8Descriptor>& queries) :
+        groundTruth(groundTruth),
+        database(database),
+        query(queries)
+    { }
     
     void BuildKDTree(unsigned leafSize, unsigned treeCount);
     void Bench(unsigned maxCandidates);
