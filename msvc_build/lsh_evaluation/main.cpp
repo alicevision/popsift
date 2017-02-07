@@ -1,13 +1,14 @@
 #include "dataio.h"
-#include <iostream>
 #include "SiftBench.h"
 #include "KDTree.h"
 
+#include <iostream>
 
 // TODO: cmdline parameters!
 static constexpr unsigned LEAF_SIZE = 50;
 static constexpr unsigned TREE_COUNT = 10;
 static constexpr unsigned QUERY_DESCRIPTOR_LIMIT = 2000;
+
 
 int main()
 {

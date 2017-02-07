@@ -41,9 +41,9 @@ static unsigned L1Distance_scalar(const U8Descriptor& ad, const U8Descriptor& bd
 
 // Returns the least possible distance between descriptor and BB.  The code uses the following:
 // ----X1----m----X2-------M-----X3--- ; bb.min <= bb.max (componentwise)
-// We observe that
+// We observe that 
 //                 / 0, when x >= m                         / 0, when x <= M
-// m - min(m,X) = |                         max(M,x) - x = |
+// m - min(m,X) = |                        max(M,x) - x = |
 //                 \ m-x, when x < m                        \ x-M when x > M
 //
 static unsigned L1Distance_AVX2(const U8Descriptor& d, const BoundingBox& bb)
@@ -62,7 +62,7 @@ static unsigned L1Distance_AVX2(const U8Descriptor& d, const BoundingBox& bb)
     return sum;
 }
 
-static unsigned L1Distance_scalar(const U8Descriptor& d, const BoundingBox& bb) {
+static unsigned L1Distance_scalar(const U8Descriptor& d, const BoundingBox& bb)  {
     unsigned sum = 0;
     for (int i = 0; i < 128; i++) {
         if (d.ufeatures[i] < bb.min.ufeatures[i]) {
