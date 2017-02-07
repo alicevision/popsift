@@ -48,7 +48,7 @@ static_assert(sizeof(U8Descriptor) == 128 && sizeof(BoundingBox) == 256, "Invali
 
 //! KDTree.  Node 0 is the root node.
 class KDTree {
-    friend std::unique_ptr<KDTree> Build(const U8Descriptor* descriptors, size_t dcount, const SplitDimensions& sdim, unsigned leaf_size);
+    friend std::unique_ptr<KDTree> Build(const U8Descriptor* descriptors, size_t dcount, unsigned leaf_size);
 public:
     KDTree(const KDTree&) = delete;
     KDTree& operator=(const KDTree&) = delete;
@@ -142,10 +142,9 @@ private:
 
     // Used by Build
     unsigned _leaf_size;
-    SplitDimensions _split_dimensions;
 
     KDTree(const U8Descriptor* descriptors, size_t dcount);
-    void Build(const SplitDimensions& sdim, unsigned leaf_size);
+    void Build(unsigned leaf_size);
     void Build(unsigned node_index,  unsigned lelem, unsigned relem);
     unsigned Partition(Node& node, unsigned lelem, unsigned relem);
 
@@ -205,10 +204,10 @@ unsigned L1Distance_scalar(const U8Descriptor&, const BoundingBox&);
 unsigned L2DistanceSquared_scalar(const U8Descriptor& ad, const U8Descriptor& bd);
 unsigned L2DistanceSquared_scalar(const U8Descriptor& d, const BoundingBox& bb);
 
-SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count);
+std::pair<SplitDimensions, SplitDimensions> GetSplitDimensions(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
 BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
 BoundingBox Union(const BoundingBox& a, const BoundingBox& b);
-KDTreePtr Build(const U8Descriptor* descriptors, size_t dcount, const SplitDimensions& sdim, unsigned leaf_size);
+KDTreePtr Build(const U8Descriptor* descriptors, size_t dcount, unsigned leaf_size);
 std::vector<KDTreePtr> Build(const U8Descriptor* descriptors, size_t descriptor_count, size_t tree_count, unsigned leaf_size);
 std::pair<unsigned, unsigned> Query2NN(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors);
 

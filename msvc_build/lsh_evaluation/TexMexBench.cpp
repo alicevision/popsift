@@ -104,7 +104,6 @@ static void ReadData()
 
 static void BuildKDTree()
 {
-    auto sdim = GetSplitDimensions(G_Base.data(), G_Base.size());
     clog << "\nBUILDING KDTREE: " << std::flush;
     auto t0 = std::chrono::high_resolution_clock::now();
     G_trees = Build(G_Base.data(), G_Base.size(), TREE_COUNT, LEAF_SIZE);

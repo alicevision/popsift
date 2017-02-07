@@ -52,7 +52,6 @@ void SiftBench::BuildKDTree(unsigned leafSize, unsigned treeCount)
     this->leafSize = leafSize;
     this->treeCount = treeCount;
 
-    auto sdim = GetSplitDimensions(database.data(), database.size());
     clog << "\nBUILDING KDTREE: " << std::flush;
     auto t0 = std::chrono::high_resolution_clock::now();
     trees = Build(database.data(), database.size(), treeCount, leafSize);

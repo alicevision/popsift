@@ -137,32 +137,42 @@ unsigned L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd)
 
 }
 
-SplitDimensions GetSplitDimensions(const U8Descriptor* descriptors, size_t count)
+// Returns a pair: first contains dimension indices, second contains mean values for them.
+std::pair<SplitDimensions, SplitDimensions> GetSplitDimensions(const U8Descriptor* descriptors, const unsigned* indexes, size_t count)
 {
     using namespace Eigen;
 
-    using SiftPoint = Array<double, 1, 128>;
-    Map<Array<unsigned char, Dynamic, 128, RowMajor>, Aligned32> u8data((unsigned char*)descriptors, count, 128);
-    
-    SiftPoint mean = u8data.cast<double>().colwise().sum() / count;
-    SiftPoint var = SiftPoint::Zero();
+    using U8Point = Map<Array<unsigned char, 1, 128>, Aligned32>;
+    using DPoint = Array<double, 1, 128>;
+
+    DPoint mean = DPoint::Zero();
     for (size_t i = 0; i < count; ++i) {
-        auto v = u8data.row(i).cast<double>() - mean;
-        var += v * v;
+        unsigned char* p = const_cast<unsigned char*>(descriptors[indexes[i]].ufeatures.data());
+        mean += U8Point(p).cast<double>();
+    }
+    mean /= count;
+
+    DPoint var = DPoint::Zero();
+    for (size_t i = 0; i < count; ++i) {
+        unsigned char* p = const_cast<unsigned char*>(descriptors[indexes[i]].ufeatures.data());
+        auto d = U8Point(p).cast<double>() - mean;
+        var += d*d;
     }
 
     using vd_tup = std::tuple<double, unsigned>;
     std::array<vd_tup, 128> vardim;
     for (int i = 0; i < 128; ++i)
         vardim[i] = std::make_tuple(var[i], i);
-    std::sort(vardim.begin(), vardim.end(), [](const vd_tup& v1, const vd_tup& v2) {
-        return std::get<0>(v1) > std::get<0>(v2);
-    });
+    std::partial_sort(vardim.begin(), vardim.begin() + SPLIT_DIMENSION_COUNT, vardim.end(),
+        [](const vd_tup& v1, const vd_tup& v2) { return std::get<0>(v1) > std::get<0>(v2); });
 
-    SplitDimensions ret;
-    std::transform(vardim.data(), vardim.data() + SPLIT_DIMENSION_COUNT, ret.begin(),
-        [](const vd_tup& v) { return std::get<1>(v); });
-    return ret;
+    SplitDimensions dims, means;
+    for (size_t i = 0; i < SPLIT_DIMENSION_COUNT; ++i) {
+        dims[i] = std::get<1>(vardim[i]);
+        means[i] = static_cast<unsigned char>(mean(dims[i]));
+    }
+
+    return std::make_pair(dims, means);
 }
 
 //! Compute BB of descriptors referenced by count indexes.

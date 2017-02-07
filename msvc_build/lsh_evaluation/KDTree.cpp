@@ -39,10 +39,10 @@ static void Validate(const KDTree& kdt, unsigned n, size_t& sum)
     }
 }
 
-KDTreePtr Build(const U8Descriptor* descriptors, size_t dcount, const SplitDimensions& sdim, unsigned leaf_size)
+KDTreePtr Build(const U8Descriptor* descriptors, size_t dcount, unsigned leaf_size)
 {
     KDTreePtr ret(new KDTree(descriptors, dcount));
-    ret->Build(sdim, leaf_size);
+    ret->Build(leaf_size);
 
     // Always validate, it's cheap.
     {
@@ -60,9 +60,8 @@ std::vector<KDTreePtr> Build(const U8Descriptor* descriptors, size_t descriptor_
     std::vector<KDTreePtr> ret;
     ret.reserve(tree_count);
 
-    auto sdim = GetSplitDimensions(descriptors, descriptor_count);
     for (size_t i = 0; i < tree_count; ++i)
-        ret.push_back(Build(descriptors, descriptor_count, sdim, leaf_size));
+        ret.push_back(Build(descriptors, descriptor_count, leaf_size));
     return ret;
 }
 
@@ -80,10 +79,9 @@ KDTree::KDTree(const U8Descriptor* descriptors, size_t dcount) :
 }
 
 // XXX: TODO: Partition() has a static random_engine.  We should explicitly pass it to build.
-void KDTree::Build(const SplitDimensions& sdim, unsigned leaf_size)
+void KDTree::Build(unsigned leaf_size)
 {
     _leaf_size = leaf_size + 16;    // Don't make too small leafs
-    _split_dimensions = sdim;
     _nodes.reserve(2 * _dcount / leaf_size);
     _bb.reserve(2 * _dcount / leaf_size);
 
@@ -148,31 +146,37 @@ unsigned KDTree::Partition(Node& node, unsigned lelem, unsigned relem)
 
     POPSIFT_KDASSERT(node.leaf);
 
-    unsigned split_dim = _split_dimensions[_split_dim_gen(rng_engine)];
+    auto list = List(lelem, relem);
+    auto split_dims_means = GetSplitDimensions(_descriptors, list.first, list.second - list.first);
+    unsigned rnddimi = _split_dim_gen(rng_engine);
+    unsigned split_dim = split_dims_means.first[rnddimi];
+    unsigned split_val = split_dims_means.second[rnddimi];
     const auto proj = [&split_dim, this](unsigned di) { return _descriptors[di].ufeatures[split_dim]; };
-    const auto list = List(lelem, relem);
 
     // Try partitioning several times.
     for (int retry_count = 0; retry_count < 16; ++retry_count) {
         const auto mm = std::minmax_element(list.first, list.second, [&](unsigned a, unsigned b) { return proj(a) < proj(b); });
-        if (proj(*mm.second) == proj(*mm.first)) {
+        if (proj(*mm.second) == proj(*mm.first))
+            goto fail;
+#if 0
+        {
         retry:
             std::uniform_int_distribution<int> dd(0, 127);
             split_dim = dd(rng_engine);
             continue;
         }
-
-        std::uniform_int_distribution<unsigned> vdist(proj(*mm.first), proj(*mm.second));
-        const unsigned split_val = vdist(rng_engine);
+#endif
 
         const unsigned* mit = std::partition(list.first, list.second, [&, this](unsigned di) { return proj(di) < split_val; });
         if (mit == list.first || mit == list.second)
-            goto retry;
+            goto fail;
 
         node.dim() = split_dim;
         node.val() = split_val;
         return static_cast<unsigned>(mit - list.first) + lelem;
     }
+
+fail:
     throw std::runtime_error("KDTree: partitioning failed.");
 }
 
