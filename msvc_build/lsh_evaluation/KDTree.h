@@ -200,7 +200,7 @@ unsigned L1Distance(const U8Descriptor&, const BoundingBox&);
 unsigned L2DistanceSquared(const U8Descriptor&, const U8Descriptor&);
 unsigned L2DistanceSquared(const U8Descriptor&, const BoundingBox&);
 
-bool VerifyL2DistanceAVX();
+void VerifyL2DistanceAVX();
 
 std::pair<SplitDimensions, SplitDimensions> GetSplitDimensions(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
 BoundingBox GetBoundingBox(const U8Descriptor* descriptors, const unsigned* indexes, size_t count);
