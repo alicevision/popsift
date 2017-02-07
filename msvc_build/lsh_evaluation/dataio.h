@@ -5,8 +5,9 @@
 #include <string>
 #include <tuple>
 
-template<typename T>
-std::vector<T> ReadTexMex(const std::string& fname);
+void ReadTexMex(std::vector<popsift::kdtree::U8Descriptor>& database,
+    std::vector<popsift::kdtree::U8Descriptor>& queries,
+    std::vector<std::pair<unsigned, unsigned>>& gt);
 
 // Reads all descriptors from OpenMVG reconstruction directory; assumes uchar
 // SIFT descriptors.  Returns two vectors:
