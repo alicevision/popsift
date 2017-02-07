@@ -75,6 +75,14 @@ static unsigned L1Distance_scalar(const U8Descriptor& d, const BoundingBox& bb) 
     return sum;
 }
 
+static inline unsigned reduce(__m256i reg)
+{
+    __m128i l = _mm256_extracti128_si256(reg, 0);
+    __m128i h = _mm256_extracti128_si256(reg, 1);
+    __m128i r = _mm_hadd_epi32(_mm_add_epi32(h, l), _mm_setzero_si128());
+    return _mm_extract_epi32(r, 0) + _mm_extract_epi32(r, 1);
+}
+
 // AVX2 implementation for U8 descriptors.
 // 128 components fit in 4 AVX2 registers.  Must expand components from 8-bit
 // to 16-bit in order to do arithmetic without overflow. Also, AVX2 doesn't
@@ -101,20 +109,7 @@ static unsigned L2DistanceSquared_AVX2(const U8Descriptor& ad, const U8Descripto
         acc = _mm256_add_epi32(acc, _mm256_add_epi32(dl, dh));
     }
 
-    ALIGNED32 unsigned int buf[8];
-    _mm256_store_si256((__m256i*)buf, acc);
-    unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
-    return sum;
-}
-
-unsigned L2DistanceSquared_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
-    unsigned sum = 0;
-    
-    for (int i = 0; i < 128; i++) {
-        int a = (int)ad.ufeatures[i] - (int)bd.ufeatures[i];
-        sum += a*a;
-    }
-    return sum;
+    return reduce(acc);
 }
 
 static unsigned L2DistanceSquared_AVX2(const U8Descriptor& d, const BoundingBox& bb)
@@ -136,9 +131,16 @@ static unsigned L2DistanceSquared_AVX2(const U8Descriptor& d, const BoundingBox&
         acc = _mm256_add_epi32(acc, _mm256_add_epi32(up1, up2));
     }
 
-    ALIGNED32 unsigned int buf[8];
-    _mm256_store_si256((__m256i*)buf, acc);
-    unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
+    return reduce(acc);
+}
+
+unsigned L2DistanceSquared_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
+    unsigned sum = 0;
+
+    for (int i = 0; i < 128; i++) {
+        int a = (int)ad.ufeatures[i] - (int)bd.ufeatures[i];
+        sum += a*a;
+    }
     return sum;
 }
 
