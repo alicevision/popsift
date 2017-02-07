@@ -81,8 +81,6 @@ static unsigned L1Distance_scalar(const U8Descriptor& d, const BoundingBox& bb) 
 // support vector multiplication of 8-bit elements.
 static unsigned L2DistanceSquared_AVX2(const U8Descriptor& ad, const U8Descriptor& bd)
 {
-    const __m256i* af = ad.features;
-    const __m256i* bf = bd.features;
     __m256i acc = _mm256_setzero_si256();
 
     // 32 components per iteration.
@@ -122,9 +120,7 @@ unsigned L2DistanceSquared_scalar(const U8Descriptor& ad, const U8Descriptor& bd
 static unsigned L2DistanceSquared_AVX2(const U8Descriptor& d, const BoundingBox& bb)
 {
     __m256i acc = _mm256_setzero_si256();
-    __m256i zero = _mm256_setzero_si256();
-
-    __m256i mask = _mm256_set_epi64x(0x0, 0x0, 0x0, 0x0);
+    
     for (int i = 0; i < 4; ++i) {
         __m256i d1 = _mm256_sub_epi8(bb.min.features[i], _mm256_min_epu8(bb.min.features[i], d.features[i]));
         __m256i d2 = _mm256_sub_epi8(_mm256_max_epu8(bb.max.features[i], d.features[i]), bb.max.features[i]);
