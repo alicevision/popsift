@@ -10,7 +10,7 @@ namespace kdtree {
 
 static_assert(SPLIT_DIMENSION_COUNT < 128, "Invalid split dimension count");
 
-unsigned L1Distance(const U8Descriptor& ad, const U8Descriptor& bd)
+static unsigned L1Distance_AVX2(const U8Descriptor& ad, const U8Descriptor& bd)
 {
     const __m256i* af = ad.features;
     const __m256i* bf = bd.features;
@@ -30,20 +30,10 @@ unsigned L1Distance(const U8Descriptor& ad, const U8Descriptor& bd)
     return sum;
 }
 
-unsigned L1Distance_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
+static unsigned L1Distance_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
     unsigned sum = 0;
     for (int i = 0; i < 128; i++) {
         sum += abs((int)ad.ufeatures[i] - (int)bd.ufeatures[i]);
-    }
-    return sum;
-}
-
-unsigned L2DistanceSquared_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
-    unsigned sum = 0;
-    
-    for (int i = 0; i < 128; i++) {
-        int a = (int)ad.ufeatures[i] - (int)bd.ufeatures[i];
-        sum += a*a;
     }
     return sum;
 }
@@ -55,10 +45,10 @@ unsigned L2DistanceSquared_scalar(const U8Descriptor& ad, const U8Descriptor& bd
 // m - min(m,X) = |                         max(M,x) - x = |
 //                 \ m-x, when x < m                        \ x-M when x > M
 //
-unsigned L1Distance(const U8Descriptor& d, const BoundingBox& bb)
+static unsigned L1Distance_AVX2(const U8Descriptor& d, const BoundingBox& bb)
 {
     __m256i acc = _mm256_setzero_si256();
-    
+
     for (int i = 0; i < 4; ++i) {
         __m256i d1 = _mm256_sad_epu8(bb.min.features[i], _mm256_min_epu8(bb.min.features[i], d.features[i]));
         __m256i d2 = _mm256_sad_epu8(bb.max.features[i], _mm256_max_epu8(bb.max.features[i], d.features[i]));
@@ -71,7 +61,7 @@ unsigned L1Distance(const U8Descriptor& d, const BoundingBox& bb)
     return sum;
 }
 
-unsigned L1Distance_scalar(const U8Descriptor& d, const BoundingBox& bb) {
+static unsigned L1Distance_scalar(const U8Descriptor& d, const BoundingBox& bb) {
     unsigned sum = 0;
     for (int i = 0; i < 128; i++) {
         if (d.ufeatures[i] < bb.min.ufeatures[i]) {
@@ -83,26 +73,12 @@ unsigned L1Distance_scalar(const U8Descriptor& d, const BoundingBox& bb) {
     }
     return sum;
 }
-unsigned L2DistanceSquared_scalar(const U8Descriptor& d, const BoundingBox& bb) {
-    unsigned sum = 0;
-    for (int i = 0; i < 128; i++) {
-        int a = 0;
-        if (d.ufeatures[i] < bb.min.ufeatures[i]) {
-            a = (int)bb.min.ufeatures[i] - (int)d.ufeatures[i];
-        }
-        else if (d.ufeatures[i] > bb.max.ufeatures[i]) {
-            a = (int)d.ufeatures[i] - (int)bb.max.ufeatures[i];
-        }
-        sum += a*a;
-    }
-    return sum;
-}
 
 // AVX2 implementation for U8 descriptors.
 // 128 components fit in 4 AVX2 registers.  Must expand components from 8-bit
 // to 16-bit in order to do arithmetic without overflow. Also, AVX2 doesn't
 // support vector multiplication of 8-bit elements.
-unsigned L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd)
+static unsigned L2DistanceSquared_AVX2(const U8Descriptor& ad, const U8Descriptor& bd)
 {
     const __m256i* af = ad.features;
     const __m256i* bf = bd.features;
@@ -134,7 +110,72 @@ unsigned L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd)
     _mm256_store_si256((__m256i*)buf, acc);
     unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
     return sum;
+}
 
+unsigned L2DistanceSquared_scalar(const U8Descriptor& ad, const U8Descriptor& bd) {
+    unsigned sum = 0;
+    
+    for (int i = 0; i < 128; i++) {
+        int a = (int)ad.ufeatures[i] - (int)bd.ufeatures[i];
+        sum += a*a;
+    }
+    return sum;
+}
+
+static unsigned L2DistanceSquared_AVX2(const U8Descriptor& d, const BoundingBox& bb)
+{
+    throw std::runtime_error("UNIMPLEMENTED");
+}
+
+unsigned L2DistanceSquared_scalar(const U8Descriptor& d, const BoundingBox& bb) {
+    unsigned sum = 0;
+    for (int i = 0; i < 128; i++) {
+        int a = 0;
+        if (d.ufeatures[i] < bb.min.ufeatures[i]) {
+            a = (int)bb.min.ufeatures[i] - (int)d.ufeatures[i];
+        }
+        else if (d.ufeatures[i] > bb.max.ufeatures[i]) {
+            a = (int)d.ufeatures[i] - (int)bb.max.ufeatures[i];
+        }
+        sum += a*a;
+    }
+    return sum;
+}
+
+unsigned L1Distance(const U8Descriptor& ad, const U8Descriptor& bd)
+{
+#ifdef __AVX2__
+    return L1Distance_AVX2(ad, bd);
+#else
+    return L1Distance_scalar(ad, bd);
+#endif
+}
+
+unsigned L1Distance(const U8Descriptor& ad, const BoundingBox& bb)
+{
+#ifdef __AVX2__
+    return L1Distance_AVX2(ad, bb);
+#else
+    return L1Distance_scalar(ad, bb);
+#endif
+}
+
+unsigned L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd)
+{
+#ifdef __AVX2__
+    return L2DistanceSquared_AVX2(ad, bd);
+#else
+    return L2DistanceSquared_scalar(ad, bd);
+#endif
+}
+
+unsigned L2DistanceSquared(const U8Descriptor& ad, const BoundingBox& bb)
+{
+#ifdef __AVX2__
+    return L2DistanceSquared_AVX2(ad, bb);
+#else
+    return L2DistanceSquared_scalar(ad, bb);
+#endif
 }
 
 // Returns a pair: first contains dimension indices, second contains mean values for them.

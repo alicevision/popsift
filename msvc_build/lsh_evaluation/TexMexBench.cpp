@@ -139,8 +139,8 @@ static void EvaluateQuery(const U8Descriptor& q, const std::pair<unsigned, unsig
 
 static bool SiftMatch(const U8Descriptor& dq, const U8Descriptor& dn1, const U8Descriptor& dn2)
 {
-    unsigned d1 = L2DistanceSquared_scalar(dq, dn1);
-    unsigned d2 = L2DistanceSquared_scalar(dq, dn2);
+    unsigned d1 = L2DistanceSquared(dq, dn1);
+    unsigned d2 = L2DistanceSquared(dq, dn2);
     if (d1 > d2) {  // Search is with L1-norm, so this can happen
         ++G_Counters[DISTANCE_SWAPS];
         std::swap(d1, d2);

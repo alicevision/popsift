@@ -5,7 +5,7 @@
 #undef min
 #undef max
 
-#define DISTANCE_CHECK(a, b) L2DistanceSquared_scalar(a, b);
+#define DISTANCE_CHECK(a, b) L2DistanceSquared(a, b);
 
 namespace popsift {
 namespace kdtree {
