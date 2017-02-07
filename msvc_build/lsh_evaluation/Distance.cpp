@@ -94,17 +94,13 @@ static unsigned L2DistanceSquared_AVX2(const U8Descriptor& ad, const U8Descripto
 
         // Squared elements, 0..15
         __m256i dl = _mm256_unpacklo_epi8(d, _mm256_setzero_si256());
-        dl = _mm256_mullo_epi16(dl, dl);
+        dl = _mm256_madd_epi16(dl, dl);
 
         // Squared elements, 15..31
         __m256i dh = _mm256_unpackhi_epi8(d, _mm256_setzero_si256());
-        dh = _mm256_mullo_epi16(dh, dh);
-
-        // Expand the squared elements to 32-bits and add to accumulator.
-        acc = _mm256_add_epi32(acc, _mm256_unpacklo_epi16(dl, _mm256_setzero_si256()));
-        acc = _mm256_add_epi32(acc, _mm256_unpackhi_epi16(dl, _mm256_setzero_si256()));
-        acc = _mm256_add_epi32(acc, _mm256_unpacklo_epi16(dh, _mm256_setzero_si256()));
-        acc = _mm256_add_epi32(acc, _mm256_unpackhi_epi16(dh, _mm256_setzero_si256()));
+        dh = _mm256_madd_epi16(dh, dh);
+        
+        acc = _mm256_add_epi32(acc, _mm256_add_epi32(dl, dh));
     }
 
     ALIGNED32 unsigned int buf[8];
@@ -136,9 +132,9 @@ static unsigned L2DistanceSquared_AVX2(const U8Descriptor& d, const BoundingBox&
         __m256i add = _mm256_add_epi8(d1, d2);
 
         __m256i up1 = _mm256_unpacklo_epi8(add, _mm256_setzero_si256());
-        __m256i up2 = _mm256_unpackhi_epi8(add, _mm256_setzero_si256());
-
         up1 = _mm256_madd_epi16(up1, up1); //8x32bit res
+        
+        __m256i up2 = _mm256_unpackhi_epi8(add, _mm256_setzero_si256());
         up2 = _mm256_madd_epi16(up2, up2); //8x32bit res
 
         acc = _mm256_add_epi32(acc, _mm256_add_epi32(up1, up2));
