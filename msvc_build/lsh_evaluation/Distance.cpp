@@ -202,15 +202,16 @@ unsigned L2DistanceSquared(const U8Descriptor& ad, const BoundingBox& bb)
 }
 
 static void verifyOne(U8Descriptor& a, U8Descriptor& b) {
-    unsigned abd = L2DistanceSquared(a, b);
-    POPSIFT_KDASSERT(abd == L2DistanceSquared_AVX2(a, b));
-    unsigned bad = L2DistanceSquared(b, a);
-    POPSIFT_KDASSERT(bad == L2DistanceSquared_AVX2(b, a));
+    POPSIFT_KDASSERT(L2DistanceSquared_scalar(a, b) == L2DistanceSquared_AVX2(a, b));
+    POPSIFT_KDASSERT(L2DistanceSquared_scalar(a, b) == L2DistanceSquared_AVX2(b, a));
+
+    POPSIFT_KDASSERT(L1Distance_scalar(a, b) == L1Distance_AVX2(a, b));
+    POPSIFT_KDASSERT(L1Distance_scalar(a, b) == L1Distance_AVX2(b, a));
 }
 
 static void verifyOne(U8Descriptor& a, BoundingBox& b) {
-    unsigned abd = L2DistanceSquared(a, b);
-    POPSIFT_KDASSERT(abd == L2DistanceSquared_AVX2(a, b));
+    POPSIFT_KDASSERT(L2DistanceSquared_scalar(a, b) == L2DistanceSquared_AVX2(a, b));
+    POPSIFT_KDASSERT(L1Distance_scalar(a, b) == L1Distance_AVX2(a, b));
 }
 
 void VerifyL2DistanceAVX() {
@@ -228,15 +229,16 @@ void VerifyL2DistanceAVX() {
         
         boxes[0].min.ufeatures[i] = rng(rng_engine);
         boxes[0].max.ufeatures[i] = rng(rng_engine);
-        for (int x = 0; x < 128; x++) {
-            if (boxes[0].min.ufeatures[x] > boxes[0].max.ufeatures[x]) {
-                unsigned char tmp = boxes[0].min.ufeatures[x];
-                boxes[0].min.ufeatures[x] = boxes[0].max.ufeatures[x];
-                boxes[0].max.ufeatures[x] = tmp;
-            }
-        }
+
         boxes[1].min.ufeatures[i] = rng(rng_engine);
         boxes[1].max.ufeatures[i] = 0;
+
+        for (int x = 0; x < 128; x++) {
+            if (boxes[0].min.ufeatures[x] > boxes[0].max.ufeatures[x])
+                std::swap(boxes[0].min.ufeatures[x], boxes[0].max.ufeatures[x]);
+            if (boxes[1].min.ufeatures[x] > boxes[1].max.ufeatures[x])
+                std::swap(boxes[1].min.ufeatures[x], boxes[1].max.ufeatures[x]);
+        }
 
         boxes[2].min.ufeatures[i] = rng(rng_engine);
         boxes[2].max.ufeatures[i] = 255;

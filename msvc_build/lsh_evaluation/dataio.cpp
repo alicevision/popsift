@@ -37,8 +37,8 @@ static std::tuple<size_t, size_t> GetVectorCountAndDim(std::ifstream& ifs, size_
     return std::make_tuple(fsz / row_size, v_dim);
 }
 
-template<typename T>
-std::vector<T> ReadTexMex(const std::string& fname)
+// TexMex descriptors are floats, but each integer in byte range.
+static void ReadTexMex(const std::string& fname, std::vector<popsift::kdtree::U8Descriptor>& out_desc)
 {
     using namespace std;
         
@@ -46,21 +46,65 @@ std::vector<T> ReadTexMex(const std::string& fname)
     ifs.exceptions(ios::failbit | ios::badbit | ios::eofbit);
     ifs.open(fname, ios::binary);
 
-    size_t v_count, v_dim, row_size;
-    std::tie(v_count, v_dim) = GetVectorCountAndDim(ifs, sizeof(T));
-    row_size = v_dim * sizeof(T);
+    size_t v_count, v_dim;
+    std::tie(v_count, v_dim) = GetVectorCountAndDim(ifs, sizeof(float));
+    if (v_dim != 128)
+        throw std::runtime_error("ReadTexMex: dim != 128");
 
-    std::vector<T> ret(v_count * v_dim);
+    std::vector<float> row(v_dim);
+    out_desc.resize(v_count);
+
     for (size_t i = 0; i < v_count; ++i) {
-        unsigned tmp_dim;
-        ifs.read(reinterpret_cast<char*>(&tmp_dim), 4);
-        if (tmp_dim != v_dim)
-            throw std::runtime_error("non-constant dimension");
-        ifs.read(reinterpret_cast<char*>(ret.data()) + i*row_size, row_size);
+        {
+            unsigned tmp_dim;
+            ifs.read(reinterpret_cast<char*>(&tmp_dim), 4);
+            if (tmp_dim != v_dim)
+                throw std::runtime_error("non-constant dimension");
+        }
+        ifs.read(reinterpret_cast<char*>(row.data()), 4*128);
+        std::transform(row.begin(), row.end(), out_desc[i].ufeatures.begin(),
+            [](float x) { return (unsigned char)x; });
     }
-
-    return ret;
 }
+
+// Extract only 2NNs from the GT.
+static void ReadTexMex(const std::string& fname, std::vector<std::pair<unsigned, unsigned>>& out_gt)
+{
+    using namespace std;
+
+    ifstream ifs;
+    ifs.exceptions(ios::failbit | ios::badbit | ios::eofbit);
+    ifs.open(fname, ios::binary);
+
+    size_t v_count, v_dim;
+    std::tie(v_count, v_dim) = GetVectorCountAndDim(ifs, sizeof(unsigned));
+
+    std::vector<unsigned> row(v_dim);
+    out_gt.resize(v_count);
+
+    for (size_t i = 0; i < v_count; ++i) {
+        {
+            unsigned tmp_dim;
+            ifs.read(reinterpret_cast<char*>(&tmp_dim), 4);
+            if (tmp_dim != v_dim)
+                throw std::runtime_error("non-constant dimension");
+        }
+        ifs.read(reinterpret_cast<char*>(row.data()), 4 * v_dim);
+        out_gt[i] = std::make_pair(row[0], row[1]);
+    }
+}
+
+void ReadTexMex(std::vector<popsift::kdtree::U8Descriptor>& database,
+    std::vector<popsift::kdtree::U8Descriptor>& queries,
+    std::vector<std::pair<unsigned, unsigned>>& gt)
+{
+    static std::string G_DataPrefix = "C:/LOCAL/texmex_sift1M_corpus";
+
+    ReadTexMex(G_DataPrefix + "/sift_base.fvecs", database);
+    ReadTexMex(G_DataPrefix + "/sift_query.fvecs", queries);
+    ReadTexMex(G_DataPrefix + "/sift_groundtruth.ivecs", gt);
+}
+
 
 /////////////////////////////////////////////////////////////////////////////
 
@@ -128,11 +172,3 @@ void ReportMemoryUsage()
     std::clog << "; CCHARGE: " << (mc.PagefileUsage >> 20) << std::endl;
 #endif
 }
-
-/////////////////////////////////////////////////////////////////////////////
-
-template std::vector<unsigned char> ReadTexMex(const std::string& fname);
-template std::vector<int> ReadTexMex(const std::string& fname);
-template std::vector<float> ReadTexMex(const std::string& fname);
-
-

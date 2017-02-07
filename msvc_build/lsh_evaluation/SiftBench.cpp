@@ -2,6 +2,10 @@
 #include "KDTree.h"
 #include "dataio.h"
 
+#include <tbb/tbb.h>
+#undef min
+#undef max
+
 #include <chrono>
 #include <iostream>
 
@@ -29,8 +33,9 @@ void SiftBench::Bench(unsigned maxCandidates)
     {
         clog << "\nQUERYING; #VECTORS=" << query.size() << " " << std::flush;
         auto t0 = std::chrono::high_resolution_clock::now();
-        for (int qi = 0; qi < query.size(); ++qi)
+        tbb::parallel_for(size_t(0), query.size(), [&](size_t qi) {
             EvaluateQuery(query[qi], groundTruth[qi]);
+        });
         auto t1 = std::chrono::high_resolution_clock::now();
         clog << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << endl;
         ReportMemoryUsage();
@@ -61,13 +66,15 @@ void SiftBench::BuildKDTree(unsigned leafSize, unsigned treeCount)
     ReportMemoryUsage();
 }
 
-void SiftBench::EvaluateQuery(const U8Descriptor& q, 
-    const std::pair<unsigned, unsigned>& gt)
+void SiftBench::EvaluateQuery(const U8Descriptor& q,  const std::pair<unsigned, unsigned>& gt)
 {
+    static tbb::spin_mutex mtx;
 
     auto knn = Query2NN(trees, q, maxCandidates);
     bool gt_sift_accept = SiftMatch(q, database[gt.first], database[gt.second]);
     bool q_sift_accept = SiftMatch(q, database[knn.first], database[knn.second]);
+
+    tbb::spin_mutex::scoped_lock lk(mtx);
 
     if (gt_sift_accept)
         ++G_Counters[GT_ACCEPTS];

@@ -1,18 +1,25 @@
 #include "dataio.h"
 #include <iostream>
 #include "SiftBench.h"
+#include "KDTree.h"
 
-void TexMexBench();
+
+// TODO: cmdline parameters!
+static constexpr unsigned LEAF_SIZE = 50;
+static constexpr unsigned TREE_COUNT = 10;
+static constexpr unsigned QUERY_DESCRIPTOR_LIMIT = 2000;
 
 int main()
 {
-    auto dbv = ReadCDCoversVectors("C:/LOCAL/sift_cdcovers/sift_dump_1M_3319.txt");
-    auto qv = ReadCDCoversVectors("C:/LOCAL/sift_cdcovers/sift_dump_ukbench_normal_10K_3319.txt");
-    auto gt = ReadCDCoversGT("C:/LOCAL/sift_cdcovers/GT_3319.txt");
+    popsift::kdtree::VerifyL2DistanceAVX();
 
-    using namespace popsift::kdtree;
-    SiftBench bench(gt, dbv, qv);
-    bench.BuildKDTree(50, 10);
-    bench.Bench(1000);
+    std::vector<popsift::kdtree::U8Descriptor> dbv, qv;
+    std::vector<std::pair<unsigned, unsigned>> gt;
+    ReadTexMex(dbv, qv, gt);
+
+    popsift::kdtree::SiftBench bench(gt, dbv, qv);
+    bench.BuildKDTree(LEAF_SIZE, TREE_COUNT);
+    bench.Bench(QUERY_DESCRIPTOR_LIMIT);
+
     return 0;
 }
