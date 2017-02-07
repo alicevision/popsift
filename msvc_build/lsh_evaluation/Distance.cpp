@@ -140,7 +140,7 @@ static unsigned L2DistanceSquared_AVX2(const U8Descriptor& d, const BoundingBox&
         acc = _mm256_add_epi32(acc, _mm256_add_epi32(up1, up2));
     }
 
-    ALIGNED32 uint64_t buf[8];
+    ALIGNED32 unsigned int buf[8];
     _mm256_store_si256((__m256i*)buf, acc);
     unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
     return sum;
