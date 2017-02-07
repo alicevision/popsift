@@ -117,34 +117,39 @@ class Q2NNquery
 
     Q2NNpq _pq;
     tbb::null_mutex _pqmtx;
-    boost::container::flat_set<unsigned> _found_descriptors;
+    size_t _found_descriptors;
     std::vector<unsigned> _leaf_new_descriptors;
     Q2NNAccumulator _result;
 
     void TraverseToLeaf(Q2NNpq::Entry pqe);
     void ProcessLeaf(const KDTree& tree, unsigned node);
 
+    
 public:
     Q2NNquery(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors);
-    std::pair<unsigned, unsigned> operator()();
+    std::pair<unsigned, unsigned> Run();
 };
 
 Q2NNquery::Q2NNquery(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors) :
     _trees(trees), _descriptor(descriptor), _max_descriptors(max_descriptors)
 {
-    _found_descriptors.reserve(_max_descriptors + 16);
+    _found_descriptors = 0;
     _leaf_new_descriptors.reserve(2048);
 }
 
-std::pair<unsigned, unsigned> Q2NNquery::operator()()
+std::pair<unsigned, unsigned> Q2NNquery::Run()
 {
-    for (unsigned short i = 0; i < _trees.size(); ++i) {
-        unsigned short d = DISTANCE_CHECK(_descriptor, _trees[i]->BB(0));
+#if 1
+    for (unsigned i = 0; i < _trees.size(); ++i) {
+        unsigned d = DISTANCE_CHECK(_descriptor, _trees[i]->BB(0));
         _pq.Push(Q2NNpq::Entry{ d, i, 0 }, _pqmtx);
     }
+#else
+
+#endif
 
     Q2NNpq::Entry pqe;
-    while (_found_descriptors.size() < _max_descriptors && _pq.Pop(pqe, _pqmtx))
+    while (_found_descriptors < _max_descriptors && _pq.Pop(pqe, _pqmtx))
     if (pqe.distance <= _result.distance[1])    // We're searching 2NN, so test 2nd-best distance
         TraverseToLeaf(pqe);
 
@@ -176,20 +181,13 @@ void Q2NNquery::TraverseToLeaf(Q2NNpq::Entry pqe)
 
 void Q2NNquery::ProcessLeaf(const KDTree& tree, unsigned node)
 {
-    _leaf_new_descriptors.clear();
     auto list = tree.List(node);
-    std::set_difference(list.first, list.second, _found_descriptors.begin(), _found_descriptors.end(),
-        std::back_inserter(_leaf_new_descriptors));
-    
-    // TODO: The two can run in parallel.
 
-    for (unsigned di : _leaf_new_descriptors) {
-        unsigned d = DISTANCE_CHECK(_descriptor, tree.Descriptors()[di]);
-        _result.Update(d, di);
+    _found_descriptors += list.second - list.first;
+    for (; list.first != list.second; ++list.first) {
+        unsigned d = DISTANCE_CHECK(_descriptor, tree.Descriptors()[*list.first]);
+        _result.Update(d, *list.first);
     }
-
-    _found_descriptors.insert(boost::container::ordered_unique_range,
-        _leaf_new_descriptors.begin(), _leaf_new_descriptors.end());
 }
 
 std::pair<unsigned, unsigned> Query2NN(const std::vector<KDTreePtr>& trees, const U8Descriptor& descriptor, size_t max_descriptors)
@@ -197,105 +195,8 @@ std::pair<unsigned, unsigned> Query2NN(const std::vector<KDTreePtr>& trees, cons
     const U8Descriptor* descriptors = trees.front()->Descriptors();
     for (const auto& t : trees) POPSIFT_KDASSERT(t->Descriptors() == descriptors);
     Q2NNquery q(trees, descriptor, max_descriptors);
-    return q();
+    return q.Run();
 }
-
-/////////////////////////////////////////////////////////////////////////////
-
-TreeQuery::TreeQuery(const U8Descriptor * qDescriptors, size_t dcount, 
-                    unsigned treeIndex, Query* query)
-    :_qDescriptors(qDescriptors),
-    _dcount(dcount),
-    _initialTreeIndex(treeIndex),
-    _query(query)
-{
-}
-
-void TreeQuery::FindCandidates()
-{
-    for (int i = 0; i < _dcount; i++) {
-        const U8Descriptor& desc = _qDescriptors[i];
-
-        //initial traverse from root-node
-        traverse(desc, 0, _initialTreeIndex);
-
-        //followup-traversal based on priority queue
-        while (_candidates.size() < _maxCandidates && _query->priority_queue.size() > 0) {
-            
-            int nextIndex = -1;
-            unsigned nextTreeIndex;
-            {
-                std::lock_guard<std::mutex>(_query->pq_mutex);
-                if (_query->priority_queue.size() > 0) {
-                    nextIndex = _query->priority_queue.top().nodeIndex;
-                    nextTreeIndex = _query->priority_queue.top().treeIndex;
-                    _query->priority_queue.pop();
-                }
-            }
-            if (nextIndex >= 0)
-                traverse(desc, nextIndex, nextTreeIndex);
-        }
-
-        //Moved the priority-queue traversal from leaf-node block 
-        //in TreeQuery::traverse to avoid huge stacks
-    }
-}
-
-void TreeQuery::traverse(const U8Descriptor & q, unsigned nodeIndex, unsigned treeIndex)
-{
-    const KDTree& tree = _query->Tree(treeIndex);
-
-    if (tree.IsLeaf(nodeIndex)) {
-        auto candidates = _tree->List(nodeIndex);
-        _candidates.insert(_candidates.end(), candidates.first, candidates.second);
-        //todo: can potentially calc dist between q and tree-desc here.
-    }
-    else {
-        if (tree.Val(nodeIndex) < q.ufeatures[tree.Dim(nodeIndex)]) {
-            const BoundingBox& rightBB = _tree->BB(_tree->Right(nodeIndex));
-            unsigned right_dist = BBDistance(rightBB, q);
-            {
-                std::lock_guard<std::mutex>(_query->pq_mutex);
-                _query->priority_queue.push(Query::PC{ treeIndex, _tree->Right(nodeIndex), right_dist });
-            }
-            traverse(q, _tree->Left(nodeIndex), treeIndex);
-        }
-        else {
-            const BoundingBox& leftBB = _tree->BB(_tree->Left(nodeIndex));
-            unsigned left_dist = BBDistance(leftBB, q);
-            
-            {
-                std::lock_guard<std::mutex>(_query->pq_mutex);
-                _query->priority_queue.push(Query::PC{ treeIndex, _tree->Right(nodeIndex), left_dist });
-            }
-            traverse(q, _tree->Right(nodeIndex), treeIndex);
-        }
-    }
-}
-
-unsigned TreeQuery::BBDistance(const BoundingBox& bb, const U8Descriptor & q)
-{
-    unsigned sum = 0;
-    for (int i = 0; i < 128; i++) {
-        if (q.ufeatures[i] < bb.min.ufeatures[i]) {
-            sum += bb.min.ufeatures[i] - q.ufeatures[i];
-        }
-        else if (q.ufeatures[i] > bb.max.ufeatures[i]) {
-            sum += q.ufeatures[i] - bb.max.ufeatures[i];
-        }
-    }
-    return sum;
-}
-
-Query::Query(const U8Descriptor * qDescriptors, size_t dcount,
-    std::vector<std::unique_ptr<KDTree>> trees, unsigned num_threads)
-{
-    for (int i = 0; i < trees.size(); i++) {
-        TreeQuery q(qDescriptors, dcount, i, this);
-
-    }
-}
-
 
 }
 }
