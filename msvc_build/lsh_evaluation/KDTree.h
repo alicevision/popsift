@@ -6,6 +6,9 @@
 #include <utility>
 #include <string>
 #include <memory>
+#include <limits>
+#undef min
+#undef max
 
 #ifdef _MSC_VER
 #define ALIGNED32 __declspec(align(32))
