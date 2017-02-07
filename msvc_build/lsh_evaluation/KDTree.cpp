@@ -2,6 +2,9 @@
 #include <assert.h>
 #include <limits>
 #include <random>
+#include <tbb/parallel_for.h>   // XXX: tbb includes windows.h
+#undef min
+#undef max
 
 namespace popsift {
 namespace kdtree {
@@ -57,11 +60,11 @@ KDTreePtr Build(const U8Descriptor* descriptors, size_t dcount, unsigned leaf_si
 
 std::vector<KDTreePtr> Build(const U8Descriptor* descriptors, size_t descriptor_count, size_t tree_count, unsigned leaf_size)
 {
-    std::vector<KDTreePtr> ret;
-    ret.reserve(tree_count);
+    std::vector<KDTreePtr> ret(tree_count);
 
-    for (size_t i = 0; i < tree_count; ++i)
-        ret.push_back(Build(descriptors, descriptor_count, leaf_size));
+    tbb::parallel_for(size_t(0), tree_count, [&](size_t i) {
+        ret[i] = Build(descriptors, descriptor_count, leaf_size);
+    });
     return ret;
 }
 
