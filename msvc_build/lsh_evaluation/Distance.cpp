@@ -125,7 +125,29 @@ unsigned L2DistanceSquared_scalar(const U8Descriptor& ad, const U8Descriptor& bd
 
 static unsigned L2DistanceSquared_AVX2(const U8Descriptor& d, const BoundingBox& bb)
 {
-    throw std::runtime_error("UNIMPLEMENTED");
+    __m256i acc = _mm256_setzero_si256();
+    __m256i zero = _mm256_setzero_si256();
+
+    __m256i mask = _mm256_set_epi64x(0x0, 0x0, 0x0, 0x0);
+    for (int i = 0; i < 4; ++i) {
+        __m256i d1 = _mm256_sub_epi8(bb.min.features[i], _mm256_min_epu8(bb.min.features[i], d.features[i]));
+        __m256i d2 = _mm256_sub_epi8(_mm256_max_epu8(bb.max.features[i], d.features[i]), bb.max.features[i]);
+
+        __m256i add = _mm256_add_epi8(d1, d2);
+
+        __m256i up1 = _mm256_unpacklo_epi8(add, _mm256_setzero_si256());
+        __m256i up2 = _mm256_unpackhi_epi8(add, _mm256_setzero_si256());
+
+        up1 = _mm256_madd_epi16(up1, up1); //8x32bit res
+        up2 = _mm256_madd_epi16(up2, up2); //8x32bit res
+
+        acc = _mm256_add_epi32(acc, _mm256_add_epi32(up1, up2));
+    }
+
+    ALIGNED32 uint64_t buf[8];
+    _mm256_store_si256((__m256i*)buf, acc);
+    unsigned int sum = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
+    return sum;
 }
 
 unsigned L2DistanceSquared_scalar(const U8Descriptor& d, const BoundingBox& bb) {
