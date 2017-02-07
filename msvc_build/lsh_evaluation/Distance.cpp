@@ -178,6 +178,63 @@ unsigned L2DistanceSquared(const U8Descriptor& ad, const BoundingBox& bb)
 #endif
 }
 
+#include <random>
+void verifyOne(U8Descriptor& a, U8Descriptor& b) {
+    unsigned abd = L2DistanceSquared(a, b);
+    POPSIFT_KDASSERT(abd == L2DistanceSquared_AVX2(a, b));
+    unsigned bad = L2DistanceSquared(b, a);
+    POPSIFT_KDASSERT(bad == L2DistanceSquared_AVX2(b, a));
+}
+void verifyOne(U8Descriptor& a, BoundingBox& b) {
+    unsigned abd = L2DistanceSquared(a, b);
+    POPSIFT_KDASSERT(abd == L2DistanceSquared_AVX2(a, b));
+}
+
+bool VerifyL2DistanceAVX() {
+    using namespace popsift::kdtree;
+    U8Descriptor descs[3]; //rand, null, one
+    BoundingBox boxes[5]; //rand_rand, rand_null, rand_one, one_one, null_null
+    
+    static std::mt19937_64 rng_engine;
+    std::uniform_int_distribution<int> rng(0, 255);
+
+    for (int i = 0; i < 128; i++) {
+        descs[0].ufeatures[i] = rng(rng_engine);
+        descs[1].ufeatures[i] = 0;
+        descs[2].ufeatures[i] = 255;
+        
+        boxes[0].min.ufeatures[i] = rng(rng_engine);
+        boxes[0].max.ufeatures[i] = rng(rng_engine);
+        for (int x = 0; x < 128; x++) {
+            if (boxes[0].min.ufeatures[x] > boxes[0].max.ufeatures[x]) {
+                unsigned char tmp = boxes[0].min.ufeatures[x];
+                boxes[0].min.ufeatures[x] = boxes[0].max.ufeatures[x];
+                boxes[0].max.ufeatures[x] = tmp;
+            }
+        }
+        boxes[1].min.ufeatures[i] = rng(rng_engine);
+        boxes[1].max.ufeatures[i] = 0;
+
+        boxes[2].min.ufeatures[i] = rng(rng_engine);
+        boxes[2].max.ufeatures[i] = 255;
+
+        boxes[3].min.ufeatures[i] = 255;
+        boxes[3].max.ufeatures[i] = 255;
+
+        boxes[4].min.ufeatures[i] = 0;
+        boxes[4].max.ufeatures[i] = 0;
+
+    }
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            verifyOne(descs[i], descs[j]);
+        }
+        for (int j = 0; j < 5; j++) {
+            verifyOne(descs[i], boxes[j]);
+        }
+    }
+}
+
 // Returns a pair: first contains dimension indices, second contains mean values for them.
 std::pair<SplitDimensions, SplitDimensions> GetSplitDimensions(const U8Descriptor* descriptors, const unsigned* indexes, size_t count)
 {
