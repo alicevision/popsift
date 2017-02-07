@@ -62,8 +62,8 @@ class Q2NNpq    // std::priority_queue doesn't support preallocation
 {
 public:
     struct Entry {
-        unsigned short distance;    // max L1 distance is 255*128 = 32640
-        unsigned short tree;
+        unsigned distance;
+        unsigned tree;
         unsigned node;
         friend bool operator<(const Entry& e1, const Entry& e2) {
             return e1.distance > e2.distance;   // Reverse heap ordering; smallest on top
