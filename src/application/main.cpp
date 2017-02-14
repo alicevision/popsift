@@ -86,14 +86,24 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     options_description all("Allowed options");
     all.add(options).add(parameters).add(modes).add(informational);
     variables_map vm;
-    store(parse_command_line(argc, argv, all), vm);
-
-    if (vm.count("help")) {
-        std::cout << all << '\n';
-        exit(1);
-    }
     
-    notify(vm); // Notify does processing (e.g., raise exceptions if required args are missing)
+    try
+    {    
+        store(parse_command_line(argc, argv, all), vm);
+
+        if (vm.count("help")) {
+            std::cout << all << '\n';
+            exit(1);
+        }
+
+        notify(vm); // Notify does processing (e.g., raise exceptions if required args are missing)
+    }
+    catch(boost::program_options::error& e)
+    {
+        std::cerr << "Error: " << e.what() << std::endl << std::endl;
+        std::cerr << "Usage:\n\n" << all << std::endl;
+        exit(EXIT_FAILURE);
+    }
 }
 
 int main(int argc, char **argv)
