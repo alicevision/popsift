@@ -12,7 +12,7 @@ else()
   find_package(PopSift CONFIG REQUIRED)
 endif()
 
-find_package(Boost 1.53.0 REQUIRED COMPONENTS program_options)
+find_package(Boost 1.53.0 REQUIRED COMPONENTS program_options system filesystem)
 
 add_executable(popsift-demo main.cpp pgmread.cpp)
 set_property(TARGET popsift-demo PROPERTY CXX_STANDARD 11)
