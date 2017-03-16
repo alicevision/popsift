@@ -17,8 +17,36 @@
 using namespace std;
 
 PopSift::PopSift( const popsift::Config& config )
-    : _config( config )
 {
+    for( int i=0; i<MAX_PIPES; i++ ) {
+        _pipe[i]._inputImage = 0;
+        _pipe[i]._pyramid    = 0;
+    }
+
+    configure(config);
+}
+
+PopSift::PopSift( )
+{
+    for( int i=0; i<MAX_PIPES; i++ ) {
+        _pipe[i]._inputImage = 0;
+        _pipe[i]._pyramid    = 0;
+    }
+}
+
+PopSift::~PopSift()
+{ }
+
+bool PopSift::configure( const popsift::Config& config )
+{
+    for( int i=0; i<MAX_PIPES; i++ ) {
+        if( _pipe[i]._inputImage != 0 ) {
+            return false;
+        }
+    }
+
+    _config = config;
+
     _config.levels = max( 2, config.levels );
 
     popsift::init_filter( _config,
@@ -28,14 +56,15 @@ PopSift::PopSift( const popsift::Config& config )
                              _config.levels,
                              _config.getPeakThreshold(),
                              _config._edge_limit,
-                             10000 ); // max extrema
+                             10000, // max extrema
+                             _config.getNormalizationMultiplier() );
+    return true;
 }
-
-PopSift::~PopSift()
-{ }
 
 bool PopSift::init( int pipe, int w, int h, bool checktime )
 {
+    if( _pipe[pipe]._inputImage != 0 ) return false;
+
     cudaEvent_t start, end;
     if( checktime ) {
         cudaEventCreate( &start );
@@ -88,12 +117,17 @@ void PopSift::uninit( int pipe )
 
     delete _pipe[pipe]._inputImage;
     delete _pipe[pipe]._pyramid;
+
+    _pipe[pipe]._inputImage = 0;
+    _pipe[pipe]._pyramid    = 0;
 }
 
 popsift::Features* PopSift::execute( int                  pipe,
                                      const unsigned char* imageData,
                                      bool                 checktime )
 {
+    if( _pipe[pipe]._inputImage == 0 ) return 0;
+
     if( pipe < 0 && pipe >= MAX_PIPES ) return 0;
 
     cudaEvent_t start, end;

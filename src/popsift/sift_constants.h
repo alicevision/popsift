@@ -55,12 +55,13 @@ struct ConstInfo
     float sigma_k;
     float edge_limit;
     float threshold;
+    int   norm_multi;
 };
 
 extern                         ConstInfo h_consts;
 extern __device__ __constant__ ConstInfo d_consts;
 
 
-void init_constants( float sigma0, int levels, float threshold, float edge_limit, int max_extrema );
+void init_constants( float sigma0, int levels, float threshold, float edge_limit, int max_extrema, int normalization_multiplier );
 
 } // namespace popsift

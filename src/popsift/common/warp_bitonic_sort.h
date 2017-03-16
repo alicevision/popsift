@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <iso646.h>
 
 namespace popsift {
 namespace BitonicSort {

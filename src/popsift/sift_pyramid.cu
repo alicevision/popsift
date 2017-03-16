@@ -11,6 +11,11 @@
 #include <vector>
 #include <stdio.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#define stat _stat
+#define mkdir(path, perm) _mkdir(path)
+#endif
 
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
@@ -73,16 +78,17 @@ void Pyramid::save_descriptors( const Config& conf, const char* basename, uint32
     }
     ostringstream ostr;
     ostr << "dir-desc/desc-" << basename << "-o-" << octave << ".txt";
-    ofstream of( ostr.str().c_str() );
-    _octaves[octave].writeDescriptor( conf, of, true );
+    ofstream of(ostr.str().c_str(), ios::binary);
+    _octaves[octave].writeDescriptor(conf, of, true);
+
 
     if (stat("dir-fpt", &st) == -1) {
         mkdir("dir-fpt", 0700);
     }
     ostringstream ostr2;
     ostr2 << "dir-fpt/desc-" << basename << "-o-" << octave << ".txt";
-    ofstream of2( ostr2.str().c_str() );
-    _octaves[octave].writeDescriptor( conf, of2, false );
+    ofstream of2(ostr2.str().c_str(), ios::binary);
+    _octaves[octave].writeDescriptor(conf, of2, false);
 }
 
 Pyramid::Pyramid( Config& config,
@@ -145,7 +151,7 @@ Features* Pyramid::find_extrema( const Config& conf,
         num_descriptors += _octaves[o].getDescriptorCount();
     }
 
-    features->_features.resize( num_extrema );
+    features->_features.resize( num_extrema+1 );
 
     features->_num_descriptors = num_descriptors;
     features->_desc_buffer = new Descriptor[ num_descriptors ];

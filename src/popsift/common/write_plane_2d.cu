@@ -80,7 +80,7 @@ void write_plane2D( const char* filename, Plane2D_float& f )
         }
     }
 #if 1
-    ofstream of( filename );
+    ofstream of( filename, ios::binary );
     of << "P2" << endl 
        << cols << " " << rows << endl
        << "255" << endl;
@@ -95,7 +95,7 @@ void write_plane2D( const char* filename, Plane2D_float& f )
     }
     delete [] c;
 #else
-    ofstream of( filename );
+    ofstream of( filename, ios::binary );
     of << "P5" << endl
        << cols << " " << rows << endl
        << "255" << endl;
@@ -120,7 +120,7 @@ void write_plane2Dunscaled( const char* filename, Plane2D_float& f, int offset )
         }
     }
 
-    ofstream of( filename );
+    ofstream of( filename, ios::binary );
     of << "P2" << endl
        << cols << " " << rows << endl
        << "255" << endl;
@@ -167,7 +167,7 @@ void dump_plane2Dfloat( const char* filename, Plane2D_float& f )
         }
     }
 
-    ofstream of( filename );
+    ofstream of( filename, ios::binary );
     of << "floats" << endl
        << cols << " " << rows << endl;
     of.write( (char*)c, rows*cols*sizeof(float) );

@@ -15,7 +15,7 @@ namespace popsift {
 ConstInfo                         h_consts;
 __device__ __constant__ ConstInfo d_consts;
 
-void init_constants( float sigma0, int levels, float threshold, float edge_limit, int max_extrema )
+void init_constants( float sigma0, int levels, float threshold, float edge_limit, int max_extrema, int normalization_multiplier )
 {
     cudaError_t err;
 
@@ -25,6 +25,7 @@ void init_constants( float sigma0, int levels, float threshold, float edge_limit
     h_consts.threshold    = threshold;
     h_consts.extrema      = max_extrema;
     h_consts.orientations = max_extrema + max_extrema/4;
+    h_consts.norm_multi   = normalization_multiplier;
 
     err = cudaMemcpyToSymbol( d_consts, &h_consts,
                               sizeof(ConstInfo), 0,

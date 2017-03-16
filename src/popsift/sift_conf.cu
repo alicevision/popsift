@@ -26,6 +26,7 @@ Config::Config( )
     , _assume_initial_blur( false )
     , _initial_blur( 0.0f )
     , _use_root_sift( false )
+    , _normalization_multiplier( 0 )
     , _print_gauss_tables( false )
     , _dp_orientation( true )
     , _dp_descriptors( true )
@@ -76,6 +77,7 @@ void Config::setPrintGaussTables() { _print_gauss_tables = true; }
 void Config::setDPOrientation( bool onoff ) { _dp_orientation = onoff; }
 void Config::setDPDescriptors( bool onoff ) { _dp_descriptors = onoff; }
 void Config::setUseRootSift( bool on ) { _use_root_sift = on; }
+void Config::setNormalizationMultiplier( int mul ) { _normalization_multiplier = mul; }
 
 void Config::setInitialBlur( float blur )
 {
