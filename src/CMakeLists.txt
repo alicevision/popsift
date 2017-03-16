@@ -87,5 +87,6 @@ install(EXPORT "${targets_export_name}"
         NAMESPACE "${namespace}"
         DESTINATION "${config_install_dir}")
 
-
-add_subdirectory(application)
+if(PopSift_BUILD_EXAMPLES)
+  add_subdirectory(application)
+endif()
