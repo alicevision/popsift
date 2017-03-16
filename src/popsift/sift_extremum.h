@@ -14,17 +14,27 @@
 
 namespace popsift {
 
+struct InitialExtremum
+{
+    float xpos;
+    float ypos;
+    int   lpos;  // extremum refined into this level
+    float sigma; // scale;
+};
+
 /* This is an internal data structure.
  * For performance reasons, it would be appropriate to split
- * the first 3 floats from the rest of this structure. Right
+ * the first 4 values from the rest of this structure. Right
  * now, descriptor computation is a bigger concern.
  */
 struct Extremum
 {
     float xpos;
     float ypos;
+    int   lpos;  // extremum refined into this level
     float sigma; // scale;
 
+    int   octave;  // belonging to this octave
     int   num_ori; // number of this extremum's orientations
     int   idx_ori; // exclusive prefix sum of the layer's orientations
     float orientation[ORIENTATION_MAX_COUNT];
@@ -45,13 +55,16 @@ struct Descriptor
  */
 struct Feature
 {
+    int         debug_octave;
     float       xpos;
     float       ypos;
-    float       sigma;     // scale;
-    int         num_descs; // number of this extremum's orientations
-                            // remaining entries in desc are 0
+    float       sigma;   // scale;
+    int         num_ori; // number of this extremum's orientations
+                         // remaining entries in desc are 0
     float       orientation[ORIENTATION_MAX_COUNT];
     Descriptor* desc[ORIENTATION_MAX_COUNT];
+
+    void print( std::ostream& ostr, bool write_as_uchar ) const;
 };
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
@@ -66,25 +79,33 @@ std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
  */
 class Features
 {
-    typedef std::vector<Feature>::iterator       F_iterator;
-    typedef std::vector<Feature>::const_iterator F_const_iterator;
-
-    std::vector<Feature> _features;
-    Descriptor*          _desc_buffer;
-    unsigned int         _num_descriptors;
+    Feature*     _ext;
+    Descriptor*  _ori;
+    int          _num_ext;
+    int          _num_ori;
 
 public:
     Features( );
+    Features( int num_ext, int num_ori );
     ~Features( );
 
-    inline F_iterator       begin()       { return _features.begin(); }
-    inline F_const_iterator begin() const { return _features.begin(); }
-    inline F_iterator       end()         { return _features.end(); }
-    inline F_const_iterator end() const   { return _features.end(); }
+    // re-introduce iterators!
+    // inline F_iterator       begin()       { return _features.begin(); }
+    // inline F_const_iterator begin() const { return _features.begin(); }
+    // inline F_iterator       end()         { return _features.end(); }
+    // inline F_const_iterator end() const   { return _features.end(); }
+    void reset( int num_ext, int num_ori );
+    void pin( );
+    void unpin( );
 
-    inline unsigned int     size() const                { return _features.size(); }
-    inline unsigned int     getFeatureCount() const     { return _features.size(); }
-    inline unsigned int     getDescriptorCount() const  { return _num_descriptors; }
+    inline int     size() const                { return _num_ext; }
+    inline int     getFeatureCount() const     { return _num_ext; }
+    inline int     getDescriptorCount() const  { return _num_ori; }
+
+    inline Feature*    getFeatures()    { return _ext; }
+    inline Descriptor* getDescriptors() { return _ori; }
+
+    void print( std::ostream& ostr, bool write_as_uchar ) const;
 
 protected:
     friend class Pyramid;

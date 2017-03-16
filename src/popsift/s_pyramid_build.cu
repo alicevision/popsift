@@ -9,7 +9,7 @@
 #include "sift_constants.h"
 #include "gauss_filter.h"
 #include "common/debug_macros.h"
-#include "assist.h"
+#include "common/assist.h"
 #include "common/clamp.h"
 
 #include <iostream>
@@ -21,15 +21,20 @@
 namespace popsift {
 
 namespace gauss {
-namespace v11 {
 
-namespace absoluteLinearTex {
+namespace variableSpan {
+
+namespace absoluteTexAddress {
 __global__
-void horiz_128x1( cudaTextureObject_t src_data,
-                  Plane2D_float       dst_data,
-                  int                 level )
+void horiz( cudaTextureObject_t src_data,
+            Plane2D_float       dst_data,
+            const int           dst_w,
+            const int           dst_h,
+            const int           dst_level )
 {
-    const int dst_w = dst_data.getWidth();
+    const int    src_level = dst_level - 1;
+    const int    span      = d_gauss.inc.span[dst_level];
+    const float* filter    = &popsift::d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
 
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -38,338 +43,235 @@ void horiz_128x1( cudaTextureObject_t src_data,
     float out = 0.0f;
 
     #pragma unroll
-    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
-        const float& g  = popsift::d_gauss.filter[level*GAUSS_ALIGN + offset];
-        const float  v1 = tex2D<float>( src_data, off_x - offset + 0.5f, blockIdx.y + 0.5f );
+    for( int offset = span; offset>0; offset-- ) {
+        const float& g  = filter[offset];
+        const float  v1 = readTex( src_data, off_x - offset, blockIdx.y, src_level );
         out += ( v1 * g );
 
-        const float  v2 = tex2D<float>( src_data, off_x + offset + 0.5f, blockIdx.y + 0.5f );
+        const float  v2 = readTex( src_data, off_x + offset, blockIdx.y, src_level );
         out += ( v2 * g );
     }
-    const float& g  = popsift::d_gauss.filter[level*GAUSS_ALIGN];
-    const float v3 = tex2D<float>( src_data, off_x+0.5f, blockIdx.y+0.5f );
+    const float& g  = filter[0];
+    const float v3 = readTex( src_data, off_x, blockIdx.y, src_level );
     out += ( v3 * g );
 
     dst_data.ptr(blockIdx.y)[off_x] = out;
 }
-} // namespace absoluteLinearTex
 
-__global__
-void horiz_tex_128x1( cudaTextureObject_t src_data,
-                      Plane2D_float       dst_data,
-                      float               shift )
+__device__ static inline
+void vert_sub( cudaTextureObject_t src_data,
+               cudaSurfaceObject_t dst_data,
+               const int           dst_w,
+               const int           dst_h,
+               const int           dst_level,
+               const int           span,
+               const float*        filter )
 {
-    const float dst_w  = dst_data.getWidth();
-    const float dst_h  = dst_data.getHeight();
-    const float read_y = ( blockIdx.y + shift ) / dst_h;
+    int block_x = blockIdx.x * blockDim.x;
+    int block_y = blockIdx.y * blockDim.y;
+    int idx     = threadIdx.x;
+    int idy;
 
-    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
+    float g;
+    float val;
+    float out = 0;
 
-    if( off_x >= dst_w ) return;
+    for( int offset = span; offset>0; offset-- ) {
+        g  = filter[offset];
 
-    float out = 0.0f;
+        idy = threadIdx.y - offset;
+        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
+        out += ( val * g );
 
-    #pragma unroll
-    for( int offset = d_gauss.span[0]; offset>0; offset-- ) {
-        const float& g  = popsift::d_gauss.filter[0*GAUSS_ALIGN + offset];
-        const float read_x_l = ( off_x - offset );
-        const float  v1 = tex2D<float>( src_data, ( read_x_l + shift ) / dst_w, read_y );
-        out += ( v1 * g );
-
-        const float read_x_r = ( off_x + offset );
-        const float  v2 = tex2D<float>( src_data, ( read_x_r + shift ) / dst_w, read_y );
-        out += ( v2 * g );
+        idy = threadIdx.y + offset;
+        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
+        out += ( val * g );
     }
-    const float& g  = popsift::d_gauss.filter[0*GAUSS_ALIGN];
-    const float read_x = off_x;
-    const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
-    out += ( v3 * g );
 
-    dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f;
-}
+    g  = filter[0];
+    idy = threadIdx.y;
+    val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
+    out += ( val * g );
 
-__global__
-void horiz_tex_128x1_initial_blur( cudaTextureObject_t src_data,
-                                   Plane2D_float       dst_data,
-                                   float               shift )
-{
-    const float dst_w  = dst_data.getWidth();
-    const float dst_h  = dst_data.getHeight();
-    const float read_y = ( blockIdx.y + shift ) / dst_h;
+    idx = block_x+threadIdx.x;
+    idy = block_y+threadIdx.y;
 
-    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if( off_x >= dst_w ) return;
-
-    float out = 0.0f;
-
-    #pragma unroll
-    for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
-        const float& g  = popsift::d_gauss.filter_initial_blur[offset];
-        const float read_x_l = ( off_x - offset );
-        const float  v1 = tex2D<float>( src_data, ( read_x_l + shift ) / dst_w, read_y );
-        out += ( v1 * g );
-
-        const float read_x_r = ( off_x + offset );
-        const float  v2 = tex2D<float>( src_data, ( read_x_r + shift ) / dst_w, read_y );
-        out += ( v2 * g );
-    }
-    const float& g  = popsift::d_gauss.filter_initial_blur[0];
-    const float read_x = off_x;
-    const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
-    out += ( v3 * g );
-
-    dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f;
-}
-
-
-__global__
-void get_by_2_interpolate( cudaTextureObject_t src_data,
-                           Plane2D_float       dst_data,
-                           int                 level )
-{
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
-    const int dst_w = dst_data.getWidth();
-    const int dst_h = dst_data.getHeight();
     if( idx >= dst_w ) return;
     if( idy >= dst_h ) return;
 
-    const float val = tex2D<float>( src_data, 2.0f * idx + 1.0f, 2.0f * idy + 1.0f );
-    dst_data.ptr(idy)[idx] = val;
-}
-
-__global__
-void get_by_2_pick_every_second( Plane2D_float src_data,
-                                 Plane2D_float dst_data,
-                                 int           level )
-{
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
-    const int dst_w = dst_data.getWidth();
-    const int dst_h = dst_data.getHeight();
-    if( idx >= dst_w ) return;
-    if( idy >= dst_h ) return;
-
-    const int src_w = src_data.getWidth();
-    const int src_h = src_data.getHeight();
-    const int read_x = clamp( idx << 1, 0, src_w );
-    const int read_y = clamp( idy << 1, 0, src_h );
-
-    const float val = src_data.ptr(read_y)[read_x];
-
-    dst_data.ptr(idy)[idx] = val;
+    surf2DLayeredwrite( out, dst_data, idx*4, idy, dst_level, cudaBoundaryModeZero ); // dst_data.ptr(idy)[idx] = out;
 }
 
 __global__
 void vert( cudaTextureObject_t src_data,
-           Plane2D_float       dst_data,
-           int level )
+           cudaSurfaceObject_t dst_data,
+           int                 dst_w,
+           int                 dst_h,
+           int                 dst_level )
 {
-    const int dst_w = dst_data.getWidth();
-    const int dst_h = dst_data.getHeight();
+    vert_sub( src_data, dst_data, dst_w, dst_h, dst_level, d_gauss.inc.span[dst_level], &popsift::d_gauss.inc.filter[dst_level*GAUSS_ALIGN] );
+}
 
-    int block_x = blockIdx.x * blockDim.x;
-    int block_y = blockIdx.y * blockDim.y;
-    int idx     = threadIdx.x;
-    int idy;
+} // namespace absoluteTexAddress
 
-    float g;
-    float val;
-    float out = 0;
+namespace relativeTexAddress {
 
-#ifdef GAUSS_INTERM_FILTER_MODE_POINT
-    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
-        g  = popsift::d_gauss.filter[level*GAUSS_ALIGN + offset];
+__device__
+inline static void horiz_sub( cudaTextureObject_t src_data,
+                              Plane2D_float       dst_data,
+                              float               shift,
+                              int                 span,
+                              float*              filter )
+{
+    const float dst_w  = dst_data.getWidth();
+    const float dst_h  = dst_data.getHeight();
+    const float read_y = ( blockIdx.y + shift ) / dst_h;
 
-        idy = threadIdx.y - offset;
-        val = tex2D<float>( src_data, block_x + idx, block_y + idy );
-        out += ( val * g );
+    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
 
-        idy = threadIdx.y + offset;
-        val = tex2D<float>( src_data, block_x + idx, block_y + idy );
-        out += ( val * g );
+    if( off_x >= dst_w ) return;
+
+    float out = 0.0f;
+
+    #pragma unroll
+    for( int offset = span; offset>0; offset-- ) {
+        const float& g  = filter[offset];
+        const float read_x_l = ( off_x - offset );
+        const float  v1 = tex2D<float>( src_data, ( read_x_l + shift ) / dst_w, read_y );
+        out += ( v1 * g );
+
+        const float read_x_r = ( off_x + offset );
+        const float  v2 = tex2D<float>( src_data, ( read_x_r + shift ) / dst_w, read_y );
+        out += ( v2 * g );
     }
+    const float& g  = filter[0];
+    const float read_x = off_x;
+    const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
+    out += ( v3 * g );
 
-    g  = popsift::d_gauss.filter[level*GAUSS_ALIGN];
-    idy = threadIdx.y;
-    val = tex2D<float>( src_data, block_x + idx, block_y + idy );
-    out += ( val * g );
-#else // not GAUSS_INTERM_FILTER_MODE_POINT
-    for( int offset = d_gauss.span[level]; offset>0; offset-- ) {
-        g  = popsift::d_gauss.filter[level*GAUSS_ALIGN + offset];
-
-        idy = threadIdx.y - offset;
-        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-        out += ( val * g );
-
-        idy = threadIdx.y + offset;
-        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-        out += ( val * g );
-    }
-
-    g  = popsift::d_gauss.filter[level*GAUSS_ALIGN];
-    idy = threadIdx.y;
-    val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-    out += ( val * g );
-#endif // not GAUSS_INTERM_FILTER_MODE_POINT
-
-    idx = block_x+threadIdx.x;
-    idy = block_y+threadIdx.y;
-
-    if( idx >= dst_w ) return;
-    if( idy >= dst_h ) return;
-
-    dst_data.ptr(idy)[idx] = out;
+    dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f;
 }
 
 __global__
-void vert_initial_blur( cudaTextureObject_t src_data,
-                        Plane2D_float       dst_data )
+void horiz( cudaTextureObject_t src_data,
+            Plane2D_float       dst_data,
+            int                 octave,
+            float               shift )
 {
-    const int dst_w = dst_data.getWidth();
-    const int dst_h = dst_data.getHeight();
-
-    int block_x = blockIdx.x * blockDim.x;
-    int block_y = blockIdx.y * blockDim.y;
-    int idx     = threadIdx.x;
-    int idy;
-
-    float g;
-    float val;
-    float out = 0;
-
-#ifdef GAUSS_INTERM_FILTER_MODE_POINT
-    for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
-        g  = popsift::d_gauss.filter_initial_blur[offset];
-
-        idy = threadIdx.y - offset;
-        val = tex2D<float>( src_data, block_x + idx, block_y + idy );
-        out += ( val * g );
-
-        idy = threadIdx.y + offset;
-        val = tex2D<float>( src_data, block_x + idx, block_y + idy );
-        out += ( val * g );
-    }
-
-    g  = popsift::d_gauss.filter_initial_blur[0];
-    idy = threadIdx.y;
-    val = tex2D<float>( src_data, block_x + idx, block_y + idy );
-    out += ( val * g );
-#else // not GAUSS_INTERM_FILTER_MODE_POINT
-    for( int offset = d_gauss.initial_span; offset>0; offset-- ) {
-        g  = popsift::d_gauss.filter_initial_blur[offset];
-
-        idy = threadIdx.y - offset;
-        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-        out += ( val * g );
-
-        idy = threadIdx.y + offset;
-        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-        out += ( val * g );
-    }
-
-    g  = popsift::d_gauss.filter_initial_blur[0];
-    idy = threadIdx.y;
-    val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-    out += ( val * g );
-#endif // not GAUSS_INTERM_FILTER_MODE_POINT
-
-    idx = block_x+threadIdx.x;
-    idy = block_y+threadIdx.y;
-
-    if( idx >= dst_w ) return;
-    if( idy >= dst_h ) return;
-
-    dst_data.ptr(idy)[idx] = out;
+    // The first line creates level-0 octave-0 for the input image only.
+    // Since we are computing the direct-downscaling gauss filter tables
+    // and the first entry in that table is identical to the "normal"
+    // table, we do not need a special case.
+    // horiz( src_data, dst_data, shift, d_gauss.inc.span[0], &d_gauss.inc.filter[0*GAUSS_ALIGN] );
+    horiz_sub( src_data,
+               dst_data,
+               shift,
+               d_gauss.dd.span[octave],
+               &d_gauss.dd.filter[octave*GAUSS_ALIGN] );
 }
+
+} // namespace relativeTexAddress
+
+} // namespace variableSpan
 
 
 __global__
-void make_dog( Plane2D_float       this_data,
-               Plane2D_float       top_data,
-               cudaSurfaceObject_t dog_data,
-               int                 level )
+void get_by_2_interpolate( cudaTextureObject_t src_data,
+                           const int           src_level,
+                           cudaSurfaceObject_t dst_data,
+                           const int           dst_w,
+                           const int           dst_h )
 {
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int idy = blockIdx.y * blockDim.y + threadIdx.y;
 
-    const int cols = this_data.getWidth();
-    const int rows = this_data.getHeight();
-    
-    const int r_x = clamp( idx, cols );
-    const int r_y = clamp( idy, rows );
+    if( idx >= dst_w ) return;
+    if( idy >= dst_h ) return;
 
-    const float b = this_data.ptr(r_y)[r_x];
-    const float a = top_data .ptr(r_y)[r_x];
+    const float val = readTex( src_data, 2.0f * idx + 1.0f, 2.0f * idy + 1.0f, src_level );
+
+    surf2DLayeredwrite( val, dst_data, idx*4, idy, 0, cudaBoundaryModeZero ); // dst_data.ptr(idy)[idx] = val;
+}
+
+__global__
+void get_by_2_pick_every_second( cudaTextureObject_t src_data,
+                                 const int           src_w,
+                                 const int           src_h,
+                                 const int           src_level,
+                                 cudaSurfaceObject_t dst_data,
+                                 const int           dst_w,
+                                 const int           dst_h )
+{
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if( idx >= dst_w ) return;
+    if( idy >= dst_h ) return;
+
+    const int read_x = clamp( idx << 1, 0, src_w );
+    const int read_y = clamp( idy << 1, 0, src_h );
+
+    const float val = readTex( src_data, read_x, read_y, src_level );
+
+    surf2DLayeredwrite( val, dst_data, idx*4, idy, 0, cudaBoundaryModeZero ); // dst_data.ptr(idy)[idx] = val;
+}
+
+
+__global__
+void make_dog( cudaTextureObject_t src_data,
+               cudaSurfaceObject_t dog_data,
+               const int           w,
+               const int           h )
+{
+    const int idx   = blockIdx.x * blockDim.x + threadIdx.x;
+    const int idy   = blockIdx.y * blockDim.y + threadIdx.y;
+    const int level = blockIdx.z;
+
+    const float b = readTex( src_data, idx, idy, level+1 );
+    const float a = readTex( src_data, idx, idy, level );
     const float c = b - a;
 
     surf2DLayeredwrite( c, dog_data, idx*4, idy, level, cudaBoundaryModeZero );
 }
 
 } // namespace gauss
-} // namespace v11
 
 __host__
-inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode, bool initial_blur )
+inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode )
 {
-    Octave&      oct_obj = _octaves[octave];
+    Octave&   oct_obj = _octaves[octave];
 
-    const int width  = oct_obj.getWidth();
-    const int height = oct_obj.getHeight();
+    const int width   = oct_obj.getWidth();
+    const int height  = oct_obj.getHeight();
 
     dim3 block( 128, 1 );
     dim3 grid;
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
 
-    float shift = 0.5f;
+    float shift  = 0.5f;
 
-    if( octave == 0 ) {
-        switch( mode )
-        {
-        case Config::PopSift :
-        case Config::VLFeat :
-            shift = 0.5f * powf( 2.0f, conf.getUpscaleFactor() );
-            break;
-        case Config::OpenCV :
-        default :
-            break;
-        }
-    } else {
-        // This code is only called for direct downscaling from the original image
-        shift = 0.5f;
+    if( octave == 0 && ( mode == Config::PopSift || mode == Config::VLFeat ) ) {
+        shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() - octave );
     }
 
-    if( initial_blur )
-        gauss::v11::horiz_tex_128x1_initial_blur
-            <<<grid,block,0,stream>>>
-            ( base->getInputTexture(),
-              oct_obj.getIntermediateData( ),
-              shift );
-    else
-        gauss::v11::horiz_tex_128x1
-            <<<grid,block,0,stream>>>
-            ( base->getInputTexture(),
-              oct_obj.getIntermediateData( ),
-              shift );
+    gauss::variableSpan::relativeTexAddress::horiz
+        <<<grid,block,0,stream>>>
+        ( base->getInputTexture(),
+          oct_obj.getIntermediateData( ),
+          octave,
+          shift );
 }
 
 
 __host__
-inline void Pyramid::downscale_from_prev_octave( int octave, int level, cudaStream_t stream, Config::SiftMode mode )
+inline void Pyramid::downscale_from_prev_octave( int octave, cudaStream_t stream, Config::SiftMode mode )
 {
     Octave&      oct_obj = _octaves[octave];
     Octave& prev_oct_obj = _octaves[octave-1];
 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
-
-    /* Necessary to wait for a lower level in the previous octave */
-    cudaEvent_t ev = prev_oct_obj.getEventGaussDone( _levels-PREV_LEVEL );
-    cudaStreamWaitEvent( stream, ev, 0 );
 
     dim3 h_block( 64, 2 );
     dim3 h_grid;
@@ -381,18 +283,24 @@ inline void Pyramid::downscale_from_prev_octave( int octave, int level, cudaStre
     case Config::PopSift :
     case Config::VLFeat :
     case Config::OpenCV :
-        gauss::v11::get_by_2_pick_every_second
+        gauss::get_by_2_pick_every_second
             <<<h_grid,h_block,0,stream>>>
-            ( prev_oct_obj.getData( _levels-PREV_LEVEL ),
-              oct_obj.getData( level ),
-              level );
+            ( prev_oct_obj.getDataTexPoint( ),
+              prev_oct_obj.getWidth(),
+              prev_oct_obj.getHeight(),
+              _levels-PREV_LEVEL,
+              oct_obj.getDataSurface( ),
+              oct_obj.getWidth(),
+              oct_obj.getHeight() );
         break;
     default :
-        gauss::v11::get_by_2_interpolate
+        gauss::get_by_2_interpolate
             <<<h_grid,h_block,0,stream>>>
-            ( prev_oct_obj._data_tex[ _levels-PREV_LEVEL ],
-              oct_obj.getData( level ),
-              level );
+            ( prev_oct_obj.getDataTexLinear( ),
+              _levels-PREV_LEVEL,
+              oct_obj.getDataSurface( ),
+              oct_obj.getWidth(),
+              oct_obj.getHeight() );
         break;
     }
 }
@@ -405,24 +313,22 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    /* waiting for previous level in same octave */
-    cudaEvent_t ev = oct_obj.getEventGaussDone( level-1 );
-    cudaStreamWaitEvent( stream, ev, 0 );
-
     dim3 block( 128, 1 );
     dim3 grid;
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
 
-    gauss::v11::absoluteLinearTex::horiz_128x1
+    gauss::variableSpan::absoluteTexAddress::horiz
         <<<grid,block,0,stream>>>
-        ( oct_obj._data_tex[ level-1 ],
+        ( oct_obj.getDataTexPoint( ),
           oct_obj.getIntermediateData( ),
+          oct_obj.getWidth(),
+          oct_obj.getHeight(),
           level );
 }
 
 __host__
-inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t stream, bool initial_blur )
+inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t stream )
 {
     Octave& oct_obj = _octaves[octave];
 
@@ -437,21 +343,17 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
     grid.x = (unsigned int)grid_divide( width,  block.x );
     grid.y = (unsigned int)grid_divide( height, block.y );
 
-    if( initial_blur )
-        gauss::v11::vert_initial_blur
-            <<<grid,block,0,stream>>>
-            ( oct_obj._interm_data_tex,
-              oct_obj.getData( 0 ) );
-    else
-        gauss::v11::vert
-            <<<grid,block,0,stream>>>
-            ( oct_obj._interm_data_tex,
-              oct_obj.getData( level ),
-              level );
+    gauss::variableSpan::absoluteTexAddress::vert
+        <<<grid,block,0,stream>>>
+        ( oct_obj.getIntermDataTexPoint( ),
+          oct_obj.getDataSurface( ),
+          oct_obj.getWidth(),
+          oct_obj.getHeight(),
+          level );
 }
 
 __host__
-inline void Pyramid::dog_from_blurred( int octave, int level, cudaStream_t stream )
+inline void Pyramid::dogs_from_blurred( int octave, int max_level, cudaStream_t stream )
 {
     Octave&      oct_obj = _octaves[octave];
 
@@ -462,19 +364,14 @@ inline void Pyramid::dog_from_blurred( int octave, int level, cudaStream_t strea
     dim3 grid;
     grid.x = grid_divide( width,  block.x );
     grid.y = grid_divide( height, block.y );
+    grid.z = max_level - 1;
 
-    /* waiting for lower level is automatic, it's in the same stream.
-     * waiting for upper level is necessary, it's in another stream.
-     */
-    cudaEvent_t  ev     = oct_obj.getEventGaussDone( level-1 );
-    cudaStreamWaitEvent( stream, ev, 0 );
-
-    gauss::v11::make_dog
+    gauss::make_dog
         <<<grid,block,0,stream>>>
-        ( oct_obj.getData(level),
-          oct_obj.getData(level-1),
+        ( oct_obj.getDataTexPoint( ),
           oct_obj.getDogSurface( ),
-          level-1 );
+          oct_obj.getWidth(),
+          oct_obj.getHeight() );
 }
 
 /*************************************************************
@@ -483,8 +380,6 @@ inline void Pyramid::dog_from_blurred( int octave, int level, cudaStream_t strea
 __host__
 void Pyramid::build_pyramid( const Config& conf, Image* base )
 {
-    cudaError_t err;
-
 #if (PYRAMID_PRINT_DEBUG==1)
     cerr << "Entering " << __FUNCTION__ << " with base image "  << endl
          << "    type size         : " << base->type_size << endl
@@ -498,55 +393,93 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
     cudaDeviceSynchronize();
 
     for( uint32_t octave=0; octave<_num_octaves; octave++ ) {
-        Octave& oct_obj   = _octaves[octave];
+        Octave&      oct_obj = _octaves[octave];
+        cudaStream_t stream  = oct_obj.getStream();
 
-        for( uint32_t level=0; level<_levels; level++ ) {
-            const int width  = oct_obj.getWidth();
-            const int height = oct_obj.getHeight();
+        if( ( conf.getScalingMode() == Config::ScaleDirect ) &&
+            ( conf.getGaussMode() == Config::Fixed9 || conf.getGaussMode() == Config::Fixed15 ) ) {
+            if( octave == 0 ) {
+                make_octave( conf, base, oct_obj, stream, true );
+            } else {
+                horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode() );
+                vert_from_interm( octave, 0, stream );
+                make_octave( conf, base, oct_obj, stream, false );
+            }
+        } else if( conf.getGaussMode() == Config::Fixed9 || conf.getGaussMode() == Config::Fixed15 ) {
+            if( octave == 0 ) {
+                make_octave( conf, base, oct_obj, stream, true );
+            } else {
+                Octave& prev_oct_obj = _octaves[octave-1];
+                cuda::event_wait( prev_oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
 
-            cudaStream_t stream = oct_obj.getStream(level);
-            cudaEvent_t  ev     = oct_obj.getEventGaussDone(level);
-            cudaEvent_t  dog_ev = oct_obj.getEventDogDone(level);
+                downscale_from_prev_octave( octave, stream, conf.getSiftMode() );
+                make_octave( conf, base, oct_obj, stream, false );
+            }
 
-            if( level == 0 )
-            {
-                if( octave == 0 )
+            cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
+        } else if( conf.getScalingMode() == Config::ScaleDirect ) {
+            for( int level=0; level<_levels; level++ ) {
+                const int width  = oct_obj.getWidth();
+                const int height = oct_obj.getHeight();
+
+                if( level == 0 )
                 {
-                    horiz_from_input_image( conf, base, 0, stream, conf.getSiftMode(), _assume_initial_blur );
-                    vert_from_interm( octave, level, stream, _assume_initial_blur );
+                    horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode() );
+                    vert_from_interm( octave, level, stream );
                 }
-                else 
+                else
                 {
-                    switch( _scaling_mode )
+                    horiz_from_prev_level( octave, level, stream );
+                    vert_from_interm( octave, level, stream );
+                }
+            }
+        } else {
+            for( int level=0; level<_levels; level++ ) {
+                const int width  = oct_obj.getWidth();
+                const int height = oct_obj.getHeight();
+
+                if( level == 0 )
+                {
+                    if( octave == 0 )
                     {
-                    case Config::ScaleDirect :
-                        // Does not work yet
-                        horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode(), false );
-                        vert_from_interm( octave, level, stream, false );
-                        break;
-                    case Config::ScaleDefault :
-                    default :
-                        downscale_from_prev_octave( octave, level, stream, conf.getSiftMode() );
-                        break;
+                        horiz_from_input_image( conf, base, 0, stream, conf.getSiftMode() );
+                        vert_from_interm( octave, 0, stream );
+                    }
+                    else
+                    {
+                        Octave& prev_oct_obj = _octaves[octave-1];
+                        cuda::event_wait( prev_oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
+
+                        downscale_from_prev_octave( octave, stream, conf.getSiftMode() );
+                    }
+                }
+                else
+                {
+                    horiz_from_prev_level( octave, level, stream );
+                    vert_from_interm( octave, level, stream );
+
+                    if( level == _levels - PREV_LEVEL ) {
+                        cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
                     }
                 }
             }
-            else
-            {
-                horiz_from_prev_level( octave, level, stream );
-                vert_from_interm( octave, level, stream, false );
-            }
 
-            err = cudaEventRecord( ev, stream );
-            POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
-
-            if( level > 0 ) {
-                dog_from_blurred( octave, level, stream );
-
-                err = cudaEventRecord( dog_ev, stream );
-                POP_CUDA_FATAL_TEST( err, "Could not record a Gauss done event: " );
-            }
         }
+    }
+    for( int octave=_num_octaves-1; octave>=0; octave-- )
+    {
+        if( conf.getGaussMode() == Config::Fixed9 || conf.getGaussMode() == Config::Fixed15 ) {
+        } else {
+            Octave&      oct_obj = _octaves[octave];
+            cudaStream_t stream  = oct_obj.getStream();
+            dogs_from_blurred( octave, _levels, stream );
+        }
+    }
+    for( int octave=_num_octaves-1; octave>=0; octave-- )
+    {
+        Octave&      oct_obj = _octaves[octave];
+        cudaStream_t stream  = oct_obj.getStream();
+        cudaStreamSynchronize( stream );
     }
 }
 

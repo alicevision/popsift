@@ -284,6 +284,12 @@ public:
         _cols = width;
     }
 
+    /** Overwrite the width and height information. Useful if smaller
+     *  planes should be loaded into larger preallocated planes
+     *  without actually allocating again, but dangerous.
+     */
+    __host__ void resetDimensions( int w, int h );
+
     /** cuda memcpy from this (plane allocated on host) to
      *  parameter (plane allocated on device) */
     __host__ inline void memcpyToDevice( Plane2D<T>& devPlane );
@@ -341,6 +347,20 @@ public:
  * member functions for PitchPlane2D that have been extracted
  * for readability.
  *************************************************************/
+
+template <typename T>
+__host__
+void Plane2D<T>::resetDimensions( int w, int h )
+{
+    if( w*sizeof(T) > this->getPitch() ) {
+        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
+                  << "    Error: trying to reinterpret plane width to " << w << " units a " << sizeof(T) << " bytes, "
+                     "only " << this->getPitch() << " bytes allocated" << std::endl;
+        exit( -1 );
+    }
+    this->_cols = w;
+    this->_rows = h;
+}
 
 template <typename T>
 __host__

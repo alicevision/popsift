@@ -7,12 +7,27 @@
  */
 #pragma once
 
+#include <string>
+#include <iso646.h>
+
+#define MAX_OCTAVES   20
+#define MAX_LEVELS    10
+
+#define USE_DOG_TEX_LINEAR
+
 namespace popsift
 {
 
 struct Config
 {
     Config( );
+
+    enum GaussMode {
+        VLFeat_Compute,
+        OpenCV_Compute,
+        Fixed9,
+        Fixed15
+    };
 
     enum SiftMode {
         PopSift,
@@ -31,10 +46,23 @@ struct Config
         ScaleDefault // Indirect - only working method
     };
 
+    /* Modes for descriptor extraction: */
+    enum DescMode {
+        Loop,        // scan horizontal, extract valid points
+        ILoop,       // scan horizontal, extract valid points, interpolate with tex engine
+        Grid,        // scan in rotated mode, round pixel address
+        IGrid,       // scan in rotated mode, interpolate with tex engine
+        NoTile       // variant of IGrid, no duplicate gradiant fetching
+    };
+
+    void setGaussMode( const std::string& m );
+    void setGaussMode( GaussMode m );
     void setMode( SiftMode m );
     void setLogMode( LogMode mode = All );
     void setScalingMode( ScalingMode mode = ScaleDefault );
     void setVerbose( bool on = true );
+    void setDescMode( const std::string& byname );
+    void setDescMode( DescMode mode = Loop );
 
     void setGaussGroup( int groupsize );
     int  getGaussGroup( ) const;
@@ -47,9 +75,9 @@ struct Config
     void setThreshold( float v );
     void setInitialBlur( float blur );
     void setUseRootSift( bool on );
+    void setMaxExtreme( int m );
     void setPrintGaussTables( );
     void setDPOrientation( bool on );
-    void setDPDescriptors( bool on );
     void setNormalizationMultiplier( int mul );
 
     bool  hasInitialBlur( ) const;
@@ -62,8 +90,14 @@ struct Config
     // print Gauss spans and tables?
     bool ifPrintGaussTables() const;
 
+    // What Gauss filter scan is desired?
+    GaussMode getGaussMode( ) const;
+
     // get the SIFT mode for more detailed sub-modes
     SiftMode getSiftMode() const;
+
+    // find out if we should print logging info or not
+    LogMode getLogMode() const;
 
     // The number of octaves is chosen freely. If not specified,
     // it is: log_2( min(x,y) ) - 3 - start_sampling
@@ -99,13 +133,21 @@ struct Config
         return _normalization_multiplier;
     }
 
-    bool useDPOrientation( ) const {
-        return ( _dp_capable & _dp_orientation );
+    int getMaxExtrema( ) const {
+        return _max_extrema;
     }
 
-    bool useDPDescriptors( ) const {
-        return ( _dp_capable & _dp_descriptors );
+    // check if we use direct downscaling from input image
+    // for all octaves
+    inline ScalingMode getScalingMode() const {
+        return _scaling_mode;
     }
+
+    inline DescMode getDescMode() const {
+        return _desc_mode;
+    }
+
+    bool equal( const Config& other ) const;
 
 private:
     // default threshold 0.0 default of vlFeat
@@ -121,22 +163,29 @@ private:
     // (x / 2^start_sampling, y / 2^start_sampling )
     float    _upscale_factor;
 
-public:
     // default LogMode::None
-    LogMode  log_mode;
+    LogMode  _log_mode;
 
     // default: ScalingMode::DownscaledOctaves
-    ScalingMode scaling_mode;
+    ScalingMode _scaling_mode;
 
+    // default: DescMode::Loop
+    DescMode    _desc_mode;
+
+public:
     bool     verbose;
 
-    /* A single Gauss filtering step filters for several levels at once,
-     * saving load operations. Accuracy is maintained only for very small
-     * numbers.
-     */
-    int gauss_group_size;
-
 private:
+    /* The maximum number of extrema that are returned. There may be
+     * several descriptors for each extremum.
+     */
+    int _max_extrema;
+
+    /* Modes are computation according to VLFeat or OpenCV,
+     * or fixed size. Default is VLFeat mode.
+     */
+    GaussMode _gauss_mode;
+
     /* Modes are PopSift, OpenCV and VLFeat.
      * Default is currently identical to PopSift.
      */
@@ -165,18 +214,17 @@ private:
      * filter width and Gauss tables in use.
      */
     bool _print_gauss_tables;
-
-    /* When these variables are true, CUDA Dynamic Parallelism can be used
-     * in the specified run-time stage.
-     */
-    bool _dp_orientation;
-    bool _dp_descriptors;
-
-    /* If the chosen GPU has compute capability below 3.5, then the previous
-     * configuration flags are always false.
-     */
-    bool _dp_capable;
 };
+
+inline bool operator==( const Config& l, const Config& r )
+{
+    return l.equal( r );
+}
+
+inline bool operator!=( const Config& l, const Config& r )
+{
+    return not l.equal( r );
+}
 
 }; // namespace popsift
 

@@ -11,8 +11,11 @@
 #include <inttypes.h>
 
 #include "common/plane_2d.h"
+#include "common/assist.h"
 #include "sift_constants.h"
 
+namespace popsift
+{
 /*
  * We are wasting time by computing gradiants on demand several
  * times. We could precompute gradiants for all pixels once, as
@@ -28,12 +31,12 @@
  * every first level of every octave ... which is not compatible
  * behaviour.
  */
-__device__
-inline void get_gradiant( float&         grad,
-                          float&         theta,
-                          uint32_t       x,
-                          uint32_t       y,
-                          popsift::Plane2D_float& layer )
+__device__ static inline
+void get_gradiant( float& grad,
+                   float& theta,
+                   int    x,
+                   int    y,
+                   popsift::Plane2D_float& layer )
 {
     grad  = 0.0f;
     theta = 0.0f;
@@ -45,18 +48,43 @@ inline void get_gradiant( float&         grad,
     }
 }
 
-// float2 x=grad, y=theta
-__device__
-inline float2 get_gradiant( uint32_t       x,
-                            uint32_t       y,
-                            popsift::Plane2D_float& layer )
+/* get_gradiant() works for both point texture and linear interpolation
+ * textures. The reason is that readTex must add 0.5 for coordinates in
+ * both cases to access the expected pixel.
+ */
+__device__ static inline
+void get_gradiant( float&              grad,
+                   float&              theta,
+                   const int           x,
+                   const int           y,
+                   cudaTextureObject_t layer,
+                   const int           level )
 {
-    if( x > 0 && x < layer.getCols()-1 && y > 0 && y < layer.getRows()-1 ) {
-        float dx = layer.ptr(y)[x+1] - layer.ptr(y)[x-1];
-        float dy = layer.ptr(y+1)[x] - layer.ptr(y-1)[x];
-        return make_float2( hypotf( dx, dy ), // __fsqrt_rz(dx*dx + dy*dy);
-                            atan2f(dy, dx) );
-    }
-    return make_float2( 0.0f, 0.0f );
+    float dx = readTex( layer, x+1.0f, y, level )
+             - readTex( layer, x-1.0f, y, level );
+    float dy = readTex( layer, x, y+1.0f, level )
+             - readTex( layer, x, y-1.0f, level );
+    grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
+    theta    = atan2f(dy, dx);
 }
+
+__device__ static inline
+void get_gradiant( float&              grad,
+                   float&              theta,
+                   float               x,
+                   float               y,
+                   float               cos_t,
+                   float               sin_t,
+                   cudaTextureObject_t texLinear,
+                   int                 level )
+{
+    float dx = readTex( texLinear, x+cos_t, y+sin_t, level )
+             - readTex( texLinear, x-cos_t, y-sin_t, level );
+    float dy = readTex( texLinear, x-sin_t, y+cos_t, level )
+             - readTex( texLinear, x+sin_t, y-cos_t, level );
+    grad     = hypotf( dx, dy );
+    theta    = atan2f( dy, dx );
+}
+
+}; // namespace popsift
 

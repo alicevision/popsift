@@ -168,5 +168,26 @@ void event_destroy( cudaEvent_t ev, const char* file, size_t line )
         exit( -__LINE__ );
     }
 }
-} }
+void event_record( cudaEvent_t ev, cudaStream_t s, const char* file, size_t line )
+{
+    cudaError_t err;
+    err = cudaEventRecord( ev, s );
+    if( err != cudaSuccess ) {
+        std::cerr << file << ":" << line << std::endl
+                  << "    cudaEventRecord failed: " << cudaGetErrorString(err) << std::endl;
+        exit( -__LINE__ );
+    }
+}
+void event_wait( cudaEvent_t ev, cudaStream_t s, const char* file, size_t line )
+{
+    cudaError_t err;
+    err = cudaStreamWaitEvent( s, ev, 0 );
+    if( err != cudaSuccess ) {
+        std::cerr << file << ":" << line << std::endl
+                  << "    cudaStreamWaitEvent failed: " << cudaGetErrorString(err) << std::endl;
+        exit( -__LINE__ );
+    }
+}
+} // namespace cuda
+} // namespace popsift
 

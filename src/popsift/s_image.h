@@ -15,10 +15,17 @@ namespace popsift {
 
 struct Image
 {
+    Image( );
+
     /** Create a device-sided buffer of the given dimensions */
-    Image( size_t w, size_t h );
+    Image( int w, int h );
 
     ~Image( );
+
+    /** Reallocation that takes care of pitch/step when new dimensions
+     *  are smaller and actually reallocation when they are bigger.
+     */
+    void resetDimensions( int w, int h );
 
     /* This loading function copies all image data to a local
      * buffer that is pinned in memory. We should offer two
@@ -26,7 +33,7 @@ struct Image
      * if the image is already uploaded, and one that takes
      * an image in pinned memory.
      */
-    void load( const Config& conf, const unsigned char* input );
+    void load( const unsigned char* input );
 
     void debug_out( );
 
@@ -34,9 +41,19 @@ struct Image
         return _input_image_tex;
     }
 
+    inline int getWidth()  const { return _w; }
+    inline int getHeight() const { return _h; }
+
 private:
-    int _w;
-    int _h;
+    void allocate( int w, int h );
+    void createTexture( );
+    void destroyTexture( );
+
+private:
+    int _w;     // width  of current image
+    int _h;     // height of current image
+    int _max_w; // allocated width  of image
+    int _max_h; // allocated height of image
 
     /* 2D plane holding input image on host for uploading
      * to device. */
