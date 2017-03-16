@@ -10,7 +10,10 @@ Build
 -----
 
 PopSift has been developed and tested on Linux machines, mostly a variant of Ubuntu, but compiles on MacOSX as well. It comes as a CMake project and requires at least CUDA 7.0. It is known to compile and work with NVidia cards of compute capability 3.0 (including the GT 650M), but the code is developed with the compute capability 5.2 card GTX 980 Ti in mind.
-PopSift requires boost to compile the test application.
+
+PopSift requires Boost only to compile the test application. If you want to avoid building the application (and thus the Boost dependency) you can run cmake with the option `-DPopSift_BUILD_EXAMPLES:BOOL=OFF`.
+
+In order to build the library you can run:
 
 ```
 mkdir build && cd build
