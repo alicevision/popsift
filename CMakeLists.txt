@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.4)
 
 project(PopSift VERSION 1.0.0)
 
+OPTION(PopSift_BUILD_EXAMPLES "Build PopSift applications." ON)
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -17,8 +19,6 @@ set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_DEBUG}   -O3")
 
 #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DGRIFF_DEBUG")
 #set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -DGRIFF_DEBUG")
-
-find_package(Boost 1.53.0 REQUIRED COMPONENTS system filesystem)
 
 find_package(CUDA 7.0)
 
