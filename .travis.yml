@@ -57,9 +57,8 @@ install:
   - rm $CUDA_REPO_PKG
   - sudo apt-get -y update
   - CUDA_PKG_VERSION="7-5"
-  - CUDA_VERSION="7.5"
   - sudo apt-get install -y --no-install-recommends  cuda-core-$CUDA_PKG_VERSION  cuda-cudart-dev-$CUDA_PKG_VERSION  cuda-cublas-dev-$CUDA_PKG_VERSION cuda-curand-dev-$CUDA_PKG_VERSION
-  - sudo ln -s /usr/local/cuda-$CUDA_VERSION /usr/local/cuda
+  - sudo ln -s /usr/local/cuda-$CUDA_PKG_VERSION /usr/local/cuda
 
 before_script:
   # Create build folder
