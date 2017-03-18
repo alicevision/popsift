@@ -13,6 +13,7 @@ addons:
       - libboost-filesystem-dev 
       - libboost-system-dev
       - libboost-program-options-dev
+      - libboost-thread-dev
 
 env:
   matrix:
