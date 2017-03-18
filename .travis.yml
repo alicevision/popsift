@@ -10,10 +10,10 @@ cache:
 addons:
   apt:
     packages:
-      - libboost-filesystem-dev 
-      - libboost-system-dev
-      - libboost-program-options-dev
-      - libboost-thread-dev
+      - libboost-filesystem1.55-dev 
+      - libboost-system1.55-dev
+      - libboost-program-options1.55-dev
+      - libboost-thread1.55-dev
 
 env:
   matrix:
