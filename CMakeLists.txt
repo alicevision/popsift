@@ -52,8 +52,15 @@ set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xcompiler;-rdynamic;-lineinfo")
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--keep")
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--source-in-ptx")
 endif(APPLE)
+
+# The following if should not be necessary, but apparently there is a bug in FindCUDA.cmake that
+# generate an empty string in the nvcc command line causing the compilation to fail.
+# see https://gitlab.kitware.com/cmake/cmake/issues/16411
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  message(STATUS "Building in debug mode")
+  set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG};-G")
+endif()
 set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-O3")
-set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG};-G")
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_30,code=sm_30")
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_35,code=sm_35")
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_50,code=sm_50")
