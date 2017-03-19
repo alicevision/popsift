@@ -27,7 +27,7 @@ PopSift::PopSift( const popsift::Config& config )
     configure( config, true );
 
     _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
-    _pipe._thread_stage2 = new boost::thread( &PopSift::execute,      this );
+    _pipe._thread_stage2 = new boost::thread( &PopSift::mainLoop,     this );
 }
 
 PopSift::PopSift( )
@@ -37,7 +37,7 @@ PopSift::PopSift( )
     _pipe._pyramid    = 0;
 
     _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
-    _pipe._thread_stage2 = new boost::thread( &PopSift::execute,      this );
+    _pipe._thread_stage2 = new boost::thread( &PopSift::mainLoop,     this );
 }
 
 PopSift::~PopSift()
@@ -70,7 +70,7 @@ bool PopSift::configure( const popsift::Config& config, bool force )
     return true;
 }
 
-bool PopSift::init( int w, int h )
+bool PopSift::private_init( int w, int h )
 {
     Pipe& p = _pipe;
 
@@ -140,7 +140,7 @@ void PopSift::uploadImages( )
     _pipe._queue_stage2.push( 0 );
 }
 
-void PopSift::execute( )
+void PopSift::mainLoop( )
 {
     Pipe& p = _pipe;
 
@@ -148,7 +148,7 @@ void PopSift::execute( )
     while( ( job = p._queue_stage2.pull() ) != 0 ) {
         popsift::Image* img = job->getImg();
 
-        init( img->getWidth(), img->getHeight() );
+        private_init( img->getWidth(), img->getHeight() );
 
         p._pyramid->step1( _config, img );
         p._unused.push( img );

@@ -89,11 +89,14 @@ public:
     Features( int num_ext, int num_ori );
     ~Features( );
 
-    // re-introduce iterators!
-    // inline F_iterator       begin()       { return _features.begin(); }
-    // inline F_const_iterator begin() const { return _features.begin(); }
-    // inline F_iterator       end()         { return _features.end(); }
-    // inline F_const_iterator end() const   { return _features.end(); }
+    typedef Feature*       F_iterator;
+    typedef const Feature* F_const_iterator;
+
+    inline F_iterator       begin()       { return _ext; }
+    inline F_const_iterator begin() const { return &_ext[_num_ext]; }
+    inline F_iterator       end()         { return _ext; }
+    inline F_const_iterator end() const   { return &_ext[_num_ext]; }
+
     void reset( int num_ext, int num_ori );
     void pin( );
     void unpin( );
