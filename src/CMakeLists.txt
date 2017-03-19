@@ -40,8 +40,7 @@ CUDA_ADD_LIBRARY(popsift STATIC
 # BUILD_INTERFACE allows to include the directory with source only when target is
 # built in the building tree (ie, not from an install location)
 target_include_directories(popsift 
-            PRIVATE ${Boost_INCLUDE_DIRS}
-            PUBLIC ${CUDA_INCLUDE_DIRS}
+            PUBLIC ${Boost_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS}
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>")
 
 

@@ -25,11 +25,10 @@ set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_RELEASE}   -O3")
 
 find_package(Boost 1.53.0 REQUIRED COMPONENTS system thread)
 if(WIN32)
-ADD_DEFINITIONS("-DBOOST_ALL_NO_LIB")
-LINK_DIRECTORIES(Boost_LIBRARRY_DIR_DEBUG)
-LINK_DIRECTORIES(Boost_LIBRARRY_DIR_RELEASE)
-
-endif()
+  add_definitions("-DBOOST_ALL_NO_LIB")
+  link_directories(Boost_LIBRARRY_DIR_DEBUG)
+  link_directories(Boost_LIBRARRY_DIR_RELEASE)
+endif(WIN32)
 
 find_package(CUDA 7.0)
 
@@ -43,15 +42,13 @@ endif(USE_NVTX_PROFILING)
 
 set(CUDA_SEPARABLE_COMPILATION ON)
 
-# set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG};-G;-g")
-if(APPLE)
-elseif(NOT WIN32)
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xcompiler;-rdynamic;-lineinfo")
-# set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;-v")
-# set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;-warn-double-usage")
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--keep")
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--source-in-ptx")
-endif(APPLE)
+if(UNIX AND NOT APPLE)
+  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xcompiler;-rdynamic;-lineinfo")
+  # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;-v")
+  # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;-warn-double-usage")
+  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--keep")
+  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--source-in-ptx")
+endif(UNIX AND NOT APPLE)
 
 # The following if should not be necessary, but apparently there is a bug in FindCUDA.cmake that
 # generate an empty string in the nvcc command line causing the compilation to fail.
@@ -68,11 +65,11 @@ set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_52,code=sm
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_52,code=compute_52")
 
 # default stream legacy implies that the 0 stream synchronizes all streams
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;legacy")
 # default stream per-thread implies that each host thread has one non-synchronizing 0-stream
+# currently, the code requires legacy mode
+set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;legacy")
 # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;per-thread")
-# print local memory usage per kernel: -Xptxas;-v
-# CUDA >= 7.5: -Xptxas;--warn-on-local-memory-usage;-Xptxas;--warn-on-spills
+
 message(STATUS "CUDA Version is ${CUDA_VERSION}")
 if(CUDA_VERSION>=7.5)
   set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;-warn-lmem-usage")
