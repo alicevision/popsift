@@ -240,9 +240,9 @@ void prep_features( Descriptor* descriptor_base, int up_fac )
     Feature&        fet = dobuf.features[offset];
 
     const int   octave  = ext.octave;
-    const float xpos    = ext.xpos  * pow(2.0, octave - up_fac);
-    const float ypos    = ext.ypos  * pow(2.0, octave - up_fac);
-    const float sigma   = ext.sigma * pow(2.0, octave - up_fac);
+    const float xpos    = ext.xpos  * powf(2.0f, float(octave - up_fac));
+    const float ypos    = ext.ypos  * powf(2.0f, float(octave - up_fac));
+    const float sigma   = ext.sigma * powf(2.0f, float(octave - up_fac));
     const int   num_ori = ext.num_ori;
 
     fet.xpos    = xpos;
