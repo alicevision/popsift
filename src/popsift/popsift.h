@@ -82,14 +82,32 @@ public:
 
     void uninit( );
 
+    /** deprecated */
+    inline bool init( int /*pipe*/, int w, int h ) {
+        _last_init_w = w;
+        _last_init_h = h;
+        return init(w,h);
+    }
+    /** deprecated */
+    inline void uninit( int /*pipe*/ ) { uninit(); }
+
     SiftJob*  enqueue( int                  w,
                        int                  h,
                        const unsigned char* imageData );
 
-    void uploadImages( );
-    void execute( );
+    /** deprecated */
+    inline popsift::Features* execute( int /*pipe*/, const unsigned char* imageData )
+    {
+        SiftJob* j = enqueue( _last_init_w, _last_init_h, imageData );
+        if( !j ) return 0;
+        popsift::Features* f = j->get();
+        delete j;
+        return f;
+    }
 
-    // inline popsift::Pyramid& pyramid( ) { return *_pipe._pyramid; }
+private:
+    void uploadImages( );
+    void mainLoop( );
 
 private:
     Pipe            _pipe;
@@ -99,5 +117,8 @@ private:
      * in configure()
      */
     popsift::Config _shadow_config;
+
+    int             _last_init_w; /* to support depreacted interface */
+    int             _last_init_h; /* to support depreacted interface */
 };
 
