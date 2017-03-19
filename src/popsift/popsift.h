@@ -78,22 +78,21 @@ public:
      *  constructor */
     bool configure( const popsift::Config& config, bool force = false );
 
-    bool init( int w, int h );
-
     void uninit( );
+
+    SiftJob*  enqueue( int                  w,
+                       int                  h,
+                       const unsigned char* imageData );
+
+    /** deprecated */
+    inline void uninit( int /*pipe*/ ) { uninit(); }
 
     /** deprecated */
     inline bool init( int /*pipe*/, int w, int h ) {
         _last_init_w = w;
         _last_init_h = h;
-        return init(w,h);
+        return true;
     }
-    /** deprecated */
-    inline void uninit( int /*pipe*/ ) { uninit(); }
-
-    SiftJob*  enqueue( int                  w,
-                       int                  h,
-                       const unsigned char* imageData );
 
     /** deprecated */
     inline popsift::Features* execute( int /*pipe*/, const unsigned char* imageData )
@@ -106,6 +105,7 @@ public:
     }
 
 private:
+    bool private_init( int w, int h );
     void uploadImages( );
     void mainLoop( );
 

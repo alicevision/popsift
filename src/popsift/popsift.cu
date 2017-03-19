@@ -70,7 +70,7 @@ bool PopSift::configure( const popsift::Config& config, bool force )
     return true;
 }
 
-bool PopSift::init( int w, int h )
+bool PopSift::private_init( int w, int h )
 {
     Pipe& p = _pipe;
 
@@ -148,7 +148,7 @@ void PopSift::mainLoop( )
     while( ( job = p._queue_stage2.pull() ) != 0 ) {
         popsift::Image* img = job->getImg();
 
-        init( img->getWidth(), img->getHeight() );
+        private_init( img->getWidth(), img->getHeight() );
 
         p._pyramid->step1( _config, img );
         p._unused.push( img );
