@@ -92,7 +92,7 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
         char b[100];
         const char* buf = strerror_r( errno, b, 100 );
 #else
-        const char* buf = strerror(errno);
+		const char* buf = strerror(errno);
 #endif
         cerr << __FILE__ << ":" << __LINE__ << endl
              << "    Failed to allocate " << sz << " bytes of page-aligned host memory." << endl
@@ -128,9 +128,9 @@ void PlaneBase::freeHost2D( void* data, PlaneMapMode m )
     }
     if (m == PageAligned) {
 #ifdef _WIN32
-        _aligned_free(data);
+	_aligned_free(data);
 #else
-        free(data);
+	free(data);
 #endif
         return;
     }

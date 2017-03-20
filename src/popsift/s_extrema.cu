@@ -14,15 +14,14 @@
 #include "sift_constants.h"
 #include "s_solve.h"
 #include "common/debug_macros.h"
-#include "assist.h"
+#include "common/assist.h"
 #include "common/clamp.h"
 
 namespace popsift{
 
 template<int HEIGHT>
-__device__
-static
-inline uint32_t extrema_count( int indicator, int* extrema_counter )
+__device__ static inline
+uint32_t extrema_count( int indicator, int* extrema_counter )
 {
     uint32_t mask = __ballot( indicator ); // bitfield of warps with results
 
@@ -52,8 +51,7 @@ inline void extremum_cmp( float val, float f, uint32_t& gt, uint32_t& lt, uint32
     lt |= ( ( val < f ) ? mask : 0 );
 }
 
-
-#define TX(dx,dy,dz) tex2DLayered<float>( obj, x+dx, y+dy, z+dz )
+#define TX(dx,dy,dz) readTex( obj, x+dx, y+dy, z+dz )
 
 __device__
 static
@@ -175,9 +173,9 @@ public:
             // return -1;
         // }
 
-        n.x += rintf( d.x );  // quicker roundf
-        n.y += rintf( d.y );  // quicker roundf
-        n.z += rintf( d.z );  // quicker roundf
+        n.x += roundf( d.x );  // choose rintf or roundf
+        n.y += roundf( d.y );  // rintf is quicker, roundf is more exact
+        n.z += roundf( d.z );
 
         const int retval = ( n.x < 5 || n.x >= width-5 ||
                              n.y < 5 || n.y >= height-5 ||
@@ -262,16 +260,16 @@ public:
     {
         if( last_it ) return 0;
 
-        float3 t;
+        int3 t;
 
-        t.x = ((d.x >= 0.6f && n.x < width-2) ?  1.0f : 0.0f )
-            + ((d.x <= -0.6f && n.x > 1)? -1.0f : 0.0f );
+        t.x = ((d.x >=  0.6f && n.x < width-2) ?  1 : 0 )
+            + ((d.x <= -0.6f && n.x > 1)       ? -1 : 0 );
 
-        t.y = ((d.y >= 0.6f && n.y < height-2)  ?  1.0f : 0.0f )
-            + ((d.y <= -0.6f && n.y > 1) ? -1.0f : 0.0f );
+        t.y = ((d.y >=  0.6f && n.y < height-2)  ?  1 : 0 )
+            + ((d.y <= -0.6f && n.y > 1)         ? -1 : 0 );
 
-        t.z = ((d.z >= 0.6f && n.z < maxlevel-1)  ?  1.0f : 0.0f )
-            + ((d.z <= -0.6f && n.z > 1) ? -1.0f : 0.0f );
+        t.z = ((d.z >=  0.6f && n.z < maxlevel-1)  ?  1 : 0 )
+            + ((d.z <= -0.6f && n.z > 1)           ? -1 : 0 );
 
         if( t.x == 0 && t.y == 0 && t.z == 0 ) {
             // no more changes
@@ -300,19 +298,18 @@ public:
 };
 
 template<int sift_mode>
-__device__
+__device__ inline
 bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
                               int                 debug_octave,
-                              int                 level,
                               int                 width,
                               int                 height,
                               const uint32_t      maxlevel,
-                              Extremum&           ec )
+                              InitialExtremum&    ec )
 {
-    ec.xpos    = 0;
-    ec.ypos    = 0;
-    ec.sigma   = 0;
-    ec.num_ori = 0;
+    ec.xpos    = 0.0f;
+    ec.ypos    = 0.0f;
+    ec.lpos    = 0;
+    ec.sigma   = 0.0f;
 
     /*
      * First consideration: extrema cannot be found on any outermost edge,
@@ -328,8 +325,10 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
      */
     const int block_x = blockIdx.x * 32;
     const int block_y = blockIdx.y * blockDim.y;
+    const int block_z = blockIdx.z;
     const int y       = block_y + threadIdx.y + 1;
     const int x       = block_x + threadIdx.x + 1;
+    const int level   = block_z + 1;
 
     if( sift_mode == Config::OpenCV ) {
         if( x < 5 || y < 5 || x >= width-5 || y >= height-5 ) {
@@ -337,7 +336,7 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
         }
     }
 
-    const float val = tex2DLayered<float>( dog, x, y, level );
+    const float val = readTex( dog, x, y, level );
 
     ModeFunctions<sift_mode> f;
     if( not f.first_contrast_ok( val ) ) return false;
@@ -365,12 +364,12 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
 
         // const int z = level - 1;
         /* compute gradient */
-        const float x2y1z1 = tex2DLayered<float>( dog, n.x+1, n.y  , n.z   );
-        const float x0y1z1 = tex2DLayered<float>( dog, n.x-1, n.y  , n.z   );
-        const float x1y2z1 = tex2DLayered<float>( dog, n.x  , n.y+1, n.z   );
-        const float x1y0z1 = tex2DLayered<float>( dog, n.x  , n.y-1, n.z   );
-        const float x1y1z2 = tex2DLayered<float>( dog, n.x  , n.y  , n.z+1 );
-        const float x1y1z0 = tex2DLayered<float>( dog, n.x  , n.y  , n.z-1 );
+        const float x2y1z1 = readTex( dog, n.x+1, n.y  , n.z   );
+        const float x0y1z1 = readTex( dog, n.x-1, n.y  , n.z   );
+        const float x1y2z1 = readTex( dog, n.x  , n.y+1, n.z   );
+        const float x1y0z1 = readTex( dog, n.x  , n.y-1, n.z   );
+        const float x1y1z2 = readTex( dog, n.x  , n.y  , n.z+1 );
+        const float x1y1z0 = readTex( dog, n.x  , n.y  , n.z-1 );
         // D.x = 0.5f * ( x2y1z1 - x0y1z1 );
         // D.y = 0.5f * ( x1y2z1 - x1y0z1 );
         // D.z = 0.5f * ( x1y1z2 - x1y1z0 );
@@ -379,7 +378,7 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
         D.z = scalbnf( x1y1z2 - x1y1z0, -1 );
 
         /* compute Hessian */
-        const float x1y1z1 = tex2DLayered<float>( dog, n.x  , n.y  , n.z   );
+        const float x1y1z1 = readTex( dog, n.x  , n.y  , n.z   );
         // DD.x = x2y1z1 + x0y1z1 - 2.0f * x1y1z1;
         // DD.y = x1y2z1 + x1y0z1 - 2.0f * x1y1z1;
         // DD.z = x1y1z2 + x1y1z0 - 2.0f * x1y1z1;
@@ -387,18 +386,18 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
         DD.y = x1y2z1 + x1y0z1 - scalbnf( x1y1z1, 1 );
         DD.z = x1y1z2 + x1y1z0 - scalbnf( x1y1z1, 1 );
 
-        const float x0y0z1 = tex2DLayered<float>( dog, n.x-1, n.y-1, n.z   );
-        const float x0y1z0 = tex2DLayered<float>( dog, n.x-1, n.y  , n.z-1 );
-        const float x0y1z2 = tex2DLayered<float>( dog, n.x-1, n.y  , n.z+1 );
-        const float x0y2z1 = tex2DLayered<float>( dog, n.x-1, n.y+1, n.z   );
-        const float x1y0z0 = tex2DLayered<float>( dog, n.x  , n.y-1, n.z-1 );
-        const float x1y0z2 = tex2DLayered<float>( dog, n.x  , n.y-1, n.z+1 );
-        const float x1y2z0 = tex2DLayered<float>( dog, n.x  , n.y+1, n.z-1 );
-        const float x1y2z2 = tex2DLayered<float>( dog, n.x  , n.y+1, n.z+1 );
-        const float x2y0z1 = tex2DLayered<float>( dog, n.x+1, n.y-1, n.z   );
-        const float x2y1z0 = tex2DLayered<float>( dog, n.x+1, n.y  , n.z-1 );
-        const float x2y1z2 = tex2DLayered<float>( dog, n.x+1, n.y  , n.z+1 );
-        const float x2y2z1 = tex2DLayered<float>( dog, n.x+1, n.y+1, n.z   );
+        const float x0y0z1 = readTex( dog, n.x-1, n.y-1, n.z   );
+        const float x0y1z0 = readTex( dog, n.x-1, n.y  , n.z-1 );
+        const float x0y1z2 = readTex( dog, n.x-1, n.y  , n.z+1 );
+        const float x0y2z1 = readTex( dog, n.x-1, n.y+1, n.z   );
+        const float x1y0z0 = readTex( dog, n.x  , n.y-1, n.z-1 );
+        const float x1y0z2 = readTex( dog, n.x  , n.y-1, n.z+1 );
+        const float x1y2z0 = readTex( dog, n.x  , n.y+1, n.z-1 );
+        const float x1y2z2 = readTex( dog, n.x  , n.y+1, n.z+1 );
+        const float x2y0z1 = readTex( dog, n.x+1, n.y-1, n.z   );
+        const float x2y1z0 = readTex( dog, n.x+1, n.y  , n.z-1 );
+        const float x2y1z2 = readTex( dog, n.x+1, n.y  , n.z+1 );
+        const float x2y2z1 = readTex( dog, n.x+1, n.y+1, n.z   );
         // DX.x = 0.25f * ( x2y2z1 + x0y0z1 - x0y2z1 - x2y0z1 );
         // DX.y = 0.25f * ( x2y1z2 + x0y1z0 - x0y1z2 - x2y1z0 );
         // DX.z = 0.25f * ( x1y2z2 + x1y0z0 - x1y2z0 - x1y0z2 );
@@ -471,9 +470,8 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
     const float det     = DD.x * DD.y - DX.x * DX.x;
     const float edgeval = tr * tr / det;
 
-    if( sift_mode == Config::PopSift && iter >= MAX_ITERATIONS && ( sn<0 || sn>maxlevel) ) {
-        return false;
-    }
+    // redundant check, verify() is stricter
+    // if( sift_mode == Config::PopSift && iter >= MAX_ITERATIONS && ( sn<0 || sn>maxlevel) ) { return false; }
 
     /* negative determinant => curvatures have different signs -> reject it */
     if (det <= 0.0f) {
@@ -492,9 +490,10 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
         return false;
     }
 
-    ec.xpos    = xn;
-    ec.ypos    = yn;
-    ec.sigma   = d_consts.sigma0 * pow(d_consts.sigma_k, sn); // * 2;
+    ec.xpos      = xn;
+    ec.ypos      = yn;
+    ec.lpos      = (int)roundf(sn);
+    ec.sigma     = d_consts.sigma0 * pow(d_consts.sigma_k, sn); // * 2;
         // const float sigma_k = powf(2.0f, 1.0f / levels );
 
     return true;
@@ -503,24 +502,26 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
 
 template<int HEIGHT, int sift_mode>
 __global__
+#ifdef NDEBUG
+__launch_bounds__(128,16)
+#endif
 void find_extrema_in_dog( cudaTextureObject_t dog,
-                             int                 octave,
-                             int                 level,
-                             int                 width,
-                             int                 height,
-                             const uint32_t      maxlevel,
-                             int*                extrema_counter,
-                             Extremum*           d_extrema,
-                             int*                d_number_of_blocks,
-                             int                 number_of_blocks )
+                          int                 octave,
+                          int                 width,
+                          int                 height,
+                          const uint32_t      maxlevel,
+                          int*                d_number_of_blocks,
+                          int                 number_of_blocks )
 {
-    Extremum ec;
+    InitialExtremum ec;
 
-    bool indicator = find_extrema_in_dog_sub<sift_mode>( dog, octave, level, width, height, maxlevel, ec );
+    bool indicator = find_extrema_in_dog_sub<sift_mode>( dog, octave, width, height, maxlevel, ec );
 
-    uint32_t write_index = extrema_count<HEIGHT>( indicator, extrema_counter );
+    uint32_t write_index = extrema_count<HEIGHT>( indicator, &dct.ext_ct[octave] );
 
-    if( indicator && write_index < d_consts.extrema ) {
+    InitialExtremum* d_extrema = dobuf.i_ext[octave];
+
+    if( indicator && write_index < d_consts.max_extrema ) {
         d_extrema[write_index] = ec;
     }
 
@@ -531,93 +532,8 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
         int ct = atomicAdd( d_number_of_blocks, 1 );
         if( ct >= number_of_blocks-1 ) {
-            int num_ext = atomicMin( extrema_counter, d_consts.extrema );
-        }
-    }
-}
-
-template<int HEIGHT>
-__host__
-void Pyramid::find_extrema_sub( const Config& conf )
-{
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        Octave&      oct_obj = _octaves[octave];
-
-        cudaEvent_t  reset_done_ev  = oct_obj.getEventExtremaDone(0);
-
-        int*  extrema_num_blocks = oct_obj.getNumberOfBlocks( );
-
-        for( int level=1; level<_levels-2; level++ ) {
-            int cols = oct_obj.getWidth();
-            int rows = oct_obj.getHeight();
-
-            dim3 block( 32, HEIGHT );
-            dim3 grid;
-            grid.x  = grid_divide( cols, block.x );
-            grid.y  = grid_divide( rows, block.y );
-
-            cudaStream_t oct_str = oct_obj.getStream(level+2);
-
-            cudaEvent_t  upp_ev  = oct_obj.getEventDogDone(level+0);
-            cudaEvent_t  mid_ev  = oct_obj.getEventDogDone(level+1);
-            // cudaEvent_t  low_ev  = oct_obj.getEventDogDone(level+2); - we are in the same stream
-
-            int*  extrema_counter = oct_obj.getExtremaCtPtrD( level );
-            int*  num_blocks      = &extrema_num_blocks[level];
-
-            cudaStreamWaitEvent( oct_str, reset_done_ev, 0 );
-            cudaStreamWaitEvent( oct_str, upp_ev, 0 );
-            cudaStreamWaitEvent( oct_str, mid_ev, 0 );
-            // cudaStreamWaitEvent( oct_str, low_ev, 0 ); - we are in the same stream
-
-            switch( conf.getSiftMode() )
-            {
-            case Config::VLFeat :
-                find_extrema_in_dog<HEIGHT,Config::VLFeat>
-                    <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
-                      octave,
-                      level,
-                      cols,
-                      rows,
-                      _levels-1,
-                      extrema_counter,
-                      oct_obj.getExtrema( level ),
-                      num_blocks,
-                      grid.x * grid.y );
-                break;
-            case Config::OpenCV :
-                find_extrema_in_dog<HEIGHT,Config::OpenCV>
-                    <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
-                      octave,
-                      level,
-                      cols,
-                      rows,
-                      _levels-1,
-                      extrema_counter,
-                      oct_obj.getExtrema( level ),
-                      num_blocks,
-                      grid.x * grid.y );
-                break;
-            default :
-                find_extrema_in_dog<HEIGHT,Config::PopSift>
-                    <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
-                      octave,
-                      level,
-                      cols,
-                      rows,
-                      _levels-1,
-                      extrema_counter,
-                      oct_obj.getExtrema( level ),
-                      num_blocks,
-                      grid.x * grid.y );
-                break;
-            }
-
-            cudaEvent_t  extrema_done_ev  = oct_obj.getEventExtremaDone(level+2);
-            cudaEventRecord( extrema_done_ev, oct_str );
+            int num_ext = atomicMin( &dct.ext_ct[octave], d_consts.max_extrema );
+            // printf( "Block %d,%d,%d num ext %d\n", blockIdx.x, blockIdx.y, blockIdx.z, dct.ext_ct[octave] );
         }
     }
 }
@@ -625,7 +541,71 @@ void Pyramid::find_extrema_sub( const Config& conf )
 __host__
 void Pyramid::find_extrema( const Config& conf )
 {
-    find_extrema_sub<4>( conf );
+    static const int HEIGHT = 4;
+
+    for( int octave=0; octave<_num_octaves; octave++ ) {
+        Octave&      oct_obj = _octaves[octave];
+
+        int*  extrema_num_blocks = getNumberOfBlocks( octave );
+
+        int cols = oct_obj.getWidth();
+        int rows = oct_obj.getHeight();
+
+        dim3 block( 32, HEIGHT );
+        dim3 grid;
+        grid.x  = grid_divide( cols, block.x );
+        grid.y  = grid_divide( rows, block.y );
+        grid.z  = _levels - 3;
+
+        cudaStream_t oct_str = oct_obj.getStream();
+
+        int*  num_blocks      = extrema_num_blocks;
+
+#ifdef USE_DOG_TEX_LINEAR
+#define getDogTexture getDogTextureLinear
+#else
+#define getDogTexture getDogTexturePoint
+#endif
+        switch( conf.getSiftMode() )
+        {
+        case Config::VLFeat :
+                find_extrema_in_dog<HEIGHT,Config::VLFeat>
+                    <<<grid,block,0,oct_str>>>
+                    ( oct_obj.getDogTexture( ),
+                      octave,
+                      cols,
+                      rows,
+                      _levels-1,
+                      num_blocks,
+                      grid.x * grid.y );
+                break;
+        case Config::OpenCV :
+                find_extrema_in_dog<HEIGHT,Config::OpenCV>
+                    <<<grid,block,0,oct_str>>>
+                    ( oct_obj.getDogTexture( ),
+                      octave,
+                      cols,
+                      rows,
+                      _levels-1,
+                      num_blocks,
+                      grid.x * grid.y );
+                break;
+        default :
+                find_extrema_in_dog<HEIGHT,Config::PopSift>
+                    <<<grid,block,0,oct_str>>>
+                    ( oct_obj.getDogTexture( ),
+                      octave,
+                      cols,
+                      rows,
+                      _levels-1,
+                      num_blocks,
+                      grid.x * grid.y );
+                break;
+        }
+#undef getDogTexture
+
+        cuda::event_record( oct_obj.getEventExtremaDone(), oct_str, __FILE__, __LINE__ );
+    }
 }
 
 } // namespace popsift

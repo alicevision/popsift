@@ -64,6 +64,8 @@ cudaStream_t stream_create( const char* file, size_t line );
 void         stream_destroy( cudaStream_t s, const char* file, size_t line );
 cudaEvent_t  event_create( const char* file, size_t line );
 void         event_destroy( cudaEvent_t ev, const char* file, size_t line );
+void         event_record( cudaEvent_t ev, cudaStream_t s, const char* file, size_t line );
+void         event_wait( cudaEvent_t ev, cudaStream_t s, const char* file, size_t line );
 };
 };
 

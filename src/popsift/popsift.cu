@@ -6,6 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include <fstream>
+#include <pthread.h> // for pthread_self
 
 #include "sift_constants.h"
 #include "popsift.h"
@@ -13,69 +14,65 @@
 #include "common/write_plane_2d.h"
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
+#include "common/assist.h"
 
 using namespace std;
 
 PopSift::PopSift( const popsift::Config& config )
 {
-    for( int i=0; i<MAX_PIPES; i++ ) {
-        _pipe[i]._inputImage = 0;
-        _pipe[i]._pyramid    = 0;
-    }
+    _pipe._unused.push( new popsift::Image );
+    _pipe._unused.push( new popsift::Image );
+    _pipe._pyramid    = 0;
 
-    configure(config);
+    configure( config, true );
+
+    _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
+    _pipe._thread_stage2 = new boost::thread( &PopSift::mainLoop,     this );
 }
 
 PopSift::PopSift( )
 {
-    for( int i=0; i<MAX_PIPES; i++ ) {
-        _pipe[i]._inputImage = 0;
-        _pipe[i]._pyramid    = 0;
-    }
+    _pipe._unused.push( new popsift::Image );
+    _pipe._unused.push( new popsift::Image );
+    _pipe._pyramid    = 0;
+
+    _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
+    _pipe._thread_stage2 = new boost::thread( &PopSift::mainLoop,     this );
 }
 
 PopSift::~PopSift()
-{ }
-
-bool PopSift::configure( const popsift::Config& config )
 {
-    for( int i=0; i<MAX_PIPES; i++ ) {
-        if( _pipe[i]._inputImage != 0 ) {
-            return false;
-        }
+}
+
+bool PopSift::configure( const popsift::Config& config, bool force )
+{
+    if( _pipe._pyramid != 0 ) {
+        return false;
     }
 
     _config = config;
 
     _config.levels = max( 2, config.levels );
 
-    popsift::init_filter( _config,
-                         _config.sigma,
-                         _config.levels );
-    popsift::init_constants(  _config.sigma,
-                             _config.levels,
-                             _config.getPeakThreshold(),
-                             _config._edge_limit,
-                             10000, // max extrema
-                             _config.getNormalizationMultiplier() );
+    if( force || ( _config  != _shadow_config ) )
+    {
+        popsift::init_filter( _config,
+                              _config.sigma,
+                              _config.levels );
+        popsift::init_constants(  _config.sigma,
+                                  _config.levels,
+                                  _config.getPeakThreshold(),
+                                  _config._edge_limit,
+                                  _config.getMaxExtrema(),
+                                  _config.getNormalizationMultiplier() );
+    }
+    _shadow_config = _config;
     return true;
 }
 
-bool PopSift::init( int pipe, int w, int h, bool checktime )
+bool PopSift::private_init( int w, int h )
 {
-    if( _pipe[pipe]._inputImage != 0 ) return false;
-
-    cudaEvent_t start, end;
-    if( checktime ) {
-        cudaEventCreate( &start );
-        cudaEventCreate( &end );
-        cudaDeviceSynchronize();
-        cudaEventRecord( start, 0 );
-    }
-
-    if( pipe < 0 && pipe >= MAX_PIPES ) {
-        return false;
-    }
+    Pipe& p = _pipe;
 
     /* up=-1 -> scale factor=2
      * up= 0 -> scale factor=1
@@ -84,6 +81,12 @@ bool PopSift::init( int pipe, int w, int h, bool checktime )
     float upscaleFactor = _config.getUpscaleFactor();
     float scaleFactor = 1.0f / powf( 2.0f, -upscaleFactor );
 
+    if( p._pyramid != 0 ) {
+        p._pyramid->resetDimensions( ceilf( w * scaleFactor ),
+                                     ceilf( h * scaleFactor ) );
+        return true;
+    }
+
     if( _config.octaves < 0 ) {
         int oct = _config.octaves;
         oct = max(int (floor( logf( (float)min( w, h ) )
@@ -91,89 +94,118 @@ bool PopSift::init( int pipe, int w, int h, bool checktime )
         _config.octaves = oct;
     }
 
-    _pipe[pipe]._inputImage = new popsift::Image( w, h );
-    _pipe[pipe]._pyramid = new popsift::Pyramid( _config,
-                                                _pipe[pipe]._inputImage,
-                                                ceilf( w * scaleFactor ),
-                                                ceilf( h * scaleFactor ) );
+    p._pyramid = new popsift::Pyramid( _config,
+                                       ceilf( w * scaleFactor ),
+                                       ceilf( h * scaleFactor ) );
 
     cudaDeviceSynchronize();
-
-    if( checktime ) {
-        cudaEventRecord( end, 0 );
-        cudaEventSynchronize( end );
-        float elapsedTime;
-        cudaEventElapsedTime( &elapsedTime, start, end );
-
-        cerr << "Initialization of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
-    }
 
     return true;
 }
 
-void PopSift::uninit( int pipe )
+void PopSift::uninit( )
 {
-    if( pipe < 0 && pipe >= MAX_PIPES ) return;
+    _pipe._queue_stage1.push( 0 );
+    _pipe._thread_stage2->join();
+    _pipe._thread_stage1->join();
+    delete _pipe._thread_stage2;
+    delete _pipe._thread_stage1;
 
-    delete _pipe[pipe]._inputImage;
-    delete _pipe[pipe]._pyramid;
+    while( !_pipe._unused.empty() ) {
+        popsift::Image* img = _pipe._unused.pull();
+        delete img;
+    }
 
-    _pipe[pipe]._inputImage = 0;
-    _pipe[pipe]._pyramid    = 0;
+    delete _pipe._pyramid;
+    _pipe._pyramid    = 0;
 }
 
-popsift::Features* PopSift::execute( int                  pipe,
-                                     const unsigned char* imageData,
-                                     bool                 checktime )
+SiftJob* PopSift::enqueue( int                  w,
+                           int                  h,
+                           const unsigned char* imageData )
 {
-    if( _pipe[pipe]._inputImage == 0 ) return 0;
+    SiftJob* job = new SiftJob( w, h, imageData );
+    _pipe._queue_stage1.push( job );
+    return job;
+}
 
-    if( pipe < 0 && pipe >= MAX_PIPES ) return 0;
+void PopSift::uploadImages( )
+{
+    SiftJob* job;
+    while( ( job = _pipe._queue_stage1.pull() ) != 0 ) {
+        popsift::Image* img = _pipe._unused.pull();
+        job->setImg( img );
+        _pipe._queue_stage2.push( job );
+    }
+    _pipe._queue_stage2.push( 0 );
+}
 
-    cudaEvent_t start, end;
-    if( checktime ) {
-        cudaEventCreate( &start );
-        cudaEventCreate( &end );
+void PopSift::mainLoop( )
+{
+    Pipe& p = _pipe;
+
+    SiftJob* job;
+    while( ( job = p._queue_stage2.pull() ) != 0 ) {
+        popsift::Image* img = job->getImg();
+
+        private_init( img->getWidth(), img->getHeight() );
+
+        p._pyramid->step1( _config, img );
+        p._unused.push( img );
+
+        p._pyramid->step2( _config );
+
+        popsift::Features* features = p._pyramid->get_descriptors( _config );
 
         cudaDeviceSynchronize();
-        cudaEventRecord( start, 0 );
-    }
 
-    _pipe[pipe]._inputImage->load( _config, imageData );
+        bool log_to_file = ( _config.getLogMode() == popsift::Config::All );
+        if( log_to_file ) {
+            int octaves = p._pyramid->getNumOctaves();
 
-    popsift::Features* features = _pipe[pipe]._pyramid->find_extrema( _config, _pipe[pipe]._inputImage );
+            // for( int o=0; o<octaves; o++ ) { p._pyramid->download_descriptors( _config, o ); }
 
-    cudaDeviceSynchronize();
+            int levels  = p._pyramid->getNumLevels();
 
-    if( checktime ) {
-        cudaEventRecord( end, 0 );
-        cudaEventSynchronize( end );
-        float elapsedTime;
-        cudaEventElapsedTime( &elapsedTime, start, end );
-
-        cerr << "Execution of pipe " << pipe << " took " << elapsedTime << " ms" << endl;
-    }
-
-    bool log_to_file = ( _config.log_mode == popsift::Config::All );
-    if( log_to_file ) {
-        int octaves = _pipe[pipe]._pyramid->getNumOctaves();
-
-        for( int o=0; o<octaves; o++ ) {
-            _pipe[pipe]._pyramid->download_descriptors( _config, o );
+            p._pyramid->download_and_save_array( "pyramid" );
+            p._pyramid->save_descriptors( _config, features, "pyramid" );
         }
 
-        int levels  = _pipe[pipe]._pyramid->getNumLevels();
-
-        for( int o=0; o<octaves; o++ ) {
-            for( int s=0; s<levels+3; s++ ) {
-                _pipe[pipe]._pyramid->download_and_save_array( "pyramid", o, s );
-            }
-        }
-        for( int o=0; o<octaves; o++ ) {
-            _pipe[pipe]._pyramid->save_descriptors( _config, "pyramid", o );
-        }
+        job->setFeatures( features );
     }
+}
 
-    return features;
+SiftJob::SiftJob( int w, int h, const unsigned char* imageData )
+    : _w(w)
+    , _h(h)
+    , _img(0)
+{
+    _f = _p.get_future();
+
+    _imageData = (unsigned char*)malloc( w*h );
+    if( _imageData != 0 ) {
+        memcpy( _imageData, imageData, w*h );
+    } else {
+        cerr << __FILE__ << ":" << __LINE__ << " Memory limitation" << endl
+             << "E    Failed to allocate memory for SiftJob" << endl;
+        exit( -1 );
+    }
+}
+
+SiftJob::~SiftJob( )
+{
+    delete [] _imageData;
+}
+
+void SiftJob::setImg( popsift::Image* img )
+{
+    img->resetDimensions( _w, _h );
+    img->load( _imageData );
+    _img = img;
+}
+
+void SiftJob::setFeatures( popsift::Features* f )
+{
+    _p.set_value( f );
 }
 

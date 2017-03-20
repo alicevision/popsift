@@ -137,7 +137,10 @@ private:
             __syncthreads();
         }
 
-        if( threadIdx.y == 0 && threadIdx.x == 31 ) {
+        // if( threadIdx.y == 0 && threadIdx.x == 31 )
+        if( threadIdx.y == 0 )
+        {
+            loop_total = __shfl( loop_total, 31 );
             _total_writer.set( loop_total );
         }
     }

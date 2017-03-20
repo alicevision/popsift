@@ -18,51 +18,103 @@
 
 namespace popsift {
 
+struct ExtremaCounters
+{
+    /* The number of extrema found per octave */
+    int ext_ct[MAX_OCTAVES];
+    /* The number of orientation found per octave */
+    int ori_ct[MAX_OCTAVES];
+
+    /* Exclusive prefix sum of ext_ct */
+    int ext_ps[MAX_OCTAVES];
+    /* Exclusive prefix sum of ori_ct */
+    int ori_ps[MAX_OCTAVES];
+
+    int ext_total;
+    int ori_total;
+};
+
+struct ExtremaBuffers
+{
+    Descriptor*      desc;
+    int              ext_allocated;
+    int              ori_allocated;
+};
+
+struct DevBuffers
+{
+    InitialExtremum* i_ext[MAX_OCTAVES];
+    int*             feat_to_ext_map;
+    Extremum*        extrema;
+    Feature*         features;
+};
+
+extern            ExtremaCounters hct;
+extern __device__ ExtremaCounters dct;
+extern            ExtremaBuffers  hbuf;
+extern __device__ ExtremaBuffers  dbuf;
+extern            ExtremaBuffers  dbuf_shadow; // just for managing memories
+extern __device__ DevBuffers      dobuf;
+extern            DevBuffers      dobuf_shadow; // just for managing memories
+
 class Pyramid
 {
-    int     _num_octaves;
-    int     _levels;
-    Octave* _octaves;
-    int     _gauss_group;
+    int          _num_octaves;
+    int          _levels;
+    Octave*      _octaves;
+    int          _gauss_group;
 
-    Config::ScalingMode _scaling_mode;
-    bool                _assume_initial_blur;
-    float               _initial_blur;
+    /* initial blur variables are used for Gauss table computation,
+     * not needed on device */
+    bool         _assume_initial_blur;
+    float        _initial_blur;
+
+    /* used to implement a global barrier per octave */
+    int*         _d_extrema_num_blocks;
+
+    /* the download of converted descriptors should be asynchronous */
+    cudaStream_t _download_stream;
 
 public:
     Pyramid( Config& config,
-             Image*  base,
              int     w,
              int     h );
     ~Pyramid( );
 
-    Features* find_extrema( const Config& conf,
-                            Image*        base );
+    void resetDimensions( int width, int height );
 
-    void download_and_save_array( const char* basename, uint32_t octave, uint32_t level );
+    /** step 1: load image and build pyramid */
+    void step1( const Config& conf, Image* img );
 
-    void download_descriptors( const Config& conf, uint32_t octave );
-    void save_descriptors( const Config& conf, const char* basename, uint32_t octave );
+    /** step 2: find extrema, orientations and descriptor */
+    void step2( const Config& conf );
+
+    /** step 3: download descriptors */
+    Features* get_descriptors( const Config& conf );
+
+    void download_and_save_array( const char* basename );
+
+    void save_descriptors( const Config& conf, Features* features, const char* basename );
 
     inline int getNumOctaves() const { return _num_octaves; }
     inline int getNumLevels()  const { return _levels; }
 
-    inline Octave & getOctave(const int o){ return _octaves[o]; }
+    inline Octave& getOctave(const int o){ return _octaves[o]; }
 
 private:
-    void build_pyramid( const Config& conf, Image* base );
 
-    inline void horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode, bool initial_blur );
-    inline void downscale_from_prev_octave( int octave, int level, cudaStream_t stream, Config::SiftMode mode );
+    inline void horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode );
+    inline void downscale_from_prev_octave( int octave, cudaStream_t stream, Config::SiftMode mode );
     inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream );
-    inline void vert_from_interm( int octave, int level, cudaStream_t stream, bool initial_blur );
-    inline void dog_from_blurred( int octave, int level, cudaStream_t stream );
+    inline void vert_from_interm( int octave, int level, cudaStream_t stream );
+    inline void dogs_from_blurred( int octave, int max_level, cudaStream_t stream );
+
+    void make_octave( const Config& conf, Image* base, Octave& oct_obj, cudaStream_t stream, bool isOctaveZero );
 
     void reset_extrema_mgmt( );
+    void build_pyramid( const Config& conf, Image* base );
     void find_extrema( const Config& conf );
-
-    template<int HEIGHT>
-    void find_extrema_sub( const Config& conf );
+    void reallocExtrema( int numExtrema );
 
     void orientation( const Config& conf );
 
@@ -70,6 +122,15 @@ private:
 
     void debug_out_floats  ( float* data, uint32_t pitch, uint32_t height );
     void debug_out_floats_t( float* data, uint32_t pitch, uint32_t height );
+
+    void readDescCountersFromDevice( );
+    void readDescCountersFromDevice( cudaStream_t s );
+    int* getNumberOfBlocks( int octave );
+    void writeDescriptor( const Config& conf, std::ostream& ostr, Features* features, bool really, bool with_orientation );
+
+private:
+    // debug
+    void print_tables_host( );
 };
 
 } // namespace popsift

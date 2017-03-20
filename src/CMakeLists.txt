@@ -1,22 +1,46 @@
-FILE( GLOB_RECURSE
-      src_files_cu
-      ./popsift/*.cu)
-
-FILE( GLOB_RECURSE
-      src_files_cpp
-      ./popsift/*.cpp)
-
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
+CUDA_INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 
 CUDA_ADD_LIBRARY(popsift STATIC
-                 ${src_files_cu}
-                 ${src_files_cpp})
+	popsift/popsift.cu popsift/popsift.h
+	popsift/sift_constants.cu popsift/sift_constants.h
+	popsift/sift_conf.cu popsift/sift_conf.h
+	popsift/gauss_filter.cu popsift/gauss_filter.h
+	popsift/s_image.cu popsift/s_image.h
+	popsift/sift_pyramid.cu popsift/sift_pyramid.h
+	popsift/sift_octave.cu popsift/sift_octave.h
+	popsift/s_pyramid_build.cu
+	popsift/s_pyramid_fixed.cu
+	popsift/sift_extremum.h
+	popsift/sift_extremum.cu popsift/s_extrema.cu
+	popsift/s_orientation.cu
+	popsift/sift_desc.cu
+	popsift/s_desc_loop.cu popsift/s_desc_loop.h
+	popsift/s_desc_iloop.cu popsift/s_desc_iloop.h
+	popsift/s_desc_grid.cu popsift/s_desc_grid.h
+	popsift/s_desc_igrid.cu popsift/s_desc_igrid.h
+	popsift/s_desc_notile.cu popsift/s_desc_notile.h
+	popsift/s_desc_norm_rs.h
+	popsift/s_desc_norm_l2.h
+	popsift/s_desc_normalize.h
+	popsift/s_gradiant.h
+	popsift/s_solve.h
+	popsift/common/assist.cu popsift/common/assist.h
+	popsift/common/clamp.h
+	popsift/common/plane_2d.cu popsift/common/plane_2d.h
+	popsift/common/write_plane_2d.cu popsift/common/write_plane_2d.h
+	popsift/common/debug_macros.cpp popsift/common/debug_macros.h
+	popsift/common/device_prop.cpp popsift/common/device_prop.h
+	popsift/common/warp_bitonic_sort.h
+	popsift/common/excl_blk_prefix_sum.h
+	popsift/common/vec_macros.h
+	popsift/common/clamp.h )
 
 # BUILD_INTERFACE allows to include the directory with source only when target is
 # built in the building tree (ie, not from an install location)
 target_include_directories(popsift 
-            PUBLIC ${CUDA_INCLUDE_DIRS}
+            PUBLIC ${Boost_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS}
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>")
 
 
@@ -25,7 +49,7 @@ set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 
 # cannot use PRIVATE here as there is a bug in FindCUDA and CUDA_ADD_LIBRARY
 # https://gitlab.kitware.com/cmake/cmake/issues/16097
-target_link_libraries(popsift ${CUDA_CUDADEVRT_LIBRARY})
+ target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
 
 
 # EXPORTING THE LIBRARY
@@ -90,3 +114,4 @@ install(EXPORT "${targets_export_name}"
 if(PopSift_BUILD_EXAMPLES)
   add_subdirectory(application)
 endif()
+
