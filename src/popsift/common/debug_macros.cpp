@@ -188,6 +188,14 @@ void event_wait( cudaEvent_t ev, cudaStream_t s, const char* file, size_t line )
         exit( -__LINE__ );
     }
 }
+
+float event_diff( cudaEvent_t from, cudaEvent_t to )
+{   
+    float ms;
+    cudaEventElapsedTime( &ms, from, to );
+    return ms;
+}
+
 } // namespace cuda
 } // namespace popsift
 

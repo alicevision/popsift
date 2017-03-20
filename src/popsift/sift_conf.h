@@ -24,6 +24,7 @@ struct Config
 
     enum GaussMode {
         VLFeat_Compute,
+        VLFeat_Relative,
         OpenCV_Compute,
         Fixed9,
         Fixed15

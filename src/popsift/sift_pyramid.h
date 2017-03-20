@@ -102,11 +102,10 @@ public:
     inline Octave& getOctave(const int o){ return _octaves[o]; }
 
 private:
-
     inline void horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode );
     inline void downscale_from_prev_octave( int octave, cudaStream_t stream, Config::SiftMode mode );
-    inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream );
-    inline void vert_from_interm( int octave, int level, cudaStream_t stream );
+    inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss );
+    inline void vert_from_interm( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss );
     inline void dogs_from_blurred( int octave, int max_level, cudaStream_t stream );
 
     void make_octave( const Config& conf, Image* base, Octave& oct_obj, cudaStream_t stream, bool isOctaveZero );
@@ -131,6 +130,12 @@ private:
 private:
     // debug
     void print_tables_host( );
+
+public:
+    enum {
+        UseInterpolatedGauss = true,
+        DontUseInterpolatedGauss = false
+    };
 };
 
 } // namespace popsift

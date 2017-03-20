@@ -34,8 +34,11 @@ class Octave
         cudaTextureObject_t   _data_tex_point;
         cudaTextureObject_t   _data_tex_linear;
 
-        Plane2D_float         _intermediate_data;
-        cudaTextureObject_t   _interm_data_tex;
+        cudaArray_t           _interm_array;
+        cudaChannelFormatDesc _interm_desc;
+        cudaSurfaceObject_t   _interm_surf;
+        cudaTextureObject_t   _interm_data_tex_point;
+        cudaTextureObject_t   _interm_data_tex_linear;
 
         cudaArray_t           _dog_3d;
         cudaChannelFormatDesc _dog_3d_desc;
@@ -51,34 +54,6 @@ class Octave
         cudaEvent_t  _extrema_done;
         cudaEvent_t  _ori_done;
         cudaEvent_t  _desc_done;
-
-#if 0
-        /* It seems strange strange to collect extrema globally only
-         * as other code does.
-         * Because of the global cut-off, features from the later
-         * octave have a smaller chance of being accepted.
-         * Besides, the management of computing gradiants and atans
-         * must be handled per scale (level) of an octave.
-         * There: one set of extrema per octave and level.
-         */
-        extrema_counter
-
-        /* An extrema can have several orientations. Extending
-         * the number of extrema is expensive, so we sum up the
-         * number of orientations and store them in the featvec
-         * counters.
-         */
-        featvec_counter;
-
-        /* Data structure for the Extrema, host and device side */
-        extrema;
-
-        /* Data structure for the Descriptors */
-        desc;
-
-        /* Array of arrays mapping a descriptor index back to an extremum index */
-        feat_to_ext_map;
-#endif
 
     public:
         Octave( );
@@ -112,8 +87,11 @@ class Octave
             return _desc_done;
         }
 
+        inline cudaTextureObject_t getIntermDataTexLinear( ) {
+            return _interm_data_tex_linear;
+        }
         inline cudaTextureObject_t getIntermDataTexPoint( ) {
-            return _interm_data_tex;
+            return _interm_data_tex_point;
         }
         inline cudaTextureObject_t getDataTexLinear( ) {
             return _data_tex_linear;
@@ -124,8 +102,8 @@ class Octave
         inline cudaSurfaceObject_t getDataSurface( ) {
             return _data_surf;
         }
-        inline Plane2D_float& getIntermediateData( ) {
-            return _intermediate_data;
+        inline cudaSurfaceObject_t getIntermediateSurface( ) {
+            return _interm_surf;
         }
         
         inline cudaSurfaceObject_t& getDogSurface( ) {
@@ -157,7 +135,7 @@ class Octave
 private:
     void alloc_data_planes( );
     void alloc_data_tex( );
-    void alloc_interm_plane( );
+    void alloc_interm_array( );
     void alloc_interm_tex( );
     void alloc_dog_array( );
     void alloc_dog_tex( );
@@ -169,7 +147,7 @@ private:
     void free_dog_tex( );
     void free_dog_array( );
     void free_interm_tex( );
-    void free_interm_plane( );
+    void free_interm_array( );
     void free_data_tex( );
     void free_data_planes( );
 };

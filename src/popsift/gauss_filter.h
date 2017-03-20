@@ -33,6 +33,9 @@ struct GaussTable
 
     __host__
     void computeBlurTable( const GaussInfo* info );
+
+    __host__
+    void transformBlurTable( const GaussInfo* info );
 };
 
 struct GaussInfo
@@ -48,6 +51,8 @@ struct GaussInfo
      * - in all other octaves, row 0 is unused
      */
     GaussTable<GAUSS_LEVELS> inc;
+
+    GaussTable<GAUSS_LEVELS> inc_relative;
 
     /* Compute the 1D Gauss tables for all levels of octave 0.
      * For octave 0, all of these tables derive from the input
@@ -92,10 +97,14 @@ private:
     static int vlFeatSpan( float sigma );
 
     __host__
+    static int vlFeatRelativeSpan( float sigma );
+
+    __host__
     static int openCVSpan( float sigma );
 };
 
 extern __device__ __constant__ GaussInfo d_gauss;
+extern                         GaussInfo h_gauss;
 
 void init_filter( const Config& conf,
                   float         sigma0,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Simula Research Laboratory
+ * Copyright 2016-2017, Simula Research Laboratory
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,6 +11,9 @@
 #include "common/debug_macros.h"
 #include "common/assist.h"
 #include "common/clamp.h"
+#include "s_pyramid_build_aa.h"
+#include "s_pyramid_build_ai.h"
+#include "s_pyramid_build_ra.h"
 
 #include <iostream>
 #include <stdio.h>
@@ -21,159 +24,6 @@
 namespace popsift {
 
 namespace gauss {
-
-namespace variableSpan {
-
-namespace absoluteTexAddress {
-__global__
-void horiz( cudaTextureObject_t src_data,
-            Plane2D_float       dst_data,
-            const int           dst_w,
-            const int           dst_h,
-            const int           dst_level )
-{
-    const int    src_level = dst_level - 1;
-    const int    span      = d_gauss.inc.span[dst_level];
-    const float* filter    = &popsift::d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
-
-    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if( off_x >= dst_w ) return;
-
-    float out = 0.0f;
-
-    #pragma unroll
-    for( int offset = span; offset>0; offset-- ) {
-        const float& g  = filter[offset];
-        const float  v1 = readTex( src_data, off_x - offset, blockIdx.y, src_level );
-        out += ( v1 * g );
-
-        const float  v2 = readTex( src_data, off_x + offset, blockIdx.y, src_level );
-        out += ( v2 * g );
-    }
-    const float& g  = filter[0];
-    const float v3 = readTex( src_data, off_x, blockIdx.y, src_level );
-    out += ( v3 * g );
-
-    dst_data.ptr(blockIdx.y)[off_x] = out;
-}
-
-__device__ static inline
-void vert_sub( cudaTextureObject_t src_data,
-               cudaSurfaceObject_t dst_data,
-               const int           dst_w,
-               const int           dst_h,
-               const int           dst_level,
-               const int           span,
-               const float*        filter )
-{
-    int block_x = blockIdx.x * blockDim.x;
-    int block_y = blockIdx.y * blockDim.y;
-    int idx     = threadIdx.x;
-    int idy;
-
-    float g;
-    float val;
-    float out = 0;
-
-    for( int offset = span; offset>0; offset-- ) {
-        g  = filter[offset];
-
-        idy = threadIdx.y - offset;
-        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-        out += ( val * g );
-
-        idy = threadIdx.y + offset;
-        val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-        out += ( val * g );
-    }
-
-    g  = filter[0];
-    idy = threadIdx.y;
-    val = tex2D<float>( src_data, block_x + idx + 0.5f, block_y + idy + 0.5f );
-    out += ( val * g );
-
-    idx = block_x+threadIdx.x;
-    idy = block_y+threadIdx.y;
-
-    if( idx >= dst_w ) return;
-    if( idy >= dst_h ) return;
-
-    surf2DLayeredwrite( out, dst_data, idx*4, idy, dst_level, cudaBoundaryModeZero ); // dst_data.ptr(idy)[idx] = out;
-}
-
-__global__
-void vert( cudaTextureObject_t src_data,
-           cudaSurfaceObject_t dst_data,
-           int                 dst_w,
-           int                 dst_h,
-           int                 dst_level )
-{
-    vert_sub( src_data, dst_data, dst_w, dst_h, dst_level, d_gauss.inc.span[dst_level], &popsift::d_gauss.inc.filter[dst_level*GAUSS_ALIGN] );
-}
-
-} // namespace absoluteTexAddress
-
-namespace relativeTexAddress {
-
-__device__
-inline static void horiz_sub( cudaTextureObject_t src_data,
-                              Plane2D_float       dst_data,
-                              float               shift,
-                              int                 span,
-                              float*              filter )
-{
-    const float dst_w  = dst_data.getWidth();
-    const float dst_h  = dst_data.getHeight();
-    const float read_y = ( blockIdx.y + shift ) / dst_h;
-
-    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if( off_x >= dst_w ) return;
-
-    float out = 0.0f;
-
-    #pragma unroll
-    for( int offset = span; offset>0; offset-- ) {
-        const float& g  = filter[offset];
-        const float read_x_l = ( off_x - offset );
-        const float  v1 = tex2D<float>( src_data, ( read_x_l + shift ) / dst_w, read_y );
-        out += ( v1 * g );
-
-        const float read_x_r = ( off_x + offset );
-        const float  v2 = tex2D<float>( src_data, ( read_x_r + shift ) / dst_w, read_y );
-        out += ( v2 * g );
-    }
-    const float& g  = filter[0];
-    const float read_x = off_x;
-    const float v3 = tex2D<float>( src_data, ( read_x + shift ) / dst_w, read_y );
-    out += ( v3 * g );
-
-    dst_data.ptr(blockIdx.y)[off_x] = out * 255.0f;
-}
-
-__global__
-void horiz( cudaTextureObject_t src_data,
-            Plane2D_float       dst_data,
-            int                 octave,
-            float               shift )
-{
-    // The first line creates level-0 octave-0 for the input image only.
-    // Since we are computing the direct-downscaling gauss filter tables
-    // and the first entry in that table is identical to the "normal"
-    // table, we do not need a special case.
-    // horiz( src_data, dst_data, shift, d_gauss.inc.span[0], &d_gauss.inc.filter[0*GAUSS_ALIGN] );
-    horiz_sub( src_data,
-               dst_data,
-               shift,
-               d_gauss.dd.span[octave],
-               &d_gauss.dd.filter[octave*GAUSS_ALIGN] );
-}
-
-} // namespace relativeTexAddress
-
-} // namespace variableSpan
-
 
 __global__
 void get_by_2_interpolate( cudaTextureObject_t src_data,
@@ -255,10 +105,12 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, in
         shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() - octave );
     }
 
-    gauss::variableSpan::relativeTexAddress::horiz
+    gauss::relativeSource::horiz
         <<<grid,block,0,stream>>>
         ( base->getInputTexture(),
-          oct_obj.getIntermediateData( ),
+          oct_obj.getIntermediateSurface( ),
+          oct_obj.getWidth(),
+          oct_obj.getHeight(),
           octave,
           shift );
 }
@@ -306,29 +158,42 @@ inline void Pyramid::downscale_from_prev_octave( int octave, cudaStream_t stream
 }
 
 __host__
-inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t stream )
+inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss )
 {
     Octave&      oct_obj = _octaves[octave];
 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    dim3 block( 128, 1 );
-    dim3 grid;
-    grid.x  = grid_divide( width,  128 );
-    grid.y  = height;
+    if( not useInterpolatedGauss ) {
+        dim3 block( 32,  8 ); // most stable good perf on GTX 980 TI
+        // similar speed: dim3 block( 32,  4 ); dim3 block( 32,  3 ); dim3 block( 32,  2 );
 
-    gauss::variableSpan::absoluteTexAddress::horiz
-        <<<grid,block,0,stream>>>
-        ( oct_obj.getDataTexPoint( ),
-          oct_obj.getIntermediateData( ),
-          oct_obj.getWidth(),
-          oct_obj.getHeight(),
-          level );
+        dim3 grid;
+        grid.x  = grid_divide( width,  32 );
+        grid.y  = grid_divide( height, block.y );
+
+        gauss::absoluteSource::horiz
+            <<<grid,block,0,stream>>>
+            ( oct_obj.getDataTexPoint( ),
+              oct_obj.getIntermediateSurface( ),
+              level );
+    } else {
+        dim3 block( 128, 1 );
+        dim3 grid;
+        grid.x  = grid_divide( width,  128 );
+        grid.y  = height;
+
+        gauss::absoluteSourceInterpolated::horiz
+            <<<grid,block,0,stream>>>
+            ( oct_obj.getDataTexLinear( ),
+              oct_obj.getIntermediateSurface( ),
+              level );
+    }
 }
 
 __host__
-inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t stream )
+inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss )
 {
     Octave& oct_obj = _octaves[octave];
 
@@ -338,18 +203,29 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    dim3 block( 64, 2 );
-    dim3 grid;
-    grid.x = (unsigned int)grid_divide( width,  block.x );
-    grid.y = (unsigned int)grid_divide( height, block.y );
+    if( not useInterpolatedGauss ) {
+        dim3 block( 64, 2 );
+        dim3 grid;
+        grid.x = (unsigned int)grid_divide( width,  block.x );
+        grid.y = (unsigned int)grid_divide( height, block.y );
 
-    gauss::variableSpan::absoluteTexAddress::vert
-        <<<grid,block,0,stream>>>
-        ( oct_obj.getIntermDataTexPoint( ),
-          oct_obj.getDataSurface( ),
-          oct_obj.getWidth(),
-          oct_obj.getHeight(),
-          level );
+        gauss::absoluteSource::vert
+            <<<grid,block,0,stream>>>
+            ( oct_obj.getIntermDataTexPoint( ),
+              oct_obj.getDataSurface( ),
+              level );
+    } else {
+        dim3 block( 4, 32 );
+        dim3 grid;
+        grid.x = (unsigned int)grid_divide( width,  block.y );
+        grid.y = (unsigned int)grid_divide( height, block.x );
+
+        gauss::absoluteSourceInterpolated::vert
+            <<<grid,block,0,stream>>>
+            ( oct_obj.getIntermDataTexLinear( ),
+              oct_obj.getDataSurface( ),
+              level );
+    }
 }
 
 __host__
@@ -402,7 +278,7 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
                 make_octave( conf, base, oct_obj, stream, true );
             } else {
                 horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode() );
-                vert_from_interm( octave, 0, stream );
+                vert_from_interm( octave, 0, stream, DontUseInterpolatedGauss );
                 make_octave( conf, base, oct_obj, stream, false );
             }
         } else if( conf.getGaussMode() == Config::Fixed9 || conf.getGaussMode() == Config::Fixed15 ) {
@@ -418,6 +294,8 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
 
             cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
         } else if( conf.getScalingMode() == Config::ScaleDirect ) {
+            bool useGauss = ( conf.getGaussMode() == Config::VLFeat_Relative ) ? UseInterpolatedGauss
+                                                                               : DontUseInterpolatedGauss;
             for( int level=0; level<_levels; level++ ) {
                 const int width  = oct_obj.getWidth();
                 const int height = oct_obj.getHeight();
@@ -425,15 +303,17 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
                 if( level == 0 )
                 {
                     horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode() );
-                    vert_from_interm( octave, level, stream );
+                    vert_from_interm( octave, level, stream, useGauss );
                 }
                 else
                 {
-                    horiz_from_prev_level( octave, level, stream );
-                    vert_from_interm( octave, level, stream );
+                    horiz_from_prev_level( octave, level, stream, DontUseInterpolatedGauss );
+                    vert_from_interm( octave, level, stream, useGauss );
                 }
             }
         } else {
+            bool useGauss = ( conf.getGaussMode() == Config::VLFeat_Relative ) ? UseInterpolatedGauss
+                                                                               : DontUseInterpolatedGauss;
             for( int level=0; level<_levels; level++ ) {
                 const int width  = oct_obj.getWidth();
                 const int height = oct_obj.getHeight();
@@ -443,7 +323,7 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
                     if( octave == 0 )
                     {
                         horiz_from_input_image( conf, base, 0, stream, conf.getSiftMode() );
-                        vert_from_interm( octave, 0, stream );
+                        vert_from_interm( octave, 0, stream, useGauss );
                     }
                     else
                     {
@@ -455,8 +335,8 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
                 }
                 else
                 {
-                    horiz_from_prev_level( octave, level, stream );
-                    vert_from_interm( octave, level, stream );
+                    horiz_from_prev_level( octave, level, stream, useGauss );
+                    vert_from_interm( octave, level, stream, useGauss );
 
                     if( level == _levels - PREV_LEVEL ) {
                         cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );

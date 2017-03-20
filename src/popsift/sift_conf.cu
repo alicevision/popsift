@@ -80,6 +80,8 @@ void Config::setGaussMode( const std::string& m )
 {
     if( m == "vlfeat" )
         setGaussMode( Config::VLFeat_Compute );
+    else if( m == "relative" )
+        setGaussMode( Config::VLFeat_Relative );
     else if( m == "opencv" )
         setGaussMode( Config::OpenCV_Compute );
     else if( m == "fixed9" )

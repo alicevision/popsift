@@ -66,6 +66,43 @@ cudaEvent_t  event_create( const char* file, size_t line );
 void         event_destroy( cudaEvent_t ev, const char* file, size_t line );
 void         event_record( cudaEvent_t ev, cudaStream_t s, const char* file, size_t line );
 void         event_wait( cudaEvent_t ev, cudaStream_t s, const char* file, size_t line );
+float        event_diff( cudaEvent_t from, cudaEvent_t to );
+
+class BriefDuration
+{
+    cudaStream_t _stream;
+    cudaEvent_t  _on;
+    cudaEvent_t  _off;
+public:
+    BriefDuration( cudaStream_t s, const char* file, size_t line )
+        : _stream( s )
+    {
+        _on  = event_create( file, line );
+        _off = event_create( file, line );
+    }
+
+    ~BriefDuration( )
+    {
+        event_destroy( _on,  __FILE__, __LINE__ );
+        event_destroy( _off, __FILE__, __LINE__ );
+    }
+
+    void start( const char* file, size_t line ) {
+        cudaStreamSynchronize( _stream );
+        event_record( _on, _stream, file, line );
+    }
+
+    void stop( const char* file, size_t line ) {
+        event_record( _off, _stream, file, line );
+    }
+
+    float report( const char* file, size_t line ) {
+        event_wait( _off, _stream, file, line );
+        cudaStreamSynchronize( _stream );
+        return event_diff( _on, _off );
+    }
+};
+
 };
 };
 

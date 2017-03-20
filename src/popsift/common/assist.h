@@ -38,6 +38,12 @@ float readTex( cudaTextureObject_t tex, float x, float y, float z )
     return tex2DLayered<float>( tex, x+0.5f, y+0.5f, z );
 }
 
+__device__ static inline
+float readTex( cudaTextureObject_t tex, float x, float y )
+{
+    return tex2D<float>( tex, x+0.5f, y+0.5f );
+}
+
 
 /*********************************************************************************
  * For a debug output to cerr with thread ID at the line start
