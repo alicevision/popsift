@@ -183,20 +183,22 @@ int main(int argc, char **argv)
     
     
     auto sift_a = extractFeatures(inputFile, config);
+    std::vector <std::pair<popsift::Descriptor*, size_t>> dbDescs;
+
+    // matchFile descriptors can be replaced with results from voctree
+    // add database image descriptors to dbDescs as it's done for the matchFile descriptors
     if (!matchFile.empty()) {
         auto sift_b = extractFeatures(matchFile, config);
-        CPU_Matching_Performance(sift_a, sift_b);
+        //CPU_Matching_Performance(sift_a, sift_b);
+        dbDescs.push_back(std::make_pair(std::get<2>(sift_b), std::get<1>(sift_b).descriptors().size()));
+    }
 
-#if 1
-        // Todo: add database image descriptors to dbDescs and send to matcher
-        std::vector <std::pair<popsift::Descriptor*, size_t>> dbDescs;
-        // Something like this
-        //dbDescs.push_back(std::make_pair(std::get<2>(sift_b), std::get<1>(sift_b).descriptors().size()));
-
+    if (dbDescs.size() > 0) {
         popsift::Matching matcher(config);
-        std::vector<std::pair<float*, size_t>> gpu_matches = matcher.Match(
+        // CalcDistances will return the distance between all a-descriptors and all b-descriptors.
+        // The results will be 
+        std::vector<std::pair<float*, size_t>> gpu_matches = matcher.CalcDistances(
             std::get<2>(sift_a), std::get<1>(sift_a).descriptors().size(), dbDescs);
-#endif
     }
     return 0;
 }

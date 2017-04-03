@@ -41,7 +41,10 @@ public:
     Matching(Config& config);
     ~Matching();
 
-    std::vector<std::pair<float*, size_t>> Match(popsift::Descriptor* device_desc_a, size_t num_a,
+    // Output: Vector element K contains the distances between all device_desc_a and all database_descs[K].first
+    //         The float pointer is a 2d matrix M of dimensions num_a * database_descs[K].second
+    //         the element M[i,j] is the distance between device_desc_a[i] and database_descs[K].first[j]
+    std::vector<std::pair<float*, size_t>> CalcDistances(popsift::Descriptor* device_desc_a, size_t num_a,
         std::vector<std::pair<popsift::Descriptor*, size_t>> database_descs);
 
 private:

@@ -72,7 +72,7 @@ void calcDistMat(Descriptor* a, Descriptor* b, int numA, int numB, float* res) {
 // returns: vector of vector of best match descriptors
 // ToDo: If this function is called in parallel with descriptor-extraction, it may be
 //       worth defining other streams than 0->database_descs.size(), and use cudaStreamSynchronize()
-std::vector<std::pair<float*, size_t>> Matching::Match(popsift::Descriptor* device_desc_a, size_t num_a,
+std::vector<std::pair<float*, size_t>> Matching::CalcDistances(popsift::Descriptor* device_desc_a, size_t num_a,
     std::vector<std::pair<popsift::Descriptor*, size_t>> database_descs)
 {
     std::vector<std::pair<float*, size_t>> result;
