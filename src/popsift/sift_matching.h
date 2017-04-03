@@ -41,8 +41,8 @@ public:
     Matching(Config& config);
     ~Matching();
 
-    std::vector<int> Match(popsift::Descriptor* d_desc_a, size_t num_desc_a, 
-                  popsift::Descriptor* d_desc_b, size_t num_desc_b);
+    std::vector<std::pair<float*, size_t>> Match(popsift::Descriptor* device_desc_a, size_t num_a,
+        std::vector<std::pair<popsift::Descriptor*, size_t>> database_descs);
 
 private:
     const Config& config;

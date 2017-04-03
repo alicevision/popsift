@@ -186,26 +186,17 @@ int main(int argc, char **argv)
     if (!matchFile.empty()) {
         auto sift_b = extractFeatures(matchFile, config);
         CPU_Matching_Performance(sift_a, sift_b);
-#if 0
+
+#if 1
+        // Todo: add database image descriptors to dbDescs and send to matcher
+        std::vector <std::pair<popsift::Descriptor*, size_t>> dbDescs;
+        // Something like this
+        //dbDescs.push_back(std::make_pair(std::get<2>(sift_b), std::get<1>(sift_b).descriptors().size()));
+
         popsift::Matching matcher(config);
-        //matcher.Match(*sift_a, *sift_b);
-        std::vector<int> gpu_matches = matcher.Match(
-            std::get<2>(sift_a), std::get<1>(sift_a).descriptors().size(), 
-            std::get<2>(sift_b), std::get<1>(sift_b).descriptors().size());
-
-        std::ofstream f("tmp.txt");
-
-        for (int i = 0; i < 100; i++) {
-            f << gpu_matches[i];
-        }
+        std::vector<std::pair<float*, size_t>> gpu_matches = matcher.Match(
+            std::get<2>(sift_a), std::get<1>(sift_a).descriptors().size(), dbDescs);
 #endif
-
-        /*
-        for (size_t i = 0; i < gpu_matches.size(); ++i) {
-            //cout << cpu_matches[i] << " " << gpu_matches[i] << "\n";
-            //cout << i << " " << gpu_matches[i] << "\n";
-        }
-        */
     }
     return 0;
 }
