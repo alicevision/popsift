@@ -181,7 +181,7 @@ std::vector<int> Matching_CPU(const std::vector<Descriptor>& da, const std::vect
 // 128 components fit in 4 AVX2 registers.  Must expand components from 8-bit
 // to 16-bit in order to do arithmetic without overflow. Also, AVX2 doesn't
 // support vector multiplication of 8-bit elements.
-static float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
+float L2DistanceSquared(const U8Descriptor& ad, const U8Descriptor& bd) {
     const __m256i* af = reinterpret_cast<const __m256i*>(ad.features);
     const __m256i* bf = reinterpret_cast<const __m256i*>(bd.features);
     __m256i acc = _mm256_setzero_si256();

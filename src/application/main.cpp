@@ -195,10 +195,8 @@ int main(int argc, char **argv)
 
     if (dbDescs.size() > 0) {
         popsift::Matching matcher(config);
-        // CalcDistances will return the distance between all a-descriptors and all b-descriptors.
-        // The results will be 
-        std::vector<std::pair<float*, size_t>> gpu_matches = matcher.CalcDistances(
-            std::get<2>(sift_a), std::get<1>(sift_a).descriptors().size(), dbDescs);
+        // See Matcher::Match function description to see what's returned.
+        auto matches = matcher.Match(std::get<2>(sift_a), std::get<1>(sift_a).descriptors().size(), dbDescs);
     }
     return 0;
 }
