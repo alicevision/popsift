@@ -20,6 +20,9 @@ struct InitialExtremum
     float ypos;
     int   lpos;  // extremum refined into this level
     float sigma; // scale;
+    int   cell;  // index into the grid for grid-based extrema filtering
+    bool  ignore; // true if this extremum has been filtered
+    int   write_index; // if any initial extrema are ignored, new index for Extremum
 };
 
 /* This is an internal data structure.

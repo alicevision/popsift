@@ -102,7 +102,7 @@ void Pyramid::save_descriptors( const Config& conf, Features* features, const ch
     writeDescriptor( conf, of2, features, false, true );
 }
 
-Pyramid::Pyramid( Config& config,
+Pyramid::Pyramid( const Config& config,
                   int width,
                   int height )
     : _num_octaves( config.octaves )
@@ -125,18 +125,21 @@ Pyramid::Pyramid( Config& config,
 
     for (int o = 0; o<_num_octaves; o++) {
         _octaves[o].debugSetOctave(o);
-        _octaves[o].alloc(w, h, _levels, _gauss_group);
+        _octaves[o].alloc( config, w, h, _levels, _gauss_group );
         w = ceilf(w / 2.0f);
         h = ceilf(h / 2.0f);
     }
 
     int sz = _num_octaves * h_consts.max_extrema;
-    dobuf_shadow.i_ext[0] = popsift::cuda::malloc_devT<InitialExtremum>( sz, __FILE__, __LINE__);
+    dobuf_shadow.i_ext_dat[0] = popsift::cuda::malloc_devT<InitialExtremum>( sz, __FILE__, __LINE__);
+    dobuf_shadow.i_ext_off[0] = popsift::cuda::malloc_devT<int>( sz, __FILE__, __LINE__);
     for (int o = 1; o<_num_octaves; o++) {
-        dobuf_shadow.i_ext[o] = dobuf_shadow.i_ext[0] + (o*h_consts.max_extrema);
+        dobuf_shadow.i_ext_dat[o] = dobuf_shadow.i_ext_dat[0] + (o*h_consts.max_extrema);
+        dobuf_shadow.i_ext_off[o] = dobuf_shadow.i_ext_off[0] + (o*h_consts.max_extrema);
     }
     for (int o = _num_octaves; o<MAX_OCTAVES; o++) {
-        dobuf_shadow.i_ext[o] = 0;
+        dobuf_shadow.i_ext_dat[o] = 0;
+        dobuf_shadow.i_ext_off[o] = 0;
     }
 
     sz = h_consts.max_extrema;
@@ -158,13 +161,13 @@ Pyramid::Pyramid( Config& config,
     cudaStreamCreate( &_download_stream );
 }
 
-void Pyramid::resetDimensions( int width, int height )
+void Pyramid::resetDimensions( const Config& conf, int width, int height )
 {
     int w = width;
     int h = height;
 
     for (int o = 0; o<_num_octaves; o++) {
-        _octaves[o].resetDimensions( w, h );
+        _octaves[o].resetDimensions( conf, w, h );
         w = ceilf(w / 2.0f);
         h = ceilf(h / 2.0f);
     }
@@ -206,7 +209,8 @@ Pyramid::~Pyramid()
 {
     cudaStreamDestroy( _download_stream );
 
-    cudaFree(     dobuf_shadow.i_ext[0] );
+    cudaFree(     dobuf_shadow.i_ext_dat[0] );
+    cudaFree(     dobuf_shadow.i_ext_off[0] );
     cudaFree(     dobuf_shadow.features );
     cudaFree(     dobuf_shadow.extrema );
     cudaFreeHost( hbuf        .desc );
@@ -315,6 +319,16 @@ void Pyramid::readDescCountersFromDevice( )
 void Pyramid::readDescCountersFromDevice( cudaStream_t s )
 {
     cudaMemcpyFromSymbolAsync( &hct, dct, sizeof(ExtremaCounters), 0, cudaMemcpyDeviceToHost, s );
+}
+
+void Pyramid::writeDescCountersToDevice( )
+{
+    cudaMemcpyToSymbol( dct, &hct, sizeof(ExtremaCounters), 0, cudaMemcpyHostToDevice );
+}
+
+void Pyramid::writeDescCountersToDevice( cudaStream_t s )
+{
+    cudaMemcpyToSymbolAsync( dct, &hct, sizeof(ExtremaCounters), 0, cudaMemcpyHostToDevice, s );
 }
 
 int* Pyramid::getNumberOfBlocks( int octave )

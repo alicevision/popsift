@@ -26,8 +26,11 @@ Config::Config( )
     , _log_mode( Config::None )
     , _scaling_mode( Config::ScaleDefault )
     , _desc_mode( Config::IGrid )
+    , _grid_filter_mode( Config::RandomScale )
     , verbose( false )
-    , _max_extrema( 10000 )
+    , _max_extrema( 5000 )
+    , _filter_max_extrema( -1 )
+    , _filter_grid_size( 2 )
     , _assume_initial_blur( true )
     , _initial_blur( 0.5f )
     , _use_root_sift( false )
@@ -92,6 +95,23 @@ void Config::setGaussMode( const std::string& m )
         POP_FATAL( "specified Gauss mode must be one of vlfeat, opencv, fixed9 or fixed15" );
 }
 
+void Config::setFilterSorting( const std::string& text )
+{
+    if( text == "up" )
+        _grid_filter_mode = Config::SmallestScaleFirst;
+    else if( text == "down" )
+        _grid_filter_mode = Config::LargestScaleFirst;
+    else if( text == "random" )
+        _grid_filter_mode = Config::RandomScale;
+    else
+        POP_FATAL( "filter sorting mode must be one of up, down or random" );
+}
+
+void Config::setFilterSorting( Config::GridFilterMode m )
+{
+    _grid_filter_mode = m;
+}
+
 void Config::setVerbose( bool on )
 {
     verbose = on;
@@ -121,6 +141,8 @@ void Config::setThreshold( float v ) { _threshold = v; }
 void Config::setPrintGaussTables() { _print_gauss_tables = true; }
 void Config::setUseRootSift( bool on ) { _use_root_sift = on; }
 void Config::setNormalizationMultiplier( int mul ) { _normalization_multiplier = mul; }
+void Config::setFilterMaxExtrema( int ext ) { _filter_max_extrema = ext; }
+void Config::setFilterGridSize( int sz ) { _filter_grid_size = sz; }
 
 void Config::setInitialBlur( float blur )
 {

@@ -82,7 +82,8 @@ bool PopSift::private_init( int w, int h )
     float scaleFactor = 1.0f / powf( 2.0f, -upscaleFactor );
 
     if( p._pyramid != 0 ) {
-        p._pyramid->resetDimensions( ceilf( w * scaleFactor ),
+        p._pyramid->resetDimensions( _config,
+                                     ceilf( w * scaleFactor ),
                                      ceilf( h * scaleFactor ) );
         return true;
     }

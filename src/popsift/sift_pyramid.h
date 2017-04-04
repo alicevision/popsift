@@ -43,7 +43,8 @@ struct ExtremaBuffers
 
 struct DevBuffers
 {
-    InitialExtremum* i_ext[MAX_OCTAVES];
+    InitialExtremum* i_ext_dat[MAX_OCTAVES];
+    int*             i_ext_off[MAX_OCTAVES];
     int*             feat_to_ext_map;
     Extremum*        extrema;
     Feature*         features;
@@ -76,12 +77,12 @@ class Pyramid
     cudaStream_t _download_stream;
 
 public:
-    Pyramid( Config& config,
+    Pyramid( const Config& config,
              int     w,
              int     h );
     ~Pyramid( );
 
-    void resetDimensions( int width, int height );
+    void resetDimensions( const Config& conf, int width, int height );
 
     /** step 1: load image and build pyramid */
     void step1( const Config& conf, Image* img );
@@ -115,6 +116,7 @@ private:
     void find_extrema( const Config& conf );
     void reallocExtrema( int numExtrema );
 
+    int  extrema_filter_grid( const Config& conf, int ext_total ); // called at head of orientation
     void orientation( const Config& conf );
 
     void descriptors( const Config& conf );
@@ -124,6 +126,8 @@ private:
 
     void readDescCountersFromDevice( );
     void readDescCountersFromDevice( cudaStream_t s );
+    void writeDescCountersToDevice( );
+    void writeDescCountersToDevice( cudaStream_t s );
     int* getNumberOfBlocks( int octave );
     void writeDescriptor( const Config& conf, std::ostream& ostr, Features* features, bool really, bool with_orientation );
 
