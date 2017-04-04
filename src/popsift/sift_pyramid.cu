@@ -102,7 +102,7 @@ void Pyramid::save_descriptors( const Config& conf, Features* features, const ch
     writeDescriptor( conf, of2, features, false, true );
 }
 
-Pyramid::Pyramid( Config& config,
+Pyramid::Pyramid( const Config& config,
                   int width,
                   int height )
     : _num_octaves( config.octaves )
@@ -125,7 +125,7 @@ Pyramid::Pyramid( Config& config,
 
     for (int o = 0; o<_num_octaves; o++) {
         _octaves[o].debugSetOctave(o);
-        _octaves[o].alloc(w, h, _levels, _gauss_group);
+        _octaves[o].alloc( config, w, h, _levels, _gauss_group );
         w = ceilf(w / 2.0f);
         h = ceilf(h / 2.0f);
     }
@@ -158,13 +158,13 @@ Pyramid::Pyramid( Config& config,
     cudaStreamCreate( &_download_stream );
 }
 
-void Pyramid::resetDimensions( int width, int height )
+void Pyramid::resetDimensions( const Config& conf, int width, int height )
 {
     int w = width;
     int h = height;
 
     for (int o = 0; o<_num_octaves; o++) {
-        _octaves[o].resetDimensions( w, h );
+        _octaves[o].resetDimensions( conf, w, h );
         w = ceilf(w / 2.0f);
         h = ceilf(h / 2.0f);
     }

@@ -138,6 +138,10 @@ struct Config
         return _max_extrema;
     }
 
+    int getGridSize( ) const {
+        return _grid_size;
+    }
+
     // check if we use direct downscaling from input image
     // for all octaves
     inline ScalingMode getScalingMode() const {
@@ -181,6 +185,12 @@ private:
      * several descriptors for each extremum.
      */
     int _max_extrema;
+
+    // Used to achieve an approximation of _max_entrema
+    // Subdivide the image in this number of vertical and horizontal tiles,
+    // i.e. the grid is actually _grid_size X _grid_size tiles.
+    // default: 1
+    int  _grid_size;
 
     /* Modes are computation according to VLFeat or OpenCV,
      * or fixed size. Default is VLFeat mode.

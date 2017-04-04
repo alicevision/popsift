@@ -76,12 +76,12 @@ class Pyramid
     cudaStream_t _download_stream;
 
 public:
-    Pyramid( Config& config,
+    Pyramid( const Config& config,
              int     w,
              int     h );
     ~Pyramid( );
 
-    void resetDimensions( int width, int height );
+    void resetDimensions( const Config& conf, int width, int height );
 
     /** step 1: load image and build pyramid */
     void step1( const Config& conf, Image* img );
