@@ -21,11 +21,11 @@ Config::Config( )
     , sigma( 1.6f )
     , _edge_limit( 10.0f )
     , _threshold( 0.04 ) // ( 10.0f / 256.0f )
-    , _gauss_mode( Config::VLFeat_Compute )
+    , _gauss_mode( Config::VLFeat_Relative )
     , _sift_mode( Config::PopSift )
     , _log_mode( Config::None )
     , _scaling_mode( Config::ScaleDefault )
-    , _desc_mode( Config::Loop )
+    , _desc_mode( Config::IGrid )
     , verbose( false )
     , _max_extrema( 10000 )
     , _assume_initial_blur( true )
@@ -80,6 +80,8 @@ void Config::setGaussMode( const std::string& m )
 {
     if( m == "vlfeat" )
         setGaussMode( Config::VLFeat_Compute );
+    else if( m == "relative" )
+        setGaussMode( Config::VLFeat_Relative );
     else if( m == "opencv" )
         setGaussMode( Config::OpenCV_Compute );
     else if( m == "fixed9" )

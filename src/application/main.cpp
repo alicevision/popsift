@@ -73,7 +73,8 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     {
     modes.add_options()
         ("gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
-        "Choice of span (1-sided) for Gauss filters. Default is VLFeat-like computation depending on sigma. Options are: vlfeat, opencv, fixed4, fixed8")
+        "Choice of span (1-sided) for Gauss filters. Default is VLFeat-like computation depending on sigma. "
+        "Options are: vlfeat, relative, opencv, fixed9, fixed15")
         ("desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
         "Choice of descriptor extraction modes:\n"
         "loop, iloop, grid, igrid, notile\n"
@@ -195,6 +196,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 void read_job( SiftJob* job, bool really_write )
 {
     popsift::Features* feature_list = job->get();
+    cerr << "Number of features: " << feature_list->size() << endl;
 
     if( really_write ) {
         nvtxRangePushA( "Writing features to disk" );

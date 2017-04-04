@@ -39,7 +39,7 @@ void Octave::alloc(int width, int height, int levels, int gauss_group)
     alloc_data_planes();
     alloc_data_tex();
 
-    alloc_interm_plane();
+    alloc_interm_array();
     alloc_interm_tex();
 
     alloc_dog_array();
@@ -58,45 +58,28 @@ void Octave::resetDimensions( int w, int h )
     _w = w;
     _h = h;
 
-    if( _w <= _max_w && _h <= _max_h ) {
-        free_dog_tex();
-        free_dog_array();
-
-        free_interm_tex();
-
-        free_data_tex();
-        free_data_planes();
-
-        alloc_data_planes();
-        alloc_data_tex();
-
-        _intermediate_data.resetDimensions( w, h );
-        alloc_interm_tex();
-
-        alloc_dog_array();
-        alloc_dog_tex();
-    } else {
+    if( _w > _max_w || _h > _max_h ) {
         _max_w = max( _w, _max_w );
         _max_h = max( _h, _max_h );
-
-        free_dog_tex();
-        free_dog_array();
-
-        free_interm_tex();
-        free_interm_plane();
-
-        free_data_tex();
-        free_data_planes();
-
-        alloc_data_planes();
-        alloc_data_tex();
-
-        alloc_interm_plane();
-        alloc_interm_tex();
-
-        alloc_dog_array();
-        alloc_dog_tex();
     }
+
+    free_dog_tex();
+    free_dog_array();
+
+    free_interm_tex();
+    free_interm_array();
+
+    free_data_tex();
+    free_data_planes();
+
+    alloc_data_planes();
+    alloc_data_tex();
+
+    alloc_interm_array();
+    alloc_interm_tex();
+
+    alloc_dog_array();
+    alloc_dog_tex();
 }
 
 void Octave::free()
@@ -108,7 +91,7 @@ void Octave::free()
     free_dog_array();
 
     free_interm_tex();
-    free_interm_plane();
+    free_interm_array();
 
     free_data_tex();
     free_data_planes();
@@ -121,69 +104,6 @@ void Octave::free()
 void Octave::download_and_save_array( const char* basename, int octave )
 {
         struct stat st = { 0 };
-
-#if 0
-        {
-            if (level == 0) {
-                int width  = getWidth();
-                int height = getHeight();
-
-                Plane2D_float hostPlane_f;
-                hostPlane_f.allocHost(width, height, CudaAllocated);
-                hostPlane_f.memcpyFromDevice(getData(level));
-
-                uint32_t total_ct = 0;
-
-                readExtremaCount();
-                cudaDeviceSynchronize();
-                for (uint32_t l = 0; l<_levels; l++) {
-                    uint32_t ct = getExtremaCountH(l); // getExtremaCount( l );
-                    if (ct > 0) {
-                        total_ct += ct;
-
-                        Extremum* cand = new Extremum[ct];
-
-                        popcuda_memcpy_sync(cand,
-                            _d_extrema[l],
-                            ct * sizeof(Extremum),
-                            cudaMemcpyDeviceToHost);
-                        for (uint32_t i = 0; i<ct; i++) {
-                            int32_t x = roundf(cand[i].xpos);
-                            int32_t y = roundf(cand[i].ypos);
-                            // cerr << "(" << x << "," << y << ") scale " << cand[i].sigma << " orient " << cand[i].orientation << endl;
-                            for (int32_t j = -4; j <= 4; j++) {
-                                hostPlane_f.ptr(clamp(y + j, height))[clamp(x, width)] = 255;
-                                hostPlane_f.ptr(clamp(y, height))[clamp(x + j, width)] = 255;
-                            }
-                        }
-
-                        delete[] cand;
-                    }
-                }
-
-                if (total_ct > 0) {
-                    if (stat("dir-feat", &st) == -1) {
-                        mkdir("dir-feat", 0700);
-                    }
-
-                    if (stat("dir-feat-txt", &st) == -1) {
-                        mkdir("dir-feat-txt", 0700);
-                    }
-
-
-                    ostringstream ostr;
-                    ostr << "dir-feat/" << basename << "-o-" << octave << "-l-" << level << ".pgm";
-                    ostringstream ostr2;
-                    ostr2 << "dir-feat-txt/" << basename << "-o-" << octave << "-l-" << level << ".txt";
-
-                    popsift::write_plane2D(ostr.str().c_str(), false, hostPlane_f);
-                    popsift::write_plane2Dunscaled(ostr2.str().c_str(), false, hostPlane_f);
-                }
-
-                hostPlane_f.freeHost(CudaAllocated);
-            }
-        }
-#endif
 
             cudaError_t err;
             int width  = getWidth();
@@ -339,56 +259,73 @@ void Octave::free_data_planes()
         POP_CUDA_FATAL_TEST(err, "Could not destroy Blur data surface: ");
     }
 
-    void Octave::alloc_interm_plane()
+    void Octave::alloc_interm_array()
     {
-        _intermediate_data.allocDev( _max_w, _max_h );
-        _intermediate_data.resetDimensions( _w, _h );
+        cudaError_t err;
+
+        _interm_desc.f = cudaChannelFormatKindFloat;
+        _interm_desc.x = 32;
+        _interm_desc.y = 0;
+        _interm_desc.z = 0;
+        _interm_desc.w = 0;
+
+        err = cudaMallocArray(&_interm_array,
+                              &_interm_desc,
+                              _w,
+                              _h,
+                              cudaArraySurfaceLoadStore);
+        POP_CUDA_FATAL_TEST(err, "Could not allocate Intermediate array: ");
     }
 
-    void Octave::free_interm_plane()
+    void Octave::free_interm_array()
     {
-        _intermediate_data.freeDev();
+        cudaError_t err;
+
+        err = cudaFreeArray(_interm_array);
+        POP_CUDA_FATAL_TEST(err, "Could not free Intermediate array: ");
     }
 
     void Octave::alloc_interm_tex()
     {
         cudaError_t err;
 
-        cudaTextureDesc      interm_data_tex_desc;
-        cudaResourceDesc     interm_data_res_desc;
+        cudaResourceDesc interm_res_desc;
+        interm_res_desc.resType = cudaResourceTypeArray;
+        interm_res_desc.res.array.array = _interm_array;
 
-        memset(&interm_data_tex_desc, 0, sizeof(cudaTextureDesc));
-        interm_data_tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
-        interm_data_tex_desc.addressMode[0] = cudaAddressModeClamp;
-        interm_data_tex_desc.addressMode[1] = cudaAddressModeClamp;
-        interm_data_tex_desc.addressMode[2] = cudaAddressModeClamp;
-        interm_data_tex_desc.readMode = cudaReadModeElementType; // read as float
-        interm_data_tex_desc.filterMode = cudaFilterModePoint;
+        err = cudaCreateSurfaceObject(&_interm_surf, &interm_res_desc);
+        POP_CUDA_FATAL_TEST(err, "Could not create Intermediate surface: ");
 
-        memset(&interm_data_res_desc, 0, sizeof(cudaResourceDesc));
-        interm_data_res_desc.resType = cudaResourceTypePitch2D;
-        interm_data_res_desc.res.pitch2D.desc.f = cudaChannelFormatKindFloat;
-        interm_data_res_desc.res.pitch2D.desc.x = 32;
-        interm_data_res_desc.res.pitch2D.desc.y = 0;
-        interm_data_res_desc.res.pitch2D.desc.z = 0;
-        interm_data_res_desc.res.pitch2D.desc.w = 0;
+        cudaTextureDesc      interm_tex_desc;
+        memset(&interm_tex_desc, 0, sizeof(cudaTextureDesc));
+        interm_tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
+        interm_tex_desc.addressMode[0] = cudaAddressModeClamp;
+        interm_tex_desc.addressMode[1] = cudaAddressModeClamp;
+        interm_tex_desc.addressMode[2] = cudaAddressModeClamp;
+        interm_tex_desc.readMode = cudaReadModeElementType; // read as float
+        interm_tex_desc.filterMode = cudaFilterModePoint; // no interpolation
 
-        interm_data_res_desc.res.pitch2D.devPtr = _intermediate_data.data;
-        interm_data_res_desc.res.pitch2D.pitchInBytes = _intermediate_data.step;
-        interm_data_res_desc.res.pitch2D.width = _intermediate_data.getCols();
-        interm_data_res_desc.res.pitch2D.height = _intermediate_data.getRows();
+        err = cudaCreateTextureObject(&_interm_data_tex_point,
+                                      &interm_res_desc,
+                                      &interm_tex_desc, 0);
+        POP_CUDA_FATAL_TEST(err, "Could not create Intermediate texture: ");
 
-        err = cudaCreateTextureObject(&_interm_data_tex,
-            &interm_data_res_desc,
-            &interm_data_tex_desc, 0);
-        POP_CUDA_FATAL_TEST(err, "Could not create texture object: ");
+        interm_tex_desc.filterMode = cudaFilterModeLinear; // linear interpolation
+        err = cudaCreateTextureObject(&_interm_data_tex_linear,
+                                      &interm_res_desc,
+                                      &interm_tex_desc, 0);
+        POP_CUDA_FATAL_TEST(err, "Could not create Intermediate texture: ");
     }
 
     void Octave::free_interm_tex()
     {
         cudaError_t err;
 
-        err = cudaDestroyTextureObject(_interm_data_tex);
+        err = cudaDestroySurfaceObject(_interm_surf);
+        POP_CUDA_FATAL_TEST(err, "Could not destroy surface object: ");
+        err = cudaDestroyTextureObject(_interm_data_tex_point);
+        POP_CUDA_FATAL_TEST(err, "Could not destroy texture object: ");
+        err = cudaDestroyTextureObject(_interm_data_tex_linear);
         POP_CUDA_FATAL_TEST(err, "Could not destroy texture object: ");
     }
 

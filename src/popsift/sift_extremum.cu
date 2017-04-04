@@ -103,8 +103,6 @@ void Features::unpin( )
 
 void Features::print( std::ostream& ostr, bool write_as_uchar ) const
 {
-    std::cout << "Num features: " << _num_ext << std::endl;
-
     for( int i=0; i<_num_ext; i++ ) {
         _ext[i].print( ostr, write_as_uchar );
     }
