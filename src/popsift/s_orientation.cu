@@ -8,6 +8,9 @@
 #include <math.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <thrust/device_vector.h>
+#include <thrust/sequence.h>
+#include <thrust/transform.h>
 
 #include "common/assist.h"
 #include "sift_pyramid.h"
@@ -341,6 +344,36 @@ void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
 }
 
 __host__
+void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
+{
+    /* At this time, we have host-side information about ext_ct[o], the number
+     * of extrema we have found in octave o, and we have summed it up on the
+     * host size. However, other values in the hct and dct data structures
+     * have not been computed yet.
+     * The extrema are only known in the InitialExtrema structure. We want to
+     * perform grid filtering before their orientation is computed and they
+     * are copied into the larger Extrema data structure.
+     */
+    const int slots = conf.getGridSize();
+
+    thrust::device_vector<int> octave_index( ext_total );
+    thrust::device_vector<int> iext_index  ( ext_total );
+    thrust::device_vector<int> permutator( ext_total );
+    thrust::device_vector<int> grid   ( ext_total );
+    thrust::sequence( permutator.begin(), permutator.end() );
+
+    int sum = 0;
+    for( int o=0; o<MAX_OCTAVES; o++ ) {
+        const int ocount = hct.ext_ct[o];
+        if( ocount > 0 ) {
+            thrust::fill(     octave_index.begin() + sum, octave_index.begin() + sum + ocount, o );
+            thrust::sequence( iext_index.begin()   + sum, iext_index  .begin() + sum + ocount );
+            sum += ocount;
+        }
+    }
+}
+
+__host__
 void Pyramid::orientation( const Config& conf )
 {
     nvtxRangePushA( "reading extrema count" );
@@ -354,6 +387,8 @@ void Pyramid::orientation( const Config& conf )
             ext_total += hct.ext_ct[o];
         }
     }
+
+    extrema_filter_grid( conf, ext_total );
 
     reallocExtrema( ext_total );
     nvtxRangePop( );

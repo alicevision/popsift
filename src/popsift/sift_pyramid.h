@@ -115,6 +115,7 @@ private:
     void find_extrema( const Config& conf );
     void reallocExtrema( int numExtrema );
 
+    void extrema_filter_grid( const Config& conf, int ext_total ); // called at head of orientation
     void orientation( const Config& conf );
 
     void descriptors( const Config& conf );
