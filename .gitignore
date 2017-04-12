@@ -38,6 +38,9 @@ popsift/playground/try-libav
 *.out
 *.app
 
+# Support files
+*.nvvp
+
 # Temporary files
 .DS_Store
 
