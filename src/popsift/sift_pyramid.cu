@@ -331,9 +331,9 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, Features* feat
     for( int ext_idx = 0; ext_idx<hct.ext_total; ext_idx++ ) {
         const Feature& ext = features->getFeatures()[ext_idx];
         const int   octave  = ext.debug_octave;
-        const float xpos    = ext.xpos  * pow(2.0, octave - up_fac);
-        const float ypos    = ext.ypos  * pow(2.0, octave - up_fac);
-        const float sigma   = ext.sigma * pow(2.0, octave - up_fac);
+        const float xpos    = ext.xpos  * pow(2.0f, octave - up_fac);
+        const float ypos    = ext.ypos  * pow(2.0f, octave - up_fac);
+        const float sigma   = ext.sigma * pow(2.0f, octave - up_fac);
         for( int ori = 0; ori<ext.num_ori; ori++ ) {
             // const int   ori_idx = ext.idx_ori + ori;
             float       dom_ori = ext.orientation[ori];
