@@ -170,10 +170,10 @@ void init_filter( const Config& conf,
                 "    Input blurriness is assumed to be %f (scaled to %f)\n"
                 ,
                 conf.getUpscaleFactor(),
-                pow( 2.0, conf.getUpscaleFactor() ),
+                pow( 2.0f, conf.getUpscaleFactor() ),
                 sigma0,
                 conf.getInitialBlur(),
-                conf.getInitialBlur() * pow( 2.0, conf.getUpscaleFactor() )
+                conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() )
                 );
         // printf("sigma is initially sigma0, afterwards the difference between previous 2 sigmas\n");
     }
@@ -187,13 +187,13 @@ void init_filter( const Config& conf,
     if( not conf.hasInitialBlur() ) {
         h_gauss.inc.sigma[0] = sigma0;
     } else {
-        const float initial_blur = conf.getInitialBlur() * pow( 2.0, conf.getUpscaleFactor() );
+        const float initial_blur = conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() );
         h_gauss.inc.sigma[0] = sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) );
     }
 
     for( int lvl=1; lvl<h_gauss.required_filter_stages; lvl++ ) {
-        const float sigmaP = sigma0 * pow( 2.0, (float)(lvl-1)/(float)levels );
-        const float sigmaS = sigma0 * pow( 2.0, (float)(lvl  )/(float)levels );
+        const float sigmaP = sigma0 * pow( 2.0f, (float)(lvl-1)/(float)levels );
+        const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl  )/(float)levels );
 
         h_gauss.inc.sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
     }
@@ -202,10 +202,10 @@ void init_filter( const Config& conf,
 
     float initial_blur = 0.0f;
     if( conf.hasInitialBlur() ) {
-        initial_blur = conf.getInitialBlur() * pow( 2.0, conf.getUpscaleFactor() );
+        initial_blur = conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() );
     }
     for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
-        const float sigmaS = sigma0 * pow( 2.0, (float)(lvl)/(float)levels );
+        const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl)/(float)levels );
         h_gauss.abs_o0.sigma[lvl]  = sqrt( fabs( sigmaS * sigmaS - initial_blur * initial_blur ) );
     }
 
@@ -214,13 +214,13 @@ void init_filter( const Config& conf,
     if( not conf.hasInitialBlur() ) {
         h_gauss.inc_relative.sigma[0] = sigma0;
     } else {
-        const float initial_blur = conf.getInitialBlur() * pow( 2.0, conf.getUpscaleFactor() );
+        const float initial_blur = conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() );
         h_gauss.inc_relative.sigma[0] = sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) );
     }
 
     for( int lvl=1; lvl<h_gauss.required_filter_stages; lvl++ ) {
-        const float sigmaP = sigma0 * pow( 2.0, (float)(lvl-1)/(float)levels );
-        const float sigmaS = sigma0 * pow( 2.0, (float)(lvl  )/(float)levels );
+        const float sigmaP = sigma0 * pow( 2.0f, (float)(lvl-1)/(float)levels );
+        const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl  )/(float)levels );
 
         h_gauss.inc_relative.sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
     }
@@ -231,23 +231,23 @@ void init_filter( const Config& conf,
 #if 0
     if( conf.ifPrintGaussTables() ) {
         for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
-            float sigmaP = sigma0 * pow( 2.0, (float)(lvl-1)/(float)levels );
-            float sigmaS = sigma0 * pow( 2.0, (float)(lvl  )/(float)levels );
+            float sigmaP = sigma0 * pow( 2.0f, (float)(lvl-1)/(float)levels );
+            float sigmaS = sigma0 * pow( 2.0f, (float)(lvl  )/(float)levels );
             if( lvl == 0 ) {
-                sigmaP = conf.getInitialBlur() * pow( 2.0, conf.getUpscaleFactor() );
+                sigmaP = conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() );
             }
             printf("    Sigma (rel) for level %d: %2.6f = sqrt(sigmaS(%2.6f)^2 - sigmaP(%2.6f)^2)\n", lvl, h_gauss.inc.sigma[lvl], sigmaS, sigmaP );
         }
 
         for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
-            const float sigmaS = sigma0 * pow( 2.0, (float)(lvl)/(float)levels );
+            const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl)/(float)levels );
             printf("    Sigma (abs0) for level %d: %2.6f = sqrt(sigmaS(%2.6f)^2 - sigmaP(%2.6f)^2)\n", lvl, h_gauss.abs_o0.sigma[lvl], sigmaS, initial_blur );
         }
     }
 #endif
 
     for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
-        const float sigmaS = sigma0 * pow( 2.0, (float)(lvl)/(float)levels );
+        const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl)/(float)levels );
         h_gauss.abs_oN.sigma[lvl]  = sigmaS;
     }
     h_gauss.abs_oN.computeBlurTable( &h_gauss );
