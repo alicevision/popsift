@@ -11,12 +11,11 @@
 #include <iostream>
 #include <pthread.h> // for pthread_self
 
-using namespace std;
-
-std::ostream& operator<<( std::ostream& ostr, const dim3& p );
 
 namespace popsift
 {
+
+std::ostream& operator<<( std::ostream& ostr, const dim3& p );
 
 /* This computation is needed very frequently when a dim3 grid block is
  * initialized. It ensure that the tail is not forgotten.
