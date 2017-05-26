@@ -93,8 +93,8 @@ public:
     typedef const Feature* F_const_iterator;
 
     inline F_iterator       begin()       { return _ext; }
-    inline F_const_iterator begin() const { return &_ext[_num_ext]; }
-    inline F_iterator       end()         { return _ext; }
+    inline F_const_iterator begin() const { return _ext; }
+    inline F_iterator       end()         { return &_ext[_num_ext]; }
     inline F_const_iterator end() const   { return &_ext[_num_ext]; }
 
     void reset( int num_ext, int num_ori );
