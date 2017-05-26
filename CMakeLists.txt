@@ -30,7 +30,7 @@ if(WIN32)
   link_directories(Boost_LIBRARRY_DIR_RELEASE)
 endif(WIN32)
 
-find_package(CUDA 7.0)
+find_package(CUDA 7.0 REQUIRED)
 
 if(NOT CUDA_FOUND)
   message(FATAL_ERROR "Could not find CUDA >= 7.0")
