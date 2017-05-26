@@ -5,6 +5,11 @@ project(PopSift VERSION 1.0.0)
 
 OPTION(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
 OPTION(USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
+OPTION(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
+
+if(PopSift_USE_POSITION_INDEPENDENT_CODE)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
@@ -58,6 +63,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG};-G")
 endif()
 set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-O3")
+
+if(PopSift_USE_POSITION_INDEPENDENT_CODE)
+  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xcompiler;-fPIC")
+endif()
+
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_30,code=sm_30")
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_35,code=sm_35")
 set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_50,code=sm_50")
