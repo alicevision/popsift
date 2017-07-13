@@ -425,7 +425,7 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
                        thrust::make_zip_iterator( thrust::make_tuple( cell_values.begin(),
                                                                       scale_values.begin() ) ),
                        fun_extract_cell );
-    // sort (octave,index) tuples by their cell values
+    // sort (octave,index,scale) tuples by their cell values
     thrust::sort_by_key( cell_values.begin(), cell_values.end(),
                          thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin(),
                                                                         iext_index.  begin(),
@@ -446,6 +446,7 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     thrust::host_vector<int> cell_count_prefix_sums( n );
     thrust::host_vector<int> cell_count_sumup      ( n );
 
+    // move to host code - computing the limits on the GPU is too wasteful
     h_cell_counts = cell_counts;
 
     std::cout << "BEGIN cell value counters" << std::endl;
