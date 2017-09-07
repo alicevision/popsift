@@ -154,6 +154,14 @@ struct Config
         return _max_extrema;
     }
 
+    /* Filtering extrema is only possible when CUDA version is >= 8.0
+     * The reason is that we use Thrust. This allows runtime testing.
+     *
+     * Note: re-writing the filtering code is possible, either older
+     *       Thrust semantics, CUDA CUB or doing everything from scratch.
+     */
+    bool getCanFilterExtrema() const;
+
     /* Set the approximate number of extrema whose orientation and descriptor
      * should be computed. Default is -1, which sets the hard limit defined
      * by "number of octaves * getMaxExtrema()".

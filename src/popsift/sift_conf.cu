@@ -95,6 +95,15 @@ void Config::setGaussMode( const std::string& m )
         POP_FATAL( "specified Gauss mode must be one of vlfeat, opencv, fixed9 or fixed15" );
 }
 
+bool Config::getCanFilterExtrema() const
+{
+#if __CUDACC_VER__ >= 80000
+    return true;
+#else
+    return false;
+#endif
+}
+
 void Config::setFilterSorting( const std::string& text )
 {
     if( text == "up" )
