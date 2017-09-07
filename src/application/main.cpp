@@ -97,7 +97,10 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
          "Direct each octave from upscaled orig instead of blurred level.")
         ("root-sift", bool_switch()->notifier([&](bool b) { if(b) config.setUseRootSift(true); }),
         "Use the L1-based norm for OpenMVG rather than L2-based as in OpenCV")
-        ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).");
+        ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
+        ("filter-max-extrema", value<int>()->notifier([&](int f) {config.setFilterMaxExtrema(f); }), "Approximate max number of extrema.")
+        ("filter-grid", value<int>()->notifier([&](int f) {config.setFilterGridSize(f); }), "Grid edge length for extrema filtering (ie. value 4 leads to a 4x4 grid)")
+        ("filter-sort", value<std::string>()->notifier([&](const std::string& s) {config.setFilterSorting(s); }), "Sort extrema in each cell by scale, either random (default), up or down");
 
     }
     options_description informational("Informational");

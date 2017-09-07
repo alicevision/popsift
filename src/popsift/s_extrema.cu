@@ -603,7 +603,7 @@ void Pyramid::find_extrema( const Config& conf )
                       grid.x * grid.y,
                       oct_obj.getWGridDivider(),
                       oct_obj.getHGridDivider(),
-                      conf.getGridSize() );
+                      conf.getFilterGridSize() );
                 break;
         case Config::OpenCV :
                 find_extrema_in_dog<HEIGHT,Config::OpenCV>
@@ -617,7 +617,7 @@ void Pyramid::find_extrema( const Config& conf )
                       grid.x * grid.y,
                       oct_obj.getWGridDivider(),
                       oct_obj.getHGridDivider(),
-                      conf.getGridSize() );
+                      conf.getFilterGridSize() );
                 break;
         default :
                 find_extrema_in_dog<HEIGHT,Config::PopSift>
@@ -631,7 +631,7 @@ void Pyramid::find_extrema( const Config& conf )
                       grid.x * grid.y,
                       oct_obj.getWGridDivider(),
                       oct_obj.getHGridDivider(),
-                      conf.getGridSize() );
+                      conf.getFilterGridSize() );
                 break;
         }
 #undef getDogTexture

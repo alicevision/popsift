@@ -347,9 +347,30 @@ void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
     }
 }
 
+struct FunctionSort_IncCell_DecScale
+{
+    __device__
+    inline bool operator()( const thrust::tuple<int,float>& l, const thrust::tuple<int,float>& r ) const
+    {
+        return ( ( thrust::get<0>(l)  < thrust::get<0>(r) ) ||
+                 ( thrust::get<0>(l) == thrust::get<0>(r) && thrust::get<1>(l) > thrust::get<1>(r) ) );
+    }
+};
+
+struct FunctionSort_IncCell_IncScale
+{
+    __device__
+    inline bool operator()( const thrust::tuple<int,float>& l, const thrust::tuple<int,float>& r ) const
+    {
+        return ( ( thrust::get<0>(l)  < thrust::get<0>(r) ) ||
+                 ( thrust::get<0>(l) == thrust::get<0>(r) && thrust::get<1>(l) < thrust::get<1>(r) ) );
+    }
+};
+
 struct FunctionExtractCell
 {
-    __device__ thrust::tuple<int,float> operator()( const thrust::tuple<int,int>& val) const
+    __device__
+    inline thrust::tuple<int,float> operator()( const thrust::tuple<int,int>& val) const
     {
         /* During the filter stage, the i_ext_dat array is still compact (all intial
          * extrema do still have ignore==false), so that we can access every entry
@@ -368,7 +389,8 @@ struct FunctionReversePosition
     const int _total;
     FunctionReversePosition( int total ) : _total(total) { }
 
-    __host__ __device__ int operator()(int val) const
+    __host__ __device__
+    inline int operator()(int val) const
     {
         return _total - val - 1;
     }
@@ -379,7 +401,8 @@ struct FunctionIsAbove
     int _limit;
     FunctionIsAbove( int limit ) : _limit(limit) { }
 
-    __host__ __device__ bool operator()( int val ) const
+    __host__ __device__
+    inline bool operator()( int val ) const
     {
         return val > _limit;
     }
@@ -387,7 +410,8 @@ struct FunctionIsAbove
 
 struct FunctionDisableExtremum
 {
-    __device__ void operator()( const thrust::tuple<int,int>& val) const
+    __device__
+    inline void operator()( const thrust::tuple<int,int>& val) const
     {
         const int octave = thrust::get<0>(val);
         const int idx    = thrust::get<1>(val);
@@ -398,7 +422,8 @@ struct FunctionDisableExtremum
 
 struct FunctionExtractIgnored
 {
-    __device__ int operator()( int idx, int octave ) const
+    __device__
+    inline int operator()( int idx, int octave ) const
     {
         InitialExtremum& e = dobuf.i_ext_dat[octave][idx];
         if( e.ignore )
@@ -419,7 +444,7 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
      * perform grid filtering before their orientation is computed and they
      * are copied into the larger Extrema data structure.
      */
-    const int slots = conf.getGridSize();
+    const int slots = conf.getFilterGridSize();
 
     thrust::device_vector<int>   octave_index( ext_total );
     thrust::device_vector<int>   iext_index  ( ext_total );
@@ -459,11 +484,40 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
                        thrust::make_zip_iterator( thrust::make_tuple( cell_values.begin(),
                                                                       scale_values.begin() ) ),
                        fun_extract_cell );
-    // sort (octave,index,scale) tuples by their cell values
-    thrust::sort_by_key( cell_values.begin(), cell_values.end(),
-                         thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin(),
-                                                                        iext_index.  begin(),
-                                                                        scale_values.begin() ) ) );
+    if( conf.getFilterSorting() == Config::LargestScaleFirst )
+    {
+        FunctionSort_IncCell_DecScale fun_sort;
+        thrust::sort_by_key(
+            thrust::make_zip_iterator( thrust::make_tuple( cell_values.begin(),
+                                                           scale_values.begin() ) ),
+            thrust::make_zip_iterator( thrust::make_tuple( cell_values.end(),
+                                                           scale_values.end() ) ),
+            thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin(),
+                                                           iext_index.  begin() ) ),
+            fun_sort );
+    }
+    else if( conf.getFilterSorting() == Config::SmallestScaleFirst )
+    {
+        FunctionSort_IncCell_IncScale fun_sort;
+        thrust::sort_by_key(
+            thrust::make_zip_iterator( thrust::make_tuple( cell_values.begin(),
+                                                           scale_values.begin() ) ),
+            thrust::make_zip_iterator( thrust::make_tuple( cell_values.end(),
+                                                           scale_values.end() ) ),
+            thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin(),
+                                                           iext_index.  begin() ) ),
+            fun_sort );
+    }
+    else
+    {
+        // sort (octave,index,scale) tuples by their cell values (in which cell are they located)
+        thrust::sort_by_key(
+            cell_values.begin(),
+            cell_values.end(),
+            thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin(),
+                                                           iext_index.  begin(),
+                                                           scale_values.begin() ) ) );
+    }
 
     // count the number of entries in all cells (in one operation instead of several reduce_if)
     thrust::reduce_by_key( cell_values.begin(), cell_values.end(),
@@ -521,7 +575,7 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
                        cell_count_sumup.begin(),
                        thrust::plus<int>() );
 
-    FunctionIsAbove function_is_above( conf.getMaxExtrema() );
+    FunctionIsAbove function_is_above( conf.getFilterMaxExtrema() );
 
     // count cells that are above the extrema limit after the summing. Those must share the
     // reduction of extrema
@@ -530,7 +584,7 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 
     float tailaverage = float( thrust::reduce( &h_cell_counts[n-ct], &h_cell_counts[n] ) ) / ct;
 
-    int   newlimit    = ::ceilf( tailaverage - ( ext_total - conf.getMaxExtrema() ) / ct );
+    int   newlimit    = ::ceilf( tailaverage - ( ext_total - conf.getFilterMaxExtrema() ) / ct );
 
     // clamp all cells to the computed limit - the total is now less than n extrema off
     thrust::transform( h_cell_counts.begin(), h_cell_counts.end(), 
@@ -543,13 +597,6 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 
     // transfer counts back to device
     cell_counts = h_cell_counts;
-
-    if( 1 ) // filter condition is random selection
-    {
-    }
-    else if( 0 ) // filter condition is largest scale first
-    {
-    }
 
     for( int i=0; i<h_cell_counts.size(); i++ )
     {
@@ -639,7 +686,12 @@ void Pyramid::orientation( const Config& conf )
         }
     }
 
-    ext_total = extrema_filter_grid( conf, ext_total );
+    // Filter functions are only called if necessary. They are very expensive,
+    // therefore add 10% slack.
+    if( conf.getFilterMaxExtrema() > 0 && int(conf.getFilterMaxExtrema()*1.1) < ext_total )
+    {
+        ext_total = extrema_filter_grid( conf, ext_total );
+    }
     nvtxRangePop( );
 
     nvtxRangePushA( "reallocating extrema arrays" );

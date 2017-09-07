@@ -36,8 +36,8 @@ void Octave::alloc( const Config& conf, int width, int height, int levels, int g
     _max_h = _h = height;
     _levels = levels;
 
-    _w_grid_divider = float(_w) / conf.getGridSize();
-    _h_grid_divider = float(_h) / conf.getGridSize();
+    _w_grid_divider = float(_w) / conf.getFilterGridSize();
+    _h_grid_divider = float(_h) / conf.getFilterGridSize();
 
     alloc_data_planes();
     alloc_data_tex();
@@ -61,8 +61,8 @@ void Octave::resetDimensions( const Config& conf, int w, int h )
     _w = w;
     _h = h;
 
-    _w_grid_divider = float(_w) / conf.getGridSize();
-    _h_grid_divider = float(_h) / conf.getGridSize();
+    _w_grid_divider = float(_w) / conf.getFilterGridSize();
+    _h_grid_divider = float(_h) / conf.getFilterGridSize();
 
     if( _w > _max_w || _h > _max_h ) {
         _max_w = max( _w, _max_w );
