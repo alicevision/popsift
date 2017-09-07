@@ -60,7 +60,6 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
  * using 16 threads for each of them.
  * direct curve fitting approach
  */
-template<int HEIGHT>
 __global__
 void ori_par( const int           octave,
               const int           ext_ct_prefix_sum,
@@ -68,16 +67,16 @@ void ori_par( const int           octave,
               const int           w,
               const int           h )
 {
-    const int extremum_index  = blockIdx.x * blockDim.y + threadIdx.y;
+    const int extremum_index  = blockIdx.x * blockDim.y;
 
     if( extremum_index >= dct.ext_ct[octave] ) return; // a few trailing warps
 
     const InitialExtremum* iext = &dobuf.i_ext[octave][extremum_index];
 
-    __shared__ float hist   [HEIGHT][ORI_NBINS];
-    __shared__ float sm_hist[HEIGHT][ORI_NBINS];
+    __shared__ float hist   [ORI_NBINS];
+    __shared__ float sm_hist[ORI_NBINS];
 
-    for( int i = threadIdx.x; i < ORI_NBINS; i += blockDim.x )  hist[threadIdx.y][i] = 0.0f;
+    for( int i = threadIdx.x; i < ORI_NBINS; i += blockDim.x )  hist[i] = 0.0f;
 
     /* keypoint fractional geometry */
     const float x     = iext->xpos;
@@ -136,7 +135,7 @@ void ori_par( const int           octave,
 
                 bidx = (bidx == ORI_NBINS) ? 0 : bidx;
 
-                atomicAdd( &hist[threadIdx.y][bidx], weight );
+                atomicAdd( &hist[bidx], weight );
             }
         }
         __syncthreads();
@@ -147,18 +146,18 @@ void ori_par( const int           octave,
         for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
             int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
             int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            sm_hist[threadIdx.y][bin] = ( hist[threadIdx.y][prev] + hist[threadIdx.y][bin] + hist[threadIdx.y][next] ) / 3.0f;
+            sm_hist[bin] = ( hist[prev] + hist[bin] + hist[next] ) / 3.0f;
         }
         __syncthreads();
         for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
             int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
             int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            hist[threadIdx.y][bin] = ( sm_hist[threadIdx.y][prev] + sm_hist[threadIdx.y][bin] + sm_hist[threadIdx.y][next] ) / 3.0f;
+            hist[bin] = ( sm_hist[prev] + sm_hist[bin] + sm_hist[next] ) / 3.0f;
         }
         __syncthreads();
     }
     for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
-        sm_hist[threadIdx.y][bin] = hist[threadIdx.y][bin];
+        sm_hist[bin] = hist[bin];
     }
     __syncthreads();
 #else // not WITH_VLFEAT_SMOOTHING
@@ -171,48 +170,47 @@ void ori_par( const int           octave,
         if( prev1 < 0 )          prev1 += ORI_NBINS;
         if( next1 >= ORI_NBINS ) next1 -= ORI_NBINS;
         if( next2 >= ORI_NBINS ) next2 -= ORI_NBINS;
-        sm_hist[threadIdx.y][bin] = (   hist[threadIdx.y][prev2] + hist[threadIdx.y][next2]
-                         + ( hist[threadIdx.y][prev1] + hist[threadIdx.y][next1] ) * 4.0f
-                         +   hist[threadIdx.y][bin] * 6.0f ) / 16.0f;
+        sm_hist[bin] = (   hist[prev2] + hist[next2]
+                         + ( hist[prev1] + hist[next1] ) * 4.0f
     }
     __syncthreads();
 #endif // not WITH_VLFEAT_SMOOTHING
 
     // sub-cell refinement of the histogram cell index, yielding the angle
     // not necessary to initialize, every cell is computed
-    __shared__ float refined_angle[HEIGHT][64];
-    __shared__ float yval         [HEIGHT][64];
+    __shared__ float refined_angle[64];
+    __shared__ float yval         [64];
 
     for( int bin = threadIdx.x; ::__any( bin < ORI_NBINS ); bin += blockDim.x ) {
         const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
         const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
 
-        bool predicate = ( bin < ORI_NBINS ) && ( sm_hist[threadIdx.y][bin] > max( sm_hist[threadIdx.y][prev], sm_hist[threadIdx.y][next] ) );
+        bool predicate = ( bin < ORI_NBINS ) && ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) );
 
-        // const float num  = predicate ? 3.0f *   sm_hist[threadIdx.y][prev] - 4.0f * sm_hist[threadIdx.y][bin] + sm_hist[threadIdx.y][next]   : 0.0f;
-        const float num  = predicate ?   2.0f * sm_hist[threadIdx.y][prev]
-                                       - 4.0f * sm_hist[threadIdx.y][bin]
-                                       + 2.0f * sm_hist[threadIdx.y][next]
+        // const float num  = predicate ? 3.0f *   sm_hist[prev] - 4.0f * sm_hist[bin] + sm_hist[next]   : 0.0f;
+        const float num  = predicate ?   2.0f * sm_hist[prev]
+                                       - 4.0f * sm_hist[bin]
+                                       + 2.0f * sm_hist[next]
                                      : 0.0f;
-        const float denB = predicate ? 2.0f * ( sm_hist[threadIdx.y][prev] - 2.0f * sm_hist[threadIdx.y][bin] + sm_hist[threadIdx.y][next] ) : 1.0f;
+        const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
 
         const float newbin = __fdividef( num, denB ); // verified: accuracy OK
 
         predicate   = ( predicate && newbin >= 0.0f && newbin <= 2.0f );
 
-        refined_angle[threadIdx.y][bin] = predicate ? prev + newbin : -1;
-        yval[threadIdx.y][bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[threadIdx.y][prev] : -INFINITY;
+        refined_angle[bin] = predicate ? prev + newbin : -1;
+        yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
     }
 
     int2 best_index = make_int2( threadIdx.x, threadIdx.x + 32 );
 
-    BitonicSort::Warp32<float> sorter( yval[threadIdx.y] );
+    BitonicSort::Warp32<float> sorter( yval );
     sorter.sort64( best_index );
     __syncthreads();
 
     // All threads retrieve the yval of thread 0, the largest
     // of all yvals.
-    const float best_val = yval[threadIdx.y][best_index.x];
+    const float best_val = yval[best_index.x];
     const float yval_ref = 0.8f * __shfl( best_val, 0 );
     const bool  valid    = ( best_val >= yval_ref );
     bool        written  = false;
@@ -221,7 +219,7 @@ void ori_par( const int           octave,
 
     if( threadIdx.x < ORIENTATION_MAX_COUNT ) {
         if( valid ) {
-            float chosen_bin = refined_angle[threadIdx.y][best_index.x];
+            float chosen_bin = refined_angle[best_index.x];
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             // float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
             float th = ::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
@@ -511,27 +509,6 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     }
 
 #if 1
-    // thrust::host_vector<int> h_octave_index( ext_total );
-    // h_octave_index = octave_index;
-    // std::cout << "BEGIN octave numbers" << std::endl;
-    // std::copy( h_octave_index.begin(), h_octave_index.end(), std::ostream_iterator<int>(std::cout, " "));
-    // std::cout << std::endl;
-    // std::cout << "END octave numbers" << std::endl;
-
-    // thrust::host_vector<int> h_iext_index(   ext_total );
-    // h_iext_index   = iext_index;
-    // std::cout << "BEGIN in-octave index" << std::endl;
-    // std::copy( h_iext_index  .begin(), h_iext_index  .end(), std::ostream_iterator<int>(std::cout, " "));
-    // std::cout << std::endl;
-    // std::cout << "END in-octave index" << std::endl;
-
-    // thrust::host_vector<int> h_cell_values(   ext_total );
-    // h_cell_values   = cell_values;
-    // std::cout << "BEGIN cell values" << std::endl;
-    // std::copy( h_cell_values  .begin(), h_cell_values  .end(), std::ostream_iterator<int>(std::cout, " "));
-    // std::cout << std::endl;
-    // std::cout << "END cell values" << std::endl;
-
     std::cout << "BEGIN cell value counters" << std::endl;
     std::copy( h_cell_counts  .begin(), h_cell_counts  .end(), std::ostream_iterator<int>(std::cout, " "));
     std::cout << std::endl;
@@ -586,31 +563,18 @@ void Pyramid::orientation( const Config& conf )
             dim3 block;
             dim3 grid;
 
-            if( num > 32 ) {
-                block.x = 32;
-                block.y = 2;
-                grid.x  = grid_divide( num, 2 );
+            block.x = 32;
+            block.y = 1;
+            grid.x  = num;
 
-                ori_par<2>
-                    <<<grid,block,0,oct_str>>>
-                    ( octave,
-                      hct.ext_ps[octave],
-                      oct_obj.getDataTexPoint( ),
-                      oct_obj.getWidth( ),
-                      oct_obj.getHeight( ) );
-            } else {
-                block.x = 32;
-                block.y = 1;
-                grid.x  = num;
+            ori_par
+                <<<grid,block,0,oct_str>>>
+                ( octave,
+                  hct.ext_ps[octave],
+                  oct_obj.getDataTexPoint( ),
+                  oct_obj.getWidth( ),
+                  oct_obj.getHeight( ) );
 
-                ori_par<1>
-                    <<<grid,block,0,oct_str>>>
-                    ( octave,
-                      hct.ext_ps[octave],
-                      oct_obj.getDataTexPoint( ),
-                      oct_obj.getWidth( ),
-                      oct_obj.getHeight( ) );
-            }
             if( octave != 0 ) {
                 cuda::event_record( oct_obj.getEventOriDone(), oct_str,   __FILE__, __LINE__ );
                 cuda::event_wait  ( oct_obj.getEventOriDone(), oct_0_str, __FILE__, __LINE__ );
