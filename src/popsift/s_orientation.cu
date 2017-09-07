@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Simula Research Laboratory
+ * Copyright 2016-2017, Simula Research Laboratory
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -10,9 +10,11 @@
 #include <inttypes.h>
 #include <thrust/device_vector.h>
 #include <thrust/sequence.h>
+#include <thrust/copy.h>
 #include <thrust/transform.h>
 #include <thrust/transform_scan.h>
 #include <thrust/sort.h>
+#include <thrust/execution_policy.h>
 
 #include "common/assist.h"
 #include "sift_pyramid.h"
@@ -72,7 +74,8 @@ void ori_par( const int           octave,
 
     if( extremum_index >= dct.ext_ct[octave] ) return; // a few trailing warps
 
-    const InitialExtremum* iext = &dobuf.i_ext[octave][extremum_index];
+    const int              iext_off =  dobuf.i_ext_off[octave][extremum_index];
+    const InitialExtremum* iext     = &dobuf.i_ext_dat[octave][iext_off];
 
     __shared__ float hist   [ORI_NBINS];
     __shared__ float sm_hist[ORI_NBINS];
@@ -348,9 +351,13 @@ struct FunctionExtractCell
 {
     __device__ thrust::tuple<int,float> operator()( const thrust::tuple<int,int>& val) const
     {
+        /* During the filter stage, the i_ext_dat array is still compact (all intial
+         * extrema do still have ignore==false), so that we can access every entry
+         * directly).
+         */
         const int octave = thrust::get<0>(val);
         const int idx    = thrust::get<1>(val);
-        InitialExtremum& e = dobuf.i_ext[octave][idx];
+        InitialExtremum& e = dobuf.i_ext_dat[octave][idx];
 
         return  thrust::make_tuple( e.cell, e.sigma * powf( 2.0f, octave ) );
     }
@@ -384,18 +391,16 @@ struct FunctionDisableExtremum
     {
         const int octave = thrust::get<0>(val);
         const int idx    = thrust::get<1>(val);
-        InitialExtremum& e = dobuf.i_ext[octave][idx];
+        InitialExtremum& e = dobuf.i_ext_dat[octave][idx];
         e.ignore = true;
     }
 };
 
 struct FunctionExtractIgnored
 {
-    __device__ int operator()( const thrust::tuple<int,int>& val) const
+    __device__ int operator()( int idx, int octave ) const
     {
-        const int octave = thrust::get<0>(val);
-        const int idx    = thrust::get<1>(val);
-        InitialExtremum& e = dobuf.i_ext[octave][idx];
+        InitialExtremum& e = dobuf.i_ext_dat[octave][idx];
         if( e.ignore )
             return 0;
         else
@@ -403,20 +408,8 @@ struct FunctionExtractIgnored
     }
 };
 
-struct FunctionWriteIndex
-{
-    __device__ void operator()( const thrust::tuple<int,int,int>& val) const
-    {
-        const int octave = thrust::get<0>(val);
-        const int idx    = thrust::get<1>(val);
-        const int wr_idx = thrust::get<2>(val);
-        InitialExtremum& e = dobuf.i_ext[octave][idx];
-        e.write_index = wr_idx;
-    }
-};
-
 __host__
-void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
+int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 {
     /* At this time, we have host-side information about ext_ct[o], the number
      * of extrema we have found in octave o, and we have summed it up on the
@@ -432,28 +425,33 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     thrust::device_vector<int>   iext_index  ( ext_total );
     thrust::device_vector<int>   cell_values ( ext_total );
     thrust::device_vector<float> scale_values( ext_total );
-    thrust::device_vector<int>   permutator  ( ext_total );
-    thrust::device_vector<int>   grid        ( ext_total );
     thrust::device_vector<int>   cell_counts ( slots * slots );
     thrust::device_vector<int>   cell_offsets( slots * slots );
-
-    thrust::sequence( permutator.begin(), permutator.end() );
 
     int sum = 0;
     for( int o=0; o<MAX_OCTAVES; o++ ) {
         const int ocount = hct.ext_ct[o];
         if( ocount > 0 ) {
+            cudaStream_t oct_str = _octaves[o].getStream();
+
             // fill a continuous device array with octave of all initial extrema
-            thrust::fill(     octave_index.begin() + sum, octave_index.begin() + sum + ocount, o );
+            thrust::fill(     thrust::cuda::par.on(oct_str),
+                              octave_index.begin() + sum,
+                              octave_index.begin() + sum + ocount,
+                              o );
             // fill a continuous device array with index within octave of all initial extrema
-            thrust::sequence( iext_index.begin()   + sum, iext_index  .begin() + sum + ocount );
+            thrust::sequence( thrust::cuda::par.on(oct_str),
+                              iext_index.begin() + sum,
+                              iext_index.begin() + sum + ocount );
             sum += ocount;
         }
     }
 
-    FunctionExtractCell fun_extract_cell;
+    cudaDeviceSynchronize();
 
     // extract cell and scale value for all initial extrema
+    FunctionExtractCell          fun_extract_cell;
+
     thrust::transform( thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin(),
                                                                       iext_index.begin() ) ),
                        thrust::make_zip_iterator( thrust::make_tuple( octave_index.end(),
@@ -493,10 +491,12 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     // offset to end indeces of each cell value - could shift h_cell_offsets and sum up counts
     thrust::inclusive_scan( h_cell_counts.begin(), h_cell_counts.end(), h_cell_limits .begin() );
 
+#if 0
     std::cout << "BEGIN cell value counters" << std::endl;
     std::copy( h_cell_counts  .begin(), h_cell_counts  .end(), std::ostream_iterator<int>(std::cout, " "));
     std::cout << std::endl;
     std::cout << "END cell value counters" << std::endl;
+#endif
 
     // the cell filter algorithm requires the cell counts in increasing order, cell_permute
     // maps new position to original index
@@ -550,7 +550,7 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     else if( 0 ) // filter condition is largest scale first
     {
     }
-    else if( 0 ) // filter condition is smallest scale first
+
     for( int i=0; i<h_cell_counts.size(); i++ )
     {
         FunctionDisableExtremum fun_disable_extremum;
@@ -558,9 +558,11 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
         int from = h_cell_offsets[i] + h_cell_counts[i];
         int to   = h_cell_limits [i];
 
+#if 0
         std::cerr << "In cell " << i << ", disable from " << from << " to " << to
                   << " (" << to-from << " are disabled, " << h_cell_counts[i] << " are kept)"
                   << std::endl;
+#endif
 
         thrust::for_each(
             thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin() + from,
@@ -570,7 +572,7 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
             fun_disable_extremum );
     }
 
-#if 1
+#if 0
     std::cout << "BEGIN cell value counters" << std::endl;
     std::copy( h_cell_counts  .begin(), h_cell_counts  .end(), std::ostream_iterator<int>(std::cout, " "));
     std::cout << std::endl;
@@ -581,35 +583,45 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     std::cout << std::endl;
     std::cout << "END original cell index" << std::endl;
 #endif
+    thrust::device_vector<int>   grid( ext_total );
 
-    //
-    // add a write index into each InitialExtremum - so that we don't have gaps in the Extremum array
-    //
-    FunctionExtractIgnored fun_extract_ignore;
-    FunctionWriteIndex     fun_write_index;
-    thrust::plus<int>      fun_plus;
+    int ret_ext_total = 0;
 
-    // extract 0 for ignored entries, 1 for not-ignored entries, and store the prefix sum
-    // of results in permutator
-    thrust::transform_exclusive_scan(
-        thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin(),
-                                                       iext_index  .begin() ) ),
-        thrust::make_zip_iterator( thrust::make_tuple( octave_index.end(),
-                                                       iext_index  .end() ) ),
-        permutator.begin(),
-        fun_extract_ignore,
-        0,
-        fun_plus );
+    for( int o=0; o<MAX_OCTAVES; o++ ) {
+        const int ocount = hct.ext_ct[o];
 
-    // store the prefix-summed not-ignored indices back to the Initial Extremum
-    thrust::for_each(
-        thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin(),
-                                                       iext_index  .begin(),
-                                                       permutator  .begin() ) ),
-        thrust::make_zip_iterator( thrust::make_tuple( octave_index.end(),
-                                                       iext_index  .end(),
-                                                       permutator  .end() ) ),
-        fun_write_index );
+        if( ocount > 0 ) {
+            FunctionExtractIgnored fun_extract_ignore;
+            thrust::identity<int>  fun_id;
+
+            grid.resize( ocount );
+
+            thrust::transform(
+                thrust::make_counting_iterator(0),
+                thrust::make_counting_iterator(ocount),
+                thrust::make_constant_iterator(o),
+                grid.begin(),
+                fun_extract_ignore );
+
+            thrust::device_ptr<int> off_ptr = thrust::device_pointer_cast( dobuf_shadow.i_ext_off[o] );
+
+            thrust::copy_if( thrust::make_counting_iterator(0),
+                             thrust::make_counting_iterator(ocount),
+                             grid.begin(),
+                             off_ptr,
+                             fun_id );
+
+            hct.ext_ct[o] = thrust::reduce( grid.begin(), grid.end() );
+
+            ret_ext_total += hct.ext_ct[o];
+        }
+    }
+
+    nvtxRangePushA( "writing back count" );
+    writeDescCountersToDevice( );
+    nvtxRangePop( );
+
+    return ret_ext_total;
 }
 
 __host__
@@ -619,7 +631,7 @@ void Pyramid::orientation( const Config& conf )
     readDescCountersFromDevice( );
     nvtxRangePop( );
 
-    nvtxRangePushA( "reallocating extrema arrays" );
+    nvtxRangePushA( "filtering grid" );
     int ext_total = 0;
     for( int o=0; o<MAX_OCTAVES; o++ ) {
         if( hct.ext_ct[o] > 0 ) {
@@ -627,8 +639,10 @@ void Pyramid::orientation( const Config& conf )
         }
     }
 
-    extrema_filter_grid( conf, ext_total );
+    ext_total = extrema_filter_grid( conf, ext_total );
+    nvtxRangePop( );
 
+    nvtxRangePushA( "reallocating extrema arrays" );
     reallocExtrema( ext_total );
     nvtxRangePop( );
 

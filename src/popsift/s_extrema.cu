@@ -535,11 +535,17 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
 
     uint32_t write_index = extrema_count<HEIGHT>( indicator, &dct.ext_ct[octave] );
 
-    InitialExtremum* d_extrema = dobuf.i_ext[octave];
+    InitialExtremum* d_extrema = dobuf.i_ext_dat[octave];
+    int*             d_ext_off = dobuf.i_ext_off[octave];
 
     if( indicator && write_index < d_consts.max_extrema ) {
         ec.write_index = write_index;
+        // store the initial extremum in an array
         d_extrema[write_index] = ec;
+
+        // index for indirect access to d_extrema, to enable
+        // access after filtering some initial extrema
+        d_ext_off[write_index] = write_index;
     }
 
     // without syncthreads, (0,0) threads may precede some calls to extrema_count()
