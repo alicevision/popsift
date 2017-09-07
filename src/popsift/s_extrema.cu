@@ -521,6 +521,7 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
                           const int           grid_width )
 {
     InitialExtremum ec;
+    ec.ignore = false;
 
     bool indicator = find_extrema_in_dog_sub<sift_mode>( dog,
                                                          octave,
@@ -537,6 +538,7 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
     InitialExtremum* d_extrema = dobuf.i_ext[octave];
 
     if( indicator && write_index < d_consts.max_extrema ) {
+        ec.write_index = write_index;
         d_extrema[write_index] = ec;
     }
 

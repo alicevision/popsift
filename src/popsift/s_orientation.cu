@@ -11,6 +11,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/sequence.h>
 #include <thrust/transform.h>
+#include <thrust/transform_scan.h>
 #include <thrust/sort.h>
 
 #include "common/assist.h"
@@ -172,6 +173,7 @@ void ori_par( const int           octave,
         if( next2 >= ORI_NBINS ) next2 -= ORI_NBINS;
         sm_hist[bin] = (   hist[prev2] + hist[next2]
                          + ( hist[prev1] + hist[next1] ) * 4.0f
+                         +   hist[bin] * 6.0f ) / 16.0f;
     }
     __syncthreads();
 #endif // not WITH_VLFEAT_SMOOTHING
@@ -352,7 +354,6 @@ struct FunctionExtractCell
 
         return  thrust::make_tuple( e.cell, e.sigma * powf( 2.0f, octave ) );
     }
-
 };
 
 struct FunctionReversePosition
@@ -374,6 +375,43 @@ struct FunctionIsAbove
     __host__ __device__ bool operator()( int val ) const
     {
         return val > _limit;
+    }
+};
+
+struct FunctionDisableExtremum
+{
+    __device__ void operator()( const thrust::tuple<int,int>& val) const
+    {
+        const int octave = thrust::get<0>(val);
+        const int idx    = thrust::get<1>(val);
+        InitialExtremum& e = dobuf.i_ext[octave][idx];
+        e.ignore = true;
+    }
+};
+
+struct FunctionExtractIgnored
+{
+    __device__ int operator()( const thrust::tuple<int,int>& val) const
+    {
+        const int octave = thrust::get<0>(val);
+        const int idx    = thrust::get<1>(val);
+        InitialExtremum& e = dobuf.i_ext[octave][idx];
+        if( e.ignore )
+            return 0;
+        else
+            return 1;
+    }
+};
+
+struct FunctionWriteIndex
+{
+    __device__ void operator()( const thrust::tuple<int,int,int>& val) const
+    {
+        const int octave = thrust::get<0>(val);
+        const int idx    = thrust::get<1>(val);
+        const int wr_idx = thrust::get<2>(val);
+        InitialExtremum& e = dobuf.i_ext[octave][idx];
+        e.write_index = wr_idx;
     }
 };
 
@@ -441,11 +479,19 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     const int n = slots * slots;
     thrust::host_vector<int> h_cell_counts         ( n );
     thrust::host_vector<int> h_cell_permute        ( n );
+    thrust::host_vector<int> h_cell_offsets        ( n );
+    thrust::host_vector<int> h_cell_limits         ( n );
     thrust::host_vector<int> cell_count_prefix_sums( n );
     thrust::host_vector<int> cell_count_sumup      ( n );
 
     // move to host code - computing the limits on the GPU is too wasteful
     h_cell_counts = cell_counts;
+
+    // offset to beginning of each cell value - recompute faster than copy
+    thrust::exclusive_scan( h_cell_counts.begin(), h_cell_counts.end(), h_cell_offsets.begin() );
+
+    // offset to end indeces of each cell value - could shift h_cell_offsets and sum up counts
+    thrust::inclusive_scan( h_cell_counts.begin(), h_cell_counts.end(), h_cell_limits .begin() );
 
     std::cout << "BEGIN cell value counters" << std::endl;
     std::copy( h_cell_counts  .begin(), h_cell_counts  .end(), std::ostream_iterator<int>(std::cout, " "));
@@ -505,7 +551,23 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     {
     }
     else if( 0 ) // filter condition is smallest scale first
+    for( int i=0; i<h_cell_counts.size(); i++ )
     {
+        FunctionDisableExtremum fun_disable_extremum;
+
+        int from = h_cell_offsets[i] + h_cell_counts[i];
+        int to   = h_cell_limits [i];
+
+        std::cerr << "In cell " << i << ", disable from " << from << " to " << to
+                  << " (" << to-from << " are disabled, " << h_cell_counts[i] << " are kept)"
+                  << std::endl;
+
+        thrust::for_each(
+            thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin() + from,
+                                                           iext_index  .begin() + from ) ),
+            thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin() + to,
+                                                           iext_index  .begin() + to ) ),
+            fun_disable_extremum );
     }
 
 #if 1
@@ -519,6 +581,35 @@ void Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     std::cout << std::endl;
     std::cout << "END original cell index" << std::endl;
 #endif
+
+    //
+    // add a write index into each InitialExtremum - so that we don't have gaps in the Extremum array
+    //
+    FunctionExtractIgnored fun_extract_ignore;
+    FunctionWriteIndex     fun_write_index;
+    thrust::plus<int>      fun_plus;
+
+    // extract 0 for ignored entries, 1 for not-ignored entries, and store the prefix sum
+    // of results in permutator
+    thrust::transform_exclusive_scan(
+        thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin(),
+                                                       iext_index  .begin() ) ),
+        thrust::make_zip_iterator( thrust::make_tuple( octave_index.end(),
+                                                       iext_index  .end() ) ),
+        permutator.begin(),
+        fun_extract_ignore,
+        0,
+        fun_plus );
+
+    // store the prefix-summed not-ignored indices back to the Initial Extremum
+    thrust::for_each(
+        thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin(),
+                                                       iext_index  .begin(),
+                                                       permutator  .begin() ) ),
+        thrust::make_zip_iterator( thrust::make_tuple( octave_index.end(),
+                                                       iext_index  .end(),
+                                                       permutator  .end() ) ),
+        fun_write_index );
 }
 
 __host__
