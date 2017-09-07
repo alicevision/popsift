@@ -14,7 +14,7 @@ SCALING=
 # FILTER=
 FILTER="--filter-max-extrema=2000 --filter-grid=2 --filter-sort=down"
 
-PARAMS="$LGO $GAUSS_MODE $SCALING $FILTER --popsift-mode --octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
+PARAMS="$LOG $GAUSS_MODE $SCALING $FILTER --popsift-mode --octaves=8 --threshold=0.04 --edge-threshold=10.0 --initial-blur=0.5"
 
 for mode in loop ; do
 # for mode in loop grid igrid notile ; do
