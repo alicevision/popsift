@@ -8,13 +8,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <inttypes.h>
-#include <thrust/device_vector.h>
-#include <thrust/sequence.h>
-#include <thrust/copy.h>
-#include <thrust/transform.h>
-#include <thrust/transform_scan.h>
-#include <thrust/sort.h>
-#include <thrust/execution_policy.h>
 
 #include "common/assist.h"
 #include "sift_pyramid.h"
@@ -23,6 +16,16 @@
 #include "common/excl_blk_prefix_sum.h"
 #include "common/warp_bitonic_sort.h"
 #include "common/debug_macros.h"
+
+#if __CUDACC_VER__ >= 80000
+#include <thrust/device_vector.h>
+#include <thrust/sequence.h>
+#include <thrust/copy.h>
+#include <thrust/transform.h>
+#include <thrust/transform_scan.h>
+#include <thrust/sort.h>
+#include <thrust/execution_policy.h>
+#endif // __CUDACC_VER__ >= 80000
 
 #ifdef USE_NVTX
 #include <nvToolsExtCuda.h>
@@ -347,6 +350,7 @@ void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
     }
 }
 
+#if __CUDACC_VER__ >= 80000
 struct FunctionSort_IncCell_DecScale
 {
     __device__
@@ -433,6 +437,7 @@ struct FunctionExtractIgnored
     }
 };
 
+/* discard extrema that exceed a conf.getFilterMaxExtrema() */
 __host__
 int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 {
@@ -545,13 +550,6 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     // offset to end indeces of each cell value - could shift h_cell_offsets and sum up counts
     thrust::inclusive_scan( h_cell_counts.begin(), h_cell_counts.end(), h_cell_limits .begin() );
 
-#if 0
-    std::cout << "BEGIN cell value counters" << std::endl;
-    std::copy( h_cell_counts  .begin(), h_cell_counts  .end(), std::ostream_iterator<int>(std::cout, " "));
-    std::cout << std::endl;
-    std::cout << "END cell value counters" << std::endl;
-#endif
-
     // the cell filter algorithm requires the cell counts in increasing order, cell_permute
     // maps new position to original index
     thrust::sequence( h_cell_permute.begin(), h_cell_permute.end() );
@@ -605,12 +603,6 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
         int from = h_cell_offsets[i] + h_cell_counts[i];
         int to   = h_cell_limits [i];
 
-#if 0
-        std::cerr << "In cell " << i << ", disable from " << from << " to " << to
-                  << " (" << to-from << " are disabled, " << h_cell_counts[i] << " are kept)"
-                  << std::endl;
-#endif
-
         thrust::for_each(
             thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin() + from,
                                                            iext_index  .begin() + from ) ),
@@ -619,17 +611,6 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
             fun_disable_extremum );
     }
 
-#if 0
-    std::cout << "BEGIN cell value counters" << std::endl;
-    std::copy( h_cell_counts  .begin(), h_cell_counts  .end(), std::ostream_iterator<int>(std::cout, " "));
-    std::cout << std::endl;
-    std::cout << "END cell value counters" << std::endl;
-
-    std::cout << "BEGIN original cell index" << std::endl;
-    std::copy( h_cell_permute  .begin(), h_cell_permute  .end(), std::ostream_iterator<int>(std::cout, " "));
-    std::cout << std::endl;
-    std::cout << "END original cell index" << std::endl;
-#endif
     thrust::device_vector<int>   grid( ext_total );
 
     int ret_ext_total = 0;
@@ -670,6 +651,14 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 
     return ret_ext_total;
 }
+#else // __CUDACC_VER__ >= 80000
+/* do nothing unless we have CUDA v 8 or newer */
+__host__
+int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
+{
+    return ext_total;
+}
+#endif // __CUDACC_VER__ >= 80000
 
 __host__
 void Pyramid::orientation( const Config& conf )
