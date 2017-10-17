@@ -49,14 +49,14 @@ void ext_desc_iloop_sub( const float         ang,
     // const float crsbp = cos_t / SBP;
     // const float srsbp = sin_t / SBP;
 
-    const float offsetptx = ix - 1.5f;
-    const float offsetpty = iy - 1.5f;
+    const float2 offsetpt = make_float2( ix - 1.5f,
+                                         iy - 1.5f );
 
     // The following 2 lines were the primary bottleneck of this kernel
     // const float ptx = csbp * offsetptx - ssbp * offsetpty + x;
     // const float pty = csbp * offsetpty + ssbp * offsetptx + y;
-    const float ptx = ::fmaf( csbp, offsetptx, -ssbp * offsetpty );
-    const float pty = ::fmaf( csbp, offsetpty,  ssbp * offsetptx );
+    const float ptx = ::fmaf( csbp, offsetpt.x, -ssbp * offsetpt.y );
+    const float pty = ::fmaf( csbp, offsetpt.y,  ssbp * offsetpt.x );
 
     const float bsz = fabsf(cos_t) + fabsf(sin_t);
 
@@ -83,9 +83,8 @@ void ext_desc_iloop_sub( const float         ang,
             get_gradiant( mod, th, jj, ii, cos_t, sin_t, layer_tex, level );
 #endif
 
-            const float dnx = n.x + offsetptx;
-            const float dny = n.y + offsetpty;
-            const float  ww = __expf( -scalbnf(dnx*dnx + dny*dny, -3));
+            const float2 dn = n + offsetpt;
+            const float  ww = __expf( -scalbnf(dn.x*dn.x + dn.y*dn.y, -3));
             // const float ww  = __expf(-0.125f * (dnx*dnx + dny*dny)); // speedup !
             const float2 w  = make_float2( 1.0f - nn.x,
                                            1.0f - nn.y );
