@@ -152,14 +152,6 @@ void ext_desc_loop( const int           octave,
     const int   ori_num  =  o_offset - ext_base;
     const float ang      =  ext->orientation[ori_num];
 
-    // if( threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 23 ) {
-        // int descdist = desc - dbuf.desc[0];
-        // int ext_dist = ext  - dobuf.extrema;
-        // printf("oct %4d offset %4d  extremum index %4d rel ext idx %4d ", octave, offset, ext_idx, ext_idx - dct.ext_ps[octave]);
-        // printf("this index: %4d ext base index %4d -> ori num %4d\n", dct.ori_ps[octave] + offset, ext->idx_ori, ori_num );
-    // }
-    // __syncthreads();
-
     ext_desc_loop_sub( ang,
                        ext,
                        desc->features,
