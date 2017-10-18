@@ -195,11 +195,14 @@ void ori_par( const int           octave,
 
         bool predicate = ( bin < ORI_NBINS ) && ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) );
 
-        // const float num  = predicate ? 3.0f *   sm_hist[prev] - 4.0f * sm_hist[bin] + sm_hist[next]   : 0.0f;
-        const float num  = predicate ?   2.0f * sm_hist[prev]
+        const float num  = predicate ?   3.0f * sm_hist[prev]
                                        - 4.0f * sm_hist[bin]
-                                       + 2.0f * sm_hist[next]
+                                       + 1.0f * sm_hist[next]
                                      : 0.0f;
+        // const float num  = predicate ?   2.0f * sm_hist[prev]
+        //                                - 4.0f * sm_hist[bin]
+        //                                + 2.0f * sm_hist[next]
+        //                              : 0.0f;
         const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
 
         const float newbin = __fdividef( num, denB ); // verified: accuracy OK
