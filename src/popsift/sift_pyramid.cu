@@ -367,8 +367,7 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, Features* feat
                 ostr << setprecision(5)
                      << xpos << " " << ypos << " "
                      << 1.0f / (sigma * sigma)
-                     // << " 0 "
-                     << " " << octave << " "
+                     << " 0 "
                      << 1.0f / (sigma * sigma) << " ";
 
             if (really) {
