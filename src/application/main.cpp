@@ -25,9 +25,8 @@
 
 #ifdef USE_DEVIL
 #include <devil_cpp_wrapper.hpp>
-#else
-#include "pgmread.h"
 #endif
+#include "pgmread.h"
 
 #ifdef USE_NVTX
 #include <nvToolsExtCuda.h>
@@ -42,6 +41,7 @@ static bool print_dev_info  = false;
 static bool print_time_info = false;
 static bool write_as_uchar  = false;
 static bool dont_write      = false;
+static bool pgmread_loading = false;
 
 static void parseargs(int argc, char** argv, popsift::Config& config, string& inputFile) {
     using namespace boost::program_options;
@@ -111,7 +111,9 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         ("print-dev-info", bool_switch(&print_dev_info)->default_value(false), "A debug output printing CUDA device information")
         ("print-time-info", bool_switch(&print_time_info)->default_value(false), "A debug output printing image processing time after load()")
         ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded to int Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar")
-        ("dont-write", bool_switch(&dont_write)->default_value(false), "Suppress descriptor output");
+        ("dont-write", bool_switch(&dont_write)->default_value(false), "Suppress descriptor output")
+        ("pgmread-loading", bool_switch(&pgmread_loading)->default_value(false), "Use the old image loader instead of LibDevIL")
+        ;
         
         //("test-direct-scaling")
     }
@@ -161,38 +163,48 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     int w;
     int h;
     unsigned char* image_data;
+    SiftJob* job;
 
     nvtxRangePushA( "load and convert image" );
 #ifdef USE_DEVIL
-    ilImage img;
-    if( img.Load( inputFile.c_str() ) == false ) {
-        cerr << "Could not load image " << inputFile << endl;
-        return 0;
-    }
-    if( img.Convert( IL_LUMINANCE ) == false ) {
-        cerr << "Failed converting image " << inputFile << " to unsigned greyscale image" << endl;
-        exit( -1 );
-    }
-    w = img.Width();
-    h = img.Height();
-    cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
-    image_data = img.GetData();
-#else
-    image_data = readPGMfile( inputFile, w, h );
-    if( image_data == 0 ) {
-        exit( -1 );
-    }
-#endif
-    nvtxRangePop( );
+    if( not pgmread_loading )
+    {
+        ilImage img;
+        if( img.Load( inputFile.c_str() ) == false ) {
+            cerr << "Could not load image " << inputFile << endl;
+            return 0;
+        }
+        if( img.Convert( IL_LUMINANCE ) == false ) {
+            cerr << "Failed converting image " << inputFile << " to unsigned greyscale image" << endl;
+            exit( -1 );
+        }
+        w = img.Width();
+        h = img.Height();
+        cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
+        image_data = img.GetData();
 
-    // PopSift.init( w, h );
-    SiftJob* job = PopSift.enqueue( w, h, image_data );
+        nvtxRangePop( );
 
-#ifdef USE_DEVIL
-    img.Clear();
-#else
-    delete [] image_data;
+        // PopSift.init( w, h );
+        job = PopSift.enqueue( w, h, image_data );
+
+        img.Clear();
+    }
+    else
 #endif
+    {
+        image_data = readPGMfile( inputFile, w, h );
+        if( image_data == 0 ) {
+            exit( -1 );
+        }
+
+        nvtxRangePop( );
+
+        // PopSift.init( w, h );
+        job = PopSift.enqueue( w, h, image_data );
+
+        delete [] image_data;
+    }
 
     return job;
 }
