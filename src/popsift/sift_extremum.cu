@@ -120,8 +120,7 @@ void Feature::print( std::ostream& ostr, bool write_as_uchar ) const
 
     for( int ori=0; ori<num_ori; ori++ ) {
         ostr << xpos << " " << ypos << " "
-             // << sigval << " 0 " << sigval << " ";
-             << sigval << " " << debug_octave << " " << sigval << " ";
+             << sigval << " 0 " << sigval << " ";
         if( write_as_uchar ) {
             for( int i=0; i<128; i++ ) {
                 ostr << roundf(desc[ori]->features[i]) << " ";
