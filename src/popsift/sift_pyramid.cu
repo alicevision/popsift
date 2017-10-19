@@ -238,6 +238,14 @@ void Pyramid::step2( const Config& conf )
     descriptors( conf );
 }
 
+/* Important detail: this function takes the pointer descriptor_base as input
+ * and computes offsets from this pointer on the device side. Those pointers
+ * are then written into Feature data structures.
+ * descriptor_base can be a device pointer or a host pointer, it works in both
+ * cases.
+ * This is possible because pointer arithmetic between Intel hosts and NVidia
+ * GPUs are compatible.
+ */
 __global__
 void prep_features( Descriptor* descriptor_base, int up_fac )
 {
@@ -305,16 +313,36 @@ HostFeatures* Pyramid::get_descriptors( const Config& conf )
     return features;
 }
 
-Features* Pyramid::clone_device_descriptors( const Config& conf )
+DeviceFeatures* Pyramid::clone_device_descriptors( const Config& conf )
 {
-    cerr << __FUNCTION__ << " is incomplete" << endl;
-    exit( -1 );
-
     const float up_fac = conf.getUpscaleFactor();
 
     readDescCountersFromDevice();
 
-    Features* features = 0;
+    DeviceFeatures* features = new DeviceFeatures( hct.ext_total, hct.ori_total );
+
+    dim3 grid( grid_divide( hct.ext_total, 32 ) );
+    prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
+
+    popcuda_memcpy_async( features->getFeatures(),
+                          dobuf_shadow.features,
+                          hct.ext_total * sizeof(Feature),
+                          cudaMemcpyDeviceToDevice,
+                          _download_stream );
+
+    popcuda_memcpy_async( features->getDescriptors(),
+                          dbuf_shadow.desc,
+                          hct.ori_total * sizeof(Descriptor),
+                          cudaMemcpyDeviceToDevice,
+                          _download_stream );
+
+    popcuda_memcpy_async( features->getReverseMap(),
+                          dobuf_shadow.feat_to_ext_map,
+                          hct.ori_total * sizeof(int),
+                          cudaMemcpyDeviceToDevice,
+                          _download_stream );
+
+    cudaStreamSynchronize( _download_stream );
 
     return features;
 }

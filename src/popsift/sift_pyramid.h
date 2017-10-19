@@ -95,7 +95,7 @@ public:
     HostFeatures* get_descriptors( const Config& conf );
 
     /** step 3 (alternative): make copy of descriptors on device side */
-    Features* clone_device_descriptors( const Config& conf );
+    DeviceFeatures* clone_device_descriptors( const Config& conf );
 
     void download_and_save_array( const char* basename );
 

@@ -40,8 +40,6 @@ public:
     SiftJob( int w, int h, const unsigned char* imageData );
     ~SiftJob( );
 
-   void match( SiftJob* otherJob );
-
     popsift::Features* get() {
         return _f.get();
     }

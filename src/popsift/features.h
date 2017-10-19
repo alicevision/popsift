@@ -91,6 +91,26 @@ protected:
     friend class Pyramid;
 };
 
+class DeviceFeatures : public Features
+{
+    Feature*     _ext;
+    Descriptor*  _ori;
+    int*         _rev; // the reverse map from descriptors to extrema
+
+public:
+    DeviceFeatures( );
+    DeviceFeatures( int num_ext, int num_ori );
+    virtual ~DeviceFeatures( );
+
+    void reset( int num_ext, int num_ori );
+
+    void match( DeviceFeatures* other );
+
+    inline Feature*    getFeatures()    { return _ext; }
+    inline Descriptor* getDescriptors() { return _ori; }
+    inline int*        getReverseMap()  { return _rev; }
+};
+
 std::ostream& operator<<( std::ostream& ostr, const HostFeatures& feature );
 
 } // namespace popsift

@@ -251,14 +251,18 @@ int main(int argc, char **argv)
 
     SiftJob* lJob = process_image( lFile, PopSift );
     SiftJob* rJob = process_image( rFile, PopSift );
-    rJob->match( lJob );
 
-    popsift::Features* lFeatures = lJob->get();
-    cerr << "Number of features: " << lFeatures->size() << endl;
+    popsift::DeviceFeatures* lFeatures = dynamic_cast<popsift::DeviceFeatures*>( lJob->get() );
+    cout << "Number of features:    " << lFeatures->getFeatureCount() << endl;
+    cout << "Number of descriptors: " << lFeatures->getDescriptorCount() << endl;
+
+    popsift::DeviceFeatures* rFeatures = dynamic_cast<popsift::DeviceFeatures*>( rJob->get() );
+    cout << "Number of features:    " << rFeatures->getFeatureCount() << endl;
+    cout << "Number of descriptors: " << rFeatures->getDescriptorCount() << endl;
+
+    lFeatures->match( rFeatures );
+
     delete lFeatures;
-
-    popsift::Features* rFeatures = rJob->get();
-    cerr << "Number of features: " << rFeatures->size() << endl;
     delete rFeatures;
 
     PopSift.uninit( );
