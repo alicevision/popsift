@@ -52,9 +52,9 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
         options.add_options()
             ("help,h", "Print usage")
             ("verbose,v", bool_switch()->notifier([&](bool i) {if(i) config.setVerbose(); }), "")
-            ("log,l", bool_switch()->notifier([&](bool i) {if(i) config.setLogMode(popsift::Config::All); }), "Write debugging files")
+            ("log", bool_switch()->notifier([&](bool i) {if(i) config.setLogMode(popsift::Config::All); }), "Write debugging files")
 
-            ("left,l",  value<std::string>(&lFile)->required(), "\"Left\"  input file");
+            ("left,l",  value<std::string>(&lFile)->required(), "\"Left\"  input file")
             ("right,r", value<std::string>(&rFile)->required(), "\"Right\" input file");
     
     }
@@ -211,24 +211,6 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     return job;
 }
 
-void read_job( SiftJob* job, const string& name, bool really_write )
-{
-    popsift::HostFeatures* feature_list = job->get();
-    cerr << "Number of features: " << feature_list->size() << endl;
-
-    if( really_write ) {
-        nvtxRangePushA( "Writing features to disk" );
-
-        std::ofstream of( ( name+"output-features.txt" ).c_str() );
-        feature_list->print( of, write_as_uchar );
-    }
-    delete feature_list;
-
-    if( really_write ) {
-        nvtxRangePop( );
-    }
-}
-
 int main(int argc, char **argv)
 {
     cudaDeviceReset();
@@ -271,8 +253,13 @@ int main(int argc, char **argv)
     SiftJob* rJob = process_image( rFile, PopSift );
     rJob->match( lJob );
 
-    read_job( lJob, lFile, not dont_write );
-    read_job( rJob, rFile, not dont_write );
+    popsift::Features* lFeatures = lJob->get();
+    cerr << "Number of features: " << lFeatures->size() << endl;
+    delete lFeatures;
+
+    popsift::Features* rFeatures = rJob->get();
+    cerr << "Number of features: " << rFeatures->size() << endl;
+    delete rFeatures;
 
     PopSift.uninit( );
 }

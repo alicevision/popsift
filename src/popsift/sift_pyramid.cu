@@ -305,6 +305,20 @@ HostFeatures* Pyramid::get_descriptors( const Config& conf )
     return features;
 }
 
+Features* Pyramid::clone_device_descriptors( const Config& conf )
+{
+    cerr << __FUNCTION__ << " is incomplete" << endl;
+    exit( -1 );
+
+    const float up_fac = conf.getUpscaleFactor();
+
+    readDescCountersFromDevice();
+
+    Features* features = 0;
+
+    return features;
+}
+
 void Pyramid::reset_extrema_mgmt()
 {
     memset( &hct,         0, sizeof(ExtremaCounters) );

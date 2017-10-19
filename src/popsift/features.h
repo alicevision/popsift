@@ -35,6 +35,23 @@ struct Feature
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
 
+class Features
+{
+    int          _num_ext;
+    int          _num_ori;
+
+public:
+    Features( );
+    virtual~ Features( );
+
+    inline int     size() const                { return _num_ext; }
+    inline int     getFeatureCount() const     { return _num_ext; }
+    inline int     getDescriptorCount() const  { return _num_ori; }
+
+    inline void    setFeatureCount( int num_ext )    { _num_ext = num_ext; }
+    inline void    setDescriptorCount( int num_ori ) { _num_ori = num_ori; }
+};
+
 /* This is a data structure that is returned to a calling program.
  * _ori is a transparent flat memory holding descriptors
  * that are referenced by the extrema.
@@ -43,33 +60,27 @@ std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
  * Descriptors in the transparent array with their extrema except
  * for brute force.
  */
-class HostFeatures
+class HostFeatures : public Features
 {
     Feature*     _ext;
     Descriptor*  _ori;
-    int          _num_ext;
-    int          _num_ori;
 
 public:
     HostFeatures( );
     HostFeatures( int num_ext, int num_ori );
-    ~HostFeatures( );
+    virtual ~HostFeatures( );
 
     typedef Feature*       F_iterator;
     typedef const Feature* F_const_iterator;
 
     inline F_iterator       begin()       { return _ext; }
     inline F_const_iterator begin() const { return _ext; }
-    inline F_iterator       end()         { return &_ext[_num_ext]; }
-    inline F_const_iterator end() const   { return &_ext[_num_ext]; }
+    inline F_iterator       end()         { return &_ext[size()]; }
+    inline F_const_iterator end() const   { return &_ext[size()]; }
 
     void reset( int num_ext, int num_ori );
     void pin( );
     void unpin( );
-
-    inline int     size() const                { return _num_ext; }
-    inline int     getFeatureCount() const     { return _num_ext; }
-    inline int     getDescriptorCount() const  { return _num_ori; }
 
     inline Feature*    getFeatures()    { return _ext; }
     inline Descriptor* getDescriptors() { return _ori; }

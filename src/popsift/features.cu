@@ -21,11 +21,17 @@ using namespace std;
 
 namespace popsift {
 
+Features::Features( )
+    : _num_ext( 0 )
+    , _num_ori( 0 )
+{ }
+
+Features::~Features( )
+{ }
+
 HostFeatures::HostFeatures( )
     : _ext( 0 )
     , _ori( 0 )
-    , _num_ext( 0 )
-    , _num_ori( 0 )
 { }
 
 HostFeatures::HostFeatures( int num_ext, int num_ori )
@@ -76,20 +82,20 @@ void HostFeatures::reset( int num_ext, int num_ori )
         exit( -1 );
     }
 
-    _num_ext = num_ext;
-    _num_ori = num_ori;
+    setFeatureCount( num_ext );
+    setDescriptorCount( num_ori );
 }
 
 void HostFeatures::pin( )
 {
     cudaError_t err;
-    err = cudaHostRegister( _ext, _num_ext * sizeof(Feature), 0 );
+    err = cudaHostRegister( _ext, getFeatureCount() * sizeof(Feature), 0 );
     if( err != cudaSuccess ) {
         cerr << __FILE__ << ":" << __LINE__ << " Runtime warning:" << endl
              << "    Failed to register feature memory in CUDA." << endl
              << "    " << cudaGetErrorString(err) << endl;
     }
-    err = cudaHostRegister( _ori, _num_ori * sizeof(Descriptor), 0 );
+    err = cudaHostRegister( _ori, getDescriptorCount() * sizeof(Descriptor), 0 );
     if( err != cudaSuccess ) {
         cerr << __FILE__ << ":" << __LINE__ << " Runtime warning:" << endl
              << "    Failed to register descriptor memory in CUDA." << endl
@@ -105,7 +111,7 @@ void HostFeatures::unpin( )
 
 void HostFeatures::print( std::ostream& ostr, bool write_as_uchar ) const
 {
-    for( int i=0; i<_num_ext; i++ ) {
+    for( int i=0; i<size(); i++ ) {
         _ext[i].print( ostr, write_as_uchar );
     }
 }

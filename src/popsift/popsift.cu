@@ -194,8 +194,7 @@ void PopSift::matchPrepareLoop( )
 
         p._pyramid->step2( _config );
 
-        // replace with DeviceFeatures and clone_descriptors instead of get_descriptors
-        popsift::HostFeatures* features = p._pyramid->get_descriptors( _config );
+        popsift::Features* features = p._pyramid->clone_device_descriptors( _config );
 
         cudaDeviceSynchronize();
 
@@ -232,7 +231,7 @@ void SiftJob::setImg( popsift::Image* img )
     _img = img;
 }
 
-void SiftJob::setFeatures( popsift::HostFeatures* f )
+void SiftJob::setFeatures( popsift::Features* f )
 {
     _p.set_value( f );
 }
