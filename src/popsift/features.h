@@ -91,6 +91,8 @@ protected:
     friend class Pyramid;
 };
 
+std::ostream& operator<<( std::ostream& ostr, const HostFeatures& feature );
+
 class DeviceFeatures : public Features
 {
     Feature*     _ext;
@@ -110,7 +112,5 @@ public:
     inline Descriptor* getDescriptors() { return _ori; }
     inline int*        getReverseMap()  { return _rev; }
 };
-
-std::ostream& operator<<( std::ostream& ostr, const HostFeatures& feature );
 
 } // namespace popsift

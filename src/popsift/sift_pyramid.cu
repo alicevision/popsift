@@ -313,13 +313,9 @@ HostFeatures* Pyramid::get_descriptors( const Config& conf )
     return features;
 }
 
-DeviceFeatures* Pyramid::clone_device_descriptors( const Config& conf )
+void Pyramid::clone_device_descriptors_sub( const Config& conf, DeviceFeatures* features )
 {
     const float up_fac = conf.getUpscaleFactor();
-
-    readDescCountersFromDevice();
-
-    DeviceFeatures* features = new DeviceFeatures( hct.ext_total, hct.ori_total );
 
     dim3 grid( grid_divide( hct.ext_total, 32 ) );
     prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
@@ -341,6 +337,15 @@ DeviceFeatures* Pyramid::clone_device_descriptors( const Config& conf )
                           hct.ori_total * sizeof(int),
                           cudaMemcpyDeviceToDevice,
                           _download_stream );
+}
+
+DeviceFeatures* Pyramid::clone_device_descriptors( const Config& conf )
+{
+    readDescCountersFromDevice();
+
+    DeviceFeatures* features = new DeviceFeatures( hct.ext_total, hct.ori_total );
+
+    clone_device_descriptors_sub( conf, features );
 
     cudaStreamSynchronize( _download_stream );
 

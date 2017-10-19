@@ -155,7 +155,7 @@ void PopSift::extractDownloadLoop( )
         private_init( img->getWidth(), img->getHeight() );
 
         p._pyramid->step1( _config, img );
-        p._unused.push( img );
+        p._unused.push( img ); // uploaded input image no longer needed, release for reuse
 
         p._pyramid->step2( _config );
 
@@ -190,7 +190,7 @@ void PopSift::matchPrepareLoop( )
         private_init( img->getWidth(), img->getHeight() );
 
         p._pyramid->step1( _config, img );
-        p._unused.push( img );
+        p._unused.push( img ); // uploaded input image no longer needed, release for reuse
 
         p._pyramid->step2( _config );
 
