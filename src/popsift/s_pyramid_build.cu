@@ -350,7 +350,8 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
 
         }
     }
-    for( int octave=_num_octaves-1; octave>=0; octave-- )
+    // for( int octave=_num_octaves-1; octave>=0; octave-- )
+    for( int octave=0; octave<_num_octaves; octave++ )
     {
         if( conf.getGaussMode() == Config::Fixed9 || conf.getGaussMode() == Config::Fixed15 ) {
         } else {
@@ -359,7 +360,8 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
             dogs_from_blurred( octave, _levels, stream );
         }
     }
-    for( int octave=_num_octaves-1; octave>=0; octave-- )
+    for( int octave=0; octave<_num_octaves; octave++ )
+    // for( int octave=_num_octaves-1; octave>=0; octave-- )
     {
         Octave&      oct_obj = _octaves[octave];
         cudaStream_t stream  = oct_obj.getStream();
