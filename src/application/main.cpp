@@ -20,6 +20,7 @@
 #include <boost/filesystem.hpp>
 
 #include <popsift/popsift.h>
+#include <popsift/features.h>
 #include <popsift/sift_conf.h>
 #include <popsift/common/device_prop.h>
 
