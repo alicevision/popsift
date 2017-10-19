@@ -92,11 +92,14 @@ public:
     void step2( const Config& conf );
 
     /** step 3: download descriptors */
-    Features* get_descriptors( const Config& conf );
+    HostFeatures* get_descriptors( const Config& conf );
+
+    /** step 3 (alternative): make copy of descriptors on device side */
+    DeviceFeatures* clone_device_descriptors( const Config& conf );
 
     void download_and_save_array( const char* basename );
 
-    void save_descriptors( const Config& conf, Features* features, const char* basename );
+    void save_descriptors( const Config& conf, HostFeatures* features, const char* basename );
 
     inline int getNumOctaves() const { return _num_octaves; }
     inline int getNumLevels()  const { return _levels; }
@@ -130,7 +133,7 @@ private:
     void writeDescCountersToDevice( );
     void writeDescCountersToDevice( cudaStream_t s );
     int* getNumberOfBlocks( int octave );
-    void writeDescriptor( const Config& conf, std::ostream& ostr, Features* features, bool really, bool with_orientation );
+    void writeDescriptor( const Config& conf, std::ostream& ostr, HostFeatures* features, bool really, bool with_orientation );
 
 private:
     // debug

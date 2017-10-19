@@ -70,7 +70,7 @@ public:
      * level parameters.
      */
     PopSift( );
-    PopSift( const popsift::Config& config );
+    PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode = popsift::Config::ExtractingMode );
     ~PopSift();
 
 public:
@@ -107,7 +107,8 @@ public:
 private:
     bool private_init( int w, int h );
     void uploadImages( );
-    void mainLoop( );
+    void extractDownloadLoop( );
+    void matchPrepareLoop( );
 
 private:
     Pipe            _pipe;
