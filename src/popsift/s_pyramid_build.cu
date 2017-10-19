@@ -71,17 +71,20 @@ __global__
 void make_dog( cudaTextureObject_t src_data,
                cudaSurfaceObject_t dog_data,
                const int           w,
-               const int           h )
+               const int           h,
+               const int           max_level )
 {
     const int idx   = blockIdx.x * blockDim.x + threadIdx.x;
     const int idy   = blockIdx.y * blockDim.y + threadIdx.y;
-    const int level = blockIdx.z;
 
-    const float b = readTex( src_data, idx, idy, level+1 );
-    const float a = readTex( src_data, idx, idy, level );
-    const float c = b - a;
+    float a = readTex( src_data, idx, idy, 0 );
+    for( int level=0; level<max_level-2; level++ )
+    {
+        const float b = readTex( src_data, idx, idy, level+1 );
 
-    surf2DLayeredwrite( c, dog_data, idx*4, idy, level, cudaBoundaryModeZero );
+        surf2DLayeredwrite( b-a, dog_data, idx*4, idy, level, cudaBoundaryModeZero );
+        a = b;
+    }
 }
 
 } // namespace gauss
@@ -240,14 +243,15 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level, cudaStream_t 
     dim3 grid;
     grid.x = grid_divide( width,  block.x );
     grid.y = grid_divide( height, block.y );
-    grid.z = max_level - 1;
+    grid.z = 1;
 
     gauss::make_dog
         <<<grid,block,0,stream>>>
         ( oct_obj.getDataTexPoint( ),
           oct_obj.getDogSurface( ),
           oct_obj.getWidth(),
-          oct_obj.getHeight() );
+          oct_obj.getHeight(),
+          max_level );
 }
 
 /*************************************************************
