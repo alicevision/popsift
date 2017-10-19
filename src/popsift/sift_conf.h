@@ -67,6 +67,15 @@ struct Config
         SmallestScaleFirst
     };
 
+    /* A parameter for the PopSift constructor. Determines which data is kept in
+     * the Job data structure after processing, which is downloaded to the host,
+     * which is invalidated.
+     */
+    enum ProcessingMode {
+        ExtractingMode,
+        MatchingMode
+    };
+
     void setGaussMode( const std::string& m );
     void setGaussMode( GaussMode m );
     void setMode( SiftMode m );

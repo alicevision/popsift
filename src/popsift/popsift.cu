@@ -18,7 +18,7 @@
 
 using namespace std;
 
-PopSift::PopSift( const popsift::Config& config )
+PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode )
 {
     _pipe._unused.push( new popsift::Image );
     _pipe._unused.push( new popsift::Image );
@@ -27,7 +27,10 @@ PopSift::PopSift( const popsift::Config& config )
     configure( config, true );
 
     _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
-    _pipe._thread_stage2 = new boost::thread( &PopSift::mainLoop,     this );
+    if( mode == popsift::Config::ExtractingMode )
+        _pipe._thread_stage2 = new boost::thread( &PopSift::extractDownloadLoop, this );
+    else
+        _pipe._thread_stage2 = new boost::thread( &PopSift::matchPrepareLoop, this );
 }
 
 PopSift::PopSift( )
@@ -37,7 +40,7 @@ PopSift::PopSift( )
     _pipe._pyramid    = 0;
 
     _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
-    _pipe._thread_stage2 = new boost::thread( &PopSift::mainLoop,     this );
+    _pipe._thread_stage2 = new boost::thread( &PopSift::extractDownloadLoop, this );
 }
 
 PopSift::~PopSift()
@@ -141,7 +144,42 @@ void PopSift::uploadImages( )
     _pipe._queue_stage2.push( 0 );
 }
 
-void PopSift::mainLoop( )
+void PopSift::extractDownloadLoop( )
+{
+    Pipe& p = _pipe;
+
+    SiftJob* job;
+    while( ( job = p._queue_stage2.pull() ) != 0 ) {
+        popsift::Image* img = job->getImg();
+
+        private_init( img->getWidth(), img->getHeight() );
+
+        p._pyramid->step1( _config, img );
+        p._unused.push( img );
+
+        p._pyramid->step2( _config );
+
+        popsift::Features* features = p._pyramid->get_descriptors( _config );
+
+        cudaDeviceSynchronize();
+
+        bool log_to_file = ( _config.getLogMode() == popsift::Config::All );
+        if( log_to_file ) {
+            int octaves = p._pyramid->getNumOctaves();
+
+            // for( int o=0; o<octaves; o++ ) { p._pyramid->download_descriptors( _config, o ); }
+
+            int levels  = p._pyramid->getNumLevels();
+
+            p._pyramid->download_and_save_array( "pyramid" );
+            p._pyramid->save_descriptors( _config, features, "pyramid" );
+        }
+
+        job->setFeatures( features );
+    }
+}
+
+void PopSift::matchPrepareLoop( )
 {
     Pipe& p = _pipe;
 
@@ -208,5 +246,9 @@ void SiftJob::setImg( popsift::Image* img )
 void SiftJob::setFeatures( popsift::Features* f )
 {
     _p.set_value( f );
+}
+
+void SiftJob::match( SiftJob* otherJob )
+{
 }
 
