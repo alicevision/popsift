@@ -4,6 +4,7 @@ CUDA_INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 
 CUDA_ADD_LIBRARY(popsift STATIC
 	popsift/popsift.cu popsift/popsift.h
+	popsift/features.cu popsift/features.h
 	popsift/sift_constants.cu popsift/sift_constants.h
 	popsift/sift_conf.cu popsift/sift_conf.h
 	popsift/gauss_filter.cu popsift/gauss_filter.h
