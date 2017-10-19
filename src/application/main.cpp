@@ -212,7 +212,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 
 void read_job( SiftJob* job, bool really_write )
 {
-    popsift::Features* feature_list = job->get();
+    popsift::HostFeatures* feature_list = job->get();
     cerr << "Number of features: " << feature_list->size() << endl;
 
     if( really_write ) {

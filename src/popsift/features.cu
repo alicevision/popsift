@@ -21,21 +21,21 @@ using namespace std;
 
 namespace popsift {
 
-Features::Features( )
+HostFeatures::HostFeatures( )
     : _ext( 0 )
     , _ori( 0 )
     , _num_ext( 0 )
     , _num_ori( 0 )
 { }
 
-Features::Features( int num_ext, int num_ori )
+HostFeatures::HostFeatures( int num_ext, int num_ori )
     : _ext( 0 )
     , _ori( 0 )
 {
     reset( num_ext, num_ori );
 }
 
-Features::~Features( )
+HostFeatures::~HostFeatures( )
 {
     free( _ext );
     free( _ori );
@@ -54,7 +54,7 @@ static void* memalign( size_t alignment, size_t size )
 }
 #endif
 
-void Features::reset( int num_ext, int num_ori )
+void HostFeatures::reset( int num_ext, int num_ori )
 {
     if( _ext != 0 ) { free( _ext ); _ext = 0; }
     if( _ori != 0 ) { free( _ori ); _ori = 0; }
@@ -80,7 +80,7 @@ void Features::reset( int num_ext, int num_ori )
     _num_ori = num_ori;
 }
 
-void Features::pin( )
+void HostFeatures::pin( )
 {
     cudaError_t err;
     err = cudaHostRegister( _ext, _num_ext * sizeof(Feature), 0 );
@@ -97,20 +97,20 @@ void Features::pin( )
     }
 }
 
-void Features::unpin( )
+void HostFeatures::unpin( )
 {
     cudaHostUnregister( _ext );
     cudaHostUnregister( _ori );
 }
 
-void Features::print( std::ostream& ostr, bool write_as_uchar ) const
+void HostFeatures::print( std::ostream& ostr, bool write_as_uchar ) const
 {
     for( int i=0; i<_num_ext; i++ ) {
         _ext[i].print( ostr, write_as_uchar );
     }
 }
 
-std::ostream& operator<<( std::ostream& ostr, const Features& feature )
+std::ostream& operator<<( std::ostream& ostr, const HostFeatures& feature )
 {
     feature.print( ostr, false );
     return ostr;

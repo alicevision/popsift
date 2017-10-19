@@ -159,7 +159,7 @@ void PopSift::extractDownloadLoop( )
 
         p._pyramid->step2( _config );
 
-        popsift::Features* features = p._pyramid->get_descriptors( _config );
+        popsift::HostFeatures* features = p._pyramid->get_descriptors( _config );
 
         cudaDeviceSynchronize();
 
@@ -194,21 +194,10 @@ void PopSift::matchPrepareLoop( )
 
         p._pyramid->step2( _config );
 
-        popsift::Features* features = p._pyramid->get_descriptors( _config );
+        // replace with DeviceFeatures and clone_descriptors instead of get_descriptors
+        popsift::HostFeatures* features = p._pyramid->get_descriptors( _config );
 
         cudaDeviceSynchronize();
-
-        bool log_to_file = ( _config.getLogMode() == popsift::Config::All );
-        if( log_to_file ) {
-            int octaves = p._pyramid->getNumOctaves();
-
-            // for( int o=0; o<octaves; o++ ) { p._pyramid->download_descriptors( _config, o ); }
-
-            int levels  = p._pyramid->getNumLevels();
-
-            p._pyramid->download_and_save_array( "pyramid" );
-            p._pyramid->save_descriptors( _config, features, "pyramid" );
-        }
 
         job->setFeatures( features );
     }
@@ -243,7 +232,7 @@ void SiftJob::setImg( popsift::Image* img )
     _img = img;
 }
 
-void SiftJob::setFeatures( popsift::Features* f )
+void SiftJob::setFeatures( popsift::HostFeatures* f )
 {
     _p.set_value( f );
 }

@@ -43,7 +43,7 @@ std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
  * Descriptors in the transparent array with their extrema except
  * for brute force.
  */
-class Features
+class HostFeatures
 {
     Feature*     _ext;
     Descriptor*  _ori;
@@ -51,9 +51,9 @@ class Features
     int          _num_ori;
 
 public:
-    Features( );
-    Features( int num_ext, int num_ori );
-    ~Features( );
+    HostFeatures( );
+    HostFeatures( int num_ext, int num_ori );
+    ~HostFeatures( );
 
     typedef Feature*       F_iterator;
     typedef const Feature* F_const_iterator;
@@ -80,6 +80,6 @@ protected:
     friend class Pyramid;
 };
 
-std::ostream& operator<<( std::ostream& ostr, const Features& feature );
+std::ostream& operator<<( std::ostream& ostr, const HostFeatures& feature );
 
 } // namespace popsift

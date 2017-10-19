@@ -82,7 +82,10 @@ void Pyramid::download_and_save_array( const char* basename )
     _octaves[o].download_and_save_array( basename, o );
 }
 
-void Pyramid::save_descriptors( const Config& conf, Features* features, const char* basename )
+/*
+ * Note this is only for debug output. HostFeatures has functions for final writing.
+ */
+void Pyramid::save_descriptors( const Config& conf, HostFeatures* features, const char* basename )
 {
     struct stat st = { 0 };
     if (stat("dir-desc", &st) == -1) {
@@ -267,14 +270,14 @@ void prep_features( Descriptor* descriptor_base, int up_fac )
     }
 }
 
-Features* Pyramid::get_descriptors( const Config& conf )
+HostFeatures* Pyramid::get_descriptors( const Config& conf )
 {
     const float up_fac = conf.getUpscaleFactor();
 
     readDescCountersFromDevice();
 
     nvtxRangePushA( "download descriptors" );
-    Features* features = new Features( hct.ext_total, hct.ori_total );
+    HostFeatures* features = new HostFeatures( hct.ext_total, hct.ori_total );
 
     dim3 grid( grid_divide( hct.ext_total, 32 ) );
     prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
@@ -336,7 +339,10 @@ int* Pyramid::getNumberOfBlocks( int octave )
     return &_d_extrema_num_blocks[octave];
 }
 
-void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, Features* features, bool really, bool with_orientation )
+/*
+ * Note this is only for debug output. HostFeatures has functions for final writing.
+ */
+void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, HostFeatures* features, bool really, bool with_orientation )
 {
     if( features->getFeatureCount() == 0 ) return;
 

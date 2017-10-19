@@ -24,13 +24,13 @@ namespace popsift
 {
     class Image;
     class Pyramid;
-    class Features;
+    class HostFeatures;
 };
 
 class SiftJob
 {
-    std::promise<popsift::Features*> _p;
-    std::future <popsift::Features*> _f;
+    std::promise<popsift::HostFeatures*> _p;
+    std::future <popsift::HostFeatures*> _f;
     int             _w;
     int             _h;
     unsigned char*  _imageData;
@@ -42,7 +42,7 @@ public:
 
    void match( SiftJob* otherJob );
 
-    popsift::Features* get() {
+    popsift::HostFeatures* get() {
         return _f.get();
     }
 
@@ -50,7 +50,7 @@ public:
     inline popsift::Image* getImg() const { return _img; }
 
     /** fulfill the promise */
-    void setFeatures( popsift::Features* f );
+    void setFeatures( popsift::HostFeatures* f );
 };
 
 class PopSift
@@ -97,11 +97,11 @@ public:
     }
 
     /** deprecated */
-    inline popsift::Features* execute( int /*pipe*/, const unsigned char* imageData )
+    inline popsift::HostFeatures* execute( int /*pipe*/, const unsigned char* imageData )
     {
         SiftJob* j = enqueue( _last_init_w, _last_init_h, imageData );
         if( !j ) return 0;
-        popsift::Features* f = j->get();
+        popsift::HostFeatures* f = j->get();
         delete j;
         return f;
     }
