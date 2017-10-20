@@ -107,7 +107,15 @@ public:
 private:
     bool private_init( int w, int h );
     void uploadImages( );
+
+    /* The following method are alternative worker functions for Jobs submitted by
+     * a calling application. The choice of method is made by the mode parameter
+     * in the PopSift constructor. */
+
+    /* Worker function: Extract SIFT features and download to host */
     void extractDownloadLoop( );
+
+    /* Worker function: Extract SIFT features, clone results in device memory */
     void matchPrepareLoop( );
 
 private:

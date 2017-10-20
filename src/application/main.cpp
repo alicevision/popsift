@@ -166,10 +166,11 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     unsigned char* image_data;
     SiftJob* job;
 
-    nvtxRangePushA( "load and convert image" );
 #ifdef USE_DEVIL
     if( not pgmread_loading )
     {
+        nvtxRangePushA( "load and convert image - devil" );
+
         ilImage img;
         if( img.Load( inputFile.c_str() ) == false ) {
             cerr << "Could not load image " << inputFile << endl;
@@ -184,7 +185,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
         cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
         image_data = img.GetData();
 
-        nvtxRangePop( );
+        nvtxRangePop( ); // "load and convert image - devil"
 
         // PopSift.init( w, h );
         job = PopSift.enqueue( w, h, image_data );
@@ -194,12 +195,14 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     else
 #endif
     {
+        nvtxRangePushA( "load and convert image - pgmread" );
+
         image_data = readPGMfile( inputFile, w, h );
         if( image_data == 0 ) {
             exit( -1 );
         }
 
-        nvtxRangePop( );
+        nvtxRangePop( ); // "load and convert image - pgmread"
 
         // PopSift.init( w, h );
         job = PopSift.enqueue( w, h, image_data );
@@ -213,7 +216,9 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 void read_job( SiftJob* job, bool really_write )
 {
     popsift::HostFeatures* feature_list = dynamic_cast<popsift::HostFeatures*>( job->get() );
-    cerr << "Number of features: " << feature_list->size() << endl;
+    cerr << "Number of feature points: " << feature_list->getFeatureCount()
+         << " number of feature descriptors: " << feature_list->getDescriptorCount()
+         << endl;
 
     if( really_write ) {
         nvtxRangePushA( "Writing features to disk" );
@@ -224,7 +229,7 @@ void read_job( SiftJob* job, bool really_write )
     delete feature_list;
 
     if( really_write ) {
-        nvtxRangePop( );
+        nvtxRangePop( ); // Writing features to disk
     }
 }
 

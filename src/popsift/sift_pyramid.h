@@ -107,7 +107,11 @@ public:
     inline Octave& getOctave(const int o){ return _octaves[o]; }
 
 private:
-    inline void horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode );
+    inline void horiz_from_input_image( const Config&    conf,
+                                        Image*           base,
+					int              octave,
+					cudaStream_t     stream,
+					Config::SiftMode mode );
     inline void downscale_from_prev_octave( int octave, cudaStream_t stream, Config::SiftMode mode );
     inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss );
     inline void vert_from_interm( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss );
@@ -134,6 +138,8 @@ private:
     void writeDescCountersToDevice( cudaStream_t s );
     int* getNumberOfBlocks( int octave );
     void writeDescriptor( const Config& conf, std::ostream& ostr, HostFeatures* features, bool really, bool with_orientation );
+
+    void clone_device_descriptors_sub( const Config& conf, DeviceFeatures* features );
 
 private:
     // debug
