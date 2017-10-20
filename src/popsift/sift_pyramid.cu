@@ -352,12 +352,6 @@ DeviceFeatures* Pyramid::clone_device_descriptors( const Config& conf )
     return features;
 }
 
-
-    cudaStreamSynchronize( _download_stream );
-
-    return features;
-}
-
 void Pyramid::reset_extrema_mgmt()
 {
     memset( &hct,         0, sizeof(ExtremaCounters) );
