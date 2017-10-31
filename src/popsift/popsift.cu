@@ -231,8 +231,19 @@ void SiftJob::setImg( popsift::Image* img )
     _img = img;
 }
 
+popsift::Image* SiftJob::getImg()
+{
+#ifdef USE_NVTX
+    _nvtx_id = nvtxRangeStartA( "inserting image" );
+#endif
+    return _img;
+}
+
 void SiftJob::setFeatures( popsift::Features* f )
 {
     _p.set_value( f );
+#ifdef USE_NVTX
+    nvtxRangeEnd( _nvtx_id );
+#endif
 }
 
