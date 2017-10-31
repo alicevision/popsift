@@ -106,6 +106,8 @@ private:
 extern __device__ __constant__ GaussInfo d_gauss;
 extern                         GaussInfo h_gauss;
 
+/* init_filter must be called early to initialize the Gauss tables.
+ */
 void init_filter( const Config& conf,
                   float         sigma0,
                   int           levels );

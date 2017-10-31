@@ -4,6 +4,7 @@ CUDA_INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 
 CUDA_ADD_LIBRARY(popsift STATIC
 	popsift/popsift.cu popsift/popsift.h
+	popsift/features.cu popsift/features.h
 	popsift/sift_constants.cu popsift/sift_constants.h
 	popsift/sift_conf.cu popsift/sift_conf.h
 	popsift/gauss_filter.cu popsift/gauss_filter.h
@@ -33,8 +34,8 @@ CUDA_ADD_LIBRARY(popsift STATIC
 	popsift/common/clamp.h
 	popsift/common/plane_2d.cu popsift/common/plane_2d.h
 	popsift/common/write_plane_2d.cu popsift/common/write_plane_2d.h
-	popsift/common/debug_macros.cpp popsift/common/debug_macros.h
-	popsift/common/device_prop.cpp popsift/common/device_prop.h
+	popsift/common/debug_macros.cu popsift/common/debug_macros.h
+	popsift/common/device_prop.cu popsift/common/device_prop.h
 	popsift/common/warp_bitonic_sort.h
 	popsift/common/excl_blk_prefix_sum.h
 	popsift/common/vec_macros.h

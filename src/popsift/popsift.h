@@ -19,6 +19,13 @@
 #include "sift_extremum.h"
 
 
+#ifdef USE_NVTX
+#include <nvToolsExtCuda.h>
+#else
+#define nvtxRangeStartA(a)
+#define nvtxRangeEnd(a)
+#endif
+
 /* user parameters */
 namespace popsift
 {
@@ -35,6 +42,9 @@ class SiftJob
     int             _h;
     unsigned char*  _imageData;
     popsift::Image* _img;
+#ifdef USE_NVTX
+    nvtxRangeId_t   _nvtx_id;
+#endif
 
 public:
     SiftJob( int w, int h, const unsigned char* imageData );
@@ -45,7 +55,7 @@ public:
     }
 
     void setImg( popsift::Image* img );
-    inline popsift::Image* getImg() const { return _img; }
+    popsift::Image* getImg();
 
     /** fulfill the promise */
     void setFeatures( popsift::Features* f );
@@ -70,7 +80,7 @@ public:
      * level parameters.
      */
     PopSift( );
-    PopSift( const popsift::Config& config );
+    PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode = popsift::Config::ExtractingMode );
     ~PopSift();
 
 public:
@@ -107,7 +117,16 @@ public:
 private:
     bool private_init( int w, int h );
     void uploadImages( );
-    void mainLoop( );
+
+    /* The following method are alternative worker functions for Jobs submitted by
+     * a calling application. The choice of method is made by the mode parameter
+     * in the PopSift constructor. */
+
+    /* Worker function: Extract SIFT features and download to host */
+    void extractDownloadLoop( );
+
+    /* Worker function: Extract SIFT features, clone results in device memory */
+    void matchPrepareLoop( );
 
 private:
     Pipe            _pipe;

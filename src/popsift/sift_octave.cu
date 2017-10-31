@@ -30,11 +30,14 @@ Octave::Octave()
 { }
 
 
-void Octave::alloc(int width, int height, int levels, int gauss_group)
+void Octave::alloc( const Config& conf, int width, int height, int levels, int gauss_group )
 {
     _max_w = _w = width;
     _max_h = _h = height;
     _levels = levels;
+
+    _w_grid_divider = float(_w) / conf.getFilterGridSize();
+    _h_grid_divider = float(_h) / conf.getFilterGridSize();
 
     alloc_data_planes();
     alloc_data_tex();
@@ -49,7 +52,7 @@ void Octave::alloc(int width, int height, int levels, int gauss_group)
     alloc_events();
 }
 
-void Octave::resetDimensions( int w, int h )
+void Octave::resetDimensions( const Config& conf, int w, int h )
 {
     if( w == _w && h == _h ) {
         return;
@@ -57,6 +60,9 @@ void Octave::resetDimensions( int w, int h )
 
     _w = w;
     _h = h;
+
+    _w_grid_divider = float(_w) / conf.getFilterGridSize();
+    _h_grid_divider = float(_h) / conf.getFilterGridSize();
 
     if( _w > _max_w || _h > _max_h ) {
         _max_w = max( _w, _max_w );
@@ -103,150 +109,150 @@ void Octave::free()
 
 void Octave::download_and_save_array( const char* basename, int octave )
 {
-        struct stat st = { 0 };
+    struct stat st = { 0 };
 
-            cudaError_t err;
-            int width  = getWidth();
-            int height = getHeight();
+    cudaError_t err;
+    int width  = getWidth();
+    int height = getHeight();
 
-            if (stat("dir-octave", &st) == -1) {
-                mkdir("dir-octave", 0700);
-            }
+    if (stat("dir-octave", &st) == -1) {
+        mkdir("dir-octave", 0700);
+    }
 
-            if (stat("dir-octave-dump", &st) == -1) {
-                mkdir("dir-octave-dump", 0700);
-            }
+    if (stat("dir-octave-dump", &st) == -1) {
+        mkdir("dir-octave-dump", 0700);
+    }
 
-            if (stat("dir-dog", &st) == -1) {
-                mkdir("dir-dog", 0700);
-            }
+    if (stat("dir-dog", &st) == -1) {
+        mkdir("dir-dog", 0700);
+    }
 
-            if (stat("dir-dog-txt", &st) == -1) {
-                mkdir("dir-dog-txt", 0700);
-            }
+    if (stat("dir-dog-txt", &st) == -1) {
+        mkdir("dir-dog-txt", 0700);
+    }
 
-            if (stat("dir-dog-dump", &st) == -1) {
-                mkdir("dir-dog-dump", 0700);
-            }
+    if (stat("dir-dog-dump", &st) == -1) {
+        mkdir("dir-dog-dump", 0700);
+    }
 
-            float* array;
-            POP_CUDA_MALLOC_HOST(&array, width * height * _levels * sizeof(float));
+    float* array;
+    POP_CUDA_MALLOC_HOST(&array, width * height * _levels * sizeof(float));
 
-            cudaMemcpy3DParms s = { 0 };
-            memset( &s, 0, sizeof(cudaMemcpy3DParms) );
-            s.srcArray = _data;
-            s.dstPtr   = make_cudaPitchedPtr( array, width * sizeof(float), width, height );
-            s.extent   = make_cudaExtent( width, height, _levels );
-            s.kind     = cudaMemcpyDeviceToHost;
-            err = cudaMemcpy3D(&s);
-            POP_CUDA_FATAL_TEST(err, "cudaMemcpy3D failed: ");
+    cudaMemcpy3DParms s = { 0 };
+    memset( &s, 0, sizeof(cudaMemcpy3DParms) );
+    s.srcArray = _data;
+    s.dstPtr   = make_cudaPitchedPtr( array, width * sizeof(float), width, height );
+    s.extent   = make_cudaExtent( width, height, _levels );
+    s.kind     = cudaMemcpyDeviceToHost;
+    err = cudaMemcpy3D(&s);
+    POP_CUDA_FATAL_TEST(err, "cudaMemcpy3D failed: ");
 
-            for( int l = 0; l<_levels; l++ ) {
-                Plane2D_float p(width, height, &array[l*width*height], width * sizeof(float));
+    for( int l = 0; l<_levels; l++ ) {
+        Plane2D_float p(width, height, &array[l*width*height], width * sizeof(float));
 
-                ostringstream ostr;
-                ostr << "dir-octave/" << basename << "-o-" << octave << "-l-" << l << ".pgm";
-                popsift::write_plane2Dunscaled( ostr.str().c_str(), false, p );
+        ostringstream ostr;
+        ostr << "dir-octave/" << basename << "-o-" << octave << "-l-" << l << ".pgm";
+        popsift::write_plane2Dunscaled( ostr.str().c_str(), false, p );
 
-                ostringstream ostr2;
-                ostr2 << "dir-octave-dump/" << basename << "-o-" << octave << "-l-" << l << ".dump";
-                popsift::dump_plane2Dfloat(ostr2.str().c_str(), false, p );
-            }
+        ostringstream ostr2;
+        ostr2 << "dir-octave-dump/" << basename << "-o-" << octave << "-l-" << l << ".dump";
+        popsift::dump_plane2Dfloat(ostr2.str().c_str(), false, p );
+    }
 
-            memset( &s, 0, sizeof(cudaMemcpy3DParms) );
-            s.srcArray = _dog_3d;
-            s.dstPtr = make_cudaPitchedPtr(array, width * sizeof(float), width, height);
-            s.extent = make_cudaExtent(width, height, _levels - 1);
-            s.kind = cudaMemcpyDeviceToHost;
-            err = cudaMemcpy3D(&s);
-            POP_CUDA_FATAL_TEST(err, "cudaMemcpy3D failed: ");
+    memset( &s, 0, sizeof(cudaMemcpy3DParms) );
+    s.srcArray = _dog_3d;
+    s.dstPtr = make_cudaPitchedPtr(array, width * sizeof(float), width, height);
+    s.extent = make_cudaExtent(width, height, _levels - 1);
+    s.kind = cudaMemcpyDeviceToHost;
+    err = cudaMemcpy3D(&s);
+    POP_CUDA_FATAL_TEST(err, "cudaMemcpy3D failed: ");
 
-            for (int l = 0; l<_levels - 1; l++) {
-                Plane2D_float p(width, height, &array[l*width*height], width * sizeof(float));
+    for (int l = 0; l<_levels - 1; l++) {
+        Plane2D_float p(width, height, &array[l*width*height], width * sizeof(float));
 
-                ostringstream ostr;
-                ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".pgm";
-                popsift::write_plane2D(ostr.str().c_str(), false, p);
+        ostringstream ostr;
+        ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".pgm";
+        popsift::write_plane2D(ostr.str().c_str(), false, p);
 
-                ostringstream pstr;
-                pstr << "dir-dog-txt/d-" << basename << "-o-" << octave << "-l-" << l << ".txt";
-                popsift::write_plane2Dunscaled(pstr.str().c_str(), false, p, 127);
+        ostringstream pstr;
+        pstr << "dir-dog-txt/d-" << basename << "-o-" << octave << "-l-" << l << ".txt";
+        popsift::write_plane2Dunscaled(pstr.str().c_str(), false, p, 127);
 
-                ostringstream qstr;
-                qstr << "dir-dog-dump/d-" << basename << "-o-" << octave << "-l-" << l << ".dump";
-                popsift::dump_plane2Dfloat(qstr.str().c_str(), false, p);
-            }
+        ostringstream qstr;
+        qstr << "dir-dog-dump/d-" << basename << "-o-" << octave << "-l-" << l << ".dump";
+        popsift::dump_plane2Dfloat(qstr.str().c_str(), false, p);
+    }
 
-            POP_CUDA_FREE_HOST(array);
+    POP_CUDA_FREE_HOST(array);
 }
 
 void Octave::alloc_data_planes()
 {
-        cudaError_t err;
+    cudaError_t err;
 
-        _data_desc.f = cudaChannelFormatKindFloat;
-        _data_desc.x = 32;
-        _data_desc.y = 0;
-        _data_desc.z = 0;
-        _data_desc.w = 0;
+    _data_desc.f = cudaChannelFormatKindFloat;
+    _data_desc.x = 32;
+    _data_desc.y = 0;
+    _data_desc.z = 0;
+    _data_desc.w = 0;
 
-        _data_ext.width  = _w; // for cudaMalloc3DArray, width in elements
-        _data_ext.height = _h;
-        _data_ext.depth  = _levels;
+    _data_ext.width  = _w; // for cudaMalloc3DArray, width in elements
+    _data_ext.height = _h;
+    _data_ext.depth  = _levels;
 
-        err = cudaMalloc3DArray( &_data,
-                                 &_data_desc,
-                                 _data_ext,
-                                 cudaArrayLayered | cudaArraySurfaceLoadStore);
-        POP_CUDA_FATAL_TEST(err, "Could not allocate Blur level array: ");
+    err = cudaMalloc3DArray( &_data,
+                             &_data_desc,
+                             _data_ext,
+                             cudaArrayLayered | cudaArraySurfaceLoadStore);
+    POP_CUDA_FATAL_TEST(err, "Could not allocate Blur level array: ");
 }
 
 void Octave::free_data_planes()
 {
-        cudaError_t err;
+    cudaError_t err;
 
-        err = cudaFreeArray( _data );
-        POP_CUDA_FATAL_TEST(err, "Could not free Blur level array: ");
+    err = cudaFreeArray( _data );
+    POP_CUDA_FATAL_TEST(err, "Could not free Blur level array: ");
 }
 
-    void Octave::alloc_data_tex()
-    {
-        cudaError_t err;
+void Octave::alloc_data_tex()
+{
+    cudaError_t err;
 
-        cudaResourceDesc res_desc;
-        res_desc.resType = cudaResourceTypeArray;
-        res_desc.res.array.array = _data;
+    cudaResourceDesc res_desc;
+    res_desc.resType = cudaResourceTypeArray;
+    res_desc.res.array.array = _data;
 
-        err = cudaCreateSurfaceObject(&_data_surf, &res_desc);
-        POP_CUDA_FATAL_TEST(err, "Could not create Blur data surface: ");
+    err = cudaCreateSurfaceObject(&_data_surf, &res_desc);
+    POP_CUDA_FATAL_TEST(err, "Could not create Blur data surface: ");
 
-        cudaTextureDesc      tex_desc;
+    cudaTextureDesc      tex_desc;
 
-        memset(&tex_desc, 0, sizeof(cudaTextureDesc));
-        tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
-        tex_desc.addressMode[0]   = cudaAddressModeClamp;
-        tex_desc.addressMode[1]   = cudaAddressModeClamp;
-        tex_desc.addressMode[2]   = cudaAddressModeClamp;
-        tex_desc.readMode         = cudaReadModeElementType; // read as float
-        tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
+    memset(&tex_desc, 0, sizeof(cudaTextureDesc));
+    tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
+    tex_desc.addressMode[0]   = cudaAddressModeClamp;
+    tex_desc.addressMode[1]   = cudaAddressModeClamp;
+    tex_desc.addressMode[2]   = cudaAddressModeClamp;
+    tex_desc.readMode         = cudaReadModeElementType; // read as float
+    tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
 
-        err = cudaCreateTextureObject( &_data_tex_point, &res_desc, &tex_desc, 0 );
-        POP_CUDA_FATAL_TEST(err, "Could not create Blur data point texture: ");
+    err = cudaCreateTextureObject( &_data_tex_point, &res_desc, &tex_desc, 0 );
+    POP_CUDA_FATAL_TEST(err, "Could not create Blur data point texture: ");
 
-        memset(&tex_desc, 0, sizeof(cudaTextureDesc));
-        tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
-        tex_desc.addressMode[0]   = cudaAddressModeClamp;
-        tex_desc.addressMode[1]   = cudaAddressModeClamp;
-        tex_desc.addressMode[2]   = cudaAddressModeClamp;
-        tex_desc.readMode         = cudaReadModeElementType; // read as float
-        tex_desc.filterMode       = cudaFilterModeLinear; // no interpolation
+    memset(&tex_desc, 0, sizeof(cudaTextureDesc));
+    tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
+    tex_desc.addressMode[0]   = cudaAddressModeClamp;
+    tex_desc.addressMode[1]   = cudaAddressModeClamp;
+    tex_desc.addressMode[2]   = cudaAddressModeClamp;
+    tex_desc.readMode         = cudaReadModeElementType; // read as float
+    tex_desc.filterMode       = cudaFilterModeLinear; // no interpolation
 
-        err = cudaCreateTextureObject( &_data_tex_linear, &res_desc, &tex_desc, 0 );
-        POP_CUDA_FATAL_TEST(err, "Could not create Blur data point texture: ");
-    }
+    err = cudaCreateTextureObject( &_data_tex_linear, &res_desc, &tex_desc, 0 );
+    POP_CUDA_FATAL_TEST(err, "Could not create Blur data point texture: ");
+}
 
-    void Octave::free_data_tex()
-    {
+void Octave::free_data_tex()
+{
         cudaError_t err;
 
         err = cudaDestroyTextureObject(_data_tex_point);
@@ -257,10 +263,10 @@ void Octave::free_data_planes()
 
         err = cudaDestroySurfaceObject(_data_surf);
         POP_CUDA_FATAL_TEST(err, "Could not destroy Blur data surface: ");
-    }
+}
 
-    void Octave::alloc_interm_array()
-    {
+void Octave::alloc_interm_array()
+{
         cudaError_t err;
 
         _interm_desc.f = cudaChannelFormatKindFloat;
@@ -275,18 +281,18 @@ void Octave::free_data_planes()
                               _h,
                               cudaArraySurfaceLoadStore);
         POP_CUDA_FATAL_TEST(err, "Could not allocate Intermediate array: ");
-    }
+}
 
-    void Octave::free_interm_array()
-    {
+void Octave::free_interm_array()
+{
         cudaError_t err;
 
         err = cudaFreeArray(_interm_array);
         POP_CUDA_FATAL_TEST(err, "Could not free Intermediate array: ");
-    }
+}
 
-    void Octave::alloc_interm_tex()
-    {
+void Octave::alloc_interm_tex()
+{
         cudaError_t err;
 
         cudaResourceDesc interm_res_desc;
@@ -315,10 +321,10 @@ void Octave::free_data_planes()
                                       &interm_res_desc,
                                       &interm_tex_desc, 0);
         POP_CUDA_FATAL_TEST(err, "Could not create Intermediate texture: ");
-    }
+}
 
-    void Octave::free_interm_tex()
-    {
+void Octave::free_interm_tex()
+{
         cudaError_t err;
 
         err = cudaDestroySurfaceObject(_interm_surf);
@@ -327,10 +333,10 @@ void Octave::free_data_planes()
         POP_CUDA_FATAL_TEST(err, "Could not destroy texture object: ");
         err = cudaDestroyTextureObject(_interm_data_tex_linear);
         POP_CUDA_FATAL_TEST(err, "Could not destroy texture object: ");
-    }
+}
 
-    void Octave::alloc_dog_array()
-    {
+void Octave::alloc_dog_array()
+{
         cudaError_t err;
 
         _dog_3d_desc.f = cudaChannelFormatKindFloat;
@@ -348,18 +354,18 @@ void Octave::free_data_planes()
             _dog_3d_ext,
             cudaArrayLayered | cudaArraySurfaceLoadStore);
         POP_CUDA_FATAL_TEST(err, "Could not allocate 3D DoG array: ");
-    }
+}
 
-    void Octave::free_dog_array()
-    {
+void Octave::free_dog_array()
+{
         cudaError_t err;
 
         err = cudaFreeArray(_dog_3d);
         POP_CUDA_FATAL_TEST(err, "Could not free 3D DoG array: ");
-    }
+}
 
-    void Octave::alloc_dog_tex()
-    {
+void Octave::alloc_dog_tex()
+{
         cudaError_t err;
 
         cudaResourceDesc dog_res_desc;
@@ -384,21 +390,21 @@ void Octave::free_data_planes()
         dog_tex_desc.filterMode = cudaFilterModeLinear; // linear interpolation
         err = cudaCreateTextureObject(&_dog_3d_tex_linear, &dog_res_desc, &dog_tex_desc, 0);
         POP_CUDA_FATAL_TEST(err, "Could not create DoG texture: ");
-    }
+}
 
-    void Octave::free_dog_tex()
-    {
-        cudaError_t err;
+void Octave::free_dog_tex()
+{
+    cudaError_t err;
 
-        err = cudaDestroyTextureObject(_dog_3d_tex_linear);
-        POP_CUDA_FATAL_TEST(err, "Could not destroy DoG texture: ");
+    err = cudaDestroyTextureObject(_dog_3d_tex_linear);
+    POP_CUDA_FATAL_TEST(err, "Could not destroy DoG texture: ");
 
-        err = cudaDestroyTextureObject(_dog_3d_tex_point);
-        POP_CUDA_FATAL_TEST(err, "Could not destroy DoG texture: ");
+    err = cudaDestroyTextureObject(_dog_3d_tex_point);
+    POP_CUDA_FATAL_TEST(err, "Could not destroy DoG texture: ");
 
-        err = cudaDestroySurfaceObject(_dog_3d_surf);
-        POP_CUDA_FATAL_TEST(err, "Could not destroy DoG surface: ");
-    }
+    err = cudaDestroySurfaceObject(_dog_3d_surf);
+    POP_CUDA_FATAL_TEST(err, "Could not destroy DoG surface: ");
+}
 
     void Octave::alloc_streams()
     {

@@ -19,118 +19,128 @@ namespace popsift {
 
 class Octave
 {
-        int _w;
-        int _h;
-        int _max_w;
-        int _max_h;
-        int _debug_octave_id;
-        int _levels;
-        int _gauss_group;
+    int   _w;
+    int   _h;
+    int   _max_w;
+    int   _max_h;
+    float _w_grid_divider;
+    float _h_grid_divider;
+    int   _debug_octave_id;
+    int   _levels;
+    int   _gauss_group;
 
-        cudaArray_t           _data;
-        cudaChannelFormatDesc _data_desc;
-        cudaExtent            _data_ext;
-        cudaSurfaceObject_t   _data_surf;
-        cudaTextureObject_t   _data_tex_point;
-        cudaTextureObject_t   _data_tex_linear;
+    cudaArray_t           _data;
+    cudaChannelFormatDesc _data_desc;
+    cudaExtent            _data_ext;
+    cudaSurfaceObject_t   _data_surf;
+    cudaTextureObject_t   _data_tex_point;
+    cudaTextureObject_t   _data_tex_linear;
 
-        cudaArray_t           _interm_array;
-        cudaChannelFormatDesc _interm_desc;
-        cudaSurfaceObject_t   _interm_surf;
-        cudaTextureObject_t   _interm_data_tex_point;
-        cudaTextureObject_t   _interm_data_tex_linear;
+    cudaArray_t           _interm_array;
+    cudaChannelFormatDesc _interm_desc;
+    cudaSurfaceObject_t   _interm_surf;
+    cudaTextureObject_t   _interm_data_tex_point;
+    cudaTextureObject_t   _interm_data_tex_linear;
 
-        cudaArray_t           _dog_3d;
-        cudaChannelFormatDesc _dog_3d_desc;
-        cudaExtent            _dog_3d_ext;
-        cudaSurfaceObject_t   _dog_3d_surf;
-        cudaTextureObject_t   _dog_3d_tex_point;
-        cudaTextureObject_t   _dog_3d_tex_linear;
+    cudaArray_t           _dog_3d;
+    cudaChannelFormatDesc _dog_3d_desc;
+    cudaExtent            _dog_3d_ext;
+    cudaSurfaceObject_t   _dog_3d_surf;
+    cudaTextureObject_t   _dog_3d_tex_point;
+    cudaTextureObject_t   _dog_3d_tex_linear;
 
-        // one CUDA stream per level
-        // consider whether some of them can be removed
-        cudaStream_t _stream;
-        cudaEvent_t  _scale_done;
-        cudaEvent_t  _extrema_done;
-        cudaEvent_t  _ori_done;
-        cudaEvent_t  _desc_done;
+    // one CUDA stream per level
+    // consider whether some of them can be removed
+    cudaStream_t _stream;
+    cudaEvent_t  _scale_done;
+    cudaEvent_t  _extrema_done;
+    cudaEvent_t  _ori_done;
+    cudaEvent_t  _desc_done;
 
-    public:
-        Octave( );
-        ~Octave( ) { this->free(); }
+public:
+    Octave( );
+    ~Octave( ) { this->free(); }
 
-        void resetDimensions( int w, int h );
+    void resetDimensions( const Config& conf, int w, int h );
 
-        inline void debugSetOctave( uint32_t o ) { _debug_octave_id = o; }
+    inline void debugSetOctave( uint32_t o ) { _debug_octave_id = o; }
 
-        inline int getLevels() const { return _levels; }
-        inline int getWidth() const  {
-            return _w;
-        }
-        inline int getHeight() const {
-            return _h;
-        }
+    inline int getLevels() const { return _levels; }
+    inline int getWidth() const  {
+        return _w;
+    }
+    inline int getHeight() const {
+        return _h;
+    }
 
-        inline cudaStream_t getStream( ) {
-            return _stream;
-        }
-        inline cudaEvent_t getEventScaleDone( ) {
-            return _scale_done;
-        }
-        inline cudaEvent_t getEventExtremaDone( ) {
-            return _extrema_done;
-        }
-        inline cudaEvent_t getEventOriDone( ) {
-            return _ori_done;
-        }
-        inline cudaEvent_t getEventDescDone( ) {
-            return _desc_done;
-        }
+    inline float getWGridDivider() const  {
+        return _w_grid_divider;
+    }
+    inline float getHGridDivider() const {
+        return _h_grid_divider;
+    }
 
-        inline cudaTextureObject_t getIntermDataTexLinear( ) {
-            return _interm_data_tex_linear;
-        }
-        inline cudaTextureObject_t getIntermDataTexPoint( ) {
-            return _interm_data_tex_point;
-        }
-        inline cudaTextureObject_t getDataTexLinear( ) {
-            return _data_tex_linear;
-        }
-        inline cudaTextureObject_t getDataTexPoint( ) {
-            return _data_tex_point;
-        }
-        inline cudaSurfaceObject_t getDataSurface( ) {
-            return _data_surf;
-        }
-        inline cudaSurfaceObject_t getIntermediateSurface( ) {
-            return _interm_surf;
-        }
+    inline cudaStream_t getStream( ) {
+        return _stream;
+    }
+    inline cudaEvent_t getEventScaleDone( ) {
+        return _scale_done;
+    }
+    inline cudaEvent_t getEventExtremaDone( ) {
+        return _extrema_done;
+    }
+    inline cudaEvent_t getEventOriDone( ) {
+        return _ori_done;
+    }
+    inline cudaEvent_t getEventDescDone( ) {
+        return _desc_done;
+    }
+
+    inline cudaTextureObject_t getIntermDataTexLinear( ) {
+        return _interm_data_tex_linear;
+    }
+    inline cudaTextureObject_t getIntermDataTexPoint( ) {
+        return _interm_data_tex_point;
+    }
+    inline cudaTextureObject_t getDataTexLinear( ) {
+        return _data_tex_linear;
+    }
+    inline cudaTextureObject_t getDataTexPoint( ) {
+        return _data_tex_point;
+    }
+    inline cudaSurfaceObject_t getDataSurface( ) {
+        return _data_surf;
+    }
+    inline cudaSurfaceObject_t getIntermediateSurface( ) {
+        return _interm_surf;
+    }
         
-        inline cudaSurfaceObject_t& getDogSurface( ) {
-            return _dog_3d_surf;
-        }
-        inline cudaTextureObject_t& getDogTexturePoint( ) {
-            return _dog_3d_tex_point;
-        }
-        inline cudaTextureObject_t& getDogTextureLinear( ) {
-            return _dog_3d_tex_linear;
-        }
+    inline cudaSurfaceObject_t& getDogSurface( ) {
+        return _dog_3d_surf;
+    }
+    inline cudaTextureObject_t& getDogTexturePoint( ) {
+        return _dog_3d_tex_point;
+    }
+    inline cudaTextureObject_t& getDogTextureLinear( ) {
+        return _dog_3d_tex_linear;
+    }
 
-        /**
-         * alloc() - allocates all GPU memories for one octave
-         * @param width in floats, not bytes!!!
-         */
-        void alloc( int width,
-                    int height,
-                    int levels,
-                    int gauss_group );
-        void free();
+    /**
+     * alloc() - allocates all GPU memories for one octave
+     * @param width in floats, not bytes!!!
+     */
+    void alloc( const Config& conf,
+                int           width,
+                int           height,
+                int           levels,
+                int           gauss_group );
+    void free();
 
-        /**
-         * debug:
-         * download a level and write to disk
-         */
-         void download_and_save_array( const char* basename, int octave );
+    /**
+     * debug:
+     * download a level and write to disk
+     */
+    void download_and_save_array( const char* basename, int octave );
 
 private:
     void alloc_data_planes( );
