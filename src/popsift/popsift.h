@@ -19,6 +19,13 @@
 #include "sift_extremum.h"
 
 
+#ifdef USE_NVTX
+#include <nvToolsExtCuda.h>
+#else
+#define nvtxRangeStartA(a)
+#define nvtxRangeEnd(a)
+#endif
+
 /* user parameters */
 namespace popsift
 {
@@ -35,6 +42,9 @@ class SiftJob
     int             _h;
     unsigned char*  _imageData;
     popsift::Image* _img;
+#ifdef USE_NVTX
+    nvtxRangeId_t   _nvtx_id;
+#endif
 
 public:
     SiftJob( int w, int h, const unsigned char* imageData );
@@ -45,7 +55,7 @@ public:
     }
 
     void setImg( popsift::Image* img );
-    inline popsift::Image* getImg() const { return _img; }
+    popsift::Image* getImg();
 
     /** fulfill the promise */
     void setFeatures( popsift::Features* f );
