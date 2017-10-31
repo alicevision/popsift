@@ -60,18 +60,18 @@ install:
   - CUDA_REPO_PKG=cuda-repo-ubuntu1404_${CUDA_PKG_LONGVERSION}_amd64.deb
   - wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64/$CUDA_REPO_PKG
   - sudo dpkg -i $CUDA_REPO_PKG
-  - rm $CUDA_REPO_PKG
+  - rm ${CUDA_REPO_PKG}
   - sudo apt-get -y update
   - sudo apt-get install -y --no-install-recommends  cuda-core-$CUDA_PKG_VERSION  cuda-cudart-dev-$CUDA_PKG_VERSION  cuda-cublas-dev-$CUDA_PKG_VERSION cuda-curand-dev-$CUDA_PKG_VERSION
   - sudo ln -s /usr/local/cuda-${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR} /usr/local/cuda
 
 before_script:
   # Create build folder
-  - mkdir $POPSIFT_BUILD
-  - cd $POPSIFT_BUILD
+  - mkdir -p ${POPSIFT_BUILD}
+  - cd ${POPSIFT_BUILD}
   # Classic release build
   - >
-     cmake . $POPSIFT_SOURCE -DCMAKE_INSTALL_PREFIX=$POPSIFT_INSTALL
+     cmake . ${POPSIFT_SOURCE} -DCMAKE_INSTALL_PREFIX=${POPSIFT_INSTALL}
 
 script:
 # limit GCC builds to a reduced number of thread for the virtual machine
@@ -79,12 +79,12 @@ script:
 # Perform unit tests
   # - make test
 # Perform tests building application with PopSift as 3rd party
-  - cd $POPSIFT_APP_SRC
-  - mkdir POPSIFT_APP_BUILD
-  - cd POPSIFT_APP_BUILD
-  - cmake .. -DPopSift_DIR=$POPSIFT_INSTALL/lib/cmake/PopSift/ -DCMAKE_INSTALL_PREFIX=$POPSIFT_APP_INSTALL
+  - cd ${POPSIFT_APP_SRC}
+  - mkdir -p ${POPSIFT_APP_BUILD}
+  - cd ${POPSIFT_APP_BUILD}
+  - cmake .. -DPopSift_DIR=${POPSIFT_INSTALL}/lib/cmake/PopSift/ -DCMAKE_INSTALL_PREFIX=${POPSIFT_APP_INSTALL}
   - make install -j 2 VERBOSE=1
 
 cache:
   directories:
-    - $CMAKE_INSTALL
+    - ${CMAKE_INSTALL}
