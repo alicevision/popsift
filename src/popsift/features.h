@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "sift_constants.h"
+#include "sift_conf.h"
 
 namespace popsift {
 
@@ -106,7 +107,7 @@ public:
 
     void reset( int num_ext, int num_ori );
 
-    void match( DeviceFeatures* other );
+    void match( DeviceFeatures* other, const popsift::Config& config );
 
     inline Feature*    getFeatures()    { return _ext; }
     inline Descriptor* getDescriptors() { return _ori; }

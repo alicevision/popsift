@@ -37,6 +37,12 @@ struct Config
         Default = PopSift
     };
 
+    enum ModeMatching {
+        l2,
+        dot
+    };
+
+  
     enum LogMode {
         None,
         All
@@ -84,10 +90,14 @@ struct Config
     void setVerbose( bool on = true );
     void setDescMode( const std::string& byname );
     void setDescMode( DescMode mode = Loop );
+    void setModeMatching(const std::string& s);
+    inline ModeMatching getModeMatching() const {
+        return _mode_matching;
+    }
 
     void setGaussGroup( int groupsize );
     int  getGaussGroup( ) const;
-
+  
     void setDownsampling( float v );
     void setOctaves( int v );
     void setLevels( int v );
@@ -108,7 +118,7 @@ struct Config
 
     bool  hasInitialBlur( ) const;
     float getInitialBlur( ) const;
-
+  
     // computes the actual peak threshold depending on the threshold
     // parameter and the non-augmented number of levels
     float getPeakThreshold() const;
@@ -251,6 +261,8 @@ private:
     // default: 1
     int  _filter_grid_size;
 
+    ModeMatching _mode_matching;
+  
     /* Modes are computation according to VLFeat or OpenCV,
      * or fixed size. Default is VLFeat mode.
      */

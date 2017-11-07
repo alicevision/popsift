@@ -18,6 +18,7 @@
 #include "features.h"
 #include "sift_extremum.h"
 #include "common/debug_macros.h"
+#include "sift_conf.h"
 
 using namespace std;
 
@@ -181,9 +182,33 @@ l2_in_t0( const float4* lptr, const float4* rptr )
 			              lval.z - rval.z,
 			              lval.w - rval.w );
     float   res = mval.x * mval.x
-	        + mval.y * mval.y
-	        + mval.z * mval.z
-	        + mval.w * mval.w;
+                + mval.y * mval.y
+                + mval.z * mval.z
+                + mval.w * mval.w;
+
+    res += __shfl_down( res, 16 );
+    res += __shfl_down( res,  8 );
+    res += __shfl_down( res,  4 );
+    res += __shfl_down( res,  2 );
+    res += __shfl_down( res,  1 );
+
+    return res;
+}
+  __device__ inline float
+dot_l2_in_t0( const float4* lptr, const float4* rptr )
+{
+    const float4  lval = lptr[threadIdx.x];
+    const float4  rval = rptr[threadIdx.x];
+    const float4  mval = make_float4( lval.x * rval.x,
+			              lval.y * rval.y,
+			              lval.z * rval.z,
+			              lval.w * rval.w );
+    float   res = mval.x
+	        + mval.y
+	        + mval.z
+                + mval.w;
+
+    
     res += __shfl_down( res, 16 );
     res += __shfl_down( res,  8 );
     res += __shfl_down( res,  4 );
@@ -191,9 +216,9 @@ l2_in_t0( const float4* lptr, const float4* rptr )
     res += __shfl_down( res,  1 );
     return res;
 }
-
+  
 __global__ void
-compute_distance( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len )
+compute_distance_l2( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len )
 {
     if( blockIdx.x >= l_len ) return;
     const int idx = blockIdx.x;
@@ -235,6 +260,74 @@ compute_distance( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, i
         match_matrix[blockIdx.x] = make_int3( match_1st_idx, match_2nd_idx, accept );
     }
 }
+  
+  
+__global__ void
+compute_distance_dot( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len )
+{
+    if( blockIdx.x >= l_len ) return;
+    const int idx = blockIdx.x;
+
+    float match_1st_val = -1.0f; //CUDART_INF_F;
+    float match_2nd_val = -1.0f; //CUDART_INF_F;
+    int   match_1st_idx = 0;
+    int   match_2nd_idx = 0;
+
+  
+
+    const float4* lptr = (const float4*)( &l[idx] );
+
+    for( int i=0; i<r_len; i++ )
+      {
+        const float4* rptr = (const float4*)( &r[i] );
+        const float   res  = dot_l2_in_t0( lptr, rptr );
+
+	
+	if( threadIdx.x == 0 )
+	  {
+	    if( res > match_1st_val )
+	      {
+		match_2nd_val = match_1st_val;
+		match_2nd_idx = match_1st_idx;
+		match_1st_val = res;
+		match_1st_idx = i;
+	      }
+	    else if( res > match_2nd_val )
+	      {
+		match_2nd_val = res;
+		match_2nd_idx = i;
+	      }
+	  }
+	
+        __syncthreads();
+	
+      }
+    
+    
+    const int one = __shfl(match_1st_idx, 0);
+    const int two = __shfl(match_2nd_idx, 0);
+    
+    //__syncthreads();
+
+    const float4* rptr = (const float4*)( &r[one] );
+    const float res2 = l2_in_t0( lptr, rptr );
+    const float4* rptr2 = (const float4*)( &r[two] );
+    const float res3 = l2_in_t0( lptr, rptr2 );
+
+     
+
+    //__syncthreads();
+    
+    
+    if( threadIdx.x == 0 ) {
+      //match_2nd_val = res3;
+      //match_1st_val = res2;
+      //bool accept = ( match_2nd_val     / match_1st_val     < 0.97f );
+      //bool accept = ( match_1st_val     / match_2nd_val     < 0.8f );
+      bool accept = (res2/res3 < 0.8f );
+      match_matrix[blockIdx.x] = make_int3( match_1st_idx, match_2nd_idx, accept );
+    }
+}
 
 __global__ void
 show_distance( int3*       match_matrix,
@@ -247,34 +340,44 @@ show_distance( int3*       match_matrix,
                int*        r_fem,
                int         r_len )
 {
-    for( int i=0; i<l_len; i++ )
+  int counter = 0;
+  for( int i=0; i<l_len; i++ )
     {
-        const float4* lptr  = (const float4*)( &l_ori[i] );
-        const float4* rptr1 = (const float4*)( &r_ori[match_matrix[i].x] );
-        const float4* rptr2 = (const float4*)( &r_ori[match_matrix[i].y] );
-	float d1 = l2_in_t0( lptr, rptr1 );
-	float d2 = l2_in_t0( lptr, rptr2 );
-	if( threadIdx.x == 0 )
+      const float4* lptr  = (const float4*)( &l_ori[i] );
+      const float4* rptr1 = (const float4*)( &r_ori[match_matrix[i].x] );
+      const float4* rptr2 = (const float4*)( &r_ori[match_matrix[i].y] );
+      float d1 = l2_in_t0( lptr, rptr1 );
+      float d2 = l2_in_t0( lptr, rptr2 );
+      if( threadIdx.x == 0 )
         {
-            if( match_matrix[i].z )
-                printf( "accept feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f\n",
-                        l_fem[i], i,
-                        r_fem[match_matrix[i].x], match_matrix[i].x,
-                        r_fem[match_matrix[i].y], match_matrix[i].y,
-                        d1, d2 );
-	    else
-                printf( "reject feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f\n",
-                        l_fem[i], i,
-                        r_fem[match_matrix[i].x], match_matrix[i].x,
-                        r_fem[match_matrix[i].y], match_matrix[i].y,
-                        d1, d2 );
-        }
-        __syncthreads();
+	  
+	  if( match_matrix[i].z )
+	    counter++;
+	  /*printf( "accept feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f\n",
+	    l_fem[i], i,
+	    r_fem[match_matrix[i].x], match_matrix[i].x,
+	    r_fem[match_matrix[i].y], match_matrix[i].y,
+	    d1, d2 );*/
+	  
+	  //else
+	    /*printf( "reject feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f\n",
+	      l_fem[i], i,
+	      r_fem[match_matrix[i].x], match_matrix[i].x,
+	      r_fem[match_matrix[i].y], match_matrix[i].y,
+	      d1, d2 );*/
+	    }
+	
+      __syncthreads();
+      
     }
+  if( threadIdx.x == 0 )
+    printf("Matches: %d\n", counter);
+  
 }
 
-void DeviceFeatures::match( DeviceFeatures* other )
+  void DeviceFeatures::match( DeviceFeatures* other, const popsift::Config& config )
 {
+
     int l_len = getDescriptorCount( );
     int r_len = other->getDescriptorCount( );
 
@@ -289,9 +392,15 @@ void DeviceFeatures::match( DeviceFeatures* other )
     block.y = 1;
     block.z = 1;
 
-    compute_distance
+    if (config.getModeMatching() == popsift::Config::l2) {
+    compute_distance_l2
         <<<grid,block>>>
         ( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
+    } else {
+    compute_distance_dot
+        <<<grid,block>>>
+        ( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
+    }
 
     show_distance
         <<<1,32>>>

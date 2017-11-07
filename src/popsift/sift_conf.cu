@@ -21,6 +21,7 @@ Config::Config( )
     , sigma( 1.6f )
     , _edge_limit( 10.0f )
     , _threshold( 0.04 ) // ( 10.0f / 256.0f )
+    , _mode_matching(Config::dot)
     , _gauss_mode( Config::VLFeat_Relative )
     , _sift_mode( Config::PopSift )
     , _log_mode( Config::None )
@@ -95,6 +96,17 @@ void Config::setGaussMode( const std::string& m )
     else
         POP_FATAL( "specified Gauss mode must be one of vlfeat, opencv, fixed9 or fixed15" );
 }
+
+void Config::setModeMatching( const std::string& m )
+{
+    if( m == "l2" )
+    	_mode_matching = Config::l2;
+    else if( m == "dot" )
+	_mode_matching = Config::dot;
+    else
+        POP_FATAL( "specified matching mode must be one of l2, dot" );
+}
+
 
 bool Config::getCanFilterExtrema() const
 {

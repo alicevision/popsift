@@ -103,8 +103,9 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
         ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
         ("filter-max-extrema", value<int>()->notifier([&](int f) {config.setFilterMaxExtrema(f); }), "Approximate max number of extrema.")
         ("filter-grid", value<int>()->notifier([&](int f) {config.setFilterGridSize(f); }), "Grid edge length for extrema filtering (ie. value 4 leads to a 4x4 grid)")
-        ("filter-sort", value<std::string>()->notifier([&](const std::string& s) {config.setFilterSorting(s); }), "Sort extrema in each cell by scale, either random (default), up or down");
-
+        ("filter-sort", value<std::string>()->notifier([&](const std::string& s) {config.setFilterSorting(s); }), "Sort extrema in each cell by scale, either random (default), up or down")
+        ("match-mode", value<std::string>()->notifier([&](const std::string& s) { config.setModeMatching(s); }),
+        "Choice of feature matching mode l2, dot.");
     }
     options_description informational("Informational");
     {
@@ -229,6 +230,10 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    if (config.getModeMatching() == popsift::Config::dot && config.getUseRootSift() == true) {
+      cout << "Root sift normalization can not be used with dot product estimation" << endl;
+      exit(-1);
+    }
     if( boost::filesystem::exists( lFile ) ) {
         if( not boost::filesystem::is_regular_file( lFile ) ) {
             cout << "Input file " << lFile << " is not a regular file, nothing to do" << endl;
@@ -260,8 +265,9 @@ int main(int argc, char **argv)
     cout << "Number of features:    " << rFeatures->getFeatureCount() << endl;
     cout << "Number of descriptors: " << rFeatures->getDescriptorCount() << endl;
 
-    lFeatures->match( rFeatures );
-
+    
+    lFeatures->match( rFeatures, config );
+    
     delete lFeatures;
     delete rFeatures;
 
