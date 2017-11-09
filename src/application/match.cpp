@@ -252,11 +252,11 @@ int main(int argc, char **argv)
     SiftJob* lJob = process_image( lFile, PopSift );
     SiftJob* rJob = process_image( rFile, PopSift );
 
-    popsift::DeviceFeatures* lFeatures = dynamic_cast<popsift::DeviceFeatures*>( lJob->get() );
+    popsift::FeaturesDev* lFeatures = lJob->getDev();
     cout << "Number of features:    " << lFeatures->getFeatureCount() << endl;
     cout << "Number of descriptors: " << lFeatures->getDescriptorCount() << endl;
 
-    popsift::DeviceFeatures* rFeatures = dynamic_cast<popsift::DeviceFeatures*>( rJob->get() );
+    popsift::FeaturesDev* rFeatures = rJob->getDev();
     cout << "Number of features:    " << rFeatures->getFeatureCount() << endl;
     cout << "Number of descriptors: " << rFeatures->getDescriptorCount() << endl;
 

@@ -15,6 +15,7 @@
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
 #include "common/assist.h"
+#include "features.h"
 
 using namespace std;
 
@@ -159,7 +160,7 @@ void PopSift::extractDownloadLoop( )
 
         p._pyramid->step2( _config );
 
-        popsift::HostFeatures* features = p._pyramid->get_descriptors( _config );
+        popsift::FeaturesHost* features = p._pyramid->get_descriptors( _config );
 
         cudaDeviceSynchronize();
 
@@ -194,7 +195,7 @@ void PopSift::matchPrepareLoop( )
 
         p._pyramid->step2( _config );
 
-        popsift::DeviceFeatures* features = p._pyramid->clone_device_descriptors( _config );
+        popsift::FeaturesDev* features = p._pyramid->clone_device_descriptors( _config );
 
         cudaDeviceSynchronize();
 
@@ -239,11 +240,31 @@ popsift::Image* SiftJob::getImg()
     return _img;
 }
 
-void SiftJob::setFeatures( popsift::Features* f )
+void SiftJob::setFeatures( popsift::FeaturesBase* f )
 {
     _p.set_value( f );
 #ifdef USE_NVTX
     nvtxRangeEnd( _nvtx_id );
 #endif
+}
+
+popsift::FeaturesHost* SiftJob::get()
+{
+    return getHost();
+}
+
+popsift::FeaturesBase* SiftJob::getBase()
+{
+    return _f.get();
+}
+
+popsift::FeaturesHost* SiftJob::getHost()
+{
+    return dynamic_cast<popsift::FeaturesHost*>( _f.get() );
+}
+
+popsift::FeaturesDev* SiftJob::getDev()
+{
+    return dynamic_cast<popsift::FeaturesDev*>( _f.get() );
 }
 

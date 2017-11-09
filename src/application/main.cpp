@@ -216,7 +216,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 
 void read_job( SiftJob* job, bool really_write )
 {
-    popsift::HostFeatures* feature_list = dynamic_cast<popsift::HostFeatures*>( job->get() );
+    popsift::Features* feature_list = job->get();
     cerr << "Number of feature points: " << feature_list->getFeatureCount()
          << " number of feature descriptors: " << feature_list->getDescriptorCount()
          << endl;

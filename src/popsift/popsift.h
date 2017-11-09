@@ -31,13 +31,15 @@ namespace popsift
 {
     class Image;
     class Pyramid;
-    class Features;
+    class FeaturesBase;
+    class FeaturesHost;
+    class FeaturesDev;
 };
 
 class SiftJob
 {
-    std::promise<popsift::Features*> _p;
-    std::future <popsift::Features*> _f;
+    std::promise<popsift::FeaturesBase*> _p;
+    std::future <popsift::FeaturesBase*> _f;
     int             _w;
     int             _h;
     unsigned char*  _imageData;
@@ -50,15 +52,16 @@ public:
     SiftJob( int w, int h, const unsigned char* imageData );
     ~SiftJob( );
 
-    popsift::Features* get() {
-        return _f.get();
-    }
+    popsift::FeaturesHost* get();    // should be deprecated, same as getHost()
+    popsift::FeaturesBase* getBase();
+    popsift::FeaturesHost* getHost();
+    popsift::FeaturesDev*  getDev();
 
     void setImg( popsift::Image* img );
     popsift::Image* getImg();
 
     /** fulfill the promise */
-    void setFeatures( popsift::Features* f );
+    void setFeatures( popsift::FeaturesBase* f );
 };
 
 class PopSift
@@ -105,11 +108,11 @@ public:
     }
 
     /** deprecated */
-    inline popsift::Features* execute( int /*pipe*/, const unsigned char* imageData )
+    inline popsift::FeaturesBase* execute( int /*pipe*/, const unsigned char* imageData )
     {
         SiftJob* j = enqueue( _last_init_w, _last_init_h, imageData );
         if( !j ) return 0;
-        popsift::Features* f = j->get();
+        popsift::FeaturesBase* f = j->getBase();
         delete j;
         return f;
     }

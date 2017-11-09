@@ -83,9 +83,9 @@ void Pyramid::download_and_save_array( const char* basename )
 }
 
 /*
- * Note this is only for debug output. HostFeatures has functions for final writing.
+ * Note this is only for debug output. FeaturesHost has functions for final writing.
  */
-void Pyramid::save_descriptors( const Config& conf, HostFeatures* features, const char* basename )
+void Pyramid::save_descriptors( const Config& conf, FeaturesHost* features, const char* basename )
 {
     struct stat st = { 0 };
     if (stat("dir-desc", &st) == -1) {
@@ -278,14 +278,14 @@ void prep_features( Descriptor* descriptor_base, int up_fac )
     }
 }
 
-HostFeatures* Pyramid::get_descriptors( const Config& conf )
+FeaturesHost* Pyramid::get_descriptors( const Config& conf )
 {
     const float up_fac = conf.getUpscaleFactor();
 
     readDescCountersFromDevice();
 
     nvtxRangePushA( "download descriptors" );
-    HostFeatures* features = new HostFeatures( hct.ext_total, hct.ori_total );
+    FeaturesHost* features = new FeaturesHost( hct.ext_total, hct.ori_total );
 
     dim3 grid( grid_divide( hct.ext_total, 32 ) );
     prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
@@ -313,7 +313,7 @@ HostFeatures* Pyramid::get_descriptors( const Config& conf )
     return features;
 }
 
-void Pyramid::clone_device_descriptors_sub( const Config& conf, DeviceFeatures* features )
+void Pyramid::clone_device_descriptors_sub( const Config& conf, FeaturesDev* features )
 {
     const float up_fac = conf.getUpscaleFactor();
 
@@ -339,11 +339,11 @@ void Pyramid::clone_device_descriptors_sub( const Config& conf, DeviceFeatures* 
                           _download_stream );
 }
 
-DeviceFeatures* Pyramid::clone_device_descriptors( const Config& conf )
+FeaturesDev* Pyramid::clone_device_descriptors( const Config& conf )
 {
     readDescCountersFromDevice();
 
-    DeviceFeatures* features = new DeviceFeatures( hct.ext_total, hct.ori_total );
+    FeaturesDev* features = new FeaturesDev( hct.ext_total, hct.ori_total );
 
     clone_device_descriptors_sub( conf, features );
 
@@ -387,9 +387,9 @@ int* Pyramid::getNumberOfBlocks( int octave )
 }
 
 /*
- * Note this is only for debug output. HostFeatures has functions for final writing.
+ * Note this is only for debug output. FeaturesHost has functions for final writing.
  */
-void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, HostFeatures* features, bool really, bool with_orientation )
+void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* features, bool really, bool with_orientation )
 {
     if( features->getFeatureCount() == 0 ) return;
 

@@ -35,14 +35,14 @@ struct Feature
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
 
-class Features
+class FeaturesBase
 {
     int          _num_ext;
     int          _num_ori;
 
 public:
-    Features( );
-    virtual~ Features( );
+    FeaturesBase( );
+    virtual~ FeaturesBase( );
 
     inline int     size() const                { return _num_ext; }
     inline int     getFeatureCount() const     { return _num_ext; }
@@ -59,16 +59,18 @@ public:
  * Note that the current data structures do not allow to match
  * Descriptors in the transparent array with their extrema except
  * for brute force.
+ *
+ * Note: FeaturesHost is typedef'd to its older name Features
  */
-class HostFeatures : public Features
+class FeaturesHost : public FeaturesBase
 {
     Feature*     _ext;
     Descriptor*  _ori;
 
 public:
-    HostFeatures( );
-    HostFeatures( int num_ext, int num_ori );
-    virtual ~HostFeatures( );
+    FeaturesHost( );
+    FeaturesHost( int num_ext, int num_ori );
+    virtual ~FeaturesHost( );
 
     typedef Feature*       F_iterator;
     typedef const Feature* F_const_iterator;
@@ -91,22 +93,24 @@ protected:
     friend class Pyramid;
 };
 
-std::ostream& operator<<( std::ostream& ostr, const HostFeatures& feature );
+typedef FeaturesHost Features;
 
-class DeviceFeatures : public Features
+std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature );
+
+class FeaturesDev : public FeaturesBase
 {
     Feature*     _ext;
     Descriptor*  _ori;
     int*         _rev; // the reverse map from descriptors to extrema
 
 public:
-    DeviceFeatures( );
-    DeviceFeatures( int num_ext, int num_ori );
-    virtual ~DeviceFeatures( );
+    FeaturesDev( );
+    FeaturesDev( int num_ext, int num_ori );
+    virtual ~FeaturesDev( );
 
     void reset( int num_ext, int num_ori );
 
-    void match( DeviceFeatures* other );
+    void match( FeaturesDev* other );
 
     inline Feature*    getFeatures()    { return _ext; }
     inline Descriptor* getDescriptors() { return _ori; }

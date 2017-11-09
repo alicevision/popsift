@@ -24,34 +24,34 @@ using namespace std;
 namespace popsift {
 
 /*************************************************************
- * Features
+ * FeaturesBase
  *************************************************************/
 
-Features::Features( )
+FeaturesBase::FeaturesBase( )
     : _num_ext( 0 )
     , _num_ori( 0 )
 { }
 
-Features::~Features( )
+FeaturesBase::~FeaturesBase( )
 { }
 
 /*************************************************************
- * HostFeatures
+ * FeaturesHost
  *************************************************************/
 
-HostFeatures::HostFeatures( )
+FeaturesHost::FeaturesHost( )
     : _ext( 0 )
     , _ori( 0 )
 { }
 
-HostFeatures::HostFeatures( int num_ext, int num_ori )
+FeaturesHost::FeaturesHost( int num_ext, int num_ori )
     : _ext( 0 )
     , _ori( 0 )
 {
     reset( num_ext, num_ori );
 }
 
-HostFeatures::~HostFeatures( )
+FeaturesHost::~FeaturesHost( )
 {
     free( _ext );
     free( _ori );
@@ -70,7 +70,7 @@ static void* memalign( size_t alignment, size_t size )
 }
 #endif
 
-void HostFeatures::reset( int num_ext, int num_ori )
+void FeaturesHost::reset( int num_ext, int num_ori )
 {
     if( _ext != 0 ) { free( _ext ); _ext = 0; }
     if( _ori != 0 ) { free( _ori ); _ori = 0; }
@@ -96,7 +96,7 @@ void HostFeatures::reset( int num_ext, int num_ori )
     setDescriptorCount( num_ori );
 }
 
-void HostFeatures::pin( )
+void FeaturesHost::pin( )
 {
     cudaError_t err;
     err = cudaHostRegister( _ext, getFeatureCount() * sizeof(Feature), 0 );
@@ -113,36 +113,36 @@ void HostFeatures::pin( )
     }
 }
 
-void HostFeatures::unpin( )
+void FeaturesHost::unpin( )
 {
     cudaHostUnregister( _ext );
     cudaHostUnregister( _ori );
 }
 
-void HostFeatures::print( std::ostream& ostr, bool write_as_uchar ) const
+void FeaturesHost::print( std::ostream& ostr, bool write_as_uchar ) const
 {
     for( int i=0; i<size(); i++ ) {
         _ext[i].print( ostr, write_as_uchar );
     }
 }
 
-std::ostream& operator<<( std::ostream& ostr, const HostFeatures& feature )
+std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature )
 {
     feature.print( ostr, false );
     return ostr;
 }
 
 /*************************************************************
- * DeviceFeatures
+ * FeaturesDev
  *************************************************************/
 
-DeviceFeatures::DeviceFeatures( )
+FeaturesDev::FeaturesDev( )
     : _ext( 0 )
     , _ori( 0 )
     , _rev( 0 )
 { }
 
-DeviceFeatures::DeviceFeatures( int num_ext, int num_ori )
+FeaturesDev::FeaturesDev( int num_ext, int num_ori )
     : _ext( 0 )
     , _ori( 0 )
     , _rev( 0 )
@@ -150,14 +150,14 @@ DeviceFeatures::DeviceFeatures( int num_ext, int num_ori )
     reset( num_ext, num_ori );
 }
 
-DeviceFeatures::~DeviceFeatures( )
+FeaturesDev::~FeaturesDev( )
 {
     cudaFree( _ext );
     cudaFree( _ori );
     cudaFree( _rev );
 }
 
-void DeviceFeatures::reset( int num_ext, int num_ori )
+void FeaturesDev::reset( int num_ext, int num_ori )
 {
     if( _ext != 0 ) { cudaFree( _ext ); _ext = 0; }
     if( _ori != 0 ) { cudaFree( _ori ); _ori = 0; }
@@ -273,7 +273,7 @@ show_distance( int3*       match_matrix,
     }
 }
 
-void DeviceFeatures::match( DeviceFeatures* other )
+void FeaturesDev::match( FeaturesDev* other )
 {
     int l_len = getDescriptorCount( );
     int r_len = other->getDescriptorCount( );
