@@ -184,12 +184,17 @@ void init_filter( const Config& conf,
 
     h_gauss.required_filter_stages = levels + 3;
 
-    if( not conf.hasInitialBlur() ) {
-        h_gauss.inc.sigma[0] = sigma0;
-    } else {
-        const float initial_blur = conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() );
-        h_gauss.inc.sigma[0] = sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) );
-    }
+    const float initial_blur = conf.hasInitialBlur()
+                             ?  conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() )
+                             : 0.0f;
+
+    /* inc :
+     * The classical Gaussian blur tables for incremental blurring.
+     * These do not rely on hardware interpolation.
+     */
+    h_gauss.inc.sigma[0] = conf.hasInitialBlur()
+                         ? sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) )
+                         : sigma0;
 
     for( int lvl=1; lvl<h_gauss.required_filter_stages; lvl++ ) {
         const float sigmaP = sigma0 * pow( 2.0f, (float)(lvl-1)/(float)levels );
@@ -200,23 +205,14 @@ void init_filter( const Config& conf,
 
     h_gauss.inc.computeBlurTable( &h_gauss );
 
-    float initial_blur = 0.0f;
-    if( conf.hasInitialBlur() ) {
-        initial_blur = conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() );
-    }
-    for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
-        const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl)/(float)levels );
-        h_gauss.abs_o0.sigma[lvl]  = sqrt( fabs( sigmaS * sigmaS - initial_blur * initial_blur ) );
-    }
-
-    h_gauss.abs_o0.computeBlurTable( &h_gauss );
-
-    if( not conf.hasInitialBlur() ) {
-        h_gauss.inc_relative.sigma[0] = sigma0;
-    } else {
-        const float initial_blur = conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() );
-        h_gauss.inc_relative.sigma[0] = sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) );
-    }
+    /* inc_relative :
+     * The classical Gaussian blur tables for incremental blurring,
+     * but transformed to use hardware interpolation and use only one
+     * multiplication for two pixels.
+     */
+    h_gauss.inc_relative.sigma[0] = conf.hasInitialBlur()
+                                  ? sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) )
+                                  : sigma0;
 
     for( int lvl=1; lvl<h_gauss.required_filter_stages; lvl++ ) {
         const float sigmaP = sigma0 * pow( 2.0f, (float)(lvl-1)/(float)levels );
@@ -228,30 +224,41 @@ void init_filter( const Config& conf,
     h_gauss.inc_relative.computeBlurTable( &h_gauss );
     h_gauss.inc_relative.transformBlurTable( &h_gauss );
 
-#if 0
-    if( conf.ifPrintGaussTables() ) {
-        for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
-            float sigmaP = sigma0 * pow( 2.0f, (float)(lvl-1)/(float)levels );
-            float sigmaS = sigma0 * pow( 2.0f, (float)(lvl  )/(float)levels );
-            if( lvl == 0 ) {
-                sigmaP = conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() );
-            }
-            printf("    Sigma (rel) for level %d: %2.6f = sqrt(sigmaS(%2.6f)^2 - sigmaP(%2.6f)^2)\n", lvl, h_gauss.inc.sigma[lvl], sigmaS, sigmaP );
-        }
-
-        for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
-            const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl)/(float)levels );
-            printf("    Sigma (abs0) for level %d: %2.6f = sqrt(sigmaS(%2.6f)^2 - sigmaP(%2.6f)^2)\n", lvl, h_gauss.abs_o0.sigma[lvl], sigmaS, initial_blur );
-        }
+    /* abs_o0 :
+     * Convenience Gauss table to create level 0 of the absolute filters.
+     * Technically useless, because it is identical with level 0 of inc.
+     * Must be used to create octave 0 level 0 for absolute filters.
+     */
+    for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
+        const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl)/(float)levels );
+        h_gauss.abs_o0.sigma[lvl]  = sqrt( fabs( sigmaS * sigmaS - initial_blur * initial_blur ) );
     }
-#endif
 
+    h_gauss.abs_o0.computeBlurTable( &h_gauss );
+
+    /* abs_oN :
+     * Gauss tables to create levels 1 and above directly from level 0.
+     * These filters have a very wide span, so they are mostly slow.
+     * However, absolute kernels don't have the speed-penalty of repeated
+     * reading and writing.
+     */
     for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
         const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl)/(float)levels );
         h_gauss.abs_oN.sigma[lvl]  = sigmaS;
     }
+
     h_gauss.abs_oN.computeBlurTable( &h_gauss );
 
+    /* dd :
+     * The direct-downscaling kernels make use of the assumption that downscaling
+     * from MAX_LEVEL-3 is identical to applying 2*sigma on the identical image
+     * before downscaling, which would be identical to applying 1*sigma after
+     * downscaling.
+     * In reality, this is not true because images are not continuous, but we
+     * support the options because it is interesting. Perhaps it works for the later
+     * octaves, where it is also good for performance.
+     * dd is only for creating level 0 of all octave directly from the input image.
+     */
     for( int oct=0; oct<MAX_OCTAVES; oct++ ) {
         // sigma * 2^i
         float oct_sigma = scalbnf( sigma0, oct );

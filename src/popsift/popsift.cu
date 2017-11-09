@@ -15,10 +15,11 @@
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
 #include "common/assist.h"
+#include "features.h"
 
 using namespace std;
 
-PopSift::PopSift( const popsift::Config& config )
+PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode )
 {
     _pipe._unused.push( new popsift::Image );
     _pipe._unused.push( new popsift::Image );
@@ -27,7 +28,10 @@ PopSift::PopSift( const popsift::Config& config )
     configure( config, true );
 
     _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
-    _pipe._thread_stage2 = new boost::thread( &PopSift::mainLoop,     this );
+    if( mode == popsift::Config::ExtractingMode )
+        _pipe._thread_stage2 = new boost::thread( &PopSift::extractDownloadLoop, this );
+    else
+        _pipe._thread_stage2 = new boost::thread( &PopSift::matchPrepareLoop, this );
 }
 
 PopSift::PopSift( )
@@ -37,7 +41,7 @@ PopSift::PopSift( )
     _pipe._pyramid    = 0;
 
     _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
-    _pipe._thread_stage2 = new boost::thread( &PopSift::mainLoop,     this );
+    _pipe._thread_stage2 = new boost::thread( &PopSift::extractDownloadLoop, this );
 }
 
 PopSift::~PopSift()
@@ -82,7 +86,8 @@ bool PopSift::private_init( int w, int h )
     float scaleFactor = 1.0f / powf( 2.0f, -upscaleFactor );
 
     if( p._pyramid != 0 ) {
-        p._pyramid->resetDimensions( ceilf( w * scaleFactor ),
+        p._pyramid->resetDimensions( _config,
+                                     ceilf( w * scaleFactor ),
                                      ceilf( h * scaleFactor ) );
         return true;
     }
@@ -140,7 +145,7 @@ void PopSift::uploadImages( )
     _pipe._queue_stage2.push( 0 );
 }
 
-void PopSift::mainLoop( )
+void PopSift::extractDownloadLoop( )
 {
     Pipe& p = _pipe;
 
@@ -151,11 +156,11 @@ void PopSift::mainLoop( )
         private_init( img->getWidth(), img->getHeight() );
 
         p._pyramid->step1( _config, img );
-        p._unused.push( img );
+        p._unused.push( img ); // uploaded input image no longer needed, release for reuse
 
         p._pyramid->step2( _config );
 
-        popsift::Features* features = p._pyramid->get_descriptors( _config );
+        popsift::FeaturesHost* features = p._pyramid->get_descriptors( _config );
 
         cudaDeviceSynchronize();
 
@@ -170,6 +175,29 @@ void PopSift::mainLoop( )
             p._pyramid->download_and_save_array( "pyramid" );
             p._pyramid->save_descriptors( _config, features, "pyramid" );
         }
+
+        job->setFeatures( features );
+    }
+}
+
+void PopSift::matchPrepareLoop( )
+{
+    Pipe& p = _pipe;
+
+    SiftJob* job;
+    while( ( job = p._queue_stage2.pull() ) != 0 ) {
+        popsift::Image* img = job->getImg();
+
+        private_init( img->getWidth(), img->getHeight() );
+
+        p._pyramid->step1( _config, img );
+        p._unused.push( img ); // uploaded input image no longer needed, release for reuse
+
+        p._pyramid->step2( _config );
+
+        popsift::FeaturesDev* features = p._pyramid->clone_device_descriptors( _config );
+
+        cudaDeviceSynchronize();
 
         job->setFeatures( features );
     }
@@ -204,8 +232,39 @@ void SiftJob::setImg( popsift::Image* img )
     _img = img;
 }
 
-void SiftJob::setFeatures( popsift::Features* f )
+popsift::Image* SiftJob::getImg()
+{
+#ifdef USE_NVTX
+    _nvtx_id = nvtxRangeStartA( "inserting image" );
+#endif
+    return _img;
+}
+
+void SiftJob::setFeatures( popsift::FeaturesBase* f )
 {
     _p.set_value( f );
+#ifdef USE_NVTX
+    nvtxRangeEnd( _nvtx_id );
+#endif
+}
+
+popsift::FeaturesHost* SiftJob::get()
+{
+    return getHost();
+}
+
+popsift::FeaturesBase* SiftJob::getBase()
+{
+    return _f.get();
+}
+
+popsift::FeaturesHost* SiftJob::getHost()
+{
+    return dynamic_cast<popsift::FeaturesHost*>( _f.get() );
+}
+
+popsift::FeaturesDev* SiftJob::getDev()
+{
+    return dynamic_cast<popsift::FeaturesDev*>( _f.get() );
 }
 

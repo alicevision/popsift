@@ -304,6 +304,9 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
                               int                 width,
                               int                 height,
                               const uint32_t      maxlevel,
+                              const float         w_grid_divider,
+                              const float         h_grid_divider,
+                              const int           grid_width,
                               InitialExtremum&    ec )
 {
     ec.xpos    = 0.0f;
@@ -494,6 +497,7 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
     ec.ypos      = yn;
     ec.lpos      = (int)roundf(sn);
     ec.sigma     = d_consts.sigma0 * pow(d_consts.sigma_k, sn); // * 2;
+    ec.cell      = floorf( yn / h_grid_divider ) * grid_width + floorf( xn / w_grid_divider );
         // const float sigma_k = powf(2.0f, 1.0f / levels );
 
     return true;
@@ -511,18 +515,37 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
                           int                 height,
                           const uint32_t      maxlevel,
                           int*                d_number_of_blocks,
-                          int                 number_of_blocks )
+                          int                 number_of_blocks,
+                          const float         w_grid_divider,
+                          const float         h_grid_divider,
+                          const int           grid_width )
 {
     InitialExtremum ec;
+    ec.ignore = false;
 
-    bool indicator = find_extrema_in_dog_sub<sift_mode>( dog, octave, width, height, maxlevel, ec );
+    bool indicator = find_extrema_in_dog_sub<sift_mode>( dog,
+                                                         octave,
+                                                         width,
+                                                         height,
+                                                         maxlevel,
+                                                         w_grid_divider,
+                                                         h_grid_divider,
+                                                         grid_width,
+                                                         ec );
 
     uint32_t write_index = extrema_count<HEIGHT>( indicator, &dct.ext_ct[octave] );
 
-    InitialExtremum* d_extrema = dobuf.i_ext[octave];
+    InitialExtremum* d_extrema = dobuf.i_ext_dat[octave];
+    int*             d_ext_off = dobuf.i_ext_off[octave];
 
     if( indicator && write_index < d_consts.max_extrema ) {
+        ec.write_index = write_index;
+        // store the initial extremum in an array
         d_extrema[write_index] = ec;
+
+        // index for indirect access to d_extrema, to enable
+        // access after filtering some initial extrema
+        d_ext_off[write_index] = write_index;
     }
 
     // without syncthreads, (0,0) threads may precede some calls to extrema_count()
@@ -577,7 +600,10 @@ void Pyramid::find_extrema( const Config& conf )
                       rows,
                       _levels-1,
                       num_blocks,
-                      grid.x * grid.y );
+                      grid.x * grid.y,
+                      oct_obj.getWGridDivider(),
+                      oct_obj.getHGridDivider(),
+                      conf.getFilterGridSize() );
                 break;
         case Config::OpenCV :
                 find_extrema_in_dog<HEIGHT,Config::OpenCV>
@@ -588,7 +614,10 @@ void Pyramid::find_extrema( const Config& conf )
                       rows,
                       _levels-1,
                       num_blocks,
-                      grid.x * grid.y );
+                      grid.x * grid.y,
+                      oct_obj.getWGridDivider(),
+                      oct_obj.getHGridDivider(),
+                      conf.getFilterGridSize() );
                 break;
         default :
                 find_extrema_in_dog<HEIGHT,Config::PopSift>
@@ -599,7 +628,10 @@ void Pyramid::find_extrema( const Config& conf )
                       rows,
                       _levels-1,
                       num_blocks,
-                      grid.x * grid.y );
+                      grid.x * grid.y,
+                      oct_obj.getWGridDivider(),
+                      oct_obj.getHGridDivider(),
+                      conf.getFilterGridSize() );
                 break;
         }
 #undef getDogTexture

@@ -82,7 +82,10 @@ void Pyramid::download_and_save_array( const char* basename )
     _octaves[o].download_and_save_array( basename, o );
 }
 
-void Pyramid::save_descriptors( const Config& conf, Features* features, const char* basename )
+/*
+ * Note this is only for debug output. FeaturesHost has functions for final writing.
+ */
+void Pyramid::save_descriptors( const Config& conf, FeaturesHost* features, const char* basename )
 {
     struct stat st = { 0 };
     if (stat("dir-desc", &st) == -1) {
@@ -102,7 +105,7 @@ void Pyramid::save_descriptors( const Config& conf, Features* features, const ch
     writeDescriptor( conf, of2, features, false, true );
 }
 
-Pyramid::Pyramid( Config& config,
+Pyramid::Pyramid( const Config& config,
                   int width,
                   int height )
     : _num_octaves( config.octaves )
@@ -125,18 +128,21 @@ Pyramid::Pyramid( Config& config,
 
     for (int o = 0; o<_num_octaves; o++) {
         _octaves[o].debugSetOctave(o);
-        _octaves[o].alloc(w, h, _levels, _gauss_group);
+        _octaves[o].alloc( config, w, h, _levels, _gauss_group );
         w = ceilf(w / 2.0f);
         h = ceilf(h / 2.0f);
     }
 
     int sz = _num_octaves * h_consts.max_extrema;
-    dobuf_shadow.i_ext[0] = popsift::cuda::malloc_devT<InitialExtremum>( sz, __FILE__, __LINE__);
+    dobuf_shadow.i_ext_dat[0] = popsift::cuda::malloc_devT<InitialExtremum>( sz, __FILE__, __LINE__);
+    dobuf_shadow.i_ext_off[0] = popsift::cuda::malloc_devT<int>( sz, __FILE__, __LINE__);
     for (int o = 1; o<_num_octaves; o++) {
-        dobuf_shadow.i_ext[o] = dobuf_shadow.i_ext[0] + (o*h_consts.max_extrema);
+        dobuf_shadow.i_ext_dat[o] = dobuf_shadow.i_ext_dat[0] + (o*h_consts.max_extrema);
+        dobuf_shadow.i_ext_off[o] = dobuf_shadow.i_ext_off[0] + (o*h_consts.max_extrema);
     }
     for (int o = _num_octaves; o<MAX_OCTAVES; o++) {
-        dobuf_shadow.i_ext[o] = 0;
+        dobuf_shadow.i_ext_dat[o] = 0;
+        dobuf_shadow.i_ext_off[o] = 0;
     }
 
     sz = h_consts.max_extrema;
@@ -158,13 +164,13 @@ Pyramid::Pyramid( Config& config,
     cudaStreamCreate( &_download_stream );
 }
 
-void Pyramid::resetDimensions( int width, int height )
+void Pyramid::resetDimensions( const Config& conf, int width, int height )
 {
     int w = width;
     int h = height;
 
     for (int o = 0; o<_num_octaves; o++) {
-        _octaves[o].resetDimensions( w, h );
+        _octaves[o].resetDimensions( conf, w, h );
         w = ceilf(w / 2.0f);
         h = ceilf(h / 2.0f);
     }
@@ -206,7 +212,8 @@ Pyramid::~Pyramid()
 {
     cudaStreamDestroy( _download_stream );
 
-    cudaFree(     dobuf_shadow.i_ext[0] );
+    cudaFree(     dobuf_shadow.i_ext_dat[0] );
+    cudaFree(     dobuf_shadow.i_ext_off[0] );
     cudaFree(     dobuf_shadow.features );
     cudaFree(     dobuf_shadow.extrema );
     cudaFreeHost( hbuf        .desc );
@@ -231,6 +238,14 @@ void Pyramid::step2( const Config& conf )
     descriptors( conf );
 }
 
+/* Important detail: this function takes the pointer descriptor_base as input
+ * and computes offsets from this pointer on the device side. Those pointers
+ * are then written into Feature data structures.
+ * descriptor_base can be a device pointer or a host pointer, it works in both
+ * cases.
+ * This is possible because pointer arithmetic between Intel hosts and NVidia
+ * GPUs are compatible.
+ */
 __global__
 void prep_features( Descriptor* descriptor_base, int up_fac )
 {
@@ -263,14 +278,14 @@ void prep_features( Descriptor* descriptor_base, int up_fac )
     }
 }
 
-Features* Pyramid::get_descriptors( const Config& conf )
+FeaturesHost* Pyramid::get_descriptors( const Config& conf )
 {
     const float up_fac = conf.getUpscaleFactor();
 
     readDescCountersFromDevice();
 
     nvtxRangePushA( "download descriptors" );
-    Features* features = new Features( hct.ext_total, hct.ori_total );
+    FeaturesHost* features = new FeaturesHost( hct.ext_total, hct.ori_total );
 
     dim3 grid( grid_divide( hct.ext_total, 32 ) );
     prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
@@ -298,6 +313,45 @@ Features* Pyramid::get_descriptors( const Config& conf )
     return features;
 }
 
+void Pyramid::clone_device_descriptors_sub( const Config& conf, FeaturesDev* features )
+{
+    const float up_fac = conf.getUpscaleFactor();
+
+    dim3 grid( grid_divide( hct.ext_total, 32 ) );
+    prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
+
+    popcuda_memcpy_async( features->getFeatures(),
+                          dobuf_shadow.features,
+                          hct.ext_total * sizeof(Feature),
+                          cudaMemcpyDeviceToDevice,
+                          _download_stream );
+
+    popcuda_memcpy_async( features->getDescriptors(),
+                          dbuf_shadow.desc,
+                          hct.ori_total * sizeof(Descriptor),
+                          cudaMemcpyDeviceToDevice,
+                          _download_stream );
+
+    popcuda_memcpy_async( features->getReverseMap(),
+                          dobuf_shadow.feat_to_ext_map,
+                          hct.ori_total * sizeof(int),
+                          cudaMemcpyDeviceToDevice,
+                          _download_stream );
+}
+
+FeaturesDev* Pyramid::clone_device_descriptors( const Config& conf )
+{
+    readDescCountersFromDevice();
+
+    FeaturesDev* features = new FeaturesDev( hct.ext_total, hct.ori_total );
+
+    clone_device_descriptors_sub( conf, features );
+
+    cudaStreamSynchronize( _download_stream );
+
+    return features;
+}
+
 void Pyramid::reset_extrema_mgmt()
 {
     memset( &hct,         0, sizeof(ExtremaCounters) );
@@ -317,12 +371,25 @@ void Pyramid::readDescCountersFromDevice( cudaStream_t s )
     cudaMemcpyFromSymbolAsync( &hct, dct, sizeof(ExtremaCounters), 0, cudaMemcpyDeviceToHost, s );
 }
 
+void Pyramid::writeDescCountersToDevice( )
+{
+    cudaMemcpyToSymbol( dct, &hct, sizeof(ExtremaCounters), 0, cudaMemcpyHostToDevice );
+}
+
+void Pyramid::writeDescCountersToDevice( cudaStream_t s )
+{
+    cudaMemcpyToSymbolAsync( dct, &hct, sizeof(ExtremaCounters), 0, cudaMemcpyHostToDevice, s );
+}
+
 int* Pyramid::getNumberOfBlocks( int octave )
 {
     return &_d_extrema_num_blocks[octave];
 }
 
-void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, Features* features, bool really, bool with_orientation )
+/*
+ * Note this is only for debug output. FeaturesHost has functions for final writing.
+ */
+void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* features, bool really, bool with_orientation )
 {
     if( features->getFeatureCount() == 0 ) return;
 
@@ -353,8 +420,7 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, Features* feat
                 ostr << setprecision(5)
                      << xpos << " " << ypos << " "
                      << 1.0f / (sigma * sigma)
-                     // << " 0 "
-                     << " " << octave << " "
+                     << " 0 "
                      << 1.0f / (sigma * sigma) << " ";
 
             if (really) {

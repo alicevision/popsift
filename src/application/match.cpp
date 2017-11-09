@@ -44,7 +44,7 @@ static bool write_as_uchar  = false;
 static bool dont_write      = false;
 static bool pgmread_loading = false;
 
-static void parseargs(int argc, char** argv, popsift::Config& config, string& inputFile) {
+static void parseargs(int argc, char** argv, popsift::Config& config, string& lFile, string& rFile) {
     using namespace boost::program_options;
 
     options_description options("Options");
@@ -52,9 +52,10 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         options.add_options()
             ("help,h", "Print usage")
             ("verbose,v", bool_switch()->notifier([&](bool i) {if(i) config.setVerbose(); }), "")
-            ("log,l", bool_switch()->notifier([&](bool i) {if(i) config.setLogMode(popsift::Config::All); }), "Write debugging files")
+            ("log", bool_switch()->notifier([&](bool i) {if(i) config.setLogMode(popsift::Config::All); }), "Write debugging files")
 
-            ("input-file,i", value<std::string>(&inputFile)->required(), "Input file");
+            ("left,l",  value<std::string>(&lFile)->required(), "\"Left\"  input file")
+            ("right,r", value<std::string>(&rFile)->required(), "\"Right\" input file");
     
     }
     options_description parameters("Parameters");
@@ -111,8 +112,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         ("print-gauss-tables", bool_switch()->notifier([&](bool b) { if(b) config.setPrintGaussTables(); }), "A debug output printing Gauss filter size and tables")
         ("print-dev-info", bool_switch(&print_dev_info)->default_value(false), "A debug output printing CUDA device information")
         ("print-time-info", bool_switch(&print_time_info)->default_value(false), "A debug output printing image processing time after load()")
-        ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded to int.\n"
-         "Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar")
+        ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded to int Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar")
         ("dont-write", bool_switch(&dont_write)->default_value(false), "Suppress descriptor output")
         ("pgmread-loading", bool_switch(&pgmread_loading)->default_value(false), "Use the old image loader instead of LibDevIL")
         ;
@@ -167,11 +167,10 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     unsigned char* image_data;
     SiftJob* job;
 
+    nvtxRangePushA( "load and convert image" );
 #ifdef USE_DEVIL
     if( not pgmread_loading )
     {
-        nvtxRangePushA( "load and convert image - devil" );
-
         ilImage img;
         if( img.Load( inputFile.c_str() ) == false ) {
             cerr << "Could not load image " << inputFile << endl;
@@ -186,7 +185,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
         cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
         image_data = img.GetData();
 
-        nvtxRangePop( ); // "load and convert image - devil"
+        nvtxRangePop( );
 
         // PopSift.init( w, h );
         job = PopSift.enqueue( w, h, image_data );
@@ -196,14 +195,12 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     else
 #endif
     {
-        nvtxRangePushA( "load and convert image - pgmread" );
-
         image_data = readPGMfile( inputFile, w, h );
         if( image_data == 0 ) {
             exit( -1 );
         }
 
-        nvtxRangePop( ); // "load and convert image - pgmread"
+        nvtxRangePop( );
 
         // PopSift.init( w, h );
         job = PopSift.enqueue( w, h, image_data );
@@ -214,56 +211,34 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     return job;
 }
 
-void read_job( SiftJob* job, bool really_write )
-{
-    popsift::Features* feature_list = job->get();
-    cerr << "Number of feature points: " << feature_list->getFeatureCount()
-         << " number of feature descriptors: " << feature_list->getDescriptorCount()
-         << endl;
-
-    if( really_write ) {
-        nvtxRangePushA( "Writing features to disk" );
-
-        std::ofstream of( "output-features.txt" );
-        feature_list->print( of, write_as_uchar );
-    }
-    delete feature_list;
-
-    if( really_write ) {
-        nvtxRangePop( ); // Writing features to disk
-    }
-}
-
 int main(int argc, char **argv)
 {
     cudaDeviceReset();
 
     popsift::Config config;
-    list<string>   inputFiles;
-    string         inputFile = "";
+    string         lFile = "";
+    string         rFile = "";
     const char*    appName   = argv[0];
 
     try {
-        parseargs( argc, argv, config, inputFile ); // Parse command line
-        std::cout << inputFile << std::endl;
+        parseargs( argc, argv, config, lFile, rFile ); // Parse command line
+        std::cout << lFile << " <-> " << rFile << std::endl;
     }
     catch (std::exception& e) {
         std::cout << e.what() << std::endl;
         exit(1);
     }
 
-    if( boost::filesystem::exists( inputFile ) ) {
-        if( boost::filesystem::is_directory( inputFile ) ) {
-            cout << "BOOST " << inputFile << " is directory" << endl;
-            collectFilenames( inputFiles, inputFile );
-            if( inputFiles.empty() ) {
-                cerr << "No files in directory, nothing to do" << endl;
-                exit( 0 );
-            }
-        } else if( boost::filesystem::is_regular_file( inputFile ) ) {
-            inputFiles.push_back( inputFile );
-        } else {
-            cout << "Input file is neither regular file nor directory, nothing to do" << endl;
+    if( boost::filesystem::exists( lFile ) ) {
+        if( not boost::filesystem::is_regular_file( lFile ) ) {
+            cout << "Input file " << lFile << " is not a regular file, nothing to do" << endl;
+            exit( -1 );
+        }
+    }
+
+    if( boost::filesystem::exists( rFile ) ) {
+        if( not boost::filesystem::is_regular_file( rFile ) ) {
+            cout << "Input file " << rFile << " is not a regular file, nothing to do" << endl;
             exit( -1 );
         }
     }
@@ -272,25 +247,23 @@ int main(int argc, char **argv)
     deviceInfo.set( 0, print_dev_info );
     if( print_dev_info ) deviceInfo.print( );
 
-    PopSift PopSift( config );
+    PopSift PopSift( config, popsift::Config::MatchingMode );
 
-    std::queue<SiftJob*> jobs;
-    for( auto it = inputFiles.begin(); it!=inputFiles.end(); it++ ) {
-        inputFile = it->c_str();
+    SiftJob* lJob = process_image( lFile, PopSift );
+    SiftJob* rJob = process_image( rFile, PopSift );
 
-        SiftJob* job = process_image( inputFile, PopSift );
-        jobs.push( job );
-    }
+    popsift::FeaturesDev* lFeatures = lJob->getDev();
+    cout << "Number of features:    " << lFeatures->getFeatureCount() << endl;
+    cout << "Number of descriptors: " << lFeatures->getDescriptorCount() << endl;
 
-    while( !jobs.empty() )
-    {
-        SiftJob* job = jobs.front();
-        jobs.pop();
-        if( job ) {
-            read_job( job, not dont_write );
-            delete job;
-        }
-    }
+    popsift::FeaturesDev* rFeatures = rJob->getDev();
+    cout << "Number of features:    " << rFeatures->getFeatureCount() << endl;
+    cout << "Number of descriptors: " << rFeatures->getDescriptorCount() << endl;
+
+    lFeatures->match( rFeatures );
+
+    delete lFeatures;
+    delete rFeatures;
 
     PopSift.uninit( );
 }

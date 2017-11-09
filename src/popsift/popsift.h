@@ -19,36 +19,49 @@
 #include "sift_extremum.h"
 
 
+#ifdef USE_NVTX
+#include <nvToolsExtCuda.h>
+#else
+#define nvtxRangeStartA(a)
+#define nvtxRangeEnd(a)
+#endif
+
 /* user parameters */
 namespace popsift
 {
     class Image;
     class Pyramid;
-    class Features;
+    class FeaturesBase;
+    class FeaturesHost;
+    class FeaturesDev;
 };
 
 class SiftJob
 {
-    std::promise<popsift::Features*> _p;
-    std::future <popsift::Features*> _f;
+    std::promise<popsift::FeaturesBase*> _p;
+    std::future <popsift::FeaturesBase*> _f;
     int             _w;
     int             _h;
     unsigned char*  _imageData;
     popsift::Image* _img;
+#ifdef USE_NVTX
+    nvtxRangeId_t   _nvtx_id;
+#endif
 
 public:
     SiftJob( int w, int h, const unsigned char* imageData );
     ~SiftJob( );
 
-    popsift::Features* get() {
-        return _f.get();
-    }
+    popsift::FeaturesHost* get();    // should be deprecated, same as getHost()
+    popsift::FeaturesBase* getBase();
+    popsift::FeaturesHost* getHost();
+    popsift::FeaturesDev*  getDev();
 
     void setImg( popsift::Image* img );
-    inline popsift::Image* getImg() const { return _img; }
+    popsift::Image* getImg();
 
     /** fulfill the promise */
-    void setFeatures( popsift::Features* f );
+    void setFeatures( popsift::FeaturesBase* f );
 };
 
 class PopSift
@@ -70,7 +83,7 @@ public:
      * level parameters.
      */
     PopSift( );
-    PopSift( const popsift::Config& config );
+    PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode = popsift::Config::ExtractingMode );
     ~PopSift();
 
 public:
@@ -95,11 +108,11 @@ public:
     }
 
     /** deprecated */
-    inline popsift::Features* execute( int /*pipe*/, const unsigned char* imageData )
+    inline popsift::FeaturesBase* execute( int /*pipe*/, const unsigned char* imageData )
     {
         SiftJob* j = enqueue( _last_init_w, _last_init_h, imageData );
         if( !j ) return 0;
-        popsift::Features* f = j->get();
+        popsift::FeaturesBase* f = j->getBase();
         delete j;
         return f;
     }
@@ -107,7 +120,16 @@ public:
 private:
     bool private_init( int w, int h );
     void uploadImages( );
-    void mainLoop( );
+
+    /* The following method are alternative worker functions for Jobs submitted by
+     * a calling application. The choice of method is made by the mode parameter
+     * in the PopSift constructor. */
+
+    /* Worker function: Extract SIFT features and download to host */
+    void extractDownloadLoop( );
+
+    /* Worker function: Extract SIFT features, clone results in device memory */
+    void matchPrepareLoop( );
 
 private:
     Pipe            _pipe;

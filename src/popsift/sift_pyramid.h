@@ -10,10 +10,11 @@
 #include <iostream>
 #include <vector>
 
-#include "s_image.h"
 #include "sift_conf.h"
-#include "sift_extremum.h"
 #include "sift_constants.h"
+#include "features.h"
+
+#include "s_image.h"
 #include "sift_octave.h"
 
 namespace popsift {
@@ -43,7 +44,8 @@ struct ExtremaBuffers
 
 struct DevBuffers
 {
-    InitialExtremum* i_ext[MAX_OCTAVES];
+    InitialExtremum* i_ext_dat[MAX_OCTAVES];
+    int*             i_ext_off[MAX_OCTAVES];
     int*             feat_to_ext_map;
     Extremum*        extrema;
     Feature*         features;
@@ -76,12 +78,12 @@ class Pyramid
     cudaStream_t _download_stream;
 
 public:
-    Pyramid( Config& config,
+    Pyramid( const Config& config,
              int     w,
              int     h );
     ~Pyramid( );
 
-    void resetDimensions( int width, int height );
+    void resetDimensions( const Config& conf, int width, int height );
 
     /** step 1: load image and build pyramid */
     void step1( const Config& conf, Image* img );
@@ -90,11 +92,14 @@ public:
     void step2( const Config& conf );
 
     /** step 3: download descriptors */
-    Features* get_descriptors( const Config& conf );
+    FeaturesHost* get_descriptors( const Config& conf );
+
+    /** step 3 (alternative): make copy of descriptors on device side */
+    FeaturesDev* clone_device_descriptors( const Config& conf );
 
     void download_and_save_array( const char* basename );
 
-    void save_descriptors( const Config& conf, Features* features, const char* basename );
+    void save_descriptors( const Config& conf, FeaturesHost* features, const char* basename );
 
     inline int getNumOctaves() const { return _num_octaves; }
     inline int getNumLevels()  const { return _levels; }
@@ -102,7 +107,11 @@ public:
     inline Octave& getOctave(const int o){ return _octaves[o]; }
 
 private:
-    inline void horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode );
+    inline void horiz_from_input_image( const Config&    conf,
+                                        Image*           base,
+					int              octave,
+					cudaStream_t     stream,
+					Config::SiftMode mode );
     inline void downscale_from_prev_octave( int octave, cudaStream_t stream, Config::SiftMode mode );
     inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss );
     inline void vert_from_interm( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss );
@@ -115,6 +124,7 @@ private:
     void find_extrema( const Config& conf );
     void reallocExtrema( int numExtrema );
 
+    int  extrema_filter_grid( const Config& conf, int ext_total ); // called at head of orientation
     void orientation( const Config& conf );
 
     void descriptors( const Config& conf );
@@ -124,8 +134,12 @@ private:
 
     void readDescCountersFromDevice( );
     void readDescCountersFromDevice( cudaStream_t s );
+    void writeDescCountersToDevice( );
+    void writeDescCountersToDevice( cudaStream_t s );
     int* getNumberOfBlocks( int octave );
-    void writeDescriptor( const Config& conf, std::ostream& ostr, Features* features, bool really, bool with_orientation );
+    void writeDescriptor( const Config& conf, std::ostream& ostr, FeaturesHost* features, bool really, bool with_orientation );
+
+    void clone_device_descriptors_sub( const Config& conf, FeaturesDev* features );
 
 private:
     // debug

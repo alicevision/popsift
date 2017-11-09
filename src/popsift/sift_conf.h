@@ -13,7 +13,7 @@
 #define MAX_OCTAVES   20
 #define MAX_LEVELS    10
 
-#define USE_DOG_TEX_LINEAR
+#undef USE_DOG_TEX_LINEAR
 
 namespace popsift
 {
@@ -56,6 +56,26 @@ struct Config
         NoTile       // variant of IGrid, no duplicate gradiant fetching
     };
 
+    /* To reduce time used in descriptor extraction, some extrema can be filtered
+     * immediately after finding them. It is possible to keep those with the largest
+     * scale (LargestScaleFirst), smallest scale (SmallestScaleFirst), or a random
+     * selection. Note that largest and smallest give a stable result, random does not.
+     */
+    enum GridFilterMode {
+        RandomScale,
+        LargestScaleFirst,
+        SmallestScaleFirst
+    };
+
+    /* A parameter for the PopSift constructor. Determines which data is kept in
+     * the Job data structure after processing, which is downloaded to the host,
+     * which is invalidated.
+     */
+    enum ProcessingMode {
+        ExtractingMode,
+        MatchingMode
+    };
+
     void setGaussMode( const std::string& m );
     void setGaussMode( GaussMode m );
     void setMode( SiftMode m );
@@ -80,6 +100,11 @@ struct Config
     void setPrintGaussTables( );
     void setDPOrientation( bool on );
     void setNormalizationMultiplier( int mul );
+    void setMaxExtrema( int extrema );
+    void setFilterMaxExtrema( int extrema );
+    void setFilterGridSize( int sz );
+    void setFilterSorting( const std::string& direction );
+    void setFilterSorting( GridFilterMode m );
 
     bool  hasInitialBlur( ) const;
     float getInitialBlur( ) const;
@@ -138,6 +163,36 @@ struct Config
         return _max_extrema;
     }
 
+    /* Filtering extrema is only possible when CUDA version is >= 8.0
+     * The reason is that we use Thrust. This allows runtime testing.
+     *
+     * Note: re-writing the filtering code is possible, either older
+     *       Thrust semantics, CUDA CUB or doing everything from scratch.
+     */
+    bool getCanFilterExtrema() const;
+
+    /* Set the approximate number of extrema whose orientation and descriptor
+     * should be computed. Default is -1, which sets the hard limit defined
+     * by "number of octaves * getMaxExtrema()".
+     */
+    int getFilterMaxExtrema( ) const {
+        return _filter_max_extrema;
+    }
+
+    /* To avoid that grid filtering happens only in a tiny piece of an image,
+     * the image is split into getFilterGridSize() X getFilterGridSize() tiles
+     * and we allow getFilterMaxExtrema() / getFilterGridSize() extrema in
+     * each tile.
+     */
+    int getFilterGridSize( ) const {
+        return _filter_grid_size;
+    }
+
+    /* See enum GridFilterMode */
+    GridFilterMode getFilterSorting() const {
+        return _grid_filter_mode;
+    }
+
     // check if we use direct downscaling from input image
     // for all octaves
     inline ScalingMode getScalingMode() const {
@@ -173,14 +228,28 @@ private:
     // default: DescMode::Loop
     DescMode    _desc_mode;
 
+    // default: RandomScale
+    GridFilterMode _grid_filter_mode;
+
 public:
     bool     verbose;
 
 private:
+    /* The number of initial extrema that can be discovered in an octave.
+     * This parameter changes memory requirements.
+     */
+    int _max_extrema;
+
     /* The maximum number of extrema that are returned. There may be
      * several descriptors for each extremum.
      */
-    int _max_extrema;
+    int _filter_max_extrema;
+
+    // Used to achieve an approximation of _max_entrema
+    // Subdivide the image in this number of vertical and horizontal tiles,
+    // i.e. the grid is actually _grid_size X _grid_size tiles.
+    // default: 1
+    int  _filter_grid_size;
 
     /* Modes are computation according to VLFeat or OpenCV,
      * or fixed size. Default is VLFeat mode.

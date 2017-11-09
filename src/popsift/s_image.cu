@@ -13,6 +13,13 @@
 #include <stdio.h>
 #include <assert.h>
 
+#ifdef USE_NVTX
+#include <nvToolsExtCuda.h>
+#else
+#define nvtxRangePushA(a)
+#define nvtxRangePop()
+#endif
+
 using namespace std;
 
 namespace popsift {
@@ -71,6 +78,8 @@ void Image::resetDimensions( int w, int h )
         destroyTexture( );
         createTexture( );
     } else {
+        nvtxRangePushA( "reallocating host-side image memory" );
+
         _max_w = max( w, _max_w );
         _max_h = max( h, _max_h );
         _input_image_h.freeHost( popsift::CudaAllocated );
@@ -82,15 +91,21 @@ void Image::resetDimensions( int w, int h )
 
         destroyTexture( );
         createTexture( );
+
+        nvtxRangePop(); // "reallocating host-side image memory"
     }
 }
 
 void Image::allocate( int w, int h )
 {
+    nvtxRangePushA( "allocating host-side image memory" );
+
     _input_image_h.allocHost( w, h, popsift::CudaAllocated );
     _input_image_d.allocDev( w, h );
 
     createTexture( );
+
+    nvtxRangePop(); // "allocating host-side image memory"
 }
 
 void Image::destroyTexture( )
