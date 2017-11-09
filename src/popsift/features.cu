@@ -268,8 +268,8 @@ compute_distance_dot( int3* match_matrix, Descriptor* l, int l_len, Descriptor* 
     if( blockIdx.x >= l_len ) return;
     const int idx = blockIdx.x;
 
-    float match_1st_val = -1.0f; //CUDART_INF_F;
-    float match_2nd_val = -1.0f; //CUDART_INF_F;
+    float match_1st_val = -1.0f;
+    float match_2nd_val = -1.0f;
     int   match_1st_idx = 0;
     int   match_2nd_idx = 0;
 
@@ -278,54 +278,43 @@ compute_distance_dot( int3* match_matrix, Descriptor* l, int l_len, Descriptor* 
     const float4* lptr = (const float4*)( &l[idx] );
 
     for( int i=0; i<r_len; i++ )
-      {
+    {
         const float4* rptr = (const float4*)( &r[i] );
         const float   res  = dot_l2_in_t0( lptr, rptr );
 
 	
-	if( threadIdx.x == 0 )
-	  {
-	    if( res > match_1st_val )
-	      {
-		match_2nd_val = match_1st_val;
-		match_2nd_idx = match_1st_idx;
-		match_1st_val = res;
-		match_1st_idx = i;
-	      }
-	    else if( res > match_2nd_val )
-	      {
-		match_2nd_val = res;
-		match_2nd_idx = i;
-	      }
-	  }
-	
-        __syncthreads();
-	
-      }
+        if( threadIdx.x == 0 )
+        {
+            if( res > match_1st_val )
+            {
+                match_2nd_val = match_1st_val;
+                match_2nd_idx = match_1st_idx;
+                match_1st_val = res;
+                match_1st_idx = i;
+            }
+            else if( res > match_2nd_val )
+            {
+                match_2nd_val = res;
+                match_2nd_idx = i;
+            }
+        }
+
+        __syncthreads();	
+    }
     
     
     const int one = __shfl(match_1st_idx, 0);
     const int two = __shfl(match_2nd_idx, 0);
-    
-    //__syncthreads();
-
+  
     const float4* rptr = (const float4*)( &r[one] );
     const float res2 = l2_in_t0( lptr, rptr );
     const float4* rptr2 = (const float4*)( &r[two] );
     const float res3 = l2_in_t0( lptr, rptr2 );
 
-     
-
-    //__syncthreads();
-    
-    
-    if( threadIdx.x == 0 ) {
-      //match_2nd_val = res3;
-      //match_1st_val = res2;
-      //bool accept = ( match_2nd_val     / match_1st_val     < 0.97f );
-      //bool accept = ( match_1st_val     / match_2nd_val     < 0.8f );
-      bool accept = (res2/res3 < 0.8f );
-      match_matrix[blockIdx.x] = make_int3( match_1st_idx, match_2nd_idx, accept );
+    if( threadIdx.x == 0 )
+    {
+        bool accept = (res2/res3 < 0.8f );
+        match_matrix[blockIdx.x] = make_int3( match_1st_idx, match_2nd_idx, accept );
     }
 }
 
@@ -392,11 +381,14 @@ show_distance( int3*       match_matrix,
     block.y = 1;
     block.z = 1;
 
-    if (config.getModeMatching() == popsift::Config::l2) {
+    if ( config.getModeMatching() == popsift::Config::l2 )
+    {
     compute_distance_l2
         <<<grid,block>>>
         ( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
-    } else {
+    }
+    else
+    {
     compute_distance_dot
         <<<grid,block>>>
         ( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
