@@ -23,7 +23,7 @@
 namespace popsift
 {
 __global__
-void ext_desc_notile( const int octave,
+void ext_desc_notile( const int           octave,
                       cudaTextureObject_t texLinear );
 
 
@@ -44,7 +44,7 @@ inline static bool start_ext_desc_notile( const int octave, Octave& oct_obj )
     ext_desc_notile
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
-          oct_obj.getDataTexLinear( ) );
+          oct_obj.getDataTexLinear( ).tex );
 
     return true;
 }

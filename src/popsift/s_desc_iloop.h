@@ -37,7 +37,7 @@ inline static bool start_ext_desc_iloop( const int octave, Octave& oct_obj )
     ext_desc_iloop
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
-          oct_obj.getDataTexLinear( ),
+          oct_obj.getDataTexLinear( ).tex,
           oct_obj.getWidth(),
           oct_obj.getHeight() );
 

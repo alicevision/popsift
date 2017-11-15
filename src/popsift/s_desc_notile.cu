@@ -175,7 +175,7 @@ void ext_desc_notile_sub( const float                  x,
  * grid  = nunmber of orientations
  */
 __global__
-void ext_desc_notile( const int octave,
+void ext_desc_notile( const int           octave,
                       cudaTextureObject_t texLinear )
 {
     const int num      = dct.ori_ct[octave];

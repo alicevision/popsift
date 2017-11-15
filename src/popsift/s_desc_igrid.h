@@ -41,7 +41,7 @@ inline static bool start_ext_desc_igrid( const int octave, Octave& oct_obj )
     ext_desc_igrid
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
-          oct_obj.getDataTexLinear( ) );
+          oct_obj.getDataTexLinear( ).tex );
 
     return true;
 }

@@ -151,7 +151,7 @@ inline void Pyramid::downscale_from_prev_octave( int octave, cudaStream_t stream
     default :
         gauss::get_by_2_interpolate
             <<<h_grid,h_block,0,stream>>>
-            ( prev_oct_obj.getDataTexLinear( ),
+            ( prev_oct_obj.getDataTexLinear( ).tex,
               _levels-PREV_LEVEL,
               oct_obj.getDataSurface( ),
               oct_obj.getWidth(),
@@ -189,7 +189,7 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t 
 
         gauss::absoluteSourceInterpolated::horiz
             <<<grid,block,0,stream>>>
-            ( oct_obj.getDataTexLinear( ),
+            ( oct_obj.getDataTexLinear( ).tex,
               oct_obj.getIntermediateSurface( ),
               level );
     }
@@ -225,7 +225,7 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
 
         gauss::absoluteSourceInterpolated::vert
             <<<grid,block,0,stream>>>
-            ( oct_obj.getIntermDataTexLinear( ),
+            ( oct_obj.getIntermDataTexLinear( ).tex,
               oct_obj.getDataSurface( ),
               level );
     }

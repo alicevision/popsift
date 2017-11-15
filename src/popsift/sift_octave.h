@@ -17,6 +17,11 @@
 
 namespace popsift {
 
+struct LinearTexture
+{
+    cudaSurfaceObject_t tex;
+};
+
 class Octave
 {
     int   _w;
@@ -34,20 +39,27 @@ class Octave
     cudaExtent            _data_ext;
     cudaSurfaceObject_t   _data_surf;
     cudaTextureObject_t   _data_tex_point;
-    cudaTextureObject_t   _data_tex_linear;
+    LinearTexture         _data_tex_linear;
+
+    cudaArray_t           _intm;
+    cudaChannelFormatDesc _intm_desc;
+    cudaExtent            _intm_ext;
+    cudaSurfaceObject_t   _intm_surf;
+    cudaTextureObject_t   _intm_tex_point;
+    LinearTexture         _intm_tex_linear;
 
     cudaArray_t           _interm_array;
     cudaChannelFormatDesc _interm_desc;
     cudaSurfaceObject_t   _interm_surf;
     cudaTextureObject_t   _interm_data_tex_point;
-    cudaTextureObject_t   _interm_data_tex_linear;
+    LinearTexture         _interm_data_tex_linear;
 
     cudaArray_t           _dog_3d;
     cudaChannelFormatDesc _dog_3d_desc;
     cudaExtent            _dog_3d_ext;
     cudaSurfaceObject_t   _dog_3d_surf;
     cudaTextureObject_t   _dog_3d_tex_point;
-    cudaTextureObject_t   _dog_3d_tex_linear;
+    LinearTexture         _dog_3d_tex_linear;
 
     // one CUDA stream per level
     // consider whether some of them can be removed
@@ -96,13 +108,13 @@ public:
         return _desc_done;
     }
 
-    inline cudaTextureObject_t getIntermDataTexLinear( ) {
+    inline LinearTexture getIntermDataTexLinear( ) {
         return _interm_data_tex_linear;
     }
     inline cudaTextureObject_t getIntermDataTexPoint( ) {
         return _interm_data_tex_point;
     }
-    inline cudaTextureObject_t getDataTexLinear( ) {
+    inline LinearTexture getDataTexLinear( ) {
         return _data_tex_linear;
     }
     inline cudaTextureObject_t getDataTexPoint( ) {
@@ -121,7 +133,7 @@ public:
     inline cudaTextureObject_t& getDogTexturePoint( ) {
         return _dog_3d_tex_point;
     }
-    inline cudaTextureObject_t& getDogTextureLinear( ) {
+    inline LinearTexture& getDogTextureLinear( ) {
         return _dog_3d_tex_linear;
     }
 
