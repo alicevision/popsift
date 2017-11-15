@@ -66,27 +66,9 @@ void print_gauss_filter_symbol( int columns )
     printf("\n");
 
     printf( "\n"
-            "Relative Gauss tables\n"
+            "Gauss tables\n"
             "      level span sigma : center value -> edge value\n"
-            "    relative sigma\n" );
-
-    for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
-        int span = d_gauss.inc_relative.span[lvl] + d_gauss.inc_relative.span[lvl] - 1;
-
-        printf("      %d %d ", lvl, span );
-        printf("%2.6f: ", d_gauss.inc_relative.sigma[lvl] );
-        int m = min( d_gauss.inc_relative.span[lvl], columns );
-        for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.inc_relative.filter[lvl*GAUSS_ALIGN+x] );
-        }
-        if( m < d_gauss.inc_relative.span[lvl] )
-            printf("...\n");
-        else
-            printf("\n");
-    }
-    printf("\n");
-
-    printf("    absolute filters octave 0\n");
+            "      absolute filters octave 0 (compute level 0, all other levels directly from level 0)\n");
 
     for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
         int span = d_gauss.abs_o0.span[lvl] + d_gauss.abs_o0.span[lvl] - 1;
@@ -101,9 +83,9 @@ void print_gauss_filter_symbol( int columns )
         else
             printf("\n");
     }
-    printf("\n");
-
-    printf("    absolute filters other octaves\n");
+    printf( "\n"
+            "      absolute filters other octaves\n"
+            "      (level 0 via downscaling, all other levels directly from level 0)\n");
 
     for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
         int span = d_gauss.abs_oN.span[lvl] + d_gauss.abs_oN.span[lvl] - 1;
