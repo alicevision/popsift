@@ -54,7 +54,7 @@ void horiz( cudaTextureObject_t src_linear_tex,
     const float v3 = tex2D<float>( src_linear_tex, ( read_x + shift ) / dst_w, read_y );
     out += ( v3 * g );
 
-    surf2Dwrite( out * 255.0f, dst_data, off_x*4, blockIdx.y, cudaBoundaryModeZero );
+    surf2DLayeredwrite( out * 255.0f, dst_data, off_x*4, blockIdx.y, 0, cudaBoundaryModeZero );
 }
 
 } // namespace relativeSource

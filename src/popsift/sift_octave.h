@@ -48,12 +48,6 @@ class Octave
     cudaTextureObject_t   _intm_tex_point;
     LinearTexture         _intm_tex_linear;
 
-    cudaArray_t           _interm_array;
-    cudaChannelFormatDesc _interm_desc;
-    cudaSurfaceObject_t   _interm_surf;
-    cudaTextureObject_t   _interm_data_tex_point;
-    LinearTexture         _interm_data_tex_linear;
-
     cudaArray_t           _dog_3d;
     cudaChannelFormatDesc _dog_3d_desc;
     cudaExtent            _dog_3d_ext;
@@ -109,10 +103,10 @@ public:
     }
 
     inline LinearTexture getIntermDataTexLinear( ) {
-        return _interm_data_tex_linear;
+        return _intm_tex_linear;
     }
     inline cudaTextureObject_t getIntermDataTexPoint( ) {
-        return _interm_data_tex_point;
+        return _intm_tex_point;
     }
     inline LinearTexture getDataTexLinear( ) {
         return _data_tex_linear;
@@ -124,7 +118,7 @@ public:
         return _data_surf;
     }
     inline cudaSurfaceObject_t getIntermediateSurface( ) {
-        return _interm_surf;
+        return _intm_surf;
     }
         
     inline cudaSurfaceObject_t& getDogSurface( ) {
