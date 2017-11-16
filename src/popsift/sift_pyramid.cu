@@ -287,6 +287,12 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
     nvtxRangePushA( "download descriptors" );
     FeaturesHost* features = new FeaturesHost( hct.ext_total, hct.ori_total );
 
+    if( hct.ext_total == 0 )
+    {
+        nvtxRangePop();
+        return features;
+    }
+
     dim3 grid( grid_divide( hct.ext_total, 32 ) );
     prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
 

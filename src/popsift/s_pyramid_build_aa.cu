@@ -49,7 +49,7 @@ void horiz( cudaTextureObject_t src_point_texture,
         out += ( D + E ) * g;
     }
 
-    surf2DLayeredwrite( out, dst_data, off_x*4, off_y, 0, cudaBoundaryModeZero );
+    surf2DLayeredwrite( out, dst_data, off_x*4, off_y, dst_level, cudaBoundaryModeZero );
 }
 
 __global__
@@ -72,17 +72,17 @@ void vert( cudaTextureObject_t src_point_texture,
         g  = filter[offset];
 
         idy = threadIdx.y - offset;
-        val = readTex( src_point_texture, block_x + idx, block_y + idy, 0 );
+        val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
         out += ( val * g );
 
         idy = threadIdx.y + offset;
-        val = readTex( src_point_texture, block_x + idx, block_y + idy, 0 );
+        val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
         out += ( val * g );
     }
 
     g  = filter[0];
     idy = threadIdx.y;
-    val = readTex( src_point_texture, block_x + idx, block_y + idy, 0 );
+    val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
     out += ( val * g );
 
     idx = block_x+threadIdx.x;

@@ -28,9 +28,9 @@ void horiz( cudaTextureObject_t src_linear_tex,
     // table, we do not need a special case.
     // horiz( src_linear_tex, dst_data, shift, d_gauss.inc.span[0], &d_gauss.inc.filter[0*GAUSS_ALIGN] );
 
-    const int    span   =  d_gauss.dd.span[octave];
-    const float* filter = &d_gauss.dd.filter[octave*GAUSS_ALIGN];
-    const float  read_y = ( blockIdx.y + shift ) / dst_h;
+    const int    span      =  d_gauss.dd.span[octave];
+    const float* filter    = &d_gauss.dd.filter[octave*GAUSS_ALIGN];
+    const float  read_y    = ( blockIdx.y + shift ) / dst_h;
 
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
 

@@ -40,7 +40,7 @@ void horiz( cudaTextureObject_t src_linear_tex,
     const float v3 = readTex( src_linear_tex, off_x, blockIdx.y, src_level );
     out += ( v3 * g );
 
-    surf2DLayeredwrite( out, dst_data, off_x*4, blockIdx.y, 0, cudaBoundaryModeZero );
+    surf2DLayeredwrite( out, dst_data, off_x*4, blockIdx.y, dst_level, cudaBoundaryModeZero );
 }
 
 __global__
@@ -60,15 +60,15 @@ void vert( cudaTextureObject_t src_linear_tex,
     for( int offset = 1; offset<=span; offset += 2 ) {
         const float u    = filter[offset];
         const float off  = offset + ( 1.0f - u );
-        const float val = readTex( src_linear_tex, block_x + idx, block_y + idy - off, 0 )
-                        + readTex( src_linear_tex, block_x + idx, block_y + idy + off, 0 );
+        const float val = readTex( src_linear_tex, block_x + idx, block_y + idy - off, dst_level )
+                        + readTex( src_linear_tex, block_x + idx, block_y + idy + off, dst_level );
 
         const float v = filter[offset+1];
         out += val * v;
     }
 
     float g   = filter[0];
-    float val = readTex( src_linear_tex, block_x + idx, block_y + idy, 0 );
+    float val = readTex( src_linear_tex, block_x + idx, block_y + idy, dst_level );
     out += ( val * g );
 
     surf2DLayeredwrite( out, dst_data, (block_x+idx)*4, block_y+idy, dst_level, cudaBoundaryModeZero );
