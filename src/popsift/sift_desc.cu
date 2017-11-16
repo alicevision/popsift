@@ -100,8 +100,10 @@ void Pyramid::descriptors( const Config& conf )
 
     if( conf.getUseRootSift() ) {
         normalize_histogram<NormalizeRootSift> <<<grid,block,0,_download_stream>>> ( );
+        POP_SYNC_CHK;
     } else {
         normalize_histogram<NormalizeL2> <<<grid,block,0,_download_stream>>> ( );
+        POP_SYNC_CHK;
     }
 
     cudaDeviceSynchronize( );

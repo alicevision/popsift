@@ -5,6 +5,7 @@ project(PopSift VERSION 1.0.0)
 
 OPTION(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
 OPTION(USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
+OPTION(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after every kernel." OFF)
 OPTION(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE)
@@ -46,6 +47,11 @@ endif()
 if(USE_NVTX_PROFILING)
   message(STATUS "PROFILING CPU CODE: NVTX is in use")
 endif(USE_NVTX_PROFILING)
+
+if(PopSift_ERRCHK_AFTER_KERNEL)
+  message(STATUS "Synchronizing and checking errors after every kernel call")
+  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-DERRCHK_AFTER_KERNEL")
+endif(PopSift_ERRCHK_AFTER_KERNEL)
 
 set(CUDA_SEPARABLE_COMPILATION ON)
 

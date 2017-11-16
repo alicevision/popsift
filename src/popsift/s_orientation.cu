@@ -403,6 +403,7 @@ void Pyramid::orientation( const Config& conf )
                   oct_obj.getDataTexPoint( ),
                   oct_obj.getWidth( ),
                   oct_obj.getHeight( ) );
+            POP_SYNC_CHK;
 
             if( octave != 0 ) {
                 cuda::event_record( oct_obj.getEventOriDone(), oct_str,   __FILE__, __LINE__ );
@@ -420,6 +421,7 @@ void Pyramid::orientation( const Config& conf )
     ori_prefix_sum
         <<<grid,block,0,oct_0_str>>>
         ( ext_ct_prefix_sum, _num_octaves );
+    POP_SYNC_CHK;
 
     cudaDeviceSynchronize();
 }

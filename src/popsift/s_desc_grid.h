@@ -10,6 +10,7 @@
 #include "sift_octave.h"
 #include "sift_extremum.h"
 #include "common/plane_2d.h"
+#include "common/debug_macros.h"
 
 /*
  * We assume that this is started with
@@ -41,6 +42,8 @@ inline static bool start_ext_desc_grid( const int octave, Octave& oct_obj )
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
           oct_obj.getDataTexPoint( ) );
+
+    POP_SYNC_CHK;
 
     return true;
 }

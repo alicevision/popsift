@@ -265,6 +265,9 @@ void init_filter( const Config& conf,
         print_gauss_filter_symbol
             <<<1,1>>>
             ( 10 );
+
+        POP_SYNC_CHK;
+
         err = cudaGetLastError();
         POP_CUDA_FATAL_TEST( err, "Gauss Symbol info failed: " );
     }

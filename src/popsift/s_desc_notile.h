@@ -12,6 +12,7 @@
 #include "s_gradiant.h"
 #include "common/assist.h"
 #include "common/vec_macros.h"
+#include "common/debug_macros.h"
 
 #define NUMLINES 2
 
@@ -45,6 +46,8 @@ inline static bool start_ext_desc_notile( const int octave, Octave& oct_obj )
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
           oct_obj.getDataTexLinear( ).tex );
+
+    POP_SYNC_CHK;
 
     return true;
 }

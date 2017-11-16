@@ -21,6 +21,9 @@
 /* It makes no sense whatsoever to change this value */
 #define PREV_LEVEL 3
 
+using std::cerr;
+using std::endl;
+
 namespace popsift {
 
 namespace gauss {
@@ -116,6 +119,8 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, in
           oct_obj.getHeight(),
           octave,
           shift );
+
+    POP_SYNC_CHK;
 }
 
 
@@ -147,6 +152,8 @@ inline void Pyramid::downscale_from_prev_octave( int octave, cudaStream_t stream
               oct_obj.getDataSurface( ),
               oct_obj.getWidth(),
               oct_obj.getHeight() );
+
+        POP_SYNC_CHK;
         break;
     default :
         gauss::get_by_2_interpolate
@@ -156,6 +163,8 @@ inline void Pyramid::downscale_from_prev_octave( int octave, cudaStream_t stream
               oct_obj.getDataSurface( ),
               oct_obj.getWidth(),
               oct_obj.getHeight() );
+
+        POP_SYNC_CHK;
         break;
     }
 }
@@ -181,6 +190,8 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t 
             ( oct_obj.getDataTexPoint( ),
               oct_obj.getIntermediateSurface( ),
               level );
+
+        POP_SYNC_CHK;
     } else {
         dim3 block( 128, 1 );
         dim3 grid;
@@ -192,6 +203,8 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t 
             ( oct_obj.getDataTexLinear( ).tex,
               oct_obj.getIntermediateSurface( ),
               level );
+
+        POP_SYNC_CHK;
     }
 }
 
@@ -217,6 +230,7 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
             ( oct_obj.getIntermDataTexPoint( ),
               oct_obj.getDataSurface( ),
               level );
+        POP_SYNC_CHK;
     } else {
         dim3 block( 4, 32 );
         dim3 grid;
@@ -228,6 +242,7 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
             ( oct_obj.getIntermDataTexLinear( ).tex,
               oct_obj.getDataSurface( ),
               level );
+        POP_SYNC_CHK;
     }
 }
 
@@ -252,6 +267,7 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level, cudaStream_t 
           oct_obj.getWidth(),
           oct_obj.getHeight(),
           max_level );
+    POP_SYNC_CHK;
 }
 
 /*************************************************************
