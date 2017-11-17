@@ -20,8 +20,8 @@ void horiz( cudaTextureObject_t src_linear_tex,
             const int           dst_level )
 {
     const int    src_level = dst_level - 1;
-    const int    span      =  d_gauss.inc_relative.span[dst_level];
-    const float* filter    = &d_gauss.inc_relative.filter[dst_level*GAUSS_ALIGN];
+    const int    span      =  d_gauss.inc.i_span[dst_level];
+    const float* filter    = &d_gauss.inc.i_filter[dst_level*GAUSS_ALIGN];
 
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -48,8 +48,8 @@ void vert( cudaTextureObject_t src_linear_tex,
            cudaSurfaceObject_t dst_data,
            const int           dst_level )
 {
-    const int    span   =  d_gauss.inc_relative.span[dst_level];
-    const float* filter = &d_gauss.inc_relative.filter[dst_level*GAUSS_ALIGN];
+    const int    span   =  d_gauss.inc.i_span[dst_level];
+    const float* filter = &d_gauss.inc.i_filter[dst_level*GAUSS_ALIGN];
     int block_x   = blockIdx.x * blockDim.y;
     int block_y   = blockIdx.y * blockDim.x;
     const int idx = threadIdx.y;

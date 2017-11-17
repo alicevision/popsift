@@ -109,9 +109,8 @@ public:
 private:
     inline void horiz_from_input_image( const Config&    conf,
                                         Image*           base,
-					int              octave,
-					cudaStream_t     stream,
-					Config::SiftMode mode );
+					                    int              octave,
+					                    cudaStream_t     stream );
     inline void downscale_from_prev_octave( int octave, cudaStream_t stream, Config::SiftMode mode );
     inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss );
     inline void vert_from_interm( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss );

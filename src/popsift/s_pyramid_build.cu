@@ -93,7 +93,7 @@ void make_dog( cudaTextureObject_t src_data,
 } // namespace gauss
 
 __host__
-inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode )
+inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream )
 {
     Octave&   oct_obj = _octaves[octave];
 
@@ -105,6 +105,7 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, in
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
 
+    const Config::SiftMode& mode = conf.getSiftMode();
     float shift  = 0.5f;
 
     if( octave == 0 && ( mode == Config::PopSift || mode == Config::VLFeat ) ) {
@@ -297,7 +298,7 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
             if( octave == 0 ) {
                 make_octave( conf, base, oct_obj, stream, true );
             } else {
-                horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode() );
+                horiz_from_input_image( conf, base, octave, stream );
                 vert_from_interm( octave, 0, stream, DontUseInterpolatedGauss );
                 make_octave( conf, base, oct_obj, stream, false );
             }
@@ -322,7 +323,7 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
 
                 if( level == 0 )
                 {
-                    horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode() );
+                    horiz_from_input_image( conf, base, octave, stream );
                     vert_from_interm( octave, level, stream, useGauss );
                 }
                 else
@@ -342,8 +343,8 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
                 {
                     if( octave == 0 )
                     {
-                        horiz_from_input_image( conf, base, 0, stream, conf.getSiftMode() );
-                        vert_from_interm( octave, 0, stream, useGauss );
+                            horiz_from_input_image( conf, base, 0, stream );
+                            vert_from_interm( octave, 0, stream, useGauss );
                     }
                     else
                     {

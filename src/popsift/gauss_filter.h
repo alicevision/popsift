@@ -17,16 +17,24 @@ struct GaussInfo;
 template<int LEVELS>
 struct GaussTable
 {
+    /* The filter that is computed from the sigma values of this level */
     float filter[ LEVELS * GAUSS_ALIGN ];
+
+    /* The same filter as above, but recomputed for use with hardware
+     * interpolation to implement half of the multiplications as hardware
+     * access */
+    float i_filter[ LEVELS * GAUSS_ALIGN ];
 
     /* The sigma used to generate the Gauss table for each level.
      * Meaning these are the differences between sigma0 and sigmaN.
      */
     float sigma [ LEVELS ];
 
-    /* The span of the table that is generated for each level.
-     */
+    /* The span of the table that is generated for each level.  */
     int   span  [ LEVELS ];
+
+    /* Alternative spans for i_filter, which must always be odd */
+    int   i_span  [ LEVELS ];
 
     __host__
     void clearTables( );
@@ -34,8 +42,9 @@ struct GaussTable
     __host__
     void computeBlurTable( const GaussInfo* info );
 
+private:
     __host__
-    void transformBlurTable( const GaussInfo* info );
+    void transformBlurTable( ); // const GaussInfo* info );
 };
 
 struct GaussInfo
@@ -51,8 +60,6 @@ struct GaussInfo
      * - in all other octaves, row 0 is unused
      */
     GaussTable<GAUSS_LEVELS> inc;
-
-    GaussTable<GAUSS_LEVELS> inc_relative;
 
     /* Compute the 1D Gauss tables for all levels of octave 0.
      * For octave 0, all of these tables derive from the input
@@ -76,12 +83,6 @@ struct GaussInfo
 
     __host__
     void clearTables( );
-
-    __host__
-    void computeAbsBlurTable_o0( int level, int span, float sigma );
-
-    __host__
-    void computeAbsBlurTable_oN( int level, int span, float sigma );
 
 public:
     __host__
