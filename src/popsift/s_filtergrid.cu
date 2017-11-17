@@ -8,16 +8,6 @@
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
 
-#if __CUDACC_VER__ >= 80000
-#include <thrust/device_vector.h>
-#include <thrust/sequence.h>
-#include <thrust/copy.h>
-#include <thrust/transform.h>
-#include <thrust/transform_scan.h>
-#include <thrust/sort.h>
-#include <thrust/execution_policy.h>
-#endif // __CUDACC_VER__ >= 80000
-
 #ifdef USE_NVTX
 #include <nvToolsExtCuda.h>
 #else
@@ -27,10 +17,19 @@
 
 using namespace std;
 
+#if (__CUDACC_VER__ >= 80000) && not defined(DISABLE_GRID_FILTER)
+
+#include <thrust/device_vector.h>
+#include <thrust/sequence.h>
+#include <thrust/copy.h>
+#include <thrust/transform.h>
+#include <thrust/transform_scan.h>
+#include <thrust/sort.h>
+#include <thrust/execution_policy.h>
+
 namespace popsift
 {
 
-#if __CUDACC_VER__ >= 80000
 struct FunctionSort_IncCell_DecScale
 {
     __device__
@@ -331,14 +330,19 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 
     return ret_ext_total;
 }
-#else // __CUDACC_VER__ >= 80000
+}; // namespace popsift
+
+#else // (__CUDACC_VER__ >= 80000) && not defined(DISABLE_GRID_FILTER)
+
+namespace popsift
+{
 /* do nothing unless we have CUDA v 8 or newer */
 __host__
 int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 {
     return ext_total;
 }
-#endif // __CUDACC_VER__ >= 80000
-
 }; // namespace popsift
+
+#endif // (__CUDACC_VER__ >= 80000) && not defined(DISABLE_GRID_FILTER)
 

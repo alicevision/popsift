@@ -4,9 +4,10 @@ cmake_minimum_required(VERSION 3.4)
 project(PopSift VERSION 1.0.0)
 
 OPTION(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
-OPTION(USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
+OPTION(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
 OPTION(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after every kernel." OFF)
 OPTION(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
+OPTION(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -44,9 +45,9 @@ if(NOT CUDA_FOUND)
   message(FATAL_ERROR "Could not find CUDA >= 7.0")
 endif()
 
-if(USE_NVTX_PROFILING)
+if(PopSift_USE_NVTX_PROFILING)
   message(STATUS "PROFILING CPU CODE: NVTX is in use")
-endif(USE_NVTX_PROFILING)
+endif(PopSift_USE_NVTX_PROFILING)
 
 if(PopSift_ERRCHK_AFTER_KERNEL)
   message(STATUS "Synchronizing and checking errors after every kernel call")
@@ -103,11 +104,16 @@ endif(CUDA_VERSION>=7.5)
 # library required for CUDA dynamic parallelism, forgotten by CMake 3.4
 cuda_find_library_local_first(CUDA_CUDADEVRT_LIBRARY cudadevrt "\"cudadevrt\" library")
 
-if(USE_NVTX_PROFILING)
+if(PopSift_USE_NVTX_PROFILING)
   # library required for NVTX profiling of the CPU
   cuda_find_library_local_first(CUDA_NVTX_LIBRARY nvToolsExt "NVTX library")
   add_definitions(-DUSE_NVTX)
-endif(USE_NVTX_PROFILING)
+endif(PopSift_USE_NVTX_PROFILING)
+
+if(NOT PopSift_USE_GRID_FILTER)
+  message(STATUS "Disabling grid filter compilation")
+  add_definitions(-DDISABLE_GRID_FILTER)
+endif(NOT PopSift_USE_GRID_FILTER)
 
 add_subdirectory(src)
 
