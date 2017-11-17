@@ -54,6 +54,44 @@ void horiz( cudaTextureObject_t src_linear_tex,
     surf2DLayeredwrite( out * 255.0f, dst_data, write_x*4, write_y, 0, cudaBoundaryModeZero );
 }
 
+__global__
+void horiz_all( cudaTextureObject_t src_linear_tex,
+                cudaSurfaceObject_t dst_data,
+                int                 dst_w,
+                int                 dst_h,
+                float               shift,
+                const int           max_level ) // dst_level )
+{
+    const int    write_x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int    write_y = blockIdx.y;
+
+    if( write_x >= dst_w ) return;
+
+    const float  read_x  = ( blockIdx.x * blockDim.x + threadIdx.x + shift ) / dst_w;
+    const float  read_y  = ( blockIdx.y + shift ) / dst_h;
+
+    for( int dst_level=0; dst_level < max_level; dst_level++ )
+    {
+        const int    span      =  d_gauss.abs_o0.span[dst_level];
+        const float* filter    = &d_gauss.abs_o0.filter[dst_level*GAUSS_ALIGN];
+
+        float out = 0.0f;
+
+        for( int offset = span; offset>0; offset-- ) {
+            const float& g  = filter[offset];
+            const float  offrel = float(offset) / dst_w;
+            const float  v1 = tex2D<float>( src_linear_tex, read_x - offrel, read_y );
+            const float  v2 = tex2D<float>( src_linear_tex, read_x + offrel, read_y );
+            out += ( ( v1 + v2 ) * g );
+        }
+        const float& g  = filter[0];
+        const float  v3 = tex2D<float>( src_linear_tex, read_x, read_y );
+        out += ( v3 * g );
+
+        surf2DLayeredwrite( out * 255.0f, dst_data, write_x*4, write_y, dst_level, cudaBoundaryModeZero );
+    }
+}
+
 } // namespace normalizedSource
 } // namespace gauss
 } // namespace popsift

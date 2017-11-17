@@ -19,6 +19,14 @@ void horiz( cudaTextureObject_t src_data,
             int                 octave,
             float               shift );
 
+__global__
+void horiz_all( cudaTextureObject_t src_linear_tex,
+                cudaSurfaceObject_t dst_data,
+                int                 dst_w,
+                int                 dst_h,
+                float               shift,
+                const int           max_level );
+
 } // namespace normalizedSource
 } // namespace gauss
 } // namespace popsift
