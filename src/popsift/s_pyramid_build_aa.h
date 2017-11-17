@@ -26,6 +26,12 @@ void vert_abs0( cudaTextureObject_t src_point_texture,
            cudaSurfaceObject_t dst_data,
            const int           dst_level );
 
+__global__
+void vert_all_abs0( cudaTextureObject_t src_point_texture,
+                    cudaSurfaceObject_t dst_data,
+                    const int           start_level,
+                    const int           max_level );
+
 } // namespace absoluteSource
 } // namespace gauss
 } // namespace popsift

@@ -164,9 +164,14 @@ inline void Pyramid::horiz_level_from_input_image( const Config& conf, Image* ba
 }
 
 __host__
-inline void Pyramid::horiz_all_from_input_image( const Config& conf, Image* base, int maxlevel, cudaStream_t stream )
+inline void Pyramid::horiz_all_from_input_image( const Config& conf, Image* base, int octave, int startlevel, int maxlevel, cudaStream_t stream )
 {
-    Octave&      oct_obj = _octaves[0];
+    if( octave != 0 )
+    {
+        POP_FATAL( "Unsupported parameter octave != 0" );
+    }
+
+    Octave&      oct_obj = _octaves[octave];
 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
@@ -371,6 +376,60 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
 }
 
 __host__
+inline void Pyramid::vert_all_from_interm( int octave, int start_level, int max_level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss )
+{
+    Octave& oct_obj = _octaves[octave];
+
+    /* waiting for any events is not necessary, it's in the same stream as horiz
+     */
+
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    switch( useInterpolatedGauss )
+    {
+    case Interpolated_FromFirst :
+        {
+            dim3 block( 4, 32 );
+            dim3 grid;
+            grid.x = (unsigned int)grid_divide( width,  block.y );
+            grid.y = (unsigned int)grid_divide( height, block.x );
+
+            gauss::absoluteSourceInterpolated::vert_all_abs0
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getIntermDataTexLinear( ).tex,
+                  oct_obj.getDataSurface( ),
+                  start_level,
+                  max_level );
+        }
+        break;
+    case NotInterpolated_FromFirst :
+        {
+            dim3 block( 64, 2 );
+            dim3 grid;
+            grid.x = (unsigned int)grid_divide( width,  block.x );
+            grid.y = (unsigned int)grid_divide( height, block.y );
+
+            gauss::absoluteSource::vert_all_abs0
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getIntermDataTexPoint( ),
+                  oct_obj.getDataSurface( ),
+                  start_level,
+                  max_level );
+        }
+        break;
+    case Interpolated_FromPrevious :
+    case NotInterpolated_FromPrevious :
+        POP_FATAL( "Case horizontal Gauss filtering from intermediate level makes not sense in case vertial-all Gauss filter from previous level" );
+        break;
+    default :
+        POP_FATAL( "Missing case in vertical-all Gauss filter from intermediate buffer" );
+        break;
+    }
+    POP_SYNC_CHK;
+}
+
+__host__
 inline void Pyramid::dogs_from_blurred( int octave, int max_level, cudaStream_t stream )
 {
     Octave&      oct_obj = _octaves[octave];
@@ -484,23 +543,9 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
                 }
             }
         } else if( octave == 0 && conf.getGaussMode() == Config::VLFeat_Relative_All ) {
-            for( int level=0; level<_levels; level++ )
-            {
-                if( level == 0 )
-                {
-                    horiz_level_from_input_image( conf, base, octave, level, stream );
-                    vert_from_interm( octave, 0, stream, NotInterpolated_FromFirst );
-                }
-                else
-                {
-                    horiz_level_from_input_image( conf, base, octave, level, stream );
-                    vert_from_interm( octave, level, stream, NotInterpolated_FromFirst );
-
-                    if( level == _levels - PREV_LEVEL ) {
-                        cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
-                    }
-                }
-            }
+            horiz_all_from_input_image( conf, base, octave, 0, _levels, stream );
+            vert_all_from_interm( octave, 0, _levels, stream, NotInterpolated_FromFirst );
+            cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
         } else {
             for( int level=0; level<_levels; level++ )
             {

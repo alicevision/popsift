@@ -76,15 +76,15 @@ void vert( cudaTextureObject_t src_linear_tex,
 
 __global__
 void vert_abs0( cudaTextureObject_t src_linear_tex,
-           cudaSurfaceObject_t dst_data,
-           const int           dst_level )
+                cudaSurfaceObject_t dst_data,
+                const int           dst_level )
 {
     const int    span   =  d_gauss.abs_o0.i_span[dst_level];
     const float* filter = &d_gauss.abs_o0.i_filter[dst_level*GAUSS_ALIGN];
-    int block_x   = blockIdx.x * blockDim.y;
-    int block_y   = blockIdx.y * blockDim.x;
-    const int idx = threadIdx.y;
-    const int idy = threadIdx.x;
+    const int block_x   = blockIdx.x * blockDim.y;
+    const int block_y   = blockIdx.y * blockDim.x;
+    const int idx       = threadIdx.y;
+    const int idy       = threadIdx.x;
 
     float out = 0;
 
@@ -103,6 +103,42 @@ void vert_abs0( cudaTextureObject_t src_linear_tex,
     out += ( val * g );
 
     surf2DLayeredwrite( out, dst_data, (block_x+idx)*4, block_y+idy, dst_level, cudaBoundaryModeZero );
+}
+
+__global__
+void vert_all_abs0( cudaTextureObject_t src_linear_tex,
+                    cudaSurfaceObject_t dst_data,
+                    const int           start_level,
+                    const int           max_level )
+{
+    const int block_x = blockIdx.x * blockDim.y;
+    const int block_y = blockIdx.y * blockDim.x;
+    const int idx     = threadIdx.y;
+    const int idy     = threadIdx.x;
+
+    for( int dst_level=start_level; dst_level<max_level; dst_level++ )
+    {
+        const int    span   =  d_gauss.abs_o0.i_span[dst_level];
+        const float* filter = &d_gauss.abs_o0.i_filter[dst_level*GAUSS_ALIGN];
+
+        float out = 0;
+
+        for( int offset = 1; offset<=span; offset += 2 ) {
+            const float u    = filter[offset];
+            const float off  = offset + ( 1.0f - u );
+            const float val = readTex( src_linear_tex, block_x + idx, block_y + idy - off, dst_level )
+                            + readTex( src_linear_tex, block_x + idx, block_y + idy + off, dst_level );
+
+            const float v = filter[offset+1];
+            out += val * v;
+        }
+
+        const float& g   = filter[0];
+        float        val = readTex( src_linear_tex, block_x + idx, block_y + idy, dst_level );
+        out += ( val * g );
+
+        surf2DLayeredwrite( out, dst_data, (block_x+idx)*4, block_y+idy, dst_level, cudaBoundaryModeZero );
+    }
 }
 
 } // namespace absoluteSourceInterpolated
