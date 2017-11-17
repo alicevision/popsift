@@ -9,7 +9,7 @@
 
 namespace popsift {
 namespace gauss {
-namespace relativeSource {
+namespace normalizedSource {
 
 __global__
 void horiz( cudaTextureObject_t src_data,
@@ -19,7 +19,7 @@ void horiz( cudaTextureObject_t src_data,
             int                 octave,
             float               shift );
 
-} // namespace relativeSource
+} // namespace normalizedSource
 } // namespace gauss
 } // namespace popsift
 

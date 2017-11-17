@@ -112,7 +112,7 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, in
         shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() - octave );
     }
 
-    gauss::relativeSource::horiz
+    gauss::normalizedSource::horiz
         <<<grid,block,0,stream>>>
         ( base->getInputTexture(),
           oct_obj.getIntermediateSurface(),

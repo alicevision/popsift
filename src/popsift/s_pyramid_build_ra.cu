@@ -12,7 +12,7 @@
 
 namespace popsift {
 namespace gauss {
-namespace relativeSource {
+namespace normalizedSource {
 
 __global__
 void horiz( cudaTextureObject_t src_linear_tex,
@@ -57,7 +57,7 @@ void horiz( cudaTextureObject_t src_linear_tex,
     surf2DLayeredwrite( out * 255.0f, dst_data, off_x*4, blockIdx.y, 0, cudaBoundaryModeZero );
 }
 
-} // namespace relativeSource
+} // namespace normalizedSource
 } // namespace gauss
 } // namespace popsift
 
