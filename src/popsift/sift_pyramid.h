@@ -78,6 +78,14 @@ class Pyramid
     cudaStream_t _download_stream;
 
 public:
+    enum GaussTableChoice {
+        Interpolated_FromPrevious,
+        Interpolated_FromFirst,
+        NotInterpolated_FromPrevious,
+        NotInterpolated_FromFirst
+    };
+
+public:
     Pyramid( const Config& config,
              int     w,
              int     h );
@@ -111,13 +119,18 @@ private:
                                         Image*           base,
 					                    int              octave,
 					                    cudaStream_t     stream );
+    inline void horiz_level_from_input_image( const Config&    conf,
+                                              Image*           base,
+					                          int              octave,
+                                              int              level,
+					                          cudaStream_t     stream );
     inline void horiz_all_from_input_image( const Config&    conf,
                                             Image*           base,
                                             int              maxlevel,
                                             cudaStream_t     stream );
     inline void downscale_from_prev_octave( int octave, cudaStream_t stream, Config::SiftMode mode );
-    inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss );
-    inline void vert_from_interm( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss );
+    inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss );
+    inline void vert_from_interm( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss );
     inline void dogs_from_blurred( int octave, int max_level, cudaStream_t stream );
 
     void make_octave( const Config& conf, Image* base, Octave& oct_obj, cudaStream_t stream, bool isOctaveZero );
@@ -149,10 +162,6 @@ private:
     void print_tables_host( );
 
 public:
-    enum {
-        UseInterpolatedGauss = true,
-        DontUseInterpolatedGauss = false
-    };
 };
 
 } // namespace popsift

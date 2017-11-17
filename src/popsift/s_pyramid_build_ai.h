@@ -21,6 +21,11 @@ void vert( cudaTextureObject_t src_linear_tex,
            cudaSurfaceObject_t dst_data,
            const int           dst_level );
 
+__global__
+void vert_abs0( cudaTextureObject_t src_linear_tex,
+           cudaSurfaceObject_t dst_data,
+           const int           dst_level );
+
 } // namespace absoluteSourceInterpolated
 } // namespace gauss
 } // namespace popsift

@@ -91,6 +91,45 @@ void vert( cudaTextureObject_t src_point_texture,
     surf2DLayeredwrite( out, dst_data, idx*4, idy, dst_level, cudaBoundaryModeZero );
 }
 
+__global__
+void vert_abs0( cudaTextureObject_t src_point_texture,
+           cudaSurfaceObject_t dst_data,
+           const int           dst_level )
+{
+    const int    span   =  d_gauss.abs_o0.span[dst_level];
+    const float* filter = &d_gauss.abs_o0.filter[dst_level*GAUSS_ALIGN];
+    int block_x = blockIdx.x * blockDim.x;
+    int block_y = blockIdx.y * blockDim.y;
+    int idx     = threadIdx.x;
+    int idy;
+
+    float g;
+    float val;
+    float out = 0;
+
+    for( int offset = span; offset>0; offset-- ) {
+        g  = filter[offset];
+
+        idy = threadIdx.y - offset;
+        val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+        out += ( val * g );
+
+        idy = threadIdx.y + offset;
+        val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+        out += ( val * g );
+    }
+
+    g  = filter[0];
+    idy = threadIdx.y;
+    val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+    out += ( val * g );
+
+    idx = block_x+threadIdx.x;
+    idy = block_y+threadIdx.y;
+
+    surf2DLayeredwrite( out, dst_data, idx*4, idy, dst_level, cudaBoundaryModeZero );
+}
+
 } // namespace absoluteSource
 } // namespace gauss
 } // namespace popsift

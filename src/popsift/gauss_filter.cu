@@ -276,11 +276,13 @@ int GaussInfo::getSpan( float sigma ) const
 {
     switch( _span_mode )
     {
+    case Config::VLFeat_Relative_All :
+        // return GaussInfo::vlFeatRelativeSpan( sigma );
+        return GaussInfo::vlFeatSpan( sigma );
+
     case Config::VLFeat_Compute :
         return GaussInfo::vlFeatSpan( sigma );
     case Config::VLFeat_Relative :
-        return GaussInfo::vlFeatRelativeSpan( sigma );
-    case Config::VLFeat_Relative_All :
         return GaussInfo::vlFeatRelativeSpan( sigma );
     case Config::OpenCV_Compute :
         return GaussInfo::openCVSpan( sigma );
