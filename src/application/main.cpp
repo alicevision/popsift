@@ -73,9 +73,10 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     options_description modes("Modes");
     {
     modes.add_options()
-        ("gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
-        "Choice of span (1-sided) for Gauss filters. Default is VLFeat-like computation depending on sigma. "
-        "Options are: vlfeat, relative, opencv, fixed9, fixed15")
+        ( "gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
+          popsift::Config::getGaussModeUsage() )
+        // "Choice of span (1-sided) for Gauss filters. Default is VLFeat-like computation depending on sigma. "
+        // "Options are: vlfeat, relative, relative-all, opencv, fixed9, fixed15"
         ("desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
         "Choice of descriptor extraction modes:\n"
         "loop, iloop, grid, igrid, notile\n"

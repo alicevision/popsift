@@ -21,7 +21,7 @@ Config::Config( )
     , sigma( 1.6f )
     , _edge_limit( 10.0f )
     , _threshold( 0.04 ) // ( 10.0f / 256.0f )
-    , _gauss_mode( Config::VLFeat_Relative )
+    , _gauss_mode( getGaussModeDefault() )
     , _sift_mode( Config::PopSift )
     , _log_mode( Config::None )
     , _scaling_mode( Config::ScaleDefault )
@@ -84,8 +84,12 @@ void Config::setGaussMode( const std::string& m )
 {
     if( m == "vlfeat" )
         setGaussMode( Config::VLFeat_Compute );
+    else if( m == "vlfeat-hw-interpolated" )
+        setGaussMode( Config::VLFeat_Relative );
     else if( m == "relative" )
         setGaussMode( Config::VLFeat_Relative );
+    else if( m == "vlfeat-direct" )
+        setGaussMode( Config::VLFeat_Relative_All );
     else if( m == "opencv" )
         setGaussMode( Config::OpenCV_Compute );
     else if( m == "fixed9" )
@@ -93,7 +97,26 @@ void Config::setGaussMode( const std::string& m )
     else if( m == "fixed15" )
         setGaussMode( Config::Fixed15 );
     else
-        POP_FATAL( "specified Gauss mode must be one of vlfeat, opencv, fixed9 or fixed15" );
+        POP_FATAL( string("Bad Gauss mode.") + getGaussModeUsage() );
+}
+
+Config::GaussMode Config::getGaussModeDefault( )
+{
+    return Config::VLFeat_Compute;
+}
+
+const char* Config::getGaussModeUsage( )
+{
+    return
+        "Choice of Gauss filter method. "
+        "Options are: "
+        "vlfeat (default), "
+        "vlfeat-hw-interpolated, "
+        "vlfeat-direct, "
+        "opencv, "
+        "fixed9, "
+        "fixed15, "
+        "relative (synonym for vlfeat-hw-interpolated)";
 }
 
 bool Config::getCanFilterExtrema() const

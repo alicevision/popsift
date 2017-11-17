@@ -25,6 +25,7 @@ struct Config
     enum GaussMode {
         VLFeat_Compute,
         VLFeat_Relative,
+        VLFeat_Relative_All,
         OpenCV_Compute,
         Fixed9,
         Fixed15
@@ -118,6 +119,12 @@ struct Config
 
     // What Gauss filter scan is desired?
     GaussMode getGaussMode( ) const;
+
+    // Call this from the constructor.
+    static GaussMode getGaussModeDefault( );
+
+    // Helper functions for the main program's usage string.
+    static const char* getGaussModeUsage( );
 
     // get the SIFT mode for more detailed sub-modes
     SiftMode getSiftMode() const;
