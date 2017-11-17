@@ -22,39 +22,36 @@ void horiz( cudaTextureObject_t src_linear_tex,
             int                 octave,
             float               shift )
 {
-    // The first line creates level-0 octave-0 for the input image only.
+    // Create level-0 for any octave from the input image.
     // Since we are computing the direct-downscaling gauss filter tables
     // and the first entry in that table is identical to the "normal"
     // table, we do not need a special case.
-    // horiz( src_linear_tex, dst_data, shift, d_gauss.inc.span[0], &d_gauss.inc.filter[0*GAUSS_ALIGN] );
 
-    const int    span      =  d_gauss.dd.span[octave];
-    const float* filter    = &d_gauss.dd.filter[octave*GAUSS_ALIGN];
-    const float  read_y    = ( blockIdx.y + shift ) / dst_h;
+    const int    write_x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int    write_y = blockIdx.y;
 
-    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
+    if( write_x >= dst_w ) return;
 
-    if( off_x >= dst_w ) return;
+    const int    span    =  d_gauss.dd.span[octave];
+    const float* filter  = &d_gauss.dd.filter[octave*GAUSS_ALIGN];
+    const float  read_x  = ( blockIdx.x * blockDim.x + threadIdx.x + shift ) / dst_w;
+    const float  read_y  = ( blockIdx.y + shift ) / dst_h;
 
     float out = 0.0f;
 
     #pragma unroll
     for( int offset = span; offset>0; offset-- ) {
         const float& g  = filter[offset];
-        const float read_x_l = ( off_x - offset );
-        const float  v1 = tex2D<float>( src_linear_tex, ( read_x_l + shift ) / dst_w, read_y );
-        out += ( v1 * g );
-
-        const float read_x_r = ( off_x + offset );
-        const float  v2 = tex2D<float>( src_linear_tex, ( read_x_r + shift ) / dst_w, read_y );
-        out += ( v2 * g );
+        const float  offrel = float(offset) / dst_w;
+        const float  v1 = tex2D<float>( src_linear_tex, read_x - offrel, read_y );
+        const float  v2 = tex2D<float>( src_linear_tex, read_x + offrel, read_y );
+        out += ( ( v1 + v2 ) * g );
     }
     const float& g  = filter[0];
-    const float read_x = off_x;
-    const float v3 = tex2D<float>( src_linear_tex, ( read_x + shift ) / dst_w, read_y );
+    const float v3 = tex2D<float>( src_linear_tex, read_x, read_y );
     out += ( v3 * g );
 
-    surf2DLayeredwrite( out * 255.0f, dst_data, off_x*4, blockIdx.y, 0, cudaBoundaryModeZero );
+    surf2DLayeredwrite( out * 255.0f, dst_data, write_x*4, write_y, 0, cudaBoundaryModeZero );
 }
 
 } // namespace normalizedSource
