@@ -7,12 +7,21 @@
  */
 #include <stdio.h>
 #include <iso646.h>
+#include <iostream>
 
 #include "sift_constants.h"
 #include "s_gradiant.h"
 #include "s_desc_notile.h"
 #include "common/assist.h"
 #include "common/vec_macros.h"
+
+//   1    -> 19.6 on 980 Ti
+//   2    -> 19.5 on 980 Ti
+//   3    -> 20.3 on 980 Ti
+//   4    -> 19.6 on 980 Ti
+//   8    -> 19.7 on 980 Ti
+
+#define BLOCK_Z_NOTILE 1
 
 using namespace popsift;
 
@@ -52,7 +61,6 @@ void ext_desc_notile_sub( const float x, const float y, const int level,
                 float       th;
                 get_gradiant( mod, th, x + ptx * SBP, y + pty * SBP, cos_t, sin_t, texLinear, level );
                 th += ( th <  0.0f  ? M_PI2 : 0.0f );
-                th -= ( th >= M_PI2 ? M_PI2 : 0.0f );
 
                 const float tth  = th * M_4RPI;
                 const int   fo   = (int)floorf(th * M_4RPI);
@@ -83,8 +91,12 @@ void ext_desc_notile_sub( const float x, const float y, const int level,
 }
 
 __global__
+// __launch_bounds__(384) // 56/threads
+// __launch_bounds__(192) // 56/threads
+// no -- __launch_bounds__(128) // 63/thread
+// no -- no launch bound // 64/thread/thread
 void ext_desc_notile( const int           octave,
-                     cudaTextureObject_t texLinear )
+                      cudaTextureObject_t texLinear )
 {
     const int   num      = dct.ori_ct[octave];
 
@@ -114,4 +126,41 @@ void ext_desc_notile( const int           octave,
                         desc->features,
                         texLinear );
 }
+
+namespace popsift
+{
+
+bool start_ext_desc_notile( const int octave, Octave& oct_obj )
+{
+    dim3 block;
+    dim3 grid;
+
+    block.x = 32;
+    block.y = 4;
+    block.z = BLOCK_Z_NOTILE;
+
+    grid.x = grid_divide( hct.ori_ct[octave], block.z );
+    grid.y = 1;
+    grid.z = 1;
+
+    if( grid.x == 0 ) return false;
+
+    ext_desc_notile
+        <<<grid,block,0,oct_obj.getStream()>>>
+        ( octave,
+          oct_obj.getDataTexLinear( ).tex );
+    cudaDeviceSynchronize();
+    cudaError_t err = cudaGetLastError( );
+    if( err != cudaSuccess ) {
+        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
+                  << "    cudaGetLastError failed: " << cudaGetErrorString(err) << std::endl;
+        exit( -__LINE__ );
+    }
+
+    POP_SYNC_CHK;
+
+    return true;
+}
+
+}; // namespace popsift
 

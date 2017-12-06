@@ -437,7 +437,7 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level, cudaStream_t 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    dim3 block( 128, 2 );
+    dim3 block( 1024, 1 );
     dim3 grid;
     grid.x = grid_divide( width,  block.x );
     grid.y = grid_divide( height, block.y );
