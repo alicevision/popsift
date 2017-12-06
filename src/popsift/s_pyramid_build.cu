@@ -82,7 +82,7 @@ void make_dog( cudaTextureObject_t src_data,
     const int idy   = blockIdx.y * blockDim.y + threadIdx.y;
 
     float a = readTex( src_data, idx, idy, 0 );
-    for( int level=0; level<max_level-2; level++ )
+    for( int level=0; level<max_level-1; level++ )
     {
         const float b = readTex( src_data, idx, idy, level+1 );
 
