@@ -34,7 +34,7 @@ Config::Config( )
     , _filter_grid_size( 2 )
     , _assume_initial_blur( true )
     , _initial_blur( 0.5f )
-    , _use_root_sift( false )
+    , _use_root_sift( true )
     , _normalization_multiplier( 0 )
     , _print_gauss_tables( false )
 {
