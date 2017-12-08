@@ -34,7 +34,7 @@ Config::Config( )
     , _filter_grid_size( 2 )
     , _assume_initial_blur( true )
     , _initial_blur( 0.5f )
-    , _use_root_sift( true )
+    , _normalization_mode( getNormModeDefault() )
     , _normalization_multiplier( 0 )
     , _print_gauss_tables( false )
 {
@@ -97,7 +97,7 @@ void Config::setGaussMode( const std::string& m )
     else if( m == "fixed15" )
         setGaussMode( Config::Fixed15 );
     else
-        POP_FATAL( string("Bad Gauss mode.") + getGaussModeUsage() );
+        POP_FATAL( string("Bad Gauss mode.\n") + getGaussModeUsage() );
 }
 
 Config::GaussMode Config::getGaussModeDefault( )
@@ -165,6 +165,72 @@ void Config::setScalingMode( ScalingMode mode )
     _scaling_mode = mode;
 }
 
+/**
+ * Normalization mode
+ * Should the descriptor normalization use L2-like classic normalization
+ * of the typically better L1-like RootSift normalization?
+ */
+void Config::setUseRootSift( bool on )
+{
+    if( on )
+        _normalization_mode = RootSift;
+    else
+        _normalization_mode = Classic;
+}
+
+bool Config::getUseRootSift( ) const
+{
+    return ( _normalization_mode == RootSift );
+}
+
+Config::NormMode Config::getNormMode( NormMode m ) const 
+{
+    return _normalization_mode;
+}
+
+void Config::setNormMode( Config::NormMode m )
+{
+    _normalization_mode = m;
+}
+
+void Config::setNormMode( const std::string& m )
+{
+    if( m == "RootSift" ) setNormMode( Config::RootSift );
+    else if( m == "classic" ) setNormMode( Config::Classic );
+    else
+        POP_FATAL( string("Bad Normalization mode.\n") + getGaussModeUsage() );
+}
+
+Config::NormMode Config::getNormModeDefault( )
+{
+    return Config::RootSift;
+}
+
+const char* Config::getNormModeUsage( )
+{
+    return
+        "Choice of descriptor normalization modes. "
+        "Options are: "
+        "RootSift (L1-like, default), "
+        "Classic (L2-like)";
+}
+
+/**
+ * Normalization multiplier
+ * A power of 2 multiplied with the normalized descriptor. Required
+ * for the construction of 1-byte integer desciptors.
+ * Usual choice is 2^8 or 2^9.
+ */
+void Config::setNormalizationMultiplier( int mul )
+{
+    _normalization_multiplier = mul;
+}
+
+int Config::getNormalizationMultiplier( ) const
+{
+    return _normalization_multiplier;
+}
+
 void Config::setDownsampling( float v ) { _upscale_factor = -v; }
 void Config::setOctaves( int v ) { octaves = v; }
 void Config::setLevels( int v ) { levels = v; }
@@ -172,8 +238,6 @@ void Config::setSigma( float v ) { sigma = v; }
 void Config::setEdgeLimit( float v ) { _edge_limit = v; }
 void Config::setThreshold( float v ) { _threshold = v; }
 void Config::setPrintGaussTables() { _print_gauss_tables = true; }
-void Config::setUseRootSift( bool on ) { _use_root_sift = on; }
-void Config::setNormalizationMultiplier( int mul ) { _normalization_multiplier = mul; }
 void Config::setFilterMaxExtrema( int ext ) { _filter_max_extrema = ext; }
 void Config::setFilterGridSize( int sz ) { _filter_grid_size = sz; }
 
@@ -233,7 +297,7 @@ bool Config::equal( const Config& other ) const
         COMPARE( _sift_mode ) ||
         COMPARE( _assume_initial_blur ) ||
         COMPARE( _initial_blur ) ||
-        COMPARE( _use_root_sift ) ||
+        COMPARE( _normalization_mode ) ||
         COMPARE( _normalization_multiplier ) ) return false;
     return true;
 }
