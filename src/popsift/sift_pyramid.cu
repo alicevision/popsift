@@ -223,7 +223,7 @@ Pyramid::~Pyramid()
     delete[] _octaves;
 }
 
-void Pyramid::step1( const Config& conf, popsift::Image* img )
+void Pyramid::step1( const Config& conf, popsift::ImageBase* img )
 {
     reset_extrema_mgmt( );
     build_pyramid( conf, img );

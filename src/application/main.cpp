@@ -43,6 +43,7 @@ static bool print_time_info = false;
 static bool write_as_uchar  = false;
 static bool dont_write      = false;
 static bool pgmread_loading = false;
+static bool float_mode      = false;
 
 static void parseargs(int argc, char** argv, popsift::Config& config, string& inputFile) {
     using namespace boost::program_options;
@@ -118,6 +119,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
          "Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar")
         ("dont-write", bool_switch(&dont_write)->default_value(false), "Suppress descriptor output")
         ("pgmread-loading", bool_switch(&pgmread_loading)->default_value(false), "Use the old image loader instead of LibDevIL")
+        ("float-mode", bool_switch(&float_mode)->default_value(false), "Upload image to GPU as float instead of byte")
         ;
         
         //("test-direct-scaling")
@@ -167,12 +169,18 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 {
     int w;
     int h;
-    unsigned char* image_data;
     SiftJob* job;
+    unsigned char* image_data;
 
 #ifdef USE_DEVIL
     if( not pgmread_loading )
     {
+        if( float_mode )
+        {
+            cerr << "Cannot combine float-mode test with DevIL image reader" << endl;
+            exit( -1 );
+        }
+
         nvtxRangePushA( "load and convert image - devil" );
 
         ilImage img;
@@ -187,11 +195,11 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
         w = img.Width();
         h = img.Height();
         cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
+
         image_data = img.GetData();
 
         nvtxRangePop( ); // "load and convert image - devil"
 
-        // PopSift.init( w, h );
         job = PopSift.enqueue( w, h, image_data );
 
         img.Clear();
@@ -208,10 +216,25 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 
         nvtxRangePop( ); // "load and convert image - pgmread"
 
-        // PopSift.init( w, h );
-        job = PopSift.enqueue( w, h, image_data );
+        if( not float_mode )
+        {
+            // PopSift.init( w, h );
+            job = PopSift.enqueue( w, h, image_data );
 
-        delete [] image_data;
+            delete [] image_data;
+        }
+        else
+        {
+            float* f_image_data = new float [w * h];
+            for( int i=0; i<w*h; i++ )
+            {
+                f_image_data[i] = float( image_data[i] ) / 256.0f;
+            }
+            job = PopSift.enqueue( w, h, f_image_data );
+
+            delete [] image_data;
+            delete [] f_image_data;
+        }
     }
 
     return job;
@@ -275,7 +298,9 @@ int main(int argc, char **argv)
     deviceInfo.set( 0, print_dev_info );
     if( print_dev_info ) deviceInfo.print( );
 
-    PopSift PopSift( config );
+    PopSift PopSift( config,
+                     popsift::Config::ExtractingMode,
+                     float_mode ? PopSift::FloatImages : PopSift::ByteImages );
 
     std::queue<SiftJob*> jobs;
     for( auto it = inputFiles.begin(); it!=inputFiles.end(); it++ ) {

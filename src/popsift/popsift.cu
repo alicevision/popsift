@@ -19,10 +19,19 @@
 
 using namespace std;
 
-PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode )
+PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode, ImageMode imode )
+    : _image_mode( imode )
 {
-    _pipe._unused.push( new popsift::Image );
-    _pipe._unused.push( new popsift::Image );
+    if( imode == ByteImages )
+    {
+        _pipe._unused.push( new popsift::Image);
+        _pipe._unused.push( new popsift::Image);
+    }
+    else
+    {
+        _pipe._unused.push( new popsift::ImageFloat );
+        _pipe._unused.push( new popsift::ImageFloat );
+    }
     _pipe._pyramid    = 0;
 
     configure( config, true );
@@ -34,10 +43,19 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
         _pipe._thread_stage2 = new boost::thread( &PopSift::matchPrepareLoop, this );
 }
 
-PopSift::PopSift( )
+PopSift::PopSift( ImageMode imode )
+    : _image_mode( imode )
 {
-    _pipe._unused.push( new popsift::Image );
-    _pipe._unused.push( new popsift::Image );
+    if( imode == ByteImages )
+    {
+        _pipe._unused.push( new popsift::Image);
+        _pipe._unused.push( new popsift::Image);
+    }
+    else
+    {
+        _pipe._unused.push( new popsift::ImageFloat );
+        _pipe._unused.push( new popsift::ImageFloat );
+    }
     _pipe._pyramid    = 0;
 
     _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
@@ -117,7 +135,7 @@ void PopSift::uninit( )
     delete _pipe._thread_stage1;
 
     while( !_pipe._unused.empty() ) {
-        popsift::Image* img = _pipe._unused.pull();
+        popsift::ImageBase* img = _pipe._unused.pull();
         delete img;
     }
 
@@ -129,6 +147,29 @@ SiftJob* PopSift::enqueue( int                  w,
                            int                  h,
                            const unsigned char* imageData )
 {
+    if( _image_mode != ByteImages )
+    {
+        cerr << __FILE__ << ":" << __LINE__ << " Image mode error" << endl
+             << "E    Cannot load byte images into a PopSift pipeline configured for float images" << endl;
+        exit( -1 );
+    }
+
+    SiftJob* job = new SiftJob( w, h, imageData );
+    _pipe._queue_stage1.push( job );
+    return job;
+}
+
+SiftJob* PopSift::enqueue( int          w,
+                           int          h,
+                           const float* imageData )
+{
+    if( _image_mode != FloatImages )
+    {
+        cerr << __FILE__ << ":" << __LINE__ << " Image mode error" << endl
+             << "E    Cannot load float images into a PopSift pipeline configured for byte images" << endl;
+        exit( -1 );
+    }
+
     SiftJob* job = new SiftJob( w, h, imageData );
     _pipe._queue_stage1.push( job );
     return job;
@@ -138,7 +179,7 @@ void PopSift::uploadImages( )
 {
     SiftJob* job;
     while( ( job = _pipe._queue_stage1.pull() ) != 0 ) {
-        popsift::Image* img = _pipe._unused.pull();
+        popsift::ImageBase* img = _pipe._unused.pull();
         job->setImg( img );
         _pipe._queue_stage2.push( job );
     }
@@ -151,7 +192,7 @@ void PopSift::extractDownloadLoop( )
 
     SiftJob* job;
     while( ( job = p._queue_stage2.pull() ) != 0 ) {
-        popsift::Image* img = job->getImg();
+        popsift::ImageBase* img = job->getImg();
 
         private_init( img->getWidth(), img->getHeight() );
 
@@ -186,7 +227,7 @@ void PopSift::matchPrepareLoop( )
 
     SiftJob* job;
     while( ( job = p._queue_stage2.pull() ) != 0 ) {
-        popsift::Image* img = job->getImg();
+        popsift::ImageBase* img = job->getImg();
 
         private_init( img->getWidth(), img->getHeight() );
 
@@ -220,19 +261,36 @@ SiftJob::SiftJob( int w, int h, const unsigned char* imageData )
     }
 }
 
+SiftJob::SiftJob( int w, int h, const float* imageData )
+    : _w(w)
+    , _h(h)
+    , _img(0)
+{
+    _f = _p.get_future();
+
+    _imageData = (unsigned char*)malloc( w*h*sizeof(float) );
+    if( _imageData != 0 ) {
+        memcpy( _imageData, imageData, w*h*sizeof(float) );
+    } else {
+        cerr << __FILE__ << ":" << __LINE__ << " Memory limitation" << endl
+             << "E    Failed to allocate memory for SiftJob" << endl;
+        exit( -1 );
+    }
+}
+
 SiftJob::~SiftJob( )
 {
     delete [] _imageData;
 }
 
-void SiftJob::setImg( popsift::Image* img )
+void SiftJob::setImg( popsift::ImageBase* img )
 {
     img->resetDimensions( _w, _h );
     img->load( _imageData );
     _img = img;
 }
 
-popsift::Image* SiftJob::getImg()
+popsift::ImageBase* SiftJob::getImg()
 {
 #ifdef USE_NVTX
     _nvtx_id = nvtxRangeStartA( "inserting image" );

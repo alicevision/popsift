@@ -94,7 +94,7 @@ void make_dog( cudaTextureObject_t src_data,
 } // namespace gauss
 
 __host__
-inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream )
+inline void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base, int octave, cudaStream_t stream )
 {
     Octave&   oct_obj = _octaves[octave];
 
@@ -126,7 +126,7 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, in
 }
 
 __host__
-inline void Pyramid::horiz_level_from_input_image( const Config& conf, Image* base, int octave, int level, cudaStream_t stream )
+inline void Pyramid::horiz_level_from_input_image( const Config& conf, ImageBase* base, int octave, int level, cudaStream_t stream )
 {
     if( octave != 0 )
     {
@@ -164,7 +164,7 @@ inline void Pyramid::horiz_level_from_input_image( const Config& conf, Image* ba
 }
 
 __host__
-inline void Pyramid::horiz_all_from_input_image( const Config& conf, Image* base, int octave, int startlevel, int maxlevel, cudaStream_t stream )
+inline void Pyramid::horiz_all_from_input_image( const Config& conf, ImageBase* base, int octave, int startlevel, int maxlevel, cudaStream_t stream )
 {
     if( octave != 0 )
     {
@@ -457,7 +457,7 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level, cudaStream_t 
  * V11: host side
  *************************************************************/
 __host__
-void Pyramid::build_pyramid( const Config& conf, Image* base )
+void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
 {
 #if (PYRAMID_PRINT_DEBUG==1)
     cerr << "Entering " << __FUNCTION__ << " with base image "  << endl
