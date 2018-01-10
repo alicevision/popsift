@@ -103,8 +103,10 @@ void Config::setModeMatching( const std::string& m )
     	_mode_matching = Config::l2;
     else if( m == "dot" )
 	_mode_matching = Config::dot;
+    else if( m == "transposed_hamming" )
+    _mode_matching = Config::transposed_hamming;
     else
-        POP_FATAL( "specified matching mode must be one of l2, dot" );
+        POP_FATAL( "specified matching mode must be one of l2, dot, transposed_hamming" );
 }
 
 

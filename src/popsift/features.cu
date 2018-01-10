@@ -318,6 +318,192 @@ compute_distance_dot( int3* match_matrix, Descriptor* l, int l_len, Descriptor* 
     }
 }
 
+    
+   __device__ void organize( unsigned char* A, unsigned char* B )
+    {
+        int i;
+        int j = 0;
+        int cnt = 0;
+        unsigned char tmp;
+        for (int j = 0; j < 8; j++)
+            for ( i = 0; i < 8 * 16; i += 8 ) {
+                B[cnt] = A[i + j];
+                cnt++;
+                
+            }
+    }
+
+    __device__ void printBits( unsigned char num ) 
+    {
+        for ( int bit = 0; bit < 8; bit++ ) 
+            {
+                printf("%i", num & 0x01);
+                num = num >> 1;
+            }
+    }
+
+
+    __device__ void printFeature( unsigned char *c ) 
+    {
+        for ( int i = 0; i < 8; i++ ) 
+            {
+                for (int j = 0; j < 16; j++)
+                    {
+                        printBits(c[ ( i * 16 ) + j]);
+                        printf( " " );
+                        //printf("%d ", (int)(( i * 16 ) + j));
+                    }
+                printf( "\n" );
+		
+            }
+
+        printf( "\n\n" );
+    }
+
+    /* hackers delight*/
+__device__ void
+transpose8rS64( unsigned char* A, unsigned char* B ) 
+{
+	unsigned long long x, t;
+	int i;
+
+	for ( i = 0; i <= 7; i++ )     // Load 8 bytes from the
+		x = x << 8 | A[i];      // input array and pack
+								  // them into x.
+
+	t = (x ^ (x >> 7)) & 0x00AA00AA00AA00AALL;
+	x = x ^ t ^ (t << 7);
+	t = (x ^ (x >> 14)) & 0x0000CCCC0000CCCCLL;
+	x = x ^ t ^ (t << 14);
+	t = (x ^ (x >> 28)) & 0x00000000F0F0F0F0LL;
+	x = x ^ t ^ (t << 28);
+
+	for ( i = 7; i >= 0; i-- ) 
+	{   // Store result into
+		B[i] = x; x = x >> 8;
+	}  // output array B.
+}
+    
+    
+    __device__ void
+    test(const float4 *src, Descriptor *des) {
+
+        if(threadIdx.x % 2 != 0)
+            return;
+        /*if(threadIdx.x != 0 && blockIdx.x != 0)
+            return;
+        */
+        const float4  tmp_src = src[threadIdx.x];
+       
+        //const float4  tmp_des = des[threadIdx.x];
+        
+        //float t1, t2, t3, t4;
+        //int *t1, *t2, *t3, *t4;
+        uchar1 *t1, *t2, *t3, *t4;
+
+        t1 = (uchar1*)&tmp_src.x;
+        t2 = (uchar1*)&tmp_src.y;
+        t3 = (uchar1*)&tmp_src.z;
+        t4 = (uchar1*)&tmp_src.w;
+
+        const float4 tmp_src2 = src[threadIdx.x+1];
+       
+        //const float4  tmp_des = des[threadIdx.x];
+        
+        //float t1, t2, t3, t4;
+        //int *t1, *t2, *t3, *t4;
+        uchar1 *t5, *t6, *t7, *t8;
+
+        t5 = (uchar1*)&tmp_src2.x;
+        t6 = (uchar1*)&tmp_src2.y;
+        t7 = (uchar1*)&tmp_src2.z;
+        t8 = (uchar1*)&tmp_src2.w;
+
+        float4* dese = (float4*)(&des[blockIdx.x]);
+        float4 tmp_des = dese[threadIdx.x];
+        uchar1 *d1, *d2, *d3, *d4;
+        d1 = (uchar1*)&tmp_des.x;
+        d2 = (uchar1*)&tmp_des.y;
+        d3 = (uchar1*)&tmp_des.z;
+        d4 = (uchar1*)&tmp_des.w;
+
+        unsigned char tmp[8];
+        unsigned char A[128];
+        unsigned char B[128];
+        for(int i = 0; i < 128; i++) {
+            A[i]= i;
+            B[i] = 0;
+        }
+
+        
+        transpose8rS64((unsigned char*)t1, tmp);
+        //transpose8rS64(A, tmp);
+        
+        __syncthreads();
+        organize(tmp, (unsigned char*)d1);
+
+        //organize(tmp, B);
+        __syncthreads();
+        if(threadIdx.x == 0 && blockIdx.x == 0) {
+            printFeature((unsigned char*)t1);
+            printFeature((unsigned char*)d1);
+            //printFeature(A);
+            //printFeature(B);
+        }
+
+        //t1 = (int*)&tmp_src.x;
+        //t2 = (int*)&tmp_src.y;
+        //t3 = (int*)&tmp_src.z;
+        //t4 = (int*)&tmp_src.w;
+
+        //des[threadIdx.x] <<= *t1 & 0;
+        //des[threadIdx.x] <<= *t1 & 1;
+        //des[threadIdx.x] <<= *t1 & 2;
+        //des[threadIdx.x] <<= *t1 & 3;
+        // des[threadIdx.x] <<= *t1 << 4;
+
+
+        //des[];
+        /*
+        const float4  mval = make_float4( lval.x * rval.x,
+                                          lval.y * rval.y,
+                                          lval.z * rval.z,
+                                          lval.w * rval.w );
+        */
+        
+        
+    }
+    
+    __device__ void
+    transpose(Descriptor * src, Descriptor *des, int size) {
+
+        if(blockIdx.x >= size) //what about r_len vs l_len is block big enough???
+            return;
+        int idx = blockIdx.x;
+        
+        const float4* tmp_src = (const float4*)( &src[idx] );
+        //const float4* tmp_des = (const float4*)( &des[idx] ); //send all?
+
+        //printf("%d\t%d\n", blockIdx.x, threadIdx.x);
+        
+        test(tmp_src, des);
+        if(threadIdx.x == 0 && blockIdx.x == 0) {
+            const float4* tmp_des = (const float4*)( &des[idx] );
+            const float4 a1 = tmp_des[0];
+            uchar1 *b = (uchar1*)&a1.x;
+            printFeature((unsigned char*)b);
+        }
+    }
+
+    __global__ void
+    compute_distance_transposed_hamming( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len , Descriptor * l_tra, Descriptor *r_tra) {
+        
+        transpose(l, l_tra, l_len);
+        //sort(l_tra)
+        
+    }
+
+    
 __global__ void
 show_distance( int3*       match_matrix,
                Feature*    l_ext,
@@ -364,6 +550,19 @@ show_distance( int3*       match_matrix,
   
 }
 
+
+    __host__ Descriptor * gpu_init(int SIZE) {
+    Descriptor *tmp;
+
+    cudaError_t err = cudaMalloc((void **)&tmp, SIZE * sizeof(Descriptor *));
+    if(err != cudaSuccess)
+        printf("%s\n", cudaGetErrorString(err));
+
+    return tmp;
+}
+
+
+    
   void DeviceFeatures::match( DeviceFeatures* other, const popsift::Config& config )
 {
 
@@ -387,13 +586,21 @@ show_distance( int3*       match_matrix,
         <<<grid,block>>>
         ( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
     }
-    else
+    else if ( config.getModeMatching() == popsift::Config::dot )
     {
     compute_distance_dot
         <<<grid,block>>>
         ( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
     }
-
+    else
+    {
+        Descriptor *l_copy = gpu_init(l_len);
+        Descriptor *r_copy = gpu_init(r_len);
+        compute_distance_transposed_hamming
+            <<<grid,block>>>
+            ( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len , l_copy, r_copy);
+    }
+    
     show_distance
         <<<1,32>>>
         ( match_matrix,

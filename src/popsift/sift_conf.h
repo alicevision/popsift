@@ -39,7 +39,8 @@ struct Config
 
     enum ModeMatching {
         l2,
-        dot
+        dot,
+        transposed_hamming
     };
 
   
