@@ -45,6 +45,17 @@ if(NOT CUDA_FOUND)
   message(FATAL_ERROR "Could not find CUDA >= 7.0")
 endif()
 
+#
+# Default setting of the CUDA CC versions to compile.
+# Shortening the lists saves a lot of compile time.
+#
+if(CUDA_VERSION_MAJOR GREATER 7)
+  set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 60 61 62)
+else(CUDA_VERSION_MAJOR GREATER 7)
+  set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 )
+endif(CUDA_VERSION_MAJOR GREATER 7)
+set(PopSift_CUDA_CC_LIST ${PopSift_CUDA_CC_LIST_BASIC} CACHE STRING "CUDA CC versions to compile")
+
 if(PopSift_USE_NVTX_PROFILING)
   message(STATUS "PROFILING CPU CODE: NVTX is in use")
 endif(PopSift_USE_NVTX_PROFILING)
@@ -77,18 +88,21 @@ if(PopSift_USE_POSITION_INDEPENDENT_CODE)
   set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xcompiler;-fPIC")
 endif()
 
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_30,code=sm_30")
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_35,code=sm_35")
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_50,code=sm_50")
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_52,code=sm_52")
-if(CUDA_VERSION_MAJOR GREATER 7)
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_60,code=sm_60")
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_61,code=sm_61")
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_62,code=sm_62")
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_62,code=compute_62")
-else(CUDA_VERSION_MAJOR GREATER 7)
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-gencode;arch=compute_52,code=compute_52")
-endif(CUDA_VERSION_MAJOR GREATER 7)
+#
+# Add all requested CUDA CCs to the command line for offline compilation
+#
+list(SORT PopSift_CUDA_CC_LIST)
+foreach(PopSift_CC_VERSION ${PopSift_CUDA_CC_LIST})
+  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-gencode;arch=compute_${PopSift_CC_VERSION},code=sm_${PopSift_CC_VERSION}")
+endforeach(PopSift_CC_VERSION)
+
+#
+# Use the highest request CUDA CC for CUDA JIT compilation
+#
+list(LENGTH PopSift_CUDA_CC_LIST PopSift_CC_LIST_LEN)
+MATH(EXPR PopSift_CC_LIST_LEN "${PopSift_CC_LIST_LEN}-1")
+list(GET PopSift_CUDA_CC_LIST ${PopSift_CC_LIST_LEN} PopSift_CUDA_CC_LIST_LAST)
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-gencode;arch=compute_${PopSift_CUDA_CC_LIST_LAST},code=compute_${PopSift_CUDA_CC_LIST_LAST}")
 
 # default stream legacy implies that the 0 stream synchronizes all streams
 # default stream per-thread implies that each host thread has one non-synchronizing 0-stream
@@ -97,6 +111,7 @@ set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;legacy")
 # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;per-thread")
 
 message(STATUS "CUDA Version is ${CUDA_VERSION}")
+message(STATUS "Compiling for CUDA CCs: ${PopSift_CUDA_CC_LIST}")
 if(CUDA_VERSION>=7.5)
   set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;-warn-lmem-usage")
   set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;-warn-spills")
