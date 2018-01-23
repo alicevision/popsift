@@ -419,19 +419,20 @@ namespace popsift {
 
         
 	
-        unsigned int * featurex = (unsigned int*)(&src[idx]);       
+        unsigned int * featurex = (unsigned int*)(src[idx].features);
 	//const float4* fx = (const float4*)(&src[idx]);
 	//const float4 fx1 = fx[0];
 	//unsigned int * featurex = (unsigned int*)&fx1.x;
 	
-        unsigned int * featurey = (unsigned int*)(&des[idx]);
+        unsigned int * featurey = (unsigned int*)(des[idx].features);
         
         //int i = blockIdx.x*blockDim.x + threadIdx.x;
         int s = threadIdx.x * 4;
         int i;
         __shared__ unsigned int T[128];
 	for (i = s; i < s + 4; i++)
-            T[i] = *(featurex + i + 128 * idx);
+            T[i] = featurex[i];
+            // T[i] = *(featurex + i + 128 * idx);
 
 
 //	    if(idx == 0 && threadIdx.x == 0) 
@@ -441,7 +442,7 @@ namespace popsift {
         if (threadIdx.x < 4)
             transpose32(T + 32 * threadIdx.x);
         __syncthreads();
-        organize_32(T, featurey + 128 * blockIdx.x);
+        organize_32(T, featurey); // organize_32(T, featurey + 128 * blockIdx.x);
 
 
 //	    if(idx == 0 && threadIdx.x == 0)
@@ -673,6 +674,23 @@ namespace popsift {
 /*
 	    thrust::device_ptr<Descriptor> d_ptr = thrust::device_pointer_cast(l_copy);
 	    
+#if 0
+
+	    desc_index = popsift::cuda::malloc_devT<int>( l_len, __FILE__, __LINE__ );
+        thrust::sequence( desc_index, desc_index+l_len );
+
+        struct IndirectLookup
+        {
+            Descriptor* base;
+            IndirectLookup( Descriptor* b ) : base(b) {}
+
+            __host__ __device__
+            inline bool operator()( int a, int b ) const
+            {
+                return compare_descriptors::operator()( base[a], base[b] );
+            }
+        };
+#endif
 	    
 	    thrust::sort(
 		d_ptr,
