@@ -21,6 +21,10 @@
 /* It makes no sense whatsoever to change this value */
 #define PREV_LEVEL 3
 
+using std::cout;
+using std::cerr;
+using std::endl;
+
 namespace popsift {
 
 namespace gauss {
@@ -78,7 +82,7 @@ void make_dog( cudaTextureObject_t src_data,
     const int idy   = blockIdx.y * blockDim.y + threadIdx.y;
 
     float a = readTex( src_data, idx, idy, 0 );
-    for( int level=0; level<max_level-2; level++ )
+    for( int level=0; level<max_level-1; level++ )
     {
         const float b = readTex( src_data, idx, idy, level+1 );
 
@@ -90,7 +94,7 @@ void make_dog( cudaTextureObject_t src_data,
 } // namespace gauss
 
 __host__
-inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, int octave, cudaStream_t stream, Config::SiftMode mode )
+inline void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base, int octave, cudaStream_t stream )
 {
     Octave&   oct_obj = _octaves[octave];
 
@@ -102,20 +106,98 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, Image* base, in
     grid.x  = grid_divide( width,  128 );
     grid.y  = height;
 
+    const Config::SiftMode& mode = conf.getSiftMode();
     float shift  = 0.5f;
 
     if( octave == 0 && ( mode == Config::PopSift || mode == Config::VLFeat ) ) {
         shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() - octave );
     }
 
-    gauss::relativeSource::horiz
+    gauss::normalizedSource::horiz
         <<<grid,block,0,stream>>>
         ( base->getInputTexture(),
           oct_obj.getIntermediateSurface(),
-          oct_obj.getWidth(),
-          oct_obj.getHeight(),
+          width,
+          height,
           octave,
           shift );
+
+    POP_SYNC_CHK;
+}
+
+__host__
+inline void Pyramid::horiz_level_from_input_image( const Config& conf, ImageBase* base, int octave, int level, cudaStream_t stream )
+{
+    if( octave != 0 )
+    {
+        POP_FATAL( "Unsupported parameter octave != 0" );
+    }
+
+    Octave&   oct_obj = _octaves[octave];
+
+    const int width   = oct_obj.getWidth();
+    const int height  = oct_obj.getHeight();
+
+    dim3 block( 128, 1 );
+    dim3 grid;
+    grid.x  = grid_divide( width,  128 );
+    grid.y  = height;
+
+    const Config::SiftMode& mode = conf.getSiftMode();
+    float shift  = 0.5f;
+
+    if( octave == 0 && ( mode == Config::PopSift || mode == Config::VLFeat ) ) {
+        shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() - octave );
+    }
+
+    gauss::normalizedSource::horiz_level
+        <<<grid,block,0,stream>>>
+        ( base->getInputTexture(),
+          oct_obj.getIntermediateSurface(),
+          width,
+          height,
+          octave,
+          level,
+          shift );
+
+    POP_SYNC_CHK;
+}
+
+__host__
+inline void Pyramid::horiz_all_from_input_image( const Config& conf, ImageBase* base, int octave, int startlevel, int maxlevel, cudaStream_t stream )
+{
+    if( octave != 0 )
+    {
+        POP_FATAL( "Unsupported parameter octave != 0" );
+    }
+
+    Octave&      oct_obj = _octaves[octave];
+
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    dim3 block( 128, 1 );
+    dim3 grid;
+    grid.x  = grid_divide( width,  128 );
+    grid.y  = height;
+
+    const Config::SiftMode& mode = conf.getSiftMode();
+    float shift  = 0.5f;
+
+    if( mode == Config::PopSift || mode == Config::VLFeat ) {
+        shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() );
+    }
+
+    gauss::normalizedSource::horiz_all
+        <<<grid,block,0,stream>>>
+        ( base->getInputTexture(),
+          oct_obj.getIntermediateSurface( ),
+          width,
+          height,
+          shift,
+          maxlevel );
+
+    POP_SYNC_CHK;
 }
 
 
@@ -147,56 +229,76 @@ inline void Pyramid::downscale_from_prev_octave( int octave, cudaStream_t stream
               oct_obj.getDataSurface( ),
               oct_obj.getWidth(),
               oct_obj.getHeight() );
+
+        POP_SYNC_CHK;
         break;
     default :
         gauss::get_by_2_interpolate
             <<<h_grid,h_block,0,stream>>>
-            ( prev_oct_obj.getDataTexLinear( ),
+            ( prev_oct_obj.getDataTexLinear( ).tex,
               _levels-PREV_LEVEL,
               oct_obj.getDataSurface( ),
               oct_obj.getWidth(),
               oct_obj.getHeight() );
+
+        POP_SYNC_CHK;
         break;
     }
 }
 
 __host__
-inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss )
+inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss )
 {
     Octave&      oct_obj = _octaves[octave];
 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    if( not useInterpolatedGauss ) {
-        dim3 block( 32,  8 ); // most stable good perf on GTX 980 TI
-        // similar speed: dim3 block( 32,  4 ); dim3 block( 32,  3 ); dim3 block( 32,  2 );
+    switch( useInterpolatedGauss )
+    {
+    case Interpolated_FromPrevious :
+        {
+            dim3 block( 128, 1 );
+            dim3 grid;
+            grid.x  = grid_divide( width,  128 );
+            grid.y  = height;
 
-        dim3 grid;
-        grid.x  = grid_divide( width,  32 );
-        grid.y  = grid_divide( height, block.y );
+            gauss::absoluteSourceInterpolated::horiz
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getDataTexLinear( ).tex,
+                  oct_obj.getIntermediateSurface( ),
+                  level );
+        }
+        break;
+    case NotInterpolated_FromPrevious :
+        {
+            dim3 block( 32,  8 ); // most stable good perf on GTX 980 TI
+            // similar speed: dim3 block( 32,  4 ); dim3 block( 32,  3 ); dim3 block( 32,  2 );
 
-        gauss::absoluteSource::horiz
-            <<<grid,block,0,stream>>>
-            ( oct_obj.getDataTexPoint( ),
-              oct_obj.getIntermediateSurface( ),
-              level );
-    } else {
-        dim3 block( 128, 1 );
-        dim3 grid;
-        grid.x  = grid_divide( width,  128 );
-        grid.y  = height;
+            dim3 grid;
+            grid.x  = grid_divide( width,  32 );
+            grid.y  = grid_divide( height, block.y );
 
-        gauss::absoluteSourceInterpolated::horiz
-            <<<grid,block,0,stream>>>
-            ( oct_obj.getDataTexLinear( ),
-              oct_obj.getIntermediateSurface( ),
-              level );
+            gauss::absoluteSource::horiz
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getDataTexPoint( ),
+                  oct_obj.getIntermediateSurface( ),
+                  level );
+        }
+        break;
+    case Interpolated_FromFirst :
+    case NotInterpolated_FromFirst :
+        POP_FATAL( "Case horizontal Gauss filtering from first level makes not sense in case horizontal Gauss filter from previous level" );
+        break;
+    default :
+        POP_FATAL( "Missing case in horizontal Gauss filter from previous level" );
+        break;
     }
+    POP_SYNC_CHK;
 }
 
 __host__
-inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t stream, bool useInterpolatedGauss )
+inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss )
 {
     Octave& oct_obj = _octaves[octave];
 
@@ -206,29 +308,125 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    if( not useInterpolatedGauss ) {
-        dim3 block( 64, 2 );
-        dim3 grid;
-        grid.x = (unsigned int)grid_divide( width,  block.x );
-        grid.y = (unsigned int)grid_divide( height, block.y );
+    switch( useInterpolatedGauss )
+    {
+    case Interpolated_FromPrevious :
+        {
+            dim3 block( 4, 32 );
+            dim3 grid;
+            grid.x = (unsigned int)grid_divide( width,  block.y );
+            grid.y = (unsigned int)grid_divide( height, block.x );
 
-        gauss::absoluteSource::vert
-            <<<grid,block,0,stream>>>
-            ( oct_obj.getIntermDataTexPoint( ),
-              oct_obj.getDataSurface( ),
-              level );
-    } else {
-        dim3 block( 4, 32 );
-        dim3 grid;
-        grid.x = (unsigned int)grid_divide( width,  block.y );
-        grid.y = (unsigned int)grid_divide( height, block.x );
+            gauss::absoluteSourceInterpolated::vert
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getIntermDataTexLinear( ).tex,
+                  oct_obj.getDataSurface( ),
+                  level );
+        }
+        break;
+    case Interpolated_FromFirst :
+        {
+            dim3 block( 4, 32 );
+            dim3 grid;
+            grid.x = (unsigned int)grid_divide( width,  block.y );
+            grid.y = (unsigned int)grid_divide( height, block.x );
 
-        gauss::absoluteSourceInterpolated::vert
-            <<<grid,block,0,stream>>>
-            ( oct_obj.getIntermDataTexLinear( ),
-              oct_obj.getDataSurface( ),
-              level );
+            gauss::absoluteSourceInterpolated::vert_abs0
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getIntermDataTexLinear( ).tex,
+                  oct_obj.getDataSurface( ),
+                  level );
+        }
+        break;
+    case NotInterpolated_FromPrevious :
+        {
+            dim3 block( 64, 2 );
+            dim3 grid;
+            grid.x = (unsigned int)grid_divide( width,  block.x );
+            grid.y = (unsigned int)grid_divide( height, block.y );
+
+            gauss::absoluteSource::vert
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getIntermDataTexPoint( ),
+                  oct_obj.getDataSurface( ),
+                  level );
+        }
+        break;
+    case NotInterpolated_FromFirst :
+        {
+            dim3 block( 64, 2 );
+            dim3 grid;
+            grid.x = (unsigned int)grid_divide( width,  block.x );
+            grid.y = (unsigned int)grid_divide( height, block.y );
+
+            gauss::absoluteSource::vert_abs0
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getIntermDataTexPoint( ),
+                  oct_obj.getDataSurface( ),
+                  level );
+        }
+        break;
+    default :
+        {
+            POP_FATAL( "Missing case in vertical Gauss filter from intermediate buffer" );
+        }
+        break;
     }
+    POP_SYNC_CHK;
+}
+
+__host__
+inline void Pyramid::vert_all_from_interm( int octave, int start_level, int max_level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss )
+{
+    Octave& oct_obj = _octaves[octave];
+
+    /* waiting for any events is not necessary, it's in the same stream as horiz
+     */
+
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    switch( useInterpolatedGauss )
+    {
+    case Interpolated_FromFirst :
+        {
+            dim3 block( 4, 32 );
+            dim3 grid;
+            grid.x = (unsigned int)grid_divide( width,  block.y );
+            grid.y = (unsigned int)grid_divide( height, block.x );
+
+            gauss::absoluteSourceInterpolated::vert_all_abs0
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getIntermDataTexLinear( ).tex,
+                  oct_obj.getDataSurface( ),
+                  start_level,
+                  max_level );
+        }
+        break;
+    case NotInterpolated_FromFirst :
+        {
+            dim3 block( 64, 2 );
+            dim3 grid;
+            grid.x = (unsigned int)grid_divide( width,  block.x );
+            grid.y = (unsigned int)grid_divide( height, block.y );
+
+            gauss::absoluteSource::vert_all_abs0
+                <<<grid,block,0,stream>>>
+                ( oct_obj.getIntermDataTexPoint( ),
+                  oct_obj.getDataSurface( ),
+                  start_level,
+                  max_level );
+        }
+        break;
+    case Interpolated_FromPrevious :
+    case NotInterpolated_FromPrevious :
+        POP_FATAL( "Case horizontal Gauss filtering from intermediate level makes not sense in case vertial-all Gauss filter from previous level" );
+        break;
+    default :
+        POP_FATAL( "Missing case in vertical-all Gauss filter from intermediate buffer" );
+        break;
+    }
+    POP_SYNC_CHK;
 }
 
 __host__
@@ -239,7 +437,7 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level, cudaStream_t 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    dim3 block( 128, 2 );
+    dim3 block( 1024, 1 );
     dim3 grid;
     grid.x = grid_divide( width,  block.x );
     grid.y = grid_divide( height, block.y );
@@ -252,13 +450,14 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level, cudaStream_t 
           oct_obj.getWidth(),
           oct_obj.getHeight(),
           max_level );
+    POP_SYNC_CHK;
 }
 
 /*************************************************************
  * V11: host side
  *************************************************************/
 __host__
-void Pyramid::build_pyramid( const Config& conf, Image* base )
+void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
 {
 #if (PYRAMID_PRINT_DEBUG==1)
     cerr << "Entering " << __FUNCTION__ << " with base image "  << endl
@@ -281,8 +480,8 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
             if( octave == 0 ) {
                 make_octave( conf, base, oct_obj, stream, true );
             } else {
-                horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode() );
-                vert_from_interm( octave, 0, stream, DontUseInterpolatedGauss );
+                horiz_from_input_image( conf, base, octave, stream );
+                vert_from_interm( octave, 0, stream, NotInterpolated_FromPrevious );
                 make_octave( conf, base, oct_obj, stream, false );
             }
         } else if( conf.getGaussMode() == Config::Fixed9 || conf.getGaussMode() == Config::Fixed15 ) {
@@ -298,36 +497,32 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
 
             cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
         } else if( conf.getScalingMode() == Config::ScaleDirect ) {
-            bool useGauss = ( conf.getGaussMode() == Config::VLFeat_Relative ) ? UseInterpolatedGauss
-                                                                               : DontUseInterpolatedGauss;
+            GaussTableChoice useGauss = ( conf.getGaussMode() == Config::VLFeat_Relative ) ? Interpolated_FromPrevious
+                                                                                           : NotInterpolated_FromPrevious;
             for( int level=0; level<_levels; level++ ) {
                 const int width  = oct_obj.getWidth();
                 const int height = oct_obj.getHeight();
 
                 if( level == 0 )
                 {
-                    horiz_from_input_image( conf, base, octave, stream, conf.getSiftMode() );
+                    horiz_from_input_image( conf, base, octave, stream );
                     vert_from_interm( octave, level, stream, useGauss );
                 }
                 else
                 {
-                    horiz_from_prev_level( octave, level, stream, DontUseInterpolatedGauss );
+                    horiz_from_prev_level( octave, level, stream, useGauss );
                     vert_from_interm( octave, level, stream, useGauss );
                 }
             }
-        } else {
-            bool useGauss = ( conf.getGaussMode() == Config::VLFeat_Relative ) ? UseInterpolatedGauss
-                                                                               : DontUseInterpolatedGauss;
-            for( int level=0; level<_levels; level++ ) {
-                const int width  = oct_obj.getWidth();
-                const int height = oct_obj.getHeight();
-
+        } else if( conf.getGaussMode() == Config::VLFeat_Relative ) {
+            for( int level=0; level<_levels; level++ )
+            {
                 if( level == 0 )
                 {
                     if( octave == 0 )
                     {
-                        horiz_from_input_image( conf, base, 0, stream, conf.getSiftMode() );
-                        vert_from_interm( octave, 0, stream, useGauss );
+                        horiz_from_input_image( conf, base, 0, stream );
+                        vert_from_interm( octave, 0, stream, Interpolated_FromPrevious );
                     }
                     else
                     {
@@ -339,15 +534,46 @@ void Pyramid::build_pyramid( const Config& conf, Image* base )
                 }
                 else
                 {
-                    horiz_from_prev_level( octave, level, stream, useGauss );
-                    vert_from_interm( octave, level, stream, useGauss );
+                    horiz_from_prev_level( octave, level, stream, Interpolated_FromPrevious );
+                    vert_from_interm( octave, level, stream, Interpolated_FromPrevious );
 
                     if( level == _levels - PREV_LEVEL ) {
                         cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
                     }
                 }
             }
+        } else if( octave == 0 && conf.getGaussMode() == Config::VLFeat_Relative_All ) {
+            horiz_all_from_input_image( conf, base, octave, 0, _levels, stream );
+            vert_all_from_interm( octave, 0, _levels, stream, NotInterpolated_FromFirst );
+            cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
+        } else {
+            for( int level=0; level<_levels; level++ )
+            {
+                if( level == 0 )
+                {
+                    if( octave == 0 )
+                    {
+                        horiz_from_input_image( conf, base, 0, stream );
+                        vert_from_interm( octave, 0, stream, NotInterpolated_FromPrevious );
+                    }
+                    else
+                    {
+                        Octave& prev_oct_obj = _octaves[octave-1];
+                        cuda::event_wait( prev_oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
 
+                        downscale_from_prev_octave( octave, stream, conf.getSiftMode() );
+                    }
+                }
+                else
+                {
+                    horiz_from_prev_level( octave, level, stream, NotInterpolated_FromPrevious );
+                    vert_from_interm( octave, level, stream, NotInterpolated_FromPrevious );
+
+                    if( level == _levels - PREV_LEVEL ) {
+                        cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
+                    }
+                }
+            }
         }
     }
     // for( int octave=_num_octaves-1; octave>=0; octave-- )

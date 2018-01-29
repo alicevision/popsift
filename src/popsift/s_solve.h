@@ -7,8 +7,19 @@
  */
 #pragma once
 
+/*
+ * Gaussian elimination is used in a lot of iterative code to solve
+ * the 3D linear equation, it is the approach classically taught in
+ * school as well. However, the 3D system has a closed-form solution
+ * that is much faster in CUDA.
+ * Retaining old code for comparative speed testing.
+ */
+#undef USE_GAUSSIAN_ELIMINATION
+
 #include <cuda_runtime.h>
 #include <stdio.h>
+
+#ifndef USE_GAUSSIAN_ELIMINATION
 
 __device__
 inline bool solve( float i[3][3], float3& b )
@@ -72,4 +83,72 @@ inline bool solve( float i[3][3], float3& b )
 
     return true;
 }
+
+#else /* USE_GAUSSIAN_ELIMINATION */
+
+__device__
+inline bool solve( float A[3][3], float3& B )
+{
+    float b[3] = { B.x, B.y, B.z };
+
+    // Gauss elimination
+    for( int j = 0 ; j < 3 ; j++ ) {
+            // look for leading pivot
+            float maxa    = 0;
+            float maxabsa = 0;
+            int   maxi    = -1;
+            for( int i = j ; i < 3 ; i++ ) {
+                float a    = A[j][i];
+                float absa = fabs( a );
+                if ( absa > maxabsa ) {
+                    maxa    = a;
+                    maxabsa = absa;
+                    maxi    = i;
+                }
+            }
+
+            // singular?
+            if( maxabsa < 1e-15 ) {
+                return false;
+            }
+
+            int i = maxi;
+
+            // swap j-th row with i-th row and
+            // normalize j-th row
+            for(int jj = j ; jj < 3 ; ++jj) {
+                float tmp = A[jj][j];
+                A[jj][j]  = A[jj][i];
+                A[jj][i]  = tmp;
+                A[jj][j] /= maxa;
+            }
+            float tmp = b[j];
+            b[j]  = b[i];
+            b[i]  = tmp;
+            b[j] /= maxa;
+
+            // elimination
+            for(int ii = j+1 ; ii < 3 ; ++ii) {
+                float x = A[j][ii];
+                for( int jj = j ; jj < 3 ; jj++ ) {
+                    A[jj][ii] -= x * A[jj][j];
+                }
+                b[ii] -= x * b[j] ;
+            }
+    }
+
+    // backward substitution
+    for( int i = 2 ; i > 0 ; i-- ) {
+            float x = b[i] ;
+            for( int ii = i-1 ; ii >= 0 ; ii-- ) {
+                b[ii] -= x * A[i][ii];
+            }
+    }
+
+    B = make_float3( b[0], b[1], b[2] );
+
+    return true;
+}
+
+#endif /* USE_GAUSSIAN_ELIMINATION */
 

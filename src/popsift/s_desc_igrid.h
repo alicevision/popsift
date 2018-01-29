@@ -9,6 +9,7 @@
 #include "sift_pyramid.h"
 #include "sift_octave.h"
 #include "sift_extremum.h"
+#include "common/debug_macros.h"
 
 /*
  * We assume that this is started with
@@ -41,7 +42,9 @@ inline static bool start_ext_desc_igrid( const int octave, Octave& oct_obj )
     ext_desc_igrid
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
-          oct_obj.getDataTexLinear( ) );
+          oct_obj.getDataTexLinear( ).tex );
+
+    POP_SYNC_CHK;
 
     return true;
 }

@@ -74,9 +74,8 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
     options_description modes("Modes");
     {
     modes.add_options()
-        ("gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
-        "Choice of span (1-sided) for Gauss filters. Default is VLFeat-like computation depending on sigma. "
-        "Options are: vlfeat, relative, opencv, fixed9, fixed15")
+        ( "gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
+          popsift::Config::getGaussModeUsage() )
         ("desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
         "Choice of descriptor extraction modes:\n"
         "loop, iloop, grid, igrid, notile\n"
@@ -98,9 +97,11 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
         "Computed filter width are lower than VLFeat/PopSift")
         ("direct-scaling", bool_switch()->notifier([&](bool b) { if(b) config.setScalingMode(popsift::Config::ScaleDirect); }),
          "Direct each octave from upscaled orig instead of blurred level.")
-        ("root-sift", bool_switch()->notifier([&](bool b) { if(b) config.setUseRootSift(true); }),
-        "Use the L1-based norm for OpenMVG rather than L2-based as in OpenCV")
         ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
+        ( "norm-mode", value<std::string>()->notifier([&](const std::string& s) { config.setNormMode(s); }),
+          popsift::Config::getNormModeUsage() )
+        ( "root-sift", bool_switch()->notifier([&](bool b) { if(b) config.setNormMode(popsift::Config::RootSift); }),
+          popsift::Config::getNormModeUsage() )
         ("filter-max-extrema", value<int>()->notifier([&](int f) {config.setFilterMaxExtrema(f); }), "Approximate max number of extrema.")
         ("filter-grid", value<int>()->notifier([&](int f) {config.setFilterGridSize(f); }), "Grid edge length for extrema filtering (ie. value 4 leads to a 4x4 grid)")
         ("filter-sort", value<std::string>()->notifier([&](const std::string& s) {config.setFilterSorting(s); }), "Sort extrema in each cell by scale, either random (default), up or down");

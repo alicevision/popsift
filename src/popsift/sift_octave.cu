@@ -247,7 +247,7 @@ void Octave::alloc_data_tex()
     tex_desc.readMode         = cudaReadModeElementType; // read as float
     tex_desc.filterMode       = cudaFilterModeLinear; // no interpolation
 
-    err = cudaCreateTextureObject( &_data_tex_linear, &res_desc, &tex_desc, 0 );
+    err = cudaCreateTextureObject( &_data_tex_linear.tex, &res_desc, &tex_desc, 0 );
     POP_CUDA_FATAL_TEST(err, "Could not create Blur data point texture: ");
 }
 
@@ -258,7 +258,7 @@ void Octave::free_data_tex()
         err = cudaDestroyTextureObject(_data_tex_point);
         POP_CUDA_FATAL_TEST(err, "Could not destroy Blur data point texture: ");
 
-        err = cudaDestroyTextureObject(_data_tex_linear);
+        err = cudaDestroyTextureObject(_data_tex_linear.tex);
         POP_CUDA_FATAL_TEST(err, "Could not destroy Blur data linear texture: ");
 
         err = cudaDestroySurfaceObject(_data_surf);
@@ -267,72 +267,75 @@ void Octave::free_data_tex()
 
 void Octave::alloc_interm_array()
 {
-        cudaError_t err;
+    cudaError_t err;
 
-        _interm_desc.f = cudaChannelFormatKindFloat;
-        _interm_desc.x = 32;
-        _interm_desc.y = 0;
-        _interm_desc.z = 0;
-        _interm_desc.w = 0;
+    _intm_desc.f = cudaChannelFormatKindFloat;
+    _intm_desc.x = 32;
+    _intm_desc.y = 0;
+    _intm_desc.z = 0;
+    _intm_desc.w = 0;
 
-        err = cudaMallocArray(&_interm_array,
-                              &_interm_desc,
-                              _w,
-                              _h,
-                              cudaArraySurfaceLoadStore);
-        POP_CUDA_FATAL_TEST(err, "Could not allocate Intermediate array: ");
+    _intm_ext.width  = _w; // for cudaMalloc3DArray, width in elements
+    _intm_ext.height = _h;
+    _intm_ext.depth  = _levels;
+
+    err = cudaMalloc3DArray( &_intm,
+                             &_intm_desc,
+                             _intm_ext,
+                             cudaArrayLayered | cudaArraySurfaceLoadStore);
+    POP_CUDA_FATAL_TEST(err, "Could not allocate Intermediate layered array: ");
 }
 
 void Octave::free_interm_array()
 {
-        cudaError_t err;
+    cudaError_t err;
 
-        err = cudaFreeArray(_interm_array);
-        POP_CUDA_FATAL_TEST(err, "Could not free Intermediate array: ");
+    err = cudaFreeArray( _intm );
+    POP_CUDA_FATAL_TEST(err, "Could not free Intermediate layered array: ");
 }
 
 void Octave::alloc_interm_tex()
 {
-        cudaError_t err;
+    cudaError_t err;
 
-        cudaResourceDesc interm_res_desc;
-        interm_res_desc.resType = cudaResourceTypeArray;
-        interm_res_desc.res.array.array = _interm_array;
+    cudaResourceDesc res_desc;
+    res_desc.resType = cudaResourceTypeArray;
+    res_desc.res.array.array = _intm;
 
-        err = cudaCreateSurfaceObject(&_interm_surf, &interm_res_desc);
-        POP_CUDA_FATAL_TEST(err, "Could not create Intermediate surface: ");
+    err = cudaCreateSurfaceObject(&_intm_surf, &res_desc);
+    POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate surface: ");
 
-        cudaTextureDesc      interm_tex_desc;
-        memset(&interm_tex_desc, 0, sizeof(cudaTextureDesc));
-        interm_tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
-        interm_tex_desc.addressMode[0] = cudaAddressModeClamp;
-        interm_tex_desc.addressMode[1] = cudaAddressModeClamp;
-        interm_tex_desc.addressMode[2] = cudaAddressModeClamp;
-        interm_tex_desc.readMode = cudaReadModeElementType; // read as float
-        interm_tex_desc.filterMode = cudaFilterModePoint; // no interpolation
+    cudaTextureDesc      tex_desc;
 
-        err = cudaCreateTextureObject(&_interm_data_tex_point,
-                                      &interm_res_desc,
-                                      &interm_tex_desc, 0);
-        POP_CUDA_FATAL_TEST(err, "Could not create Intermediate texture: ");
+    memset(&tex_desc, 0, sizeof(cudaTextureDesc));
+    tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
+    tex_desc.addressMode[0]   = cudaAddressModeClamp;
+    tex_desc.addressMode[1]   = cudaAddressModeClamp;
+    tex_desc.addressMode[2]   = cudaAddressModeClamp;
+    tex_desc.readMode         = cudaReadModeElementType; // read as float
+    tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
 
-        interm_tex_desc.filterMode = cudaFilterModeLinear; // linear interpolation
-        err = cudaCreateTextureObject(&_interm_data_tex_linear,
-                                      &interm_res_desc,
-                                      &interm_tex_desc, 0);
-        POP_CUDA_FATAL_TEST(err, "Could not create Intermediate texture: ");
+    err = cudaCreateTextureObject( &_intm_tex_point, &res_desc, &tex_desc, 0 );
+    POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate point texture: ");
+
+    tex_desc.filterMode       = cudaFilterModeLinear; // no interpolation
+
+    err = cudaCreateTextureObject( &_intm_tex_linear.tex, &res_desc, &tex_desc, 0 );
+    POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate point texture: ");
 }
 
 void Octave::free_interm_tex()
 {
-        cudaError_t err;
+    cudaError_t err;
 
-        err = cudaDestroySurfaceObject(_interm_surf);
-        POP_CUDA_FATAL_TEST(err, "Could not destroy surface object: ");
-        err = cudaDestroyTextureObject(_interm_data_tex_point);
-        POP_CUDA_FATAL_TEST(err, "Could not destroy texture object: ");
-        err = cudaDestroyTextureObject(_interm_data_tex_linear);
-        POP_CUDA_FATAL_TEST(err, "Could not destroy texture object: ");
+    err = cudaDestroyTextureObject(_intm_tex_point);
+    POP_CUDA_FATAL_TEST(err, "Could not destroy Blur intermediate point texture: ");
+
+    err = cudaDestroyTextureObject(_intm_tex_linear.tex);
+    POP_CUDA_FATAL_TEST(err, "Could not destroy Blur intermediate linear texture: ");
+
+    err = cudaDestroySurfaceObject(_intm_surf);
+    POP_CUDA_FATAL_TEST(err, "Could not destroy Blur intermediate surface: ");
 }
 
 void Octave::alloc_dog_array()
@@ -388,7 +391,7 @@ void Octave::alloc_dog_tex()
         POP_CUDA_FATAL_TEST(err, "Could not create DoG texture: ");
 
         dog_tex_desc.filterMode = cudaFilterModeLinear; // linear interpolation
-        err = cudaCreateTextureObject(&_dog_3d_tex_linear, &dog_res_desc, &dog_tex_desc, 0);
+        err = cudaCreateTextureObject(&_dog_3d_tex_linear.tex, &dog_res_desc, &dog_tex_desc, 0);
         POP_CUDA_FATAL_TEST(err, "Could not create DoG texture: ");
 }
 
@@ -396,7 +399,7 @@ void Octave::free_dog_tex()
 {
     cudaError_t err;
 
-    err = cudaDestroyTextureObject(_dog_3d_tex_linear);
+    err = cudaDestroyTextureObject(_dog_3d_tex_linear.tex);
     POP_CUDA_FATAL_TEST(err, "Could not destroy DoG texture: ");
 
     err = cudaDestroyTextureObject(_dog_3d_tex_point);

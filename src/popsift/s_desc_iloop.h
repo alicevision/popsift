@@ -10,6 +10,7 @@
 #include "sift_octave.h"
 #include "sift_extremum.h"
 #include "common/plane_2d.h"
+#include "common/debug_macros.h"
 
 __global__
 void ext_desc_iloop( const int           octave,
@@ -37,9 +38,11 @@ inline static bool start_ext_desc_iloop( const int octave, Octave& oct_obj )
     ext_desc_iloop
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
-          oct_obj.getDataTexLinear( ),
+          oct_obj.getDataTexLinear( ).tex,
           oct_obj.getWidth(),
           oct_obj.getHeight() );
+
+    POP_SYNC_CHK;
 
     return true;
 }

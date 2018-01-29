@@ -25,6 +25,7 @@ struct Config
     enum GaussMode {
         VLFeat_Compute,
         VLFeat_Relative,
+        VLFeat_Relative_All,
         OpenCV_Compute,
         Fixed9,
         Fixed15
@@ -54,6 +55,11 @@ struct Config
         Grid,        // scan in rotated mode, round pixel address
         IGrid,       // scan in rotated mode, interpolate with tex engine
         NoTile       // variant of IGrid, no duplicate gradiant fetching
+    };
+
+    enum NormMode {
+        RootSift,   // The L1-inspired norm, gives better matching results
+        Classic     // The L2-inspired norm, all descriptors on a hypersphere
     };
 
     /* To reduce time used in descriptor extraction, some extrema can be filtered
@@ -95,11 +101,9 @@ struct Config
     void setEdgeLimit( float v );
     void setThreshold( float v );
     void setInitialBlur( float blur );
-    void setUseRootSift( bool on );
     void setMaxExtreme( int m );
     void setPrintGaussTables( );
     void setDPOrientation( bool on );
-    void setNormalizationMultiplier( int mul );
     void setMaxExtrema( int extrema );
     void setFilterMaxExtrema( int extrema );
     void setFilterGridSize( int sz );
@@ -118,6 +122,12 @@ struct Config
 
     // What Gauss filter scan is desired?
     GaussMode getGaussMode( ) const;
+
+    // Call this from the constructor.
+    static GaussMode getGaussModeDefault( );
+
+    // Helper functions for the main program's usage string.
+    static const char* getGaussModeUsage( );
 
     // get the SIFT mode for more detailed sub-modes
     SiftMode getSiftMode() const;
@@ -144,19 +154,27 @@ struct Config
     // default edge_limit 10.0f from Bemap
     float    _edge_limit;
 
-    inline bool getUseRootSift( ) const {
-        return _use_root_sift;
-    }
+    /** Functions related to descriptor normalization: L2-like or RootSift
+     */
+    void               setNormMode( NormMode m );
+    void               setNormMode( const std::string& m );
+    void               setNormNode( const std::string& m );
+    void               setUseRootSift( bool on ) __attribute__ ((deprecated));
+    bool               getUseRootSift( ) const;
+    NormMode           getNormMode( NormMode m ) const;
+    static NormMode    getNormModeDefault( ); // Call this from the constructor.
+    static const char* getNormModeUsage( );  // Helper functions for the main program's usage string.
+
+    /** Functions related to descriptor normalization: multiply with a power of 2
+     */
+    int  getNormalizationMultiplier( ) const;
+    void setNormalizationMultiplier( int mul );
 
     /* The input image is stretched by 2^upscale_factor
      * before processing. The factor 1 is default.
      */
     inline float getUpscaleFactor( ) const {
         return _upscale_factor;
-    }
-
-    int getNormalizationMultiplier( ) const {
-        return _normalization_multiplier;
     }
 
     int getMaxExtrema( ) const {
@@ -268,17 +286,17 @@ private:
     bool  _assume_initial_blur;
     float _initial_blur;
 
-    /* OpenMVG requires a normalization named rootSift.
-     * Default is the OpenCV method.
+    /* OpenMVG requires a normalization named rootSift, the
+     * classical L2-inspired mode is also supported.
      */
-    bool _use_root_sift;
+    NormMode _normalization_mode;
 
     /* SIFT descriptors are normalized in a final step.
      * The values of the descriptor can also be multiplied
      * by a power of 2 if required.
      * Specify the exponent.
      */
-    int      _normalization_multiplier;
+    int _normalization_multiplier;
 
     /* Call the debug functions in gauss_filter.cu to print Gauss
      * filter width and Gauss tables in use.

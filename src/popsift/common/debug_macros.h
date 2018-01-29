@@ -14,9 +14,19 @@
 #include <assert.h>
 #include <cuda_runtime.h>
 
-void pop_check_last_error( const char* file,
-                           size_t      line );
+// synchronize device and check for an error
+void pop_sync_check_last_error( const char* file, size_t line );
+
+// check for an error without synchronizing first
+void pop_check_last_error( const char* file, size_t      line );
+
 #define POP_CHK pop_check_last_error( __FILE__, __LINE__ )
+
+#ifdef ERRCHK_AFTER_KERNEL
+#define POP_SYNC_CHK pop_sync_check_last_error( __FILE__, __LINE__ )
+#else
+#define POP_SYNC_CHK
+#endif
 
 namespace popsift {
 namespace cuda {

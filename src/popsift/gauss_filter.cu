@@ -50,15 +50,15 @@ void print_gauss_filter_symbol( int columns )
             "      level span sigma : center value -> ( interpolation value, multiplier ) [one edge value] \n" );
 
     for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
-        int span = d_gauss.inc_relative.span[lvl] + d_gauss.inc_relative.span[lvl] - 1;
+        int span = d_gauss.inc.i_span[lvl] + d_gauss.inc.i_span[lvl] - 1;
 
         printf("      %d %d ", lvl, span );
-        printf("%2.6f: ", d_gauss.inc_relative.sigma[lvl] );
-        int m = min( d_gauss.inc_relative.span[lvl], columns );
+        printf("%2.6f: ", d_gauss.inc.sigma[lvl] );
+        int m = min( d_gauss.inc.i_span[lvl], columns );
         for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.inc_relative.filter[lvl*GAUSS_ALIGN+x] );
+            printf("%0.8f ", d_gauss.inc.i_filter[lvl*GAUSS_ALIGN+x] );
         }
-        if( m < d_gauss.inc_relative.span[lvl] )
+        if( m < d_gauss.inc.i_span[lvl] )
             printf("...\n");
         else
             printf("\n");
@@ -66,27 +66,9 @@ void print_gauss_filter_symbol( int columns )
     printf("\n");
 
     printf( "\n"
-            "Relative Gauss tables\n"
+            "Gauss tables\n"
             "      level span sigma : center value -> edge value\n"
-            "    relative sigma\n" );
-
-    for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
-        int span = d_gauss.inc_relative.span[lvl] + d_gauss.inc_relative.span[lvl] - 1;
-
-        printf("      %d %d ", lvl, span );
-        printf("%2.6f: ", d_gauss.inc_relative.sigma[lvl] );
-        int m = min( d_gauss.inc_relative.span[lvl], columns );
-        for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.inc_relative.filter[lvl*GAUSS_ALIGN+x] );
-        }
-        if( m < d_gauss.inc_relative.span[lvl] )
-            printf("...\n");
-        else
-            printf("\n");
-    }
-    printf("\n");
-
-    printf("    absolute filters octave 0\n");
+            "      absolute filters octave 0 (compute level 0, all other levels directly from level 0)\n");
 
     for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
         int span = d_gauss.abs_o0.span[lvl] + d_gauss.abs_o0.span[lvl] - 1;
@@ -101,9 +83,9 @@ void print_gauss_filter_symbol( int columns )
         else
             printf("\n");
     }
-    printf("\n");
-
-    printf("    absolute filters other octaves\n");
+    printf( "\n"
+            "      absolute filters other octaves\n"
+            "      (level 0 via downscaling, all other levels directly from level 0)\n");
 
     for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
         int span = d_gauss.abs_oN.span[lvl] + d_gauss.abs_oN.span[lvl] - 1;
@@ -185,7 +167,7 @@ void init_filter( const Config& conf,
     h_gauss.required_filter_stages = levels + 3;
 
     const float initial_blur = conf.hasInitialBlur()
-                             ?  conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() )
+                             ? conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() )
                              : 0.0f;
 
     /* inc :
@@ -205,29 +187,9 @@ void init_filter( const Config& conf,
 
     h_gauss.inc.computeBlurTable( &h_gauss );
 
-    /* inc_relative :
-     * The classical Gaussian blur tables for incremental blurring,
-     * but transformed to use hardware interpolation and use only one
-     * multiplication for two pixels.
-     */
-    h_gauss.inc_relative.sigma[0] = conf.hasInitialBlur()
-                                  ? sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) )
-                                  : sigma0;
-
-    for( int lvl=1; lvl<h_gauss.required_filter_stages; lvl++ ) {
-        const float sigmaP = sigma0 * pow( 2.0f, (float)(lvl-1)/(float)levels );
-        const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl  )/(float)levels );
-
-        h_gauss.inc_relative.sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
-    }
-
-    h_gauss.inc_relative.computeBlurTable( &h_gauss );
-    h_gauss.inc_relative.transformBlurTable( &h_gauss );
-
     /* abs_o0 :
-     * Convenience Gauss table to create level 0 of the absolute filters.
-     * Technically useless, because it is identical with level 0 of inc.
-     * Must be used to create octave 0 level 0 for absolute filters.
+     * Gauss table to create octave 0 of the absolute filters directly from
+     * input images.
      */
     for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
         const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl)/(float)levels );
@@ -237,14 +199,17 @@ void init_filter( const Config& conf,
     h_gauss.abs_o0.computeBlurTable( &h_gauss );
 
     /* abs_oN :
-     * Gauss tables to create levels 1 and above directly from level 0.
-     * These filters have a very wide span, so they are mostly slow.
-     * However, absolute kernels don't have the speed-penalty of repeated
-     * reading and writing.
+     * Gauss tables to create levels 1 and above directly from level 0 of every
+     * octave. Could be used on octave 0, but abs_o0 is better.
+     * Level 0 must be created by other means (downscaling from previous octave,
+     * direct downscaling from input image, ...) before using abs_oN.
+     * 
      */
-    for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
+    h_gauss.abs_oN.sigma[0] = 0;
+    for( int lvl=1; lvl<h_gauss.required_filter_stages; lvl++ ) {
+        const float sigmaP = sigma0; // level 0 has already reached sigma0 blur
         const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl)/(float)levels );
-        h_gauss.abs_oN.sigma[lvl]  = sigmaS;
+        h_gauss.abs_oN.sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
     }
 
     h_gauss.abs_oN.computeBlurTable( &h_gauss );
@@ -283,6 +248,9 @@ void init_filter( const Config& conf,
         print_gauss_filter_symbol
             <<<1,1>>>
             ( 10 );
+
+        POP_SYNC_CHK;
+
         err = cudaGetLastError();
         POP_CUDA_FATAL_TEST( err, "Gauss Symbol info failed: " );
     }
@@ -291,11 +259,10 @@ void init_filter( const Config& conf,
 __host__
 void GaussInfo::clearTables( )
 {
-    inc         .clearTables();
-    inc_relative.clearTables();
-    abs_o0      .clearTables();
-    abs_oN      .clearTables();
-    dd          .clearTables();
+    inc            .clearTables();
+    abs_o0         .clearTables();
+    abs_oN         .clearTables();
+    dd             .clearTables();
 }
 
 __host__
@@ -309,6 +276,10 @@ int GaussInfo::getSpan( float sigma ) const
 {
     switch( _span_mode )
     {
+    case Config::VLFeat_Relative_All :
+        // return GaussInfo::vlFeatRelativeSpan( sigma );
+        return GaussInfo::vlFeatSpan( sigma );
+
     case Config::VLFeat_Compute :
         return GaussInfo::vlFeatSpan( sigma );
     case Config::VLFeat_Relative :
@@ -361,7 +332,8 @@ __host__
 void GaussTable<LEVELS>::clearTables( )
 {
     for( int i=0; i<GAUSS_ALIGN * LEVELS; i++ ) {
-        filter[i] = 0.0f;
+        filter[i]   = 0.0f;
+        i_filter[i] = 0.0f;
     }
 }
 
@@ -370,7 +342,7 @@ __host__
 void GaussTable<LEVELS>::computeBlurTable( const GaussInfo* info )
 {
     for( int level=0; level<LEVELS; level++ ) {
-        span[level] = info->getSpan( sigma[level] );
+        span[level] = min( info->getSpan( sigma[level] ), GAUSS_ALIGN-1 );
     }
 
     for( int level=0; level<LEVELS; level++ ) {
@@ -391,17 +363,22 @@ void GaussTable<LEVELS>::computeBlurTable( const GaussInfo* info )
         for( int x = 0; x < spn; x++ ) {
             filter[level*GAUSS_ALIGN + x] /= sum;
         }
+        for( int x = spn; x < GAUSS_ALIGN; x++ ) {
+            filter[level*GAUSS_ALIGN + x] = 0;
+        }
     }
+
+    transformBlurTable();
 }
 
 template<int LEVELS>
 __host__
-void GaussTable<LEVELS>::transformBlurTable( const GaussInfo* info )
+void GaussTable<LEVELS>::transformBlurTable( )
 {
     for( int level=0; level<LEVELS; level++ ) {
-        span[level] = info->getSpan( sigma[level] );
-        if( not ( span[level] & 1 ) ) {
-            span[level] -= 1;
+        i_span[level] = span[level];
+        if( not ( i_span[level] & 1 ) ) {
+            i_span[level] += 1;
         }
     }
 
@@ -413,14 +390,22 @@ void GaussTable<LEVELS>::transformBlurTable( const GaussInfo* info )
          * u = aa + ab
          * v = 1/(a+b)
          */
-        const int   spn = span[level];
+        const int   spn = i_span[level];
         for( int x = 1; x < spn; x += 2 ) {
             float a = filter[level*GAUSS_ALIGN + x];
             float b = filter[level*GAUSS_ALIGN + x + 1];
             float u = a / (a+b);
             float v = a+b;
-            filter[level*GAUSS_ALIGN + x]     = u; // ratios are odd
-            filter[level*GAUSS_ALIGN + x + 1] = v; // multipliers are even
+            i_filter[level*GAUSS_ALIGN + x]     = u; // ratios are odd
+            i_filter[level*GAUSS_ALIGN + x + 1] = v; // multipliers are even
+        }
+
+        // center stays the same
+        i_filter[level*GAUSS_ALIGN] = filter[level*GAUSS_ALIGN];
+
+        // outside of span is 0
+        for( int x = spn; x < GAUSS_ALIGN; x++ ) {
+            i_filter[level*GAUSS_ALIGN + x] = 0;
         }
     }
 }

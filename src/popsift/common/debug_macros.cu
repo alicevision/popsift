@@ -11,6 +11,12 @@
 
 using namespace std;
 
+void pop_sync_check_last_error( const char* file, size_t line )
+{
+    cudaDeviceSynchronize();
+    pop_check_last_error( file, line );
+}
+
 void pop_check_last_error( const char* file, size_t line )
 {
     cudaError_t err = cudaGetLastError( );

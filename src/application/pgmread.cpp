@@ -62,10 +62,11 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
 
     int type;
     if( pgmtype.substr(0,2) == "P2" ) type = 2;
+    else if( pgmtype.substr(0,2) == "P3" ) type = 3;
     else if( pgmtype.substr(0,2) == "P5" ) type = 5;
     else if( pgmtype.substr(0,2) == "P6" ) type = 6;
     else {
-        cerr << "File " << input_file << " can only contain P2, P5 or P6 PGM images" << endl;
+        cerr << "File " << input_file << " can only contain P2, P3, P5 or P6 PGM images" << endl;
         return 0;
     }
 
@@ -137,6 +138,42 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
                 delete [] input_data;
                 return 0;
             }
+        }
+        break;
+    case 3 :
+        {
+            unsigned char* i2 = new unsigned char[ w * h * 3 ];
+            unsigned char* src = i2;
+            for( int i=0; i<w*h*3; i++ ) {
+                int input;
+                pgmfile >> input;
+                if( maxval == 255 ) {
+                    i2[i] = input;
+                } else {
+                    i2[i] = (unsigned char)(input * 255.0 / maxval );
+                }
+                if( pgmfile.fail() ) {
+                    cerr << "File " << input_file << " file too short" << endl;
+                    delete [] i2;
+                    delete [] input_data;
+                    return 0;
+                }
+            }
+            for( int i=0; i<w*h; i++ ) {
+#ifdef RGB2GRAY_IN_INT
+                unsigned int r = *src; src++;
+                unsigned int g = *src; src++;
+                unsigned int b = *src; src++;
+                unsigned int res = ( ( R_RATE*r+G_RATE*g+B_RATE*b ) >> RATE_SHIFT );
+                input_data[i] = (unsigned char)res;
+#else // RGB2GRAY_IN_INT
+                float r = *src; src++;
+                float g = *src; src++;
+                float b = *src; src++;
+                input_data[i] = (unsigned char)( R_RATE*r+G_RATE*g+B_RATE*b );
+#endif // RGB2GRAY_IN_INT
+            }
+            delete [] i2;
         }
         break;
     case 5 :

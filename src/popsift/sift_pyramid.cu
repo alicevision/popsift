@@ -223,7 +223,7 @@ Pyramid::~Pyramid()
     delete[] _octaves;
 }
 
-void Pyramid::step1( const Config& conf, popsift::Image* img )
+void Pyramid::step1( const Config& conf, popsift::ImageBase* img )
 {
     reset_extrema_mgmt( );
     build_pyramid( conf, img );
@@ -287,8 +287,15 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
     nvtxRangePushA( "download descriptors" );
     FeaturesHost* features = new FeaturesHost( hct.ext_total, hct.ori_total );
 
+    if( hct.ext_total == 0 )
+    {
+        nvtxRangePop();
+        return features;
+    }
+
     dim3 grid( grid_divide( hct.ext_total, 32 ) );
     prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
+    POP_SYNC_CHK;
 
     nvtxRangePushA( "register host memory" );
     features->pin( );
@@ -319,6 +326,7 @@ void Pyramid::clone_device_descriptors_sub( const Config& conf, FeaturesDev* fea
 
     dim3 grid( grid_divide( hct.ext_total, 32 ) );
     prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
+    POP_SYNC_CHK;
 
     popcuda_memcpy_async( features->getFeatures(),
                           dobuf_shadow.features,

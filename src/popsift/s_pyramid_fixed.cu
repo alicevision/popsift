@@ -209,7 +209,7 @@ void octave_fixed( cudaTextureObject_t src_data,
 
 template<int SHIFT, bool OCT_0, int LEVELS>
 __host__
-inline void make_octave_sub( const Config& conf, Image* base, Octave& oct_obj, cudaStream_t stream )
+inline void make_octave_sub( const Config& conf, ImageBase* base, Octave& oct_obj, cudaStream_t stream )
 {
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
@@ -266,7 +266,7 @@ inline void make_octave_sub( const Config& conf, Image* base, Octave& oct_obj, c
     }
 }
 
-void Pyramid::make_octave( const Config& conf, Image* base, Octave& oct_obj, cudaStream_t stream, bool isOctaveZero )
+void Pyramid::make_octave( const Config& conf, ImageBase* base, Octave& oct_obj, cudaStream_t stream, bool isOctaveZero )
 {
     if( _levels == 6 ) {
         if( conf.getGaussMode() == Config::Fixed9 ) {

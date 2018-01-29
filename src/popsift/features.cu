@@ -293,6 +293,8 @@ void FeaturesDev::match( FeaturesDev* other )
         <<<grid,block>>>
         ( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
 
+    POP_SYNC_CHK;
+
     show_distance
         <<<1,32>>>
         ( match_matrix,
@@ -305,6 +307,7 @@ void FeaturesDev::match( FeaturesDev* other )
           other->getReverseMap(),
           r_len );
 
+    POP_SYNC_CHK;
 
     cudaFree( match_matrix );
 }
