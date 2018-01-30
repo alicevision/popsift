@@ -19,6 +19,7 @@
 #include "common/debug_macros.h"
 #include "sift_conf.h"
 #include <thrust/sort.h>
+#include <thrust/device_vector.h>
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 
@@ -357,10 +358,11 @@ namespace popsift {
         
         printf( "\n\n" );
     }
+
     
     __device__ void
     transpose32(unsigned int *A) {
-        int j, k;
+	int j, k;
         unsigned m, t;
         
         m = 0x0000FFFF;
@@ -372,9 +374,22 @@ namespace popsift {
             }
         }
     }
+
+    __device__ void
+    organize( unsigned int* A, unsigned int* B )
+    {
+	int i, j;
+	int cnt = 0;
+	for (j = 0; j < 32; j++)
+	    for ( i = 0; i < 32 * 4; i += 32 )
+	    {
+		B[cnt] = A[i + j];
+		cnt++;   
+	    }
+    }
     
     __device__ void
-    organize_32( unsigned int* A, unsigned int* B )
+    organize_32( float* A, float* B )
     {
         int i = threadIdx.x;
         int cnt = threadIdx.x * 4;
@@ -382,99 +397,74 @@ namespace popsift {
 	{
 	    B[cnt] = A[i + j];
 	    cnt++;   
-                
+	}
+    }
+
+       
+    __device__ void
+    organize_A( unsigned int* A, unsigned int* B )
+    {
+        for (int j = 0; j < 128; j++)
+	{
+	    B[j] = A[j];	
 	}
     }
 	
-    // Using __shared__ variables within a descriptor
-    __global__ void
-    compute_distance_shared_32(unsigned int *featurex, unsigned int *featurey)
-    {
-//int i = blockIdx.x*blockDim.x + threadIdx.x;
-	int s = threadIdx.x * 4;
-	int i;
-	__shared__ unsigned int T[128];
-	for (i = s; i < s + 4; i++)
-	    T[i] = *(featurex + i + 128 * blockIdx.x);
-        
-	__syncthreads();
-	if (threadIdx.x < 4)
-	    transpose32(T + 32 * threadIdx.x);
-	__syncthreads();
-	organize_32(T, featurey + 128 * blockIdx.x);
-        
-        
-//__syncthreads();
-//if (threadIdx.x == 0 && blockIdx.x == 32)
-//printFeature(featurey + DIMENSIONS * blockIdx.x);
-        
-    }
-    
   
     
     __device__ void
     transpose(Descriptor * src, Descriptor *des, int size) {
               
-        int idx = blockIdx.x;
+        int block = blockIdx.x;
+	int thread = threadIdx.x;
 
-        
-	
-        unsigned int * featurex = (unsigned int*)(&src[idx]);       
-	//const float4* fx = (const float4*)(&src[idx]);
-	//const float4 fx1 = fx[0];
-	//unsigned int * featurex = (unsigned int*)&fx1.x;
-	
-        unsigned int * featurey = (unsigned int*)(&des[idx]);
-        
-        //int i = blockIdx.x*blockDim.x + threadIdx.x;
-        int s = threadIdx.x * 4;
-        int i;
-        __shared__ unsigned int T[128];
-	for (i = s; i < s + 4; i++)
-            T[i] = *(featurex + i + 128 * idx);
+	const float * source = (float*)(src[block].features);       	
+        float * destination = (float*)(des[block].features);
 
-
-//	    if(idx == 0 && threadIdx.x == 0) 
-//		printFeature(featurex);
 	    
-        __syncthreads();        
-        if (threadIdx.x < 4)
-            transpose32(T + 32 * threadIdx.x);
-        __syncthreads();
-        organize_32(T, featurey + 128 * blockIdx.x);
+        int s = thread * 4;
+        int i;
 
+	__shared__ float T[128];
+	
+	for (i = s; i < s + 4; i++)
+	    T[i] = source[i];
+	    
+	
+	 __syncthreads();
 
-//	    if(idx == 0 && threadIdx.x == 0)
-//		printFeature(featurey+128*idx);
+	 
+	 //if(block == 0 && thread == 0) 
+	 //    printFeature((unsigned int*)T);
 
+	 
+	 if (thread < 4)
+	     transpose32((unsigned int*)&T[32 * thread]);     	    
+       
+	 __syncthreads();
+	 
+	 
+	 organize_32(T, destination);
+	 
+	 //if(thread == 0 && block == 0)
+	 //printFeature((unsigned int*)destination);	 	 
+	 
 	__syncthreads();
 
-	//if(idx == 0 && threadIdx.x == 0)
-	//   printFeature((unsigned int*)des+128*idx);
-	//const int N = 2;	
-	//std::string s1((char*)featurey+128*idx, 16);
-	//std::string s2((char*)featurex, 16);
-	//int keys[N] = {1, 2};
-	//char values[N] = {'b', 'a'};	    
-	//thrust::stable_sort_by_key(thrust::device, keys, keys+N, values);
-        
        
     }
     
     __global__ void
-    compute_distance_transposed_hamming( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len , Descriptor * l_tra, Descriptor *r_tra) {
+    compute_distance_transposed_hamming( int3* match_matrix, Descriptor * l, int l_len, Descriptor* r, int r_len , Descriptor * l_tra, Descriptor *r_tra) {
 
         if(blockIdx.x > l_len)
             return;
 
-	if(blockIdx.x == 2 && threadIdx.x == 0)
-	    printFeature((unsigned int*)l+128*blockIdx.x);
-	
-	
         transpose(l, l_tra, l_len);
 	
-	if(blockIdx.x == 2 && threadIdx.x == 0)
-	printFeature((unsigned int*)l_tra+128*blockIdx.x);
+	
+	//if(blockIdx.x == 0 && threadIdx.x == 0)
+	//    printFeature((unsigned int*)l_tra[blockIdx.x].features);		       
 	
 	
     }
@@ -489,24 +479,8 @@ namespace popsift {
 		printf("%u\t", l_tra[i].features[j]);
 	    printf("\n");
 	}
-	/*
-	unsigned int * t = (unsigned int*)(&l_tra[0]);
-	printFeature((unsigned int *)t);
-	t = (unsigned int*)(&l_tra[1]);
-	printFeature((unsigned int *)t);
-	t = (unsigned int*)(&l_tra[2]);
-	printFeature((unsigned int *)t);
-	t = (unsigned int*)(&l_tra[3]);
-	printFeature((unsigned int *)t);
-	t = (unsigned int*)(&l_tra[4]);
-	printFeature((unsigned int *)t);
-	t = (unsigned int*)(&l_tra[5]);
-	printFeature((unsigned int *)t);
-	t = (unsigned int*)(&l_tra[6]);
-	printFeature((unsigned int *)t);
-	*/
-	printf("-------\n");
-	//printFeature((unsigned int *)l_tra + 128);
+	
+	printf("-------\n");	
     }
 
     struct compare_descriptors {
@@ -521,6 +495,19 @@ namespace popsift {
 	    }
 	    return false;
 	}
+    };
+
+    struct IndirectLookup
+    {
+	Descriptor* base;
+	//struct compare_descriptors comp;
+	
+	IndirectLookup( Descriptor* b ) : base(b) {}
+	__host__ __device__
+	inline bool operator()( int a, int b ) const
+	    {
+		return compare_descriptors()(base[a], base[b]);//operator()( base[a], base[b] );
+	    }
     };
 
     
@@ -577,7 +564,8 @@ namespace popsift {
 	cudaError_t err = cudaMalloc((void **)&tmp, SIZE * sizeof(Descriptor));
 	if(err != cudaSuccess)
 	    printf("%s\n", cudaGetErrorString(err));
-
+//	cudaMemset(tmp, 0, SIZE*sizeof(Descriptor));  //no function??
+	
 	return tmp;
     }
 
@@ -628,61 +616,67 @@ namespace popsift {
 	
 	    Descriptor *l_copy = gpu_init(l_len);
 	    Descriptor *r_copy = gpu_init(r_len);
-/*
-	    compute_distance_print
-		<<<1, 1>>>
-		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len , l_copy, r_copy);
-	    cudaDeviceSynchronize();*/
+
+	    //TRANSPOSE
 	    compute_distance_transposed_hamming
 		<<<grid,block>>>
 		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len , l_copy, r_copy);
 	    
 	    cudaDeviceSynchronize();
-	    // printf("%f\n", [0].features[0]);
 	    
-	    Descriptor *h_data;
 	    Descriptor *d_data;
-	    Descriptor *tmp_host = (Descriptor*)malloc(l_len * sizeof(Descriptor));
-	    //h_data = l_copy;
+
+	    int SIZE = 20;
 
 	    cudaMalloc(
 		&d_data,
 		l_len*sizeof(Descriptor));
-
-	    cudaDeviceSynchronize();
-	    compute_distance_print
-		<<<1, 1>>>
-		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len , l_copy, r_copy);
-
-
-	    /*
+	    
 	    cudaMemcpy(
 		d_data,
 	        l_copy,
-		l_len*sizeof(Descriptor),
+		SIZE*sizeof(Descriptor),
 		cudaMemcpyDeviceToDevice);
 
-	    */
-	    /*
-	     cudaDeviceSynchronize();
-	    compute_distance_print
-		<<<1, 1>>>
-		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len , d_data, r_copy);
-	    */
-	    //thrust::device_ptr<Descriptor> d_ptr(d_data);
-/*
-	    thrust::device_ptr<Descriptor> d_ptr = thrust::device_pointer_cast(l_copy);
+	    thrust::device_vector<Descriptor> d_vec(d_data, d_data+SIZE);
+	    Descriptor * desc_ptr = thrust::raw_pointer_cast(d_vec.data());
 	    
+	    thrust::device_vector<int> desc_index(SIZE);
+//= popsift::cuda::malloc_devT<int>( l_len, __FILE__, __LINE__ );
 	    
+	    thrust::sequence( desc_index.begin(), desc_index.end());
+
+/*	    thrust::copy(
+		desc_index.begin(),
+		desc_index.end(),
+		std::ostream_iterator<int>(std::cout, " \n"));
+*/
 	    thrust::sort(
-		d_ptr,
-		d_ptr+l_len,
-		compare_descriptors());
+		desc_index.begin(),
+		desc_index.end(),
+		IndirectLookup(desc_ptr));
+
+
+	    thrust::copy(
+		desc_index.begin(),
+		desc_index.end(),
+		std::ostream_iterator<int>(std::cout, " \n"));
+	    //for(int i = 0; i < l_len; i++)
+	    //	printf("%d ", desc_index[i]);
+		
+
+	    
+	    
+/*
+  thrust::sort(
+  d_ptr,
+  d_ptr+l_len,
+  compare_descriptors());
 */
 	    cudaDeviceSynchronize();
-	    compute_distance_print
+/*	    compute_distance_print
 		<<<1, 1>>>
-		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len , l_copy, r_copy);
+		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len , l_copy, r_copy);*/
 /*
 	    cudaMemcpy(
 		tmp_host,
