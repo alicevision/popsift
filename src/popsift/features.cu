@@ -624,73 +624,73 @@ namespace popsift {
 	    
 	    cudaDeviceSynchronize();
 	    
-	    Descriptor *d_data;
+	    const int SIZE = 100;
 
-	    int SIZE = 20;
+	    thrust::device_ptr<Descriptor> d_ptr(l_copy);
+	    thrust::device_vector<int> B(SIZE);
+	    thrust::sequence(B.begin(), B.end());
+	    thrust::sort(B.begin(), B.end(), IndirectLookup(l_copy));
+	    thrust::host_vector<int> H = B;
+	     thrust::copy(H.begin(), H.end(), std::ostream_iterator<int>(std::cout, " "));
+	     int cnter = 0;
+	    for(int i = 0; i < SIZE; i++) {
+		for(int j = 0; j < SIZE; j++) {
+		    if(i != j) {
+			if (H[j] == H[i]) {
+			    cnter++;
+			}
+		    }
+		    
+		}
+	    }
+	    std::cout << "l_len: " <<  SIZE << " cnt: " << cnter << std::endl;
+	    std::exit(1);
+	    int *desc_index = popsift::cuda::malloc_devT<int>(SIZE, __FILE__, __LINE__ );
+	    thrust::sequence(thrust::device, desc_index, desc_index+SIZE);
 
-	    cudaMalloc(
-		&d_data,
-		l_len*sizeof(Descriptor));
-	    
+	    int b[SIZE];
+
 	    cudaMemcpy(
-		d_data,
-	        l_copy,
-		SIZE*sizeof(Descriptor),
-		cudaMemcpyDeviceToDevice);
-
-	    thrust::device_vector<Descriptor> d_vec(d_data, d_data+SIZE);
-	    Descriptor * desc_ptr = thrust::raw_pointer_cast(d_vec.data());
-	    
-	    thrust::device_vector<int> desc_index(SIZE);
-//= popsift::cuda::malloc_devT<int>( l_len, __FILE__, __LINE__ );
-	    
-	    thrust::sequence( desc_index.begin(), desc_index.end());
-
-/*	    thrust::copy(
-		desc_index.begin(),
-		desc_index.end(),
-		std::ostream_iterator<int>(std::cout, " \n"));
-*/
-	    thrust::sort(
-		desc_index.begin(),
-		desc_index.end(),
-		IndirectLookup(desc_ptr));
-
-
-	    thrust::copy(
-		desc_index.begin(),
-		desc_index.end(),
-		std::ostream_iterator<int>(std::cout, " \n"));
-	    //for(int i = 0; i < l_len; i++)
-	    //	printf("%d ", desc_index[i]);
-		
-
-	    
-	    
-/*
-  thrust::sort(
-  d_ptr,
-  d_ptr+l_len,
-  compare_descriptors());
-*/
-	    cudaDeviceSynchronize();
-/*	    compute_distance_print
-		<<<1, 1>>>
-		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len , l_copy, r_copy);*/
-/*
-	    cudaMemcpy(
-		tmp_host,
-		d_data,
-		l_len*sizeof(Descriptor),
+		b,
+	        desc_index,
+		SIZE*sizeof(int),
 		cudaMemcpyDeviceToHost);
-*/
 
-  
-	    //int tmp_size = l_len;
+	    thrust::sort(b, b+SIZE);
 	    
-	    // for(int i = 0; i < tmp_size; i++)
-	    //	printf("%f %f\n", tmp_host[i].features[126], tmp_host[i].features[127]);
-	
+
+	    thrust::sort(
+		thrust::device,
+		desc_index,
+		desc_index+SIZE,
+		IndirectLookup(l_copy) //Issue here
+		);
+
+
+	    int a[SIZE];
+
+	    cudaMemcpy(
+		a,
+	        desc_index,
+		SIZE*sizeof(int),
+		cudaMemcpyDeviceToHost);
+
+	    bool success = true;
+	    for(int i = 0; i < SIZE; i++) {
+		bool tmp = false;
+		for(int j = 0; j < SIZE; j++) {
+		    if(b[i] == a[j])
+			tmp = true;
+		}
+		if(tmp == false)
+		    success = false;
+	    }
+
+	    if(success)
+		printf("SUCCESS\n");
+	    else
+		printf("ERROR\n");
+	    
 	}
 
 	show_distance
