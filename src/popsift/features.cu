@@ -322,7 +322,7 @@ namespace popsift {
 	}
     }
 
-    __device__ void
+    __host__ __device__ void
     printBits( unsigned int num )
     {
         for ( int bit = 0; bit < 32; bit++ )
@@ -333,7 +333,7 @@ namespace popsift {
     }
 
   
-    __device__ void
+    __host__ __device__ void
     printFeature( unsigned int *num )
     {
         for ( int i = 0; i < 128; i += 4 ) {
@@ -487,20 +487,87 @@ namespace popsift {
 	template <typename T>
 	__host__ __device__
 	bool operator()(const T &l, const T &r) const {
-	    for(int i = 0; i < 128; i++) {
-		if(l.features[i] > r.features[i])
-		    return true;
-		if(l.features[i] < r.features[i])
-		    return false;
+	    //for(int i = 0; i < 128; i++) {
+
+	    unsigned char *a, *b;
+	    a = (unsigned char*)&l;
+	    b = (unsigned char*)&r;
+
+	    int i = 0;
+	    {
+		{
+		    {
+			
+			while(i < 512) {
+			    
+			    if(a[i] < b[i]) {
+				//printf("%d\t%d\n", a[i], b[i]);
+				return true;
+				}
+			    
+			    if(a[i] > b[i]) {
+				printf("%d\t%d\n", a[i], b[i]);				
+				return false;
+			    }
+		
+			    if(a[i-1] < b[i-1])
+				return true;
+
+			    if(a[i-1] > b[i-1])
+				return false;
+
+		
+			    if(a[i-2] < b[i-2])
+				return true;
+
+			    if(a[i-2] > b[i-2])
+				return false;
+
+		
+			    if(a[i-3] < b[i-3])
+				return true;
+
+			    if(a[i-3] > b[i-3])
+				return false;
+			    i+=4;
+			    //printf("%d\n", a[i]);
+		
+			    /*
+			      if((unsigned int)l.features[i] < (unsigned int)r.features[i]) {
+			
+			      return true;
+			      }
+			      if((unsigned int)l.features[i] > (unsigned int)r.features[i])
+			      return false;
+			      i++;
+			    */
+			}
+		    }
+		}
 	    }
 	    return false;
+	    
+
+	    /*
+	    if(l.features[0] > r.features[0])
+		return true;
+	    if(l.features[0] < r.features[0])
+		return false;
+	    if(l.features[1] > r.features[1])
+		return true;
+	    if(l.features[1] < r.features[1])
+		return false;
+	    if(l.features[2] > r.features[2])
+		return true;
+	    
+	    return false;
+	    */
 	}
     };
 
     struct IndirectLookup
     {
 	Descriptor* base;
-	//struct compare_descriptors comp;
 	
 	IndirectLookup( Descriptor* b ) : base(b) {}
 	__host__ __device__
@@ -508,6 +575,51 @@ namespace popsift {
 	    {
 		return compare_descriptors()(base[a], base[b]);//operator()( base[a], base[b] );
 	    }
+    };
+
+    struct char_array {
+	float v[128];
+	//float w;
+    };
+
+    struct cmp_test2 {
+	template<typename T>
+	__host__ __device__
+	bool operator()(const T &a, const T &b) const {
+	    	    
+	    /*
+	    for(int i = 0; i <= 1; i++) {
+		if(a.v[i] < b.v[i])
+		    return true;
+		if(b.v[i] > a.v[i])
+		    return false;
+		    }	    
+	    return false;
+	    */
+
+	    int i = 0;
+
+	    while(i < 128) {
+	    if(a.v[i] < b.v[i])
+		return true;
+	    if(b.v[i] < a.v[i])
+		return false;
+	    i++;
+	    }
+	    //if(a.v[1] < b.v[1])
+	    //return true;
+	    
+	    return false;
+	}
+    };
+
+    struct cmp_test {
+	char_array *base;
+	cmp_test(char_array *b) : base(b){}
+	__host__ __device__
+	inline bool operator() (int a, int b) const {
+	    return cmp_test2()(base[a], base[b]);
+	}
     };
 
     
@@ -624,9 +736,13 @@ namespace popsift {
 	    
 	    cudaDeviceSynchronize();
 	    
-	    const int SIZE = 100;
+	    const int SIZE = l_len;
 
-	    thrust::device_ptr<Descriptor> d_ptr(l_copy);
+
+	    //thrust::device_ptr<int> off_ptr = thrust::device_pointer_cast();
+
+
+	    /*thrust::device_ptr<Descriptor> d_ptr(l_copy);
 	    thrust::device_vector<int> B(SIZE);
 	    thrust::sequence(B.begin(), B.end());
 	    thrust::sort(B.begin(), B.end(), IndirectLookup(l_copy));
@@ -645,51 +761,161 @@ namespace popsift {
 	    }
 	    std::cout << "l_len: " <<  SIZE << " cnt: " << cnter << std::endl;
 	    std::exit(1);
+	      */
+	    
 	    int *desc_index = popsift::cuda::malloc_devT<int>(SIZE, __FILE__, __LINE__ );
-	    thrust::sequence(thrust::device, desc_index, desc_index+SIZE);
+	    //thrust::sequence(thrust::device, desc_index, desc_index+SIZE);
+	    	   
+	     thrust::device_ptr<int> d = thrust::device_pointer_cast(desc_index);	    
+	     thrust::sequence(d, d+SIZE);
+	    	    
+	    
+	    int *t1 = thrust::raw_pointer_cast(d);
+	    //int c[SIZE];
+	    //cudaMemcpy(c, t1, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
 
+
+
+	    //thrust::sort(thrust::device, desc_index, desc_index+SIZE, IndirectLookup(l_copy));
+	    
 	    int b[SIZE];
 
 	    cudaMemcpy(
 		b,
-	        desc_index,
+	        t1,
 		SIZE*sizeof(int),
 		cudaMemcpyDeviceToHost);
 
-	    thrust::sort(b, b+SIZE);
-	    
 
+	    //thrust::sort(b, b+SIZE, thrust::greater<int>());
+
+	    thrust::sort(d, d+SIZE, IndirectLookup(l_copy));			
+	   
+/*
 	    thrust::sort(
 		thrust::device,
 		desc_index,
 		desc_index+SIZE,
 		IndirectLookup(l_copy) //Issue here
 		);
+*/
 
-
+	
 	    int a[SIZE];
 
-	    cudaMemcpy(
-		a,
-	        desc_index,
-		SIZE*sizeof(int),
-		cudaMemcpyDeviceToHost);
+	    int *t2 = thrust::raw_pointer_cast(d);
+	    cudaMemcpy(a, t2, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
 
+	    
+
+	    //cudaMemcpy(a, desc_index, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
+
+	    //thrust::sort(a, a+SIZE, thrust::greater<int>());
+	    
+	    //    for(int i = 0; i < SIZE; i++)
+	    //	  printf("%d\t%d\n", b[i], a[i]);
+
+	    int counter = 0;
+	    
 	    bool success = true;
 	    for(int i = 0; i < SIZE; i++) {
 		bool tmp = false;
-		for(int j = 0; j < SIZE; j++) {
+		for(int j = 0; j < SIZE; j++) {		    
 		    if(b[i] == a[j])
 			tmp = true;
 		}
-		if(tmp == false)
+		if(tmp == false) {
 		    success = false;
+		    counter++;
+		}
 	    }
 
-	    if(success)
+	    Descriptor *tmp = (Descriptor*)malloc(l_len*sizeof(Descriptor));
+
+	    cudaMemcpy(tmp, l_copy, l_len*sizeof(Descriptor), cudaMemcpyDeviceToHost);
+
+	    int print = 0;
+	    
+	    if(success) {
 		printf("SUCCESS\n");
+		if(print) {
+		    printFeature((unsigned int*)&tmp[a[50]]);
+		    printFeature((unsigned int*)&tmp[a[51]]);
+		    printFeature((unsigned int*)&tmp[a[52]]);
+		}
+	    }
 	    else
-		printf("ERROR\n");
+		printf("ERROR %d indexes missing\n", counter);
+
+
+	    /*
+	    int *ind = popsift::cuda::malloc_devT<int>(SIZE, __FILE__, __LINE__ );
+	    thrust::sequence(thrust::device, ind, ind+SIZE);	    	   
+	    
+	    struct char_array *data;
+	    cudaMalloc(&data, sizeof(char_array)*SIZE);
+
+	    float da[SIZE*128];
+	    for(int i = 0; i < SIZE*128; i++)
+		da[i] = rand()%100;
+
+	     cudaMemcpy(data, da, sizeof(Descriptor)*SIZE, cudaMemcpyDeviceToDevice);
+
+	    
+	  
+	    int copy1[SIZE];
+	    cudaMemcpy(copy1, ind, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
+	    //thrust::sort(copy1, copy1+SIZE, thrust::greater<int>());
+
+	    thrust::sort(thrust::device, ind, ind+SIZE, cmp_test(data));
+	    
+	    int copy[SIZE];
+	    cudaMemcpy(copy, ind, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
+
+	    //thrust::sort(copy, copy+SIZE);
+
+
+	    bool error = false;
+
+	    for(int i = 0; i < SIZE; i++) {
+		bool tmp = false;
+		for(int j = 0; j < SIZE; j++)  {
+		    if(copy1[i] == copy[j])
+			tmp = true;
+		}
+		if(!tmp)
+		    error = true;
+	    }
+
+	    for(int i = 0; i < SIZE; i++)
+		printf("%d\t%d\n", copy1[i], copy[i]);
+
+	    if(error)
+		printf("ERRORRRRRRRRRR\n");
+	    else {
+		struct char_array *tp = (struct char_array*)malloc(SIZE*sizeof(char_array));
+		cudaMemcpy(tp, data, sizeof(char_array)*SIZE, cudaMemcpyDeviceToHost);
+		for(int i = 0; i < SIZE-1; i++) {
+		    for(int j = 0; j < 128; j++){
+			if(tp[copy[i]].v[j] < tp[copy[i+1]].v[j])
+			    continue;
+			else if(tp[copy[i]].v[j] < tp[copy[i+1]].v[j])
+			    printf("%f\t%f\n", tp[copy[0]].v[0], tp[copy[1]].v[0]);
+			}
+		    }
+		    
+		//printf("%f\t%f\t%f\n", tp[copy[0]].v[0], tp[copy[1]].v[0], tp[copy[2]].v[0]);
+	    }
+	    */
+
+	    /*
+	     * Stumbled upon the error
+	     * seems like the issue is that the floats are an array (memory error?)	    
+	     */
+	    
+
+		
+	    
 	    
 	}
 
