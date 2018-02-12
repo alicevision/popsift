@@ -13,7 +13,7 @@ install:
     - cmd: >-
           call cudaInstallAppveyor.cmd
     - vcpkg update
-    - vcpkg install --featurepackages boost-system:x64-windows boost-program-options:x64-windows boost-thread:x64-windows boost-filesystem:x64-windows cuda:x64-windows
+    - vcpkg install --featurepackages boost-system:x64-windows boost-program-options:x64-windows boost-thread:x64-windows boost-filesystem:x64-windows
 
 before_build:
     - md build
