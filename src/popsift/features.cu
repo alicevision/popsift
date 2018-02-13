@@ -103,12 +103,16 @@ void FeaturesHost::pin( )
     if( err != cudaSuccess ) {
         cerr << __FILE__ << ":" << __LINE__ << " Runtime warning:" << endl
              << "    Failed to register feature memory in CUDA." << endl
+             << "    Features count: " << getFeatureCount() << endl
+             << "    Memory size requested: " << getFeatureCount() * sizeof(Feature) << endl
              << "    " << cudaGetErrorString(err) << endl;
     }
     err = cudaHostRegister( _ori, getDescriptorCount() * sizeof(Descriptor), 0 );
     if( err != cudaSuccess ) {
         cerr << __FILE__ << ":" << __LINE__ << " Runtime warning:" << endl
              << "    Failed to register descriptor memory in CUDA." << endl
+             << "    Descriptors count: " << getDescriptorCount() << endl
+             << "    Memory size requested: " << getDescriptorCount() * sizeof(Descriptor) << endl
              << "    " << cudaGetErrorString(err) << endl;
     }
 }
