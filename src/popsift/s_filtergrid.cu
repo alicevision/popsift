@@ -17,7 +17,7 @@
 
 using namespace std;
 
-#if (__CUDACC_VER__ >= 80000) && not defined(DISABLE_GRID_FILTER)
+#if not defined(DISABLE_GRID_FILTER)
 
 #include <thrust/device_vector.h>
 #include <thrust/sequence.h>
@@ -64,18 +64,6 @@ struct FunctionExtractCell
         InitialExtremum& e = dobuf.i_ext_dat[octave][idx];
 
         return  thrust::make_tuple( e.cell, e.sigma * powf( 2.0f, octave ) );
-    }
-};
-
-struct FunctionReversePosition
-{
-    const int _total;
-    FunctionReversePosition( int total ) : _total(total) { }
-
-    __host__ __device__
-    inline int operator()(int val) const
-    {
-        return _total - val - 1;
     }
 };
 
@@ -239,12 +227,14 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     // inclusive prefix sum
     thrust::inclusive_scan( h_cell_counts.begin(), h_cell_counts.end(), cell_count_prefix_sums.begin() );
 
-    FunctionReversePosition fun_reverse_pos( n );
+    thrust::host_vector<int> h_reverse_index(n);
+    thrust::sequence( h_reverse_index.begin(), h_reverse_index.end(),
+                      n-1,
+                      -1 );
 
     // sumup[i] = prefix sum[i] + sum( cell[i] copied into remaining cells )
     thrust::transform( h_cell_counts.begin(), h_cell_counts.end(),
-                       thrust::make_transform_iterator( thrust::make_counting_iterator<int>(0),
-                                                        fun_reverse_pos ),
+                       h_reverse_index.begin(),
                        cell_count_sumup.begin(),
                        thrust::multiplies<int>() );
     thrust::transform( cell_count_sumup.begin(), cell_count_sumup.end(),
