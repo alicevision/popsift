@@ -484,14 +484,15 @@ namespace popsift {
     }
 
     struct compare_descriptors {
-	template <typename T>
+	// template <typename T>
 	__host__ __device__
-	bool operator()(const T &l, const T &r) const {
+	// bool operator()(const T &l, const T &r) const {
+	int operator()(const Descriptor &l, const Descriptor &r) const {
 	    //for(int i = 0; i < 128; i++) {
 
 	    unsigned char *a, *b;
-	    a = (unsigned char*)&l;
-	    b = (unsigned char*)&r;
+	    a = (unsigned char*)l.features;
+	    b = (unsigned char*)r.features;
 
 	    int i = 0;
 	    {
@@ -502,33 +503,33 @@ namespace popsift {
 			    
 			    if(a[i] < b[i]) {
 				//printf("%d\t%d\n", a[i], b[i]);
-				return true;
+				return 2;
 				}
 			    
 			    if(a[i] > b[i]) {
 				printf("%d\t%d\n", a[i], b[i]);				
-				return false;
+				return 0;
 			    }
 		
 			    if(a[i-1] < b[i-1])
-				return true;
+				return 2;
 
 			    if(a[i-1] > b[i-1])
-				return false;
+				return 0;
 
 		
 			    if(a[i-2] < b[i-2])
-				return true;
+				return 2;
 
 			    if(a[i-2] > b[i-2])
-				return false;
+				return 0;
 
 		
 			    if(a[i-3] < b[i-3])
-				return true;
+				return 2;
 
 			    if(a[i-3] > b[i-3])
-				return false;
+				return 0;
 			    i+=4;
 			    //printf("%d\n", a[i]);
 		
@@ -545,7 +546,7 @@ namespace popsift {
 		    }
 		}
 	    }
-	    return false;
+	    return 1;
 	    
 
 	    /*
@@ -565,15 +566,30 @@ namespace popsift {
 	}
     };
 
+    struct ILookup
+    {
+	__device__
+	inline bool operator()( int a, int b ) const
+        {
+	    return true; // a < b;
+        }
+    };
+
     struct IndirectLookup
     {
 	Descriptor* base;
 	
 	IndirectLookup( Descriptor* b ) : base(b) {}
-	__host__ __device__
+	__device__
 	inline bool operator()( int a, int b ) const
 	    {
-		return compare_descriptors()(base[a], base[b]);//operator()( base[a], base[b] );
+		int x = compare_descriptors()(base[a], base[b]);//operator()( base[a], base[b] );
+                switch(x)
+                {
+                case 0 : return false;
+                case 2 : return true;
+                }
+                return ( a < b );
 	    }
     };
 
@@ -689,10 +705,13 @@ namespace popsift {
 
 	int l_len = getDescriptorCount( );
 	int r_len = other->getDescriptorCount( );
+        POP_CHK;
 
-	cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 10000000);
+	// cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 10000000);
+        POP_CHK;
 
 	int3* match_matrix = popsift::cuda::malloc_devT<int3>( l_len, __FILE__, __LINE__ );    
+        POP_CHK;
     
 	dim3 grid;
 	grid.x = l_len;
@@ -730,11 +749,14 @@ namespace popsift {
 	    Descriptor *r_copy = gpu_init(r_len);
 
 	    //TRANSPOSE
+            POP_CHK;
 	    compute_distance_transposed_hamming
 		<<<grid,block>>>
 		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len , l_copy, r_copy);
+            POP_CHK;
 	    
 	    cudaDeviceSynchronize();
+            POP_CHK;
 	    
 	    const int SIZE = l_len;
 
@@ -763,17 +785,23 @@ namespace popsift {
 	    std::exit(1);
 	      */
 	    
+#if 0
 	    int *desc_index = popsift::cuda::malloc_devT<int>(SIZE, __FILE__, __LINE__ );
+            POP_CHK;
 	    //thrust::sequence(thrust::device, desc_index, desc_index+SIZE);
 	    	   
 	     thrust::device_ptr<int> d = thrust::device_pointer_cast(desc_index);	    
 	     thrust::sequence(d, d+SIZE);
 	    	    
+            thrust::host_vector<int> hsorted( SIZE );
+            thrust::copy( d, d+SIZE, hsorted.begin() );
+            thrust::sort( hsorted.begin(), hsorted.end() );
+            thrust::copy( hsorted.begin(), hsorted.end(), std::ostream_iterator<int>(std::cout, " ") );
+            cout << endl;
 	    
 	    int *t1 = thrust::raw_pointer_cast(d);
 	    //int c[SIZE];
 	    //cudaMemcpy(c, t1, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
-
 
 
 	    //thrust::sort(thrust::device, desc_index, desc_index+SIZE, IndirectLookup(l_copy));
@@ -789,7 +817,14 @@ namespace popsift {
 
 	    //thrust::sort(b, b+SIZE, thrust::greater<int>());
 
-	    thrust::sort(d, d+SIZE, IndirectLookup(l_copy));			
+            IndirectLookup il_obj( l_copy );
+	    thrust::sort( d, d+SIZE, il_obj );
+
+            // thrust::host_vector<int> hsorted( SIZE );
+            thrust::copy( d, d+SIZE, hsorted.begin() );
+            thrust::sort( hsorted.begin(), hsorted.end() );
+            thrust::copy( hsorted.begin(), hsorted.end(), std::ostream_iterator<int>(std::cout, " ") );
+            cout << endl;
 	   
 /*
 	    thrust::sort(
@@ -806,6 +841,31 @@ namespace popsift {
 	    int *t2 = thrust::raw_pointer_cast(d);
 	    cudaMemcpy(a, t2, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
 
+#else
+	    thrust::device_vector<int> d( SIZE );
+	    thrust::sequence( d.begin(), d.end() );
+
+            thrust::host_vector<int> b( SIZE );
+            thrust::copy( d.begin(), d.end(), b.begin() );
+	    	    
+            thrust::host_vector<int> hsorted( SIZE );
+            thrust::copy( d.begin(), d.end(), hsorted.begin() );
+            thrust::sort( hsorted.begin(), hsorted.end() );
+            thrust::copy( hsorted.begin(), hsorted.end(), std::ostream_iterator<int>(std::cout, " ") );
+            cout << endl;
+
+            IndirectLookup il_obj( l_copy );
+	    thrust::sort( d.begin(), d.end(), il_obj );
+
+            // thrust::host_vector<int> hsorted( SIZE );
+            thrust::copy( d.begin(), d.end(), hsorted.begin() );
+            thrust::sort( hsorted.begin(), hsorted.end() );
+            thrust::copy( hsorted.begin(), hsorted.end(), std::ostream_iterator<int>(std::cout, " ") );
+            cout << endl;
+
+            thrust::host_vector<int> a( SIZE );
+            thrust::copy( d.begin(), d.end(), a.begin() );
+#endif
 	    
 
 	    //cudaMemcpy(a, desc_index, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
@@ -830,11 +890,12 @@ namespace popsift {
 		}
 	    }
 
+            printf("Number of descriptors %d\n", l_len );
 	    Descriptor *tmp = (Descriptor*)malloc(l_len*sizeof(Descriptor));
 
 	    cudaMemcpy(tmp, l_copy, l_len*sizeof(Descriptor), cudaMemcpyDeviceToHost);
 
-	    int print = 0;
+	    int print = 1;
 	    
 	    if(success) {
 		printf("SUCCESS\n");
