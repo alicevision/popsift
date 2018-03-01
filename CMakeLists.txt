@@ -8,6 +8,11 @@ OPTION(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
 OPTION(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after every kernel." OFF)
 OPTION(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
 OPTION(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
+OPTION(PopSift_BOOST_USE_STATIC_LIBS "Link with static Boost libraries" OFF)
+
+if(PopSift_BOOST_USE_STATIC_LIBS)
+  set(Boost_USE_STATIC_LIBS ON)
+endif()
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
