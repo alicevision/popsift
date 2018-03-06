@@ -424,6 +424,104 @@ namespace popsift {
 
 
 /*****************************
+BLOOM FILTER
+****************************/
+typedef unsigned int (*hash_function)(const void *data);
+typedef struct bloom_filter * bloom_t;
+    
+struct bloom_hash 
+{
+  hash_function func;
+  struct bloom_hash *next;
+};
+
+
+struct bloom_filter 
+{
+  struct bloom_hash *func;
+  void *bits;
+  size_t size;
+};
+
+
+bloom_t bloom_create(size_t size) 
+{
+    bloom_t res = (bloom_t)calloc(1, sizeof(struct bloom_filter)); //cudamalloc cudamemset
+  res->size = size;
+  res->bits = malloc(size);
+  return res;
+}
+
+
+void bloom_free(bloom_t filter) 
+{
+  if (filter) {
+    while (filter->func) {
+      struct bloom_hash *h;
+      filter->func = h->next;
+      free(h);
+    }
+    free(filter->bits);
+    free(filter);
+  }
+}
+
+
+
+void bloom_add_hash(bloom_t filter, hash_function func) {
+    struct bloom_hash *h = (struct bloom_hash *)calloc(1, sizeof(struct bloom_hash));
+  h->func = func;
+  struct bloom_hash *last = filter->func;
+  while (last && last->next) {
+    last = last->next;
+  }
+  if (last) {
+    last->next = h;
+  } else {
+    filter->func = h;
+  }
+}
+
+    
+//bytewise bloomfilter
+void bloom_add(bloom_t filter, const void *item) 
+{
+  struct bloom_hash *h = filter->func;
+  uint8_t *bits = (uint8_t *)filter->bits;
+  while (h) {
+    unsigned int hash = h->func(item);
+    printf("hash: %d\n", hash);
+    hash %= filter->size;
+    printf("hash MOD: %d\n", hash);
+    bits[hash] = 1;
+    printf("hash/8: %d\n", hash);
+    h = h->next;
+  }
+}
+
+bool bloom_test(bloom_t filter, const void *item) 
+{
+    struct bloom_hash *h = (struct bloom_hash *)filter->func;
+  uint8_t *bits = (uint8_t *)filter->bits;
+  while (h) {
+    unsigned int hash = h->func(item);
+    hash %= filter->size;
+    if (!(bits[hash])) {
+      return false;
+    }
+    h = h->next;
+  }
+  return true;
+}
+
+
+    
+/*****************************
+BLOOM FILTER end
+****************************/
+    
+
+/*****************************
 HASH TABLE - fix seperate file.
 ******************************/
     
@@ -477,30 +575,33 @@ struct Table
 };
 
 
-__host__ __device__
-unsigned int djb2(const void *_str)
-{
-    const char *str = (const char *)_str;
+    __host__ __device__
+    unsigned int djb2(const void *_str)
+    {
+	const char *str = (const char *)_str;
 	unsigned int hash = 5381;
-	char c;
-	while ((c = *str++))
+	char c, i = 0;
+	while ((i < 16))
 	{
-		hash = ((hash << 5) + hash) + c;
+	    c = str[i];
+	    hash = ((hash << 5) + hash) + c;
+	    i++;
 	}
 	return hash;
-}
+    }
 
 __host__ __device__
-unsigned int jenkins(unsigned int *_str)
+unsigned int jenkins(const void *_str)
 {
-    unsigned int *key = (unsigned int *)_str;
+    const char *key = (const char *)_str;
     unsigned int hash, i = 0;
-	while (i++ < 4)
+	while (i < 16)
 	{
 		hash += *key;
 		hash += (hash << 10);
 		hash ^= (hash >> 6);
 		key++;
+		i++;
 	}
 	hash += (hash << 3);
 	hash ^= (hash >> 11);
@@ -515,24 +616,23 @@ unsigned int jenkins(unsigned int *_str)
 __device__ __host__
 size_t hash(unsigned int * key, size_t count )
 {
-    //return key % count; //some sort of integer conversion needed.
-    //return djb2((void*)&key) % count; //needs fixing? it might need.
-    //printf("key address:  %p\n", (unsigned int *)(&key));
-    //if ((*key) % count)
-    //printf("hash %d\n", jenkins(key) % count);
-    //printf("hash %d\n", (*key) % count);
-    
-    //return (*key) % count;
-
+    int i = 0;
     size_t sum = 0;
     unsigned char * p  = (unsigned char *)key;
-    for (int i = 0; i < 16; i++)
-	sum += p[i];
 
-    //printf("hash %d\n", sum);
-    return sum;
-    //return jenkins(key) % count; //located at table zero?
-    //return jenkins((const void *)key) % count;
+    while (i < 16)
+    {
+	sum += p[i];
+	sum += (sum << 10);
+	sum ^= (sum >> 6);
+	i++;
+    }
+
+    sum += (sum << 3);
+    sum ^= (sum >> 11);
+    sum += (sum << 15);
+
+    return sum % count;
 }
 
 
@@ -706,9 +806,9 @@ add_to_table( struct Descriptor *keys, thrust::device_ptr<int> values, Table tab
 	
 	
 	for (int i=0; i<32; i++)
-	{
-	    if ((tid % 32) == i)
 	    {
+	    if ((tid % 32) == i)
+		{
 		Entry *location = &(table.pool[tid]);
 		memcpy(&(location->key), key, sizeof(struct Desc));
 		//location->value = values[tid];
@@ -757,8 +857,8 @@ add_to_table( struct Descriptor *keys, thrust::device_ptr<int> values, Table tab
 		}
 		
 		lock[hashValue].unlock();
+		}
 	    }
-	}
 	
 	tid += stride;
     } 
@@ -1438,7 +1538,7 @@ HASH TABLE END - fix seperate file.
 	    float elapsedTime;
 	    cudaEventElapsedTime( &elapsedTime, start, stop );
 	    printf( "Time to hash:  %3.1f ms\n", elapsedTime );
-	    //verify_table( table, SIZE ); 
+	    verify_table( table, SIZE ); 
 
 	    cudaEventDestroy( start );
 	    cudaEventDestroy( stop );
