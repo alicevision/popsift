@@ -326,15 +326,13 @@ namespace popsift {
 	}
     }
 
- __global__ void
- compute_dot_in_section( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len, thrust::device_ptr<int> indexes, unsigned int *start_idx, unsigned int *stop_idx )
+    __global__ void
+    compute_dot_in_section( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len, thrust::device_ptr<int> indexes, unsigned int *start_idx, unsigned int *stop_idx )
     {
 	
 	if( blockIdx.x >= l_len ) return; //redundant?
 	const int idx = blockIdx.x;
-
-	int len = stop_idx[idx] - start_idx[idx];
-
+	
 	float match_1st_val = -1.0f;
 	float match_2nd_val = -1.0f;
 	int   match_1st_idx = 0;
@@ -385,6 +383,369 @@ namespace popsift {
 	}
     }
 
+    #define DESC_SEQ 4
+        //16 bytes of concecutive memory (4 floats/ints)
+    struct Desc 
+    {
+	//unsigned int descriptor[DESC_SEQ]; 
+	float descriptor[DESC_SEQ]; //float makes a difference?
+    };
+
+    
+    __device__
+    unsigned int hamming_distance(unsigned int* A, unsigned int* B) //make const?
+    {
+	unsigned int g[4];
+	unsigned int sum, sum_1, sum_2;
+
+	g[0] = *A ^ *B;
+	g[1] = *(A + 4) ^ *(B + 4);
+	g[2] = *(A + 8) ^ *(B + 8);
+	g[3] = *(A + 12) ^ *(B + 12);
+
+	sum_1 = __popc(*g);
+	sum_2 = __popc(*(g + 1));
+	sum_1 += __popc(*(g + 2));
+	sum_2 += __popc(*(g + 3));
+	sum = sum_1 + sum_2;
+	return sum;
+    }
+
+    __global__ void
+    compute_distance_hamming( int3* match_matrix, Descriptor* l, Descriptor* l_tra, int l_len, Descriptor* r, Descriptor* r_tra, int r_len, thrust::device_ptr<int> indexes, unsigned int *start_idx, unsigned int *stop_idx )
+    {
+	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	int stride = blockDim.x * gridDim.x;
+	
+	const int idx = blockIdx.x;
+        int offset = 2;
+	
+	//float match_1st_val = -1.0f;
+	//float match_2nd_val = -1.0f;
+
+        int match_1st_val = 128;
+	int match_2nd_val = 128;
+	int match_1st_idx = 0;
+	int match_2nd_idx = 0;
+
+	
+
+	//while (tid < elements)
+	//{
+	//const float4* lptr = (const float4*)( &l_tra[idx] );
+
+	//fix end value //another variable setting offset from a kernel in case of multilvl
+	//could also have seperate stream for dot product..? based on depth and interval size
+	if (start_idx[idx] == 0) offset = 3;
+	__syncthreads;
+	
+        struct Desc *lptr = (struct Desc *)((&l_tra[indexes[idx]])) + offset;
+
+	for( int i = start_idx[idx]; i< stop_idx[idx]; i++ )
+	{
+	    //const float4* rptr = (const float4*)( &r_[indexes[i]] );
+	    const struct Desc *rptr = (struct Desc *)((&r_tra[indexes[idx]])) + offset;
+
+		
+	    //const float   res  = dot_l2_in_t0( lptr, rptr );
+	    const int res = hamming_distance((unsigned int *)lptr, (unsigned int *)rptr);
+	
+	    if( threadIdx.x == 0 )
+	    {
+		if( res < match_1st_val )
+		{
+		    match_2nd_val = match_1st_val;
+		    match_2nd_idx = match_1st_idx;
+		    match_1st_val = res;
+		    match_1st_idx = i;
+		}
+		else if( res < match_2nd_val )
+		{
+		    match_2nd_val = res;
+		    match_2nd_idx = i;
+		}
+	    }
+
+	    __syncthreads();	
+	}
+
+	const int one = __shfl(match_1st_idx, 0);
+	const int two = __shfl(match_2nd_idx, 0);
+
+
+	float result_1 = 0.0f;
+	float result_2 = 0.0f;
+	//float diff0, diff1, diff2, diff3;
+	float diff0 = 0.0f, diff1 = 0.0f, diff2 = 0.0f, diff3 = 0.0f;
+
+
+	int i = 0;
+	int last = 127 - 3;
+
+	// Process 4 items with each loop for efficiency. helps on gpu at all?
+	while (i < last) {
+	    diff0 = l[indexes[idx]].features[i] - r[indexes[one]].features[i];
+	    diff1 = l[indexes[idx]].features[i+1] - r[indexes[one]].features[i+1];
+	    diff2 = l[indexes[idx]].features[i+2] - r[indexes[one]].features[i+2];
+	    diff3 = l[indexes[idx]].features[i+3] - r[indexes[one]].features[i+3];
+	    result_1 += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
+	    i += 4;
+	}
+
+	i = 0;
+
+	while (i < last) {
+	    diff0 = l[indexes[idx]].features[i] - r[indexes[two]].features[i];
+	    diff1 = l[indexes[idx]].features[i+1] - r[indexes[two]].features[i+1];
+	    diff2 = l[indexes[idx]].features[i+2] - r[indexes[two]].features[i+2];
+	    diff3 = l[indexes[idx]].features[i+3] - r[indexes[two]].features[i+3];
+	    result_2 += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
+	    i += 4;
+	}
+		
+	if( threadIdx.x == 0 )
+	{
+	    bool accept = (result_1/result_2 < 0.8f );
+	    match_matrix[blockIdx.x] = make_int3( indexes[match_1st_idx], indexes[match_2nd_idx], accept );
+	}
+	
+	// tid += stride;
+	//}
+    }
+
+
+     __global__ void
+    compute_distance_hamming_levels( int3* match_matrix, Descriptor* l, Descriptor* l_tra, int l_len, Descriptor* r, Descriptor* r_tra, int r_len, thrust::device_ptr<int> indexes, unsigned int *start_idx, unsigned int *stop_idx )
+    {
+	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	int stride = blockDim.x * gridDim.x;
+	
+	const int idx = blockIdx.x;
+        int offset = 2;
+	
+	//float match_1st_val = -1.0f;
+	//float match_2nd_val = -1.0f;
+
+        int match_1st_val_1 = 128;
+	int match_2nd_val_1 = 128;
+	int match_1st_val_2 = 128;
+	int match_2nd_val_2 = 128;
+	int match_1st_val_3 = 128;
+	int match_2nd_val_3 = 128;
+	int match_1st_val_4 = 128;
+	int match_2nd_val_4 = 128;
+
+
+	int match_1st_idx = 0;
+	int match_2nd_idx = 0;
+
+	
+
+	//while (tid < elements)
+	//{
+	//const float4* lptr = (const float4*)( &l_tra[idx] );
+
+	//fix end value //another variable setting offset from a kernel in case of multilvl
+	//could also have seperate stream for dot product..? based on depth and interval size
+	if (start_idx[idx] == 0) offset = 3;
+	__syncthreads;
+	
+        struct Desc *lptr_1 = (struct Desc *)((&l_tra[indexes[idx]])) + offset;
+	struct Desc *lptr_2 = (struct Desc *)((&l_tra[indexes[idx]])) + offset + 1;
+        struct Desc *lptr_3 = (struct Desc *)((&l_tra[indexes[idx]])) + offset + 2;
+	struct Desc *lptr_4 = (struct Desc *)((&l_tra[indexes[idx]])) + offset + 3;
+
+			
+
+	for( int i = start_idx[idx]; i< stop_idx[idx]; i++ )
+	{
+	    //const float4* rptr = (const float4*)( &r_[indexes[i]] );
+	    const struct Desc *rptr_1 = (struct Desc *)((&r_tra[indexes[idx]])) + offset;
+	    const struct Desc *rptr_2 = (struct Desc *)((&r_tra[indexes[idx]])) + offset + 1;
+	    const struct Desc *rptr_3 = (struct Desc *)((&r_tra[indexes[idx]])) + offset + 2;
+	    const struct Desc *rptr_4 = (struct Desc *)((&r_tra[indexes[idx]])) + offset + 3;
+
+		
+	    //const float   res  = dot_l2_in_t0( lptr, rptr );
+	    const int res_1 = hamming_distance((unsigned int *)lptr_1, (unsigned int *)rptr_1);
+	    const int res_2 = hamming_distance((unsigned int *)lptr_2, (unsigned int *)rptr_2);
+	    const int res_3 = hamming_distance((unsigned int *)lptr_3, (unsigned int *)rptr_3);
+	    const int res_4 = hamming_distance((unsigned int *)lptr_4, (unsigned int *)rptr_4);
+
+	    if( threadIdx.x == 0 ) 
+	    {
+		
+		int not_best = 1;
+		if ( res_1 < match_1st_val_1 ) // first level shorter distance
+		{
+		    match_2nd_val_1 = match_1st_val_1;
+		    match_2nd_val_2 = match_1st_val_2;
+		    match_2nd_val_3 = match_1st_val_3;
+		    match_2nd_val_4 = match_1st_val_4;
+
+		    match_2nd_idx = match_1st_idx;
+		    match_1st_idx = i;
+
+		    match_1st_val_1 = res_1;
+		    match_1st_val_2 = res_2;
+		    match_1st_val_3 = res_3;
+		    match_1st_val_4 = res_4;
+		    not_best = 0;
+
+		}
+		else if ( res_1 == match_1st_val_1 ) // first level equal distance
+		{
+		    if ( res_2 < match_1st_val_2 ) // second level shorter distance
+		    {
+			match_2nd_val_1 = match_1st_val_1;
+			match_2nd_val_2 = match_1st_val_2;
+			match_2nd_val_3 = match_1st_val_3;
+			match_2nd_val_4 = match_1st_val_4;
+			
+			match_2nd_idx = match_1st_idx;
+			match_1st_idx = i;
+			
+			match_1st_val_1 = res_1; //since equal, not nessesary.. other places as well
+			match_1st_val_2 = res_2;
+			match_1st_val_3 = res_3;
+			match_1st_val_4 = res_4;
+		        not_best = 0;
+			printf("res1: %d\t res2 %d\n", res_1, res_2);
+					    
+		    }
+		    else if ( res_2 == match_1st_val_2 ) // second level equal distance
+		    {
+			if ( res_3 < match_1st_val_3 ) // third level shorter distance
+			{
+			    match_2nd_val_1 = match_1st_val_1; 
+			    match_2nd_val_2 = match_1st_val_2; 
+			    match_2nd_val_3 = match_1st_val_3;
+			    match_2nd_val_4 = match_1st_val_4;
+			
+			    match_2nd_idx = match_1st_idx;
+			    match_1st_idx = i;
+			
+			    match_1st_val_1 = res_1; //equal
+			    match_1st_val_2 = res_2; //equal
+			    match_1st_val_3 = res_3;
+			    match_1st_val_4 = res_4;
+			    not_best = 0;
+			}
+			else if ( res_3 == match_1st_val_3 ) //skip equal, go directly on next if statement?
+			{
+			    if ( res_4 < match_1st_val_4 ) // forth level shorter distance
+			    {
+				match_2nd_val_1 = match_1st_val_1; 
+				match_2nd_val_2 = match_1st_val_2; 
+				match_2nd_val_3 = match_1st_val_3;
+				match_2nd_val_4 = match_1st_val_4;
+			
+				match_2nd_idx = match_1st_idx;
+				match_1st_idx = i;
+			
+				match_1st_val_1 = res_1; //equal
+				match_1st_val_2 = res_2; //equal
+				match_1st_val_3 = res_3; //equal
+				match_1st_val_4 = res_4;
+			        not_best = 0;
+			    }
+			}
+		    }
+		}
+		else if ( not_best == 1 ) // could find a better way to do this i think.. check for 0 instead? set 1 in an else maybe?
+		{
+		    if ( res_1 < match_2nd_val_1 )
+		    {
+			match_2nd_val_1 = res_1;
+			match_2nd_val_2 = res_2;
+			match_2nd_val_3 = res_3;
+			match_2nd_val_4 = res_4;
+			match_2nd_idx = i;
+		    }
+		    else if ( res_1 == match_2nd_val_1)
+		    {
+			if ( res_2 < match_2nd_val_2 )
+			{
+			    match_2nd_val_1 = res_1; //equal
+			    match_2nd_val_2 = res_2;
+			    match_2nd_val_3 = res_3;
+			    match_2nd_val_4 = res_4;
+			    match_2nd_idx = i;
+			}
+			else if ( res_2 == match_2nd_val_2)
+			{
+			    if ( res_3 < match_2nd_val_3 )
+			    {
+				match_2nd_val_1 = res_1; //equal
+				match_2nd_val_2 = res_2; //equal
+				match_2nd_val_3 = res_3;
+				match_2nd_val_4 = res_4;
+				match_2nd_idx = i;
+			    }
+			    else if ( res_3 == match_2nd_val_3)
+			    {
+				if ( res_4 < match_2nd_val_4 )
+				{
+				    match_2nd_val_1 = res_1; //equal
+				    match_2nd_val_2 = res_2; //equal
+				    match_2nd_val_3 = res_3; //equal
+				    match_2nd_val_4 = res_4;
+				    match_2nd_idx = i;
+				}
+			    }
+			}
+		    }
+		}
+	    }
+
+	    __syncthreads();	
+	}
+
+	const int one = __shfl(match_1st_idx, 0);
+	const int two = __shfl(match_2nd_idx, 0);
+
+
+	float result_1 = 0.0f;
+	float result_2 = 0.0f;
+	//float diff0, diff1, diff2, diff3;
+	float diff0 = 0.0f, diff1 = 0.0f, diff2 = 0.0f, diff3 = 0.0f;
+
+
+	int i = 0;
+	int last = 127 - 3;
+
+	// Process 4 items with each loop for efficiency. helps on gpu at all?
+	while (i < last) {
+	    diff0 = l[indexes[idx]].features[i] - r[indexes[one]].features[i];
+	    diff1 = l[indexes[idx]].features[i+1] - r[indexes[one]].features[i+1];
+	    diff2 = l[indexes[idx]].features[i+2] - r[indexes[one]].features[i+2];
+	    diff3 = l[indexes[idx]].features[i+3] - r[indexes[one]].features[i+3];
+	    result_1 += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
+	    i += 4;
+	}
+
+	i = 0;
+
+	while (i < last) {
+	    diff0 = l[indexes[idx]].features[i] - r[indexes[two]].features[i];
+	    diff1 = l[indexes[idx]].features[i+1] - r[indexes[two]].features[i+1];
+	    diff2 = l[indexes[idx]].features[i+2] - r[indexes[two]].features[i+2];
+	    diff3 = l[indexes[idx]].features[i+3] - r[indexes[two]].features[i+3];
+	    result_2 += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
+	    i += 4;
+	}
+		
+	if( threadIdx.x == 0 )
+	{
+	    bool accept = (result_1/result_2 < 0.8f );
+	    match_matrix[blockIdx.x] = make_int3( indexes[match_1st_idx], indexes[match_2nd_idx], accept );
+	}
+	
+	// tid += stride;
+	//}
+    }
+
+
     __host__ __device__ void
     printBits( unsigned int num )
     {
@@ -423,117 +784,14 @@ namespace popsift {
     }
 
 
-/*****************************
-BLOOM FILTER
-****************************/
-typedef unsigned int (*hash_function)(const void *data);
-typedef struct bloom_filter * bloom_t;
-    
-struct bloom_hash 
-{
-  hash_function func;
-  struct bloom_hash *next;
-};
-
-
-struct bloom_filter 
-{
-  struct bloom_hash *func;
-  void *bits;
-  size_t size;
-};
-
-
-bloom_t bloom_create(size_t size) 
-{
-    bloom_t res = (bloom_t)calloc(1, sizeof(struct bloom_filter)); //cudamalloc cudamemset
-  res->size = size;
-  res->bits = malloc(size);
-  return res;
-}
-
-
-void bloom_free(bloom_t filter) 
-{
-  if (filter) {
-    while (filter->func) {
-      struct bloom_hash *h;
-      filter->func = h->next;
-      free(h);
-    }
-    free(filter->bits);
-    free(filter);
-  }
-}
-
-
-
-void bloom_add_hash(bloom_t filter, hash_function func) {
-    struct bloom_hash *h = (struct bloom_hash *)calloc(1, sizeof(struct bloom_hash));
-  h->func = func;
-  struct bloom_hash *last = filter->func;
-  while (last && last->next) {
-    last = last->next;
-  }
-  if (last) {
-    last->next = h;
-  } else {
-    filter->func = h;
-  }
-}
-
-    
-//bytewise bloomfilter
-void bloom_add(bloom_t filter, const void *item) 
-{
-  struct bloom_hash *h = filter->func;
-  uint8_t *bits = (uint8_t *)filter->bits;
-  while (h) {
-    unsigned int hash = h->func(item);
-    printf("hash: %d\n", hash);
-    hash %= filter->size;
-    printf("hash MOD: %d\n", hash);
-    bits[hash] = 1;
-    printf("hash/8: %d\n", hash);
-    h = h->next;
-  }
-}
-
-bool bloom_test(bloom_t filter, const void *item) 
-{
-    struct bloom_hash *h = (struct bloom_hash *)filter->func;
-  uint8_t *bits = (uint8_t *)filter->bits;
-  while (h) {
-    unsigned int hash = h->func(item);
-    hash %= filter->size;
-    if (!(bits[hash])) {
-      return false;
-    }
-    h = h->next;
-  }
-  return true;
-}
-
-
-    
-/*****************************
-BLOOM FILTER end
-****************************/
-    
 
 /*****************************
 HASH TABLE - fix seperate file.
 ******************************/
     
-#define DESC_SEQ 4
-#define HASH_ENTRIES     1024*10
 
-    //16 bytes of concecutive memory (4 floats/ints)
-struct Desc 
- {
-     //unsigned int descriptor[DESC_SEQ]; 
-     float descriptor[DESC_SEQ]; //float makes a difference?
- };
+#define HASH_ENTRIES     1024 //increase
+
 
 /*
  * struct: Entry
@@ -541,20 +799,17 @@ struct Desc
  * Table entry for hash table
  * 
  * Each entry holds: 
- * Key: unsigned integer
- * Value: a 128 bit significanse sequence of a discriptor, 
- * but in theory we can hold anything here. Therefore we 
- * make it a void pointer to indicate this. 
+ * Key: a 128 bit significanse sequence of a discriptor, 
+ * Value: an interval of indexes desided by begin and end
  * Next: Null or pointer to the next entry within this 'bucket'. 
  */
-struct Entry
-{
-    struct Desc key;
-    //unsigned int value; //should be int begin end ()void * value...
-    unsigned int begin;
-    unsigned int end; 
-    Entry *next = NULL; 
-};
+    struct Entry
+    {
+	struct Desc key;
+	unsigned int begin;
+	unsigned int end; 
+	Entry *next = NULL; 
+    };
 
 
 /*
@@ -567,12 +822,36 @@ struct Entry
  * here is a pointer to an entry. 
  * Pool: Unused entries. Pre allocated.
  */
-struct Table
-{
-    size_t count;
-    Entry   **entries;
-    Entry   *pool; 
-};
+    struct Table
+    {
+	size_t count;
+	Entry   **entries;
+	Entry   *pool; 
+    };
+
+    
+/*
+ * struct: Inner_Table
+ * -------------------
+ * Hash table within each entry of main hash table
+ * 
+ * Count: Number of entries in our table.
+ * Entries: List of entries. Each address 
+ * here is a pointer to an entry. 
+ * Pool: Unused entries. Pre allocated.
+ */
+    struct Inner_Table
+    {
+	size_t count;
+	Entry   **entries;
+	Entry   *pool; 
+    };
+
+    struct bloom_filter 
+    {
+	uint8_t *bits;
+	size_t size;
+    };
 
 
     __host__ __device__
@@ -590,330 +869,366 @@ struct Table
 	return hash;
     }
 
-__host__ __device__
-unsigned int jenkins(const void *_str)
-{
-    const char *key = (const char *)_str;
-    unsigned int hash, i = 0;
+    __host__ __device__
+    unsigned int jenkins(const void *_str)
+    {
+	const char *key = (const char *)_str;
+	unsigned int hash, i = 0;
 	while (i < 16)
 	{
-		hash += *key;
-		hash += (hash << 10);
-		hash ^= (hash >> 6);
-		key++;
-		i++;
+	    hash += *key;
+	    hash += (hash << 10);
+	    hash ^= (hash >> 6);
+	    key++;
+	    i++;
 	}
 	hash += (hash << 3);
 	hash ^= (hash >> 11);
 	hash += (hash << 15);
 	return hash;
-}
+    }
     
 /*
  * Could create a function pointer in the table, and pass different hash 
  * functions for a better testing environment 
  */
-__device__ __host__
-size_t hash(unsigned int * key, size_t count )
-{
-    int i = 0;
-    size_t sum = 0;
-    unsigned char * p  = (unsigned char *)key;
-
-    while (i < 16)
+    __device__ __host__
+    size_t hash(unsigned int * key, size_t count )
     {
-	sum += p[i];
-	sum += (sum << 10);
-	sum ^= (sum >> 6);
-	i++;
+	int i = 0;
+	size_t sum = 0;
+	unsigned char * p  = (unsigned char *)key;
+
+	while (i < 16)
+	{
+	    sum += p[i];
+	    sum += (sum << 10);
+	    sum ^= (sum >> 6);
+	    i++;
+	}
+
+	sum += (sum << 3);
+	sum ^= (sum >> 11);
+	sum += (sum << 15);
+
+	return sum % count;
     }
 
-    sum += (sum << 3);
-    sum ^= (sum >> 11);
-    sum += (sum << 15);
+    __device__ __host__
+    size_t hash2(unsigned int * key, size_t count )
+    {
+	int i = 0;
+	char c;
+	size_t sum = 5381;
+	unsigned char * p  = (unsigned char *)key;
 
-    return sum % count;
-}
+	while (i < 16)
+	{
+	    c = p[i];
+	    sum = ((sum << 5) + sum) + c;
+	    i++;
+	}
+
+	return sum % count;
+    }
 
 
-void initialize_table( Table &table, int entries, int elements )
-{
-    printf("init: entries: %d\t elements: %d\n", entries, elements);
-    table.count = entries;
-    cudaMalloc( (void**)&table.entries, entries * sizeof(Entry*) );
-    cudaMemset( table.entries, 0, entries * sizeof(Entry*) );
-    cudaMalloc( (void**)&table.pool, elements *sizeof(Entry) ); 
-}
+    void initialize_table( Table &table, int entries, int elements )
+    {
+	printf("init: entries: %d\t elements: %d\n", entries, elements);
+	table.count = entries;
+	cudaMalloc( (void**)&table.entries, entries * sizeof(Entry*) );
+	cudaMemset( table.entries, 0, entries * sizeof(Entry*) );
+	cudaMalloc( (void**)&table.pool, elements *sizeof(Entry) ); 
+    }
 
 
-void free_table( Table &table )
-{
-    cudaFree( table.pool );
-    cudaFree( table.entries ); 
-}
+    void free_table( Table &table )
+    {
+	cudaFree( table.pool );
+	cudaFree( table.entries ); 
+    }
 
 
     void copy_table_to_host( const Table &table, Table &hostTable, unsigned int elements )
     {
-    hostTable.count = table.count;
-    hostTable.entries = (Entry**)calloc( table.count, sizeof(Entry*) );
-    hostTable.pool = (Entry*)malloc( elements * sizeof( Entry ) );
+	hostTable.count = table.count;
+	hostTable.entries = (Entry**)calloc( table.count, sizeof(Entry*) );
+	hostTable.pool = (Entry*)malloc( elements * sizeof( Entry ) );
     
-    cudaMemcpy( hostTable.entries, table.entries, table.count * sizeof(Entry*), cudaMemcpyDeviceToHost );
-    cudaMemcpy( hostTable.pool, table.pool, elements * sizeof( Entry ), cudaMemcpyDeviceToHost );
+	cudaMemcpy( hostTable.entries, table.entries, table.count * sizeof(Entry*), cudaMemcpyDeviceToHost );
+	cudaMemcpy( hostTable.pool, table.pool, elements * sizeof( Entry ), cudaMemcpyDeviceToHost );
 
     
-    for (int i=0; i<table.count; i++)
-    {
-	if (hostTable.entries[i] != NULL)
-	    hostTable.entries[i] = (Entry*)((size_t)hostTable.entries[i] - (size_t)table.pool + (size_t)hostTable.pool);
+	for (int i=0; i<table.count; i++)
+	{
+	    if (hostTable.entries[i] != NULL)
+		hostTable.entries[i] = (Entry*)((size_t)hostTable.entries[i] - (size_t)table.pool + (size_t)hostTable.pool);
+	}
+    
+
+	for ( int i=0; i < elements; i++)
+	{
+	    if (hostTable.pool[i].next != NULL)
+		hostTable.pool[i].next = (Entry*)((size_t)hostTable.pool[i].next - (size_t)table.pool + (size_t)hostTable.pool);
+	}
+
     }
-    
-
-    for ( int i=0; i < elements; i++)
-    {
-	if (hostTable.pool[i].next != NULL)
-            hostTable.pool[i].next = (Entry*)((size_t)hostTable.pool[i].next - (size_t)table.pool + (size_t)hostTable.pool);
-    }
-
-}
 
     void verify_table( const Table &dev_table, unsigned int elements )
     {
-    Table table;
-    copy_table_to_host( dev_table, table, elements );
-    int count = 0;
+	Table table;
+	copy_table_to_host( dev_table, table, elements );
+	int count = 0;
 
 
-    for (size_t i=0; i<table.count; i++)
-    {
-	Entry   *current = table.entries[i];
-	//printf("entry ptr %ld\n",  table.entries[i]);
-
-	while (current != NULL)
+	for (size_t i=0; i<table.count; i++)
 	{
-	    if (current->end - current->begin > 1)
-	    printf("begin %d\t end %d\t table %d\n",  current->begin, current->end, i);
-	    ++count;
-	    if (hash((unsigned int *)&(current->key), table.count ) != i)
-		printf("begin %d end %d hashed to %ld, but was located "
-		       "at %ld\n",
-		       current->begin, current->end,
-		       hash((unsigned int *)&(current->key), table.count), i ); // *(unsigned int *)*/
-	    current = current->next;
+	    Entry   *current = table.entries[i];
+	    //printf("entry ptr %ld\n",  table.entries[i]);
 
+	    while (current != NULL)
+	    {
+		if (current->end - current->begin > 1)
+		    printf("begin %d\t end %d\t table %d\n",  current->begin, current->end, i);
+		++count;
+		if (hash((unsigned int *)&(current->key), table.count ) != i)
+		    printf("begin %d end %d hashed to %ld, but was located "
+			   "at %ld\n",
+			   current->begin, current->end,
+			   hash((unsigned int *)&(current->key), table.count), i ); // *(unsigned int *)*/
+		current = current->next;
+
+	    }
 	}
+
+	if (count != elements)
+	    printf( "%d elements found in hash table.  Should be %d\t missing are likely ignored duplicates\n", count, elements );
+	else
+	    printf( "All %d elements found in hash table.\n", count );
+	free( table.pool );
+	free( table.entries ); 
     }
 
-    if (count != elements)
-        printf( "%d elements found in hash table.  Should be %d\t missing are likely ignored duplicates\n", count, elements );
-    else
-        printf( "All %d elements found in hash table.\n", count );
-    free( table.pool );
-    free( table.entries ); 
-}
-
 /*
-__device__ //This must be fixed.. //might have been pointer issue.. //pointer from cpu?
-int compareKey(struct Desc *A, struct Desc *B)
-{
-    int i = 0;
-    while ( i < DESC_SEQ && A->descriptor[i] == B->descriptor[i] ) i++;
-    if (i == 4)	{ return -1;}
-    return 1;
-}
+  __device__ //This must be fixed.. //might have been pointer issue.. //pointer from cpu?
+  int compareKey(struct Desc *A, struct Desc *B)
+  {
+  int i = 0;
+  while ( i < DESC_SEQ && A->descriptor[i] == B->descriptor[i] ) i++;
+  if (i == 4)	{ return -1;}
+  return 1;
+  }
 */
 
     /*  __device__ //This must be fixed.. //might have been pointer issue.. //pointer from cpu?
-int compareKey(unsigned int *A, unsigned int *B)
-{
-    int i = 0;
-    while ( i < DESC_SEQ && A[i] == B[i] )
-    {
+	int compareKey(unsigned int *A, unsigned int *B)
+	{
+	int i = 0;
+	while ( i < DESC_SEQ && A[i] == B[i] )
+	{
 	i++;
-    }
-    //printf("cmp: %d %d\n", A[i-1], B[i-1]);
-    if (i == 4)	{  return -1;}
-    return 1;
-}
+	}
+	//printf("cmp: %d %d\n", A[i-1], B[i-1]);
+	if (i == 4)	{  return -1;}
+	return 1;
+	}
     */
     
     __device__ //compare with hamming dinstance here? might be good
-int compareKey(unsigned char *A, unsigned char *B)
-{
-    int i = 0;
-    while ( i < DESC_SEQ * DESC_SEQ && A[i] == B[i] )
+    int compareKey(unsigned char *A, unsigned char *B)
     {
-	i++;
+	int i = 0;
+	while ( i < DESC_SEQ * DESC_SEQ && A[i] == B[i] )
+	{
+	    i++;
+	}
+
+	//printf("i: %d\n", i); 
+	//printf("cmp: %d %d\n", A[i-1], B[i-1]);
+	if (i == 16)	{  return -1;}
+	return 1;
     }
 
-    //printf("i: %d\n", i); 
-    //printf("cmp: %d %d\n", A[i-1], B[i-1]);
-    if (i == 16)	{  return -1;}
-    return 1;
-}
-
+    __device__
+    unsigned int bloom_check( uint8_t * bits,  struct Desc *key, unsigned int size) 
+    {
+	const unsigned int hashkey_1 = hash((unsigned int *)key, size);
+	if (bits[hashkey_1] != 1) return 0;
+	const unsigned int hashkey_2 = hash2((unsigned int *)key, size);
+	if (bits[hashkey_2] != 1) return 0;
+	return 1;
+    }
 
 
 
 //we need a check for equal key
     //might be possible to do this in some sort of log n format due to sorted keys
-__global__ void
-add_to_table( struct Descriptor *keys, thrust::device_ptr<int> values, Table table, Lock *lock, unsigned int elements)
-{
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int stride = blockDim.x * gridDim.x;
-    //struct Desc *keys
-    //   float * destination = (float*)(des[block].features);
-    //
-    
-    while (tid < elements)
+    __global__ void
+    add_to_table( struct Descriptor *keys, thrust::device_ptr<int> values, Table table, Lock *lock, unsigned int elements)
     {
-	//cast so we only use first 16bytes, we use the indirect lookup sorted list to find
-	//corresponding key value pair... values is host vector? error //pointer caster minnet til pointer?
+	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	int stride = blockDim.x * gridDim.x;
+	//struct Desc *keys
+	//   float * destination = (float*)(des[block].features);
+	//
+    
+	while (tid < elements)
+	{
+	    //cast so we only use first 16bytes, we use the indirect lookup sorted list to find
+	    //corresponding key value pair... values is host vector? error //pointer caster minnet til pointer?
 
 	
-        struct Desc *key = (struct Desc *)((&keys[values[tid]])) + 2; //I think this works, all zero's in first two layers though.. expected.. skip them?
+	    struct Desc *key = (struct Desc *)((&keys[values[tid]])) + 2; //I think this works, all zero's in first two layers though.. expected.. skip them?
 
 
 //struct Desc *key1 = (struct Desc *)((&keys[values[tid]])) + 3;
-	//struct Desc *key2 = (struct Desc *)((&keys[values[tid]])) + 5;
-	//struct Descriptor tmp = keys[values[tid]];
+	    //struct Desc *key2 = (struct Desc *)((&keys[values[tid]])) + 5;
+	    //struct Descriptor tmp = keys[values[tid]];
 
-	/*if (threadIdx.x == 0 && blockIdx.x == 0) { 
-	    printf("key0: %d\n", *key);
-	    printf("key1: %d\n", *key1);
-	    printf("key2: %d\n", *key2);
+	    /*if (threadIdx.x == 0 && blockIdx.x == 0) { 
+	      printf("key0: %d\n", *key);
+	      printf("key1: %d\n", *key1);
+	      printf("key2: %d\n", *key2);
 		
-	    //printFeature((unsigned int *)&key->descriptor[0]);
-	    }*/
+	      //printFeature((unsigned int *)&key->descriptor[0]);
+	      }*/
 	
-	//printf("key: %p\n", &keys[values[tid]]);
-	//printf("key: %.4f\n", key.descriptor[3]);
+	    //printf("key: %p\n", &keys[values[tid]]);
+	    //printf("key: %.4f\n", key.descriptor[3]);
 
-	size_t hashValue = hash((unsigned int *)key, table.count ); //cast to unsigned char?
+	    size_t hashValue = hash((unsigned int *)key, table.count ); //cast to unsigned char?
 
-	//printf("hashval: %ld\n", hashValue);
-	//printf("key: %d\t %d\t %d\t %d\t\n", key[0], key[1], key[2], key[3]);
+	    //printf("hashval: %ld\n", hashValue);
+	    //printf("key: %d\t %d\t %d\t %d\t\n", key[0], key[1], key[2], key[3]);
 
-	unsigned int *w = (unsigned int *)key;
+	    unsigned int *w = (unsigned int *)key;
 
 //if (hashValue == 1023)
-	//{
-	//printf("key: %d\t %d\t %d\t %d\t hashval: %ld\n", w[0], w[1], w[2], w[3], hashValue);
+	    //{
+	    //printf("key: %d\t %d\t %d\t %d\t hashval: %ld\n", w[0], w[1], w[2], w[3], hashValue);
 	    //}
 	
 	
 	
-	for (int i=0; i<32; i++)
+	    for (int i=0; i<32; i++)
 	    {
-	    if ((tid % 32) == i)
+		if ((tid % 32) == i)
 		{
-		Entry *location = &(table.pool[tid]);
-		memcpy(&(location->key), key, sizeof(struct Desc));
-		//location->value = values[tid];
-		location->begin = tid; //values[tid]?
-		location->end = tid + 1;
-		lock[hashValue].lock();
+		    Entry *location = &(table.pool[tid]);
+		    memcpy(&(location->key), key, sizeof(struct Desc));
+		    //location->value = values[tid];
+		    location->begin = tid; //values[tid]?
+		    location->end = tid + 1;
+		    lock[hashValue].lock();
 
 		
-		Entry *ptr = table.entries[hashValue];
-		int exists = 1;
-		while (ptr != NULL)
-		{
-		    //exists = compareKey((unsigned int *)&(ptr->key), (unsigned int *)&(location->key)); //pretty sure this does not work as intended..
-		    exists = compareKey((unsigned char *)&(ptr->key), (unsigned char *)&(location->key));
-		    if (exists == -1) break;
-		    ptr = ptr->next;
-		}
+		    Entry *ptr = table.entries[hashValue];
+		    int exists = 1;
+		    while (ptr != NULL)
+		    {
+			//exists = compareKey((unsigned int *)&(ptr->key), (unsigned int *)&(location->key)); //pretty sure this does not work as intended..
+			exists = compareKey((unsigned char *)&(ptr->key), (unsigned char *)&(location->key));
+			if (exists == -1) break;
+			ptr = ptr->next;
+		    }
 		
-		if (exists == 1)
-		{
-		    location->next = table.entries[hashValue];
-		    table.entries[hashValue] = location;
-		}
-		else
-		{
-		    //printf("exists\n");
-		    //ptr->end++; //begin / end ---- how am i sure to increase end, not decrease begin? needs fixing..
+		    if (exists == 1)
+		    {
+			location->next = table.entries[hashValue];
+			table.entries[hashValue] = location;
+		    }
+		    else
+		    {
+			//printf("exists\n");
+			//ptr->end++; //begin / end ---- how am i sure to increase end, not decrease begin? needs fixing..
 
-		    /******************************************************
-		    *
-		    * This solution did not work as expected...huge overlapping sectors..
-		    * Is this because of some mistake in the sorting? might be. 
-		    * Could also just be some fallacies in the code...
-		    *
-		    * If mistake in sort, get around this by storing every index,  
-		    * creating an interable list?
-		    *
-		    ********************************************************/
-		    if (location->begin < ptr->begin) ptr->begin = location->begin;
-		    if (location->end > ptr->end) ptr->end = location->end;
+			/******************************************************
+			 *
+			 * This solution did not work as expected...huge overlapping sectors..
+			 * Is this because of some mistake in the sorting? might be. 
+			 * Could also just be some fallacies in the code...
+			 *
+			 * If mistake in sort, get around this by storing every index,  
+			 * creating an interable list? -- SOLVED. Did not get sector from sorted lookup. 
+			 *
+			 ********************************************************/
+			if (location->begin < ptr->begin) ptr->begin = location->begin;
+			if (location->end > ptr->end) ptr->end = location->end;
 
-		    //if (location->begin < ptr->begin) ptr->begin--;
-		    //if (location->end > ptr->end) ptr->end++;
+			//if (location->begin < ptr->begin) ptr->begin--;
+			//if (location->end > ptr->end) ptr->end++;
 		    
 		    
-		}
+		    }
 		
-		lock[hashValue].unlock();
+		    lock[hashValue].unlock();
 		}
 	    }
 	
-	tid += stride;
-    } 
-}
+	    tid += stride;
+	} 
+    }
 
 
 
     __global__ void
     get_section_from_table( Table table, struct Descriptor *keys, unsigned int elements, unsigned int l_len, unsigned int *start_idx, unsigned int *stop_idx )
-{
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int stride = blockDim.x * gridDim.x;
-
-    //Search area - set to max if no key match is found - how do i return these in a good way?
-    //two unsigned int arrays allocated on the gpu?
-    
-    while (tid < elements)
     {
-	struct Desc *key = (struct Desc *)(&keys[tid]) + 2; //+2 because second layer is currently stored.
-
-	size_t hashValue = hash((unsigned int *)key, table.count );
-
-	Entry *ptr = table.entries[hashValue];
-	int exists = 1;
-	int cnt = 0;
-	//This while loop might not be very fast..splits inside warp if threads
-	while (ptr != NULL)
+	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	int stride = blockDim.x * gridDim.x;
+	int check;
+	//Search area - set to max if no key match is found - how do i return these in a good way?
+	//two unsigned int arrays allocated on the gpu?
+	
+	while (tid < elements)
 	{
-	    exists = compareKey((unsigned char *)&(ptr->key), (unsigned char *)key);
-	    if (exists == -1) break;
-	    ptr = ptr->next;
-	}
-
-	if (exists == -1 && (ptr->end - ptr->begin) > 1) //must be two or more in set
-	{
-	    start_idx[tid] = ptr->begin;
-	    stop_idx[tid] = ptr->end;
-	}
-	else
-	{
-	    start_idx[tid] = 0;
-	    stop_idx[tid] = l_len;
-
-	    //if (tid == 0)
+	    struct Desc *key = (struct Desc *)(&keys[tid]) + 2; //+2 because second layer is currently stored.
+	    // bloom_filter bloom,
+	    //check = bloom_check(bloom.bits, key, bloom.size);
+	    //if (check == 0)
 	    //{
-	    //unsigned char * p1 = (unsigned char *)key;
+	    //	start_idx[tid] = 0;
+	    //	stop_idx[tid] = l_len;
+	    //	tid += stride;
+	    //	continue;
+	    //}
+	    
+	    size_t hashValue = hash((unsigned int *)key, table.count );
+
+	    Entry *ptr = table.entries[hashValue];
+	    int exists = 1;
+	    int cnt = 0;
+	    //This while loop might not be very fast..splits inside warp if threads
+	    while (ptr != NULL)
+	    {
+		exists = compareKey((unsigned char *)&(ptr->key), (unsigned char *)key);
+		if (exists == -1) break;
+		ptr = ptr->next;
+	    }
+
+	    if (exists == -1 && (ptr->end - ptr->begin) > 1) //must be two or more in set
+	    {
+		start_idx[tid] = ptr->begin;
+		stop_idx[tid] = ptr->end;
+	    }
+	    else
+	    {
+		start_idx[tid] = 0;
+		stop_idx[tid] = l_len;
+
+		//if (tid == 0)
+		//{
+		//unsigned char * p1 = (unsigned char *)key;
 		//printf("key:\t");
 		//printf(" %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n", p1[0], p1[1], p1[2], p1[3], p1[4], p1[5], p1[6], p1[7], p1[8], p1[9], p1[10], p1[11], p1[12], p1[13], p1[14], p1[15]);
 		
 		//}
-	}
+	    }
 	
-	tid += stride;
+	    tid += stride;
+	}
     }
-}
 
 /********************************
 HASH TABLE END - fix seperate file.
@@ -922,6 +1237,94 @@ HASH TABLE END - fix seperate file.
 
 
 
+/*****************************
+BLOOM FILTER
+****************************/
+
+
+
+    void initialize_bloom_filter( bloom_filter &bloom, size_t size )
+    {
+	bloom.size = size;
+	cudaMalloc( (void**)&bloom.bits, size );
+	cudaMemset( bloom.bits, 0, size ); 
+    }
+
+
+
+//bytewise bloomfilter
+    __device__
+    void bloom_add( bloom_filter &filter, const void *item ) 
+    {
+	uint8_t *bits = (uint8_t *)filter.bits;
+
+	unsigned int hash = jenkins(item);
+	printf("hash: %d\n", hash);
+	hash %= filter.size;
+	printf("hash MOD: %d\n", hash);
+	bits[hash] = 1;
+	printf("hash/8: %d\n", hash);
+
+	hash = djb2(item);
+    }
+
+
+
+    __global__ void
+    bloom_add_filters( bloom_filter bloom,  struct Descriptor *keys, unsigned int elements)
+    {
+	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	int stride = blockDim.x * gridDim.x;
+
+	uint8_t *bits = (uint8_t *)bloom.bits;
+	unsigned int hashkey;
+	struct Desc *key;
+	while (tid < elements)
+	{
+	    key = (struct Desc *)((&keys[tid])) + 2;
+	    hashkey = hash((unsigned int *)key, bloom.size);
+	    bits[hashkey] = 1;
+	    hashkey = hash2((unsigned int *)key, bloom.size);
+	    bits[hashkey] = 1;
+	    tid += stride;
+	}
+    }
+
+    //even if hit we do not know if we have  two or more in the set... pointless?
+    //cant see imediate benefit.
+    __global__ void
+    bloom_filter_check( bloom_filter bloom,  struct Descriptor *keys, unsigned int elements)
+    {
+	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	int stride = blockDim.x * gridDim.x;
+
+	uint8_t *bits = (uint8_t *)bloom.bits;
+	unsigned int hashkey_1;
+	unsigned int hashkey_2;
+
+	int check = 1;
+	struct Desc *key;
+	while (tid < elements)
+	{
+	    key = (struct Desc *)((&keys[tid])) + 2;
+	    hashkey_1 = hash((unsigned int *)key, bloom.size);
+	    if (bits[hashkey_1] != 1)
+		check = 0;
+	    hashkey_2 = hash2((unsigned int *)key, bloom.size);
+	    if (bits[hashkey_2] != 1)
+		check = 0;
+	    if (tid < elements)
+		printf("bloom: %d\n", check);
+	    tid += stride;
+	}
+    }
+
+
+
+/*****************************
+BLOOM FILTER end
+****************************/
+    
 
     
 
@@ -940,6 +1343,31 @@ HASH TABLE END - fix seperate file.
             }
         }
     }
+
+        __device__ void
+    transpose8rS64( unsigned char* A, unsigned char* B ) 
+    {
+    	unsigned long long x, t;
+    	int i;
+
+	for ( i = 0; i <= 7; i++ )     // Load 8 bytes from the
+		x = x << 8 | A[1*i];      // input array and pack
+								  // them into x.
+
+	t = (x ^ (x >> 7)) & 0x00AA00AA00AA00AALL;
+	x = x ^ t ^ (t << 7);
+	t = (x ^ (x >> 14)) & 0x0000CCCC0000CCCCLL;
+	x = x ^ t ^ (t << 14);
+	t = (x ^ (x >> 28)) & 0x00000000F0F0F0F0LL;
+	x = x ^ t ^ (t << 28);
+
+	for ( i = 7; i >= 0; i-- ) 
+	{   // Store result into
+		B[1*i] = x; x = x >> 8;
+	}  // output array B.
+    }
+
+
 
     __device__ void
     organize( unsigned int* A, unsigned int* B )
@@ -997,23 +1425,23 @@ HASH TABLE END - fix seperate file.
 	    T[i] = source[i];
 	    
 	
-	 __syncthreads();
+	__syncthreads();
 
 	 
-	 //if(block == 0 && thread == 0) 
-	 //    printFeature((unsigned int*)T);
+	//if(block == 0 && thread == 0) 
+	//    printFeature((unsigned int*)T);
 
 	 
-	 if (thread < 4)
-	     transpose32((unsigned int*)&T[32 * thread]);     	    
+	if (thread < 4)
+	    transpose32((unsigned int*)&T[32 * thread]);     	    
        
-	 __syncthreads();
+	__syncthreads();
 	 
 	 
-	 organize_32(T, destination);
+	organize_32(T, destination);
 	 
-	 //if(thread == 0 && block == 0)
-	 //printFeature((unsigned int*)destination);	 	 
+	//if(thread == 0 && block == 0)
+	//printFeature((unsigned int*)destination);	 	 
 	 
 	__syncthreads();
 
@@ -1021,19 +1449,96 @@ HASH TABLE END - fix seperate file.
     }
 
 /*
-        __global__ void
-    compute_distance_transposed_hamming( int3* match_matrix, Descriptor * l, int l_len, Descriptor* r, int r_len , Descriptor * l_tra, Descriptor *r_tra) {
+  __global__ void
+  compute_distance_transposed_hamming( int3* match_matrix, Descriptor * l, int l_len, Descriptor* r, int r_len , Descriptor * l_tra, Descriptor *r_tra) {
 
-        if(blockIdx.x > l_len)
-            return;
+  if(blockIdx.x > l_len)
+  return;
 
-        transpose(l, l_tra, l_len);
+  transpose(l, l_tra, l_len);
 	
-	//if(blockIdx.x == 0 && threadIdx.x == 0)
-	//    printFeature((unsigned int*)l_tra[blockIdx.x].features);		       
+  //if(blockIdx.x == 0 && threadIdx.x == 0)
+  //    printFeature((unsigned int*)l_tra[blockIdx.x].features);		       
 	
 	
-    }*/
+  }*/
+    
+#define DIMENSIONS 128
+
+    __device__ __constant__ unsigned int gpu_idx[64] =
+{
+	0, 1, 2, 3,
+	4, 5, 6, 7,
+	8, 9, 10, 11,
+	12, 13, 14, 15,
+	128, 129, 130, 131,
+	132, 133, 134, 135,
+	136, 137, 138, 139,
+	140, 141, 142, 143,
+	256, 257, 258, 259,
+	260, 261, 262, 263,
+	264, 265, 266, 267,
+	268, 269, 270, 271,
+	384, 385, 386, 387,
+	388, 389, 390, 391,
+	392, 393, 394, 395,
+	396, 397, 398, 399,
+};
+
+
+__device__ __constant__ unsigned int gpu_write_back[64] =
+{
+	384, 256, 128, 0, 
+	388, 260, 132, 4, 
+	392, 264, 136, 8, 
+	396, 268, 140, 12, 
+	385, 257, 129, 1, 
+	389, 261, 133, 5, 
+	393, 365, 137, 9, 
+	397, 269, 141, 13, 
+	386, 258, 130, 2, 
+	390, 262, 134, 6, 
+	394, 266, 138, 10, 
+	398, 270, 142, 14, 
+	387, 259, 131, 3, 
+	391, 263, 135, 7, 
+	395, 267, 139, 11, 
+	399, 271, 143, 15,
+
+};
+    
+    __global__ void
+    transpose_descriptors_64(Descriptor *src, Descriptor *des)
+    {
+    
+	unsigned char *ptr = (unsigned char *)(src + blockIdx.x);
+	unsigned char *ptr_res = (unsigned char *)(des + blockIdx.x);
+
+	int i;
+	int start_pos, end_pos;
+	int offset = 0;
+	unsigned char C[8];                        //Local8x8 src
+	unsigned char R[8];                        //Local8x8 des
+
+	start_pos = gpu_idx[threadIdx.x];          //get starting index
+	end_pos = gpu_write_back[threadIdx.x];     //get ending index
+	ptr += start_pos;                          //set starting index
+	ptr_res += end_pos;                        //set write back position
+
+	//prepare 8x8 blocks for transpose
+	for (i = 0; i < 8; i++) {
+	    C[i] = ptr[offset];
+	    offset += 16;
+	} 
+
+	transpose8rS64(C, R);
+
+	offset = 0;
+	for (i = 0; i < 8; i++) {
+	    ptr_res[offset] = R[i];
+	    offset += 16;
+	} 
+    }
     
     __global__ void
     transpose_descriptors(Descriptor * src, int len, Descriptor * des) {
@@ -1042,11 +1547,7 @@ HASH TABLE END - fix seperate file.
             return;
 
         transpose(src, des, len);
-	
-	//if(blockIdx.x == 0 && threadIdx.x == 0)
-	//    printFeature((unsigned int*)l_tra[blockIdx.x].features);		       
-	
-	
+       
     }
 
     __global__ void
@@ -1135,17 +1636,17 @@ HASH TABLE END - fix seperate file.
 
 	    /*
 	      if(l.features[0] > r.features[0])
-		return true;
-	    if(l.features[0] < r.features[0])
-		return false;
-	    if(l.features[1] > r.features[1])
-		return true;
-	    if(l.features[1] < r.features[1])
-		return false;
-	    if(l.features[2] > r.features[2])
-		return true;
+	      return true;
+	      if(l.features[0] < r.features[0])
+	      return false;
+	      if(l.features[1] > r.features[1])
+	      return true;
+	      if(l.features[1] < r.features[1])
+	      return false;
+	      if(l.features[2] > r.features[2])
+	      return true;
 	    
-	    return false;
+	      return false;
 	    */
 	}
     };
@@ -1154,9 +1655,9 @@ HASH TABLE END - fix seperate file.
     {
 	__device__
 	inline bool operator()( int a, int b ) const
-        {
-	    return true; // a < b;
-        }
+	    {
+		return true; // a < b;
+	    }
     };
 
     struct IndirectLookup
@@ -1188,23 +1689,23 @@ HASH TABLE END - fix seperate file.
 	bool operator()(const T &a, const T &b) const {
 	    	    
 	    /*
-	    for(int i = 0; i <= 1; i++) {
-		if(a.v[i] < b.v[i])
-		    return true;
-		if(b.v[i] > a.v[i])
-		    return false;
-		    }	    
-	    return false;
+	      for(int i = 0; i <= 1; i++) {
+	      if(a.v[i] < b.v[i])
+	      return true;
+	      if(b.v[i] > a.v[i])
+	      return false;
+	      }	    
+	      return false;
 	    */
 
 	    int i = 0;
 
 	    while(i < 128) {
-	    if(a.v[i] < b.v[i])
-		return true;
-	    if(b.v[i] < a.v[i])
-		return false;
-	    i++;
+		if(a.v[i] < b.v[i])
+		    return true;
+		if(b.v[i] < a.v[i])
+		    return false;
+		i++;
 	    }
 	    //if(a.v[1] < b.v[1])
 	    //return true;
@@ -1321,6 +1822,8 @@ HASH TABLE END - fix seperate file.
 	else
 	{
 
+
+
 	    dim3 grid_r;
 	    grid.x = r_len;
 	    grid.y = 1;
@@ -1342,6 +1845,18 @@ HASH TABLE END - fix seperate file.
 	    //<<<grid,block>>>
 	    //	( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len , l_copy, r_copy);
 
+	    //two streams..
+	    cudaStream_t stream1, stream2;
+	    cudaStreamCreate( &stream1 );
+	    cudaStreamCreate( &stream2 );
+
+	    cudaEvent_t start, stop;
+	    cudaEventCreate( &start );
+	    cudaEventCreate( &stop );
+	    float elapsedTime;
+	    
+	    cudaEventRecord( start, 0 );
+/*
 	    transpose_descriptors
 		<<<l_len,block>>>
 		( getDescriptors(), l_len, l_copy);
@@ -1351,6 +1866,28 @@ HASH TABLE END - fix seperate file.
 	    transpose_descriptors
 		<<<r_len,block>>>
 		( other->getDescriptors(), r_len , r_copy);
+*/
+	    /*
+	    transpose_descriptors_64
+		<<<l_len,64,0,stream1>>>
+		( getDescriptors(), l_copy);
+
+	    transpose_descriptors_64
+		<<<r_len,64,0,stream2>>>
+		( other->getDescriptors(), r_copy);
+	    */
+	    	    transpose_descriptors_64
+		<<<l_len,64,0>>>
+		( getDescriptors(), l_copy);
+
+	    transpose_descriptors_64
+		<<<r_len,64>>>
+		( other->getDescriptors(), r_copy);
+	    
+	    cudaEventRecord( stop, 0 );
+	    cudaEventSynchronize( stop );
+	    cudaEventElapsedTime( &elapsedTime, start, stop );
+	    printf( "Time to transpose:  %3.1f ms\n", elapsedTime );
 	    
 	    cudaDeviceSynchronize();
             POP_CHK;
@@ -1362,33 +1899,33 @@ HASH TABLE END - fix seperate file.
 
 
 	    /*thrust::device_ptr<Descriptor> d_ptr(l_copy);
-	    thrust::device_vector<int> B(SIZE);
-	    thrust::sequence(B.begin(), B.end());
-	    thrust::sort(B.begin(), B.end(), IndirectLookup(l_copy));
-	    thrust::host_vector<int> H = B;
-	     thrust::copy(H.begin(), H.end(), std::ostream_iterator<int>(std::cout, " "));
-	     int cnter = 0;
-	    for(int i = 0; i < SIZE; i++) {
-		for(int j = 0; j < SIZE; j++) {
-		    if(i != j) {
-			if (H[j] == H[i]) {
-			    cnter++;
-			}
-		    }
+	      thrust::device_vector<int> B(SIZE);
+	      thrust::sequence(B.begin(), B.end());
+	      thrust::sort(B.begin(), B.end(), IndirectLookup(l_copy));
+	      thrust::host_vector<int> H = B;
+	      thrust::copy(H.begin(), H.end(), std::ostream_iterator<int>(std::cout, " "));
+	      int cnter = 0;
+	      for(int i = 0; i < SIZE; i++) {
+	      for(int j = 0; j < SIZE; j++) {
+	      if(i != j) {
+	      if (H[j] == H[i]) {
+	      cnter++;
+	      }
+	      }
 		    
-		}
-	    }
-	    std::cout << "l_len: " <<  SIZE << " cnt: " << cnter << std::endl;
-	    std::exit(1);
-	      */
+	      }
+	      }
+	      std::cout << "l_len: " <<  SIZE << " cnt: " << cnter << std::endl;
+	      std::exit(1);
+	    */
 	    
 #if 0
 	    int *desc_index = popsift::cuda::malloc_devT<int>(SIZE, __FILE__, __LINE__ );
             POP_CHK;
 	    //thrust::sequence(thrust::device, desc_index, desc_index+SIZE);
 	    	   
-	     thrust::device_ptr<int> d = thrust::device_pointer_cast(desc_index);	    
-	     thrust::sequence(d, d+SIZE);
+	    thrust::device_ptr<int> d = thrust::device_pointer_cast(desc_index);	    
+	    thrust::sequence(d, d+SIZE);
             thrust::host_vector<int> hsorted( SIZE );
             thrust::copy( d, d+SIZE, hsorted.begin() );
             thrust::sort( hsorted.begin(), hsorted.end() );
@@ -1424,12 +1961,12 @@ HASH TABLE END - fix seperate file.
             cout << endl;
 	   
 /*
-	    thrust::sort(
-		thrust::device,
-		desc_index,
-		desc_index+SIZE,
-		IndirectLookup(l_copy) //Issue here
-		);
+  thrust::sort(
+  thrust::device,
+  desc_index,
+  desc_index+SIZE,
+  IndirectLookup(l_copy) //Issue here
+  );
 */
 
 	
@@ -1514,31 +2051,41 @@ HASH TABLE END - fix seperate file.
 
 	    thrust::device_ptr<int> indexes = &d[0];
 	    
-	    cudaEvent_t start, stop;
-	    cudaEventCreate( &start );
-	    cudaEventCreate( &stop );
-	    cudaEventRecord( start, 0 );
-	    
-	    //find a good way to set HASH_ENTRIES
-	    Table table; 
-	    initialize_table( table, HASH_ENTRIES, SIZE );
 
+	    cudaEventRecord( start, 0 );
+
+	    //Set up the bloom filter
+	    //bloom_filter bloom;
+	    //initialize_bloom_filter(bloom, SIZE);
+	    //bloom_add_filters
+	    //	<<<60, 256,0,stream2>>>
+	    //	( bloom, r_copy, SIZE );
+
+	    //cudaDeviceSynchronize();
+
+
+	    
+	    Table table; 
+	    initialize_table( table, HASH_ENTRIES, SIZE ); //hash entries set equal to size for max performance
+	    
+
+	    
 	    //initialize mutual exclution locks.
 	    Lock lock[HASH_ENTRIES];
 	    Lock *dev_lock;
 	    cudaMalloc( (void**)&dev_lock, HASH_ENTRIES * sizeof( Lock ) );
 	    cudaMemcpy( dev_lock, lock, HASH_ENTRIES * sizeof( Lock ), cudaMemcpyHostToDevice );
 
-	    add_to_table<<<60,256>>>( r_copy, indexes, table, dev_lock, SIZE );
+	    add_to_table<<<60,256,0,stream1>>>( r_copy, indexes, table, dev_lock, SIZE );
 	    
 	    cudaEventRecord( stop, 0 );
 	    cudaEventSynchronize( stop );
 	    //printf("add table call\n");
 	    POP_CHK;
-	    float elapsedTime;
-	    cudaEventElapsedTime( &elapsedTime, start, stop );
-	    printf( "Time to hash:  %3.1f ms\n", elapsedTime );
-	    verify_table( table, SIZE ); 
+	    float elapsedTimeh;
+	    cudaEventElapsedTime( &elapsedTimeh, start, stop );
+	    printf( "Time to hash:  %3.1f ms\n", elapsedTimeh );
+	    //verify_table( table, SIZE ); 
 
 	    cudaEventDestroy( start );
 	    cudaEventDestroy( stop );
@@ -1556,7 +2103,7 @@ HASH TABLE END - fix seperate file.
 	    
 	    //Probably better to utilize threads as well.
 	    get_section_from_table
-		<<<l_len, 1>>>
+		<<<60, 256>>>
 		( table, l_copy, l_len, r_len, dev_start_idx, dev_stop_idx );
 	    
 	    cudaDeviceSynchronize();
@@ -1573,15 +2120,33 @@ HASH TABLE END - fix seperate file.
 		}
 	    }
 
-
+/* Working hamming, few matches	    
+	    compute_distance_hamming
+		<<<l_len,1>>>
+		( match_matrix, getDescriptors(), l_copy, l_len, other->getDescriptors(), r_copy, r_len, indexes, dev_start_idx, dev_stop_idx );
+*/
+	    /*
+	    compute_distance_hamming_levels
+		<<<l_len,1>>>
+		( match_matrix, getDescriptors(), l_copy, l_len, other->getDescriptors(), r_copy, r_len, indexes, dev_start_idx, dev_stop_idx );
+	    */
+	    
+ //working dot product in section
 	    compute_dot_in_section
 		<<<grid,block>>>
 		( match_matrix, getDescriptors(), l_len, other->getDescriptors(),  r_len, indexes, dev_start_idx, dev_stop_idx );
 
 	    cudaDeviceSynchronize();
 
+		/*
+		  bloom_filter_check
+		  <<<60, 256>>>
+		  ( bloom, l_copy, SIZE );
+		  cudaDeviceSynchronize();
+		  
+		*/
 
-		
+	    
 	    //create array of keys? This can be done in the transpose kernel of the gpu.
 	    //might not be needed, can use (some 128 bit struct...*)descriptor
 	    //This way all treads (or blocks depending on implementation) can get
@@ -1596,64 +2161,64 @@ HASH TABLE END - fix seperate file.
 	  
 
 /*
-	    int *ind = popsift::cuda::malloc_devT<int>(SIZE, __FILE__, __LINE__ );
-	    thrust::sequence(thrust::device, ind, ind+SIZE);	    	   
+  int *ind = popsift::cuda::malloc_devT<int>(SIZE, __FILE__, __LINE__ );
+  thrust::sequence(thrust::device, ind, ind+SIZE);	    	   
 	    
-	    struct char_array *data;
-	    cudaMalloc(&data, sizeof(char_array)*SIZE);
+  struct char_array *data;
+  cudaMalloc(&data, sizeof(char_array)*SIZE);
 
-	    float da[SIZE*128];
-	    for(int i = 0; i < SIZE*128; i++)
-		da[i] = rand()%100;
+  float da[SIZE*128];
+  for(int i = 0; i < SIZE*128; i++)
+  da[i] = rand()%100;
 
-	     cudaMemcpy(data, da, sizeof(Descriptor)*SIZE, cudaMemcpyDeviceToDevice);
+  cudaMemcpy(data, da, sizeof(Descriptor)*SIZE, cudaMemcpyDeviceToDevice);
 
 	    
 	  
-	    int copy1[SIZE];
-	    cudaMemcpy(copy1, ind, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
-	    //thrust::sort(copy1, copy1+SIZE, thrust::greater<int>());
+  int copy1[SIZE];
+  cudaMemcpy(copy1, ind, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
+  //thrust::sort(copy1, copy1+SIZE, thrust::greater<int>());
 
-	    thrust::sort(thrust::device, ind, ind+SIZE, cmp_test(data));
+  thrust::sort(thrust::device, ind, ind+SIZE, cmp_test(data));
 	    
-	    int copy[SIZE];
-	    cudaMemcpy(copy, ind, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
+  int copy[SIZE];
+  cudaMemcpy(copy, ind, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
 
-	    //thrust::sort(copy, copy+SIZE);
+  //thrust::sort(copy, copy+SIZE);
 
 
-	    bool error = false;
+  bool error = false;
 
-	    for(int i = 0; i < SIZE; i++) {
-		bool tmp = false;
-		for(int j = 0; j < SIZE; j++)  {
-		    if(copy1[i] == copy[j])
-			tmp = true;
-		}
-		if(!tmp)
-		    error = true;
-	    }
+  for(int i = 0; i < SIZE; i++) {
+  bool tmp = false;
+  for(int j = 0; j < SIZE; j++)  {
+  if(copy1[i] == copy[j])
+  tmp = true;
+  }
+  if(!tmp)
+  error = true;
+  }
 
-	    for(int i = 0; i < SIZE; i++)
-		printf("%d\t%d\n", copy1[i], copy[i]);
+  for(int i = 0; i < SIZE; i++)
+  printf("%d\t%d\n", copy1[i], copy[i]);
 
-	    if(error)
-		printf("ERRORRRRRRRRRR\n");
-	    else {
-		struct char_array *tp = (struct char_array*)malloc(SIZE*sizeof(char_array));
-		cudaMemcpy(tp, data, sizeof(char_array)*SIZE, cudaMemcpyDeviceToHost);
-		for(int i = 0; i < SIZE-1; i++) {
-		    for(int j = 0; j < 128; j++){
-			if(tp[copy[i]].v[j] < tp[copy[i+1]].v[j])
-			    continue;
-			else if(tp[copy[i]].v[j] < tp[copy[i+1]].v[j])
-			    printf("%f\t%f\n", tp[copy[0]].v[0], tp[copy[1]].v[0]);
-			}
-		    }
+  if(error)
+  printf("ERRORRRRRRRRRR\n");
+  else {
+  struct char_array *tp = (struct char_array*)malloc(SIZE*sizeof(char_array));
+  cudaMemcpy(tp, data, sizeof(char_array)*SIZE, cudaMemcpyDeviceToHost);
+  for(int i = 0; i < SIZE-1; i++) {
+  for(int j = 0; j < 128; j++){
+  if(tp[copy[i]].v[j] < tp[copy[i+1]].v[j])
+  continue;
+  else if(tp[copy[i]].v[j] < tp[copy[i+1]].v[j])
+  printf("%f\t%f\n", tp[copy[0]].v[0], tp[copy[1]].v[0]);
+  }
+  }
 		    
-		//printf("%f\t%f\t%f\n", tp[copy[0]].v[0], tp[copy[1]].v[0], tp[copy[2]].v[0]);
-	    }
-	    */
+  //printf("%f\t%f\t%f\n", tp[copy[0]].v[0], tp[copy[1]].v[0], tp[copy[2]].v[0]);
+  }
+*/
 
 	    /*
 	     * Stumbled upon the error
