@@ -17,13 +17,16 @@ struct GaussInfo;
 template<int LEVELS>
 struct GaussTable
 {
-    /* The filter that is computed from the sigma values of this level */
-    float filter[ LEVELS * GAUSS_ALIGN ];
+    union
+    {
+        /* The filter that is computed from the sigma values of this level */
+        float filter_n[ LEVELS * GAUSS_ALIGN ];
 
-    /* The same filter as above, but recomputed for use with hardware
-     * interpolation to implement half of the multiplications as hardware
-     * access */
-    float i_filter[ LEVELS * GAUSS_ALIGN ];
+        /* The same filter as above, but recomputed for use with hardware
+         * interpolation to implement half of the multiplications as hardware
+         * access */
+        float filter_i[ LEVELS * GAUSS_ALIGN ];
+    } u;
 
     /* The sigma used to generate the Gauss table for each level.
      * Meaning these are the differences between sigma0 and sigmaN.
@@ -40,11 +43,11 @@ struct GaussTable
     void clearTables( );
 
     __host__
-    void computeBlurTable( const GaussInfo* info );
+    void computeBlurTable( const Config& conf, const GaussInfo* info );
 
 private:
     __host__
-    void transformBlurTable( ); // const GaussInfo* info );
+    void transformBlurTable( const Config& conf ); // const GaussInfo* info );
 };
 
 struct GaussInfo

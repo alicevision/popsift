@@ -33,7 +33,7 @@ void horiz( cudaTextureObject_t src_linear_tex,
     if( write_x >= dst_w ) return;
 
     const int    span    =  d_gauss.dd.span[octave];
-    const float* filter  = &d_gauss.dd.filter[octave*GAUSS_ALIGN];
+    const float* filter  = &d_gauss.dd.u.filter_n[octave*GAUSS_ALIGN];
     const float  read_x  = ( blockIdx.x * blockDim.x + threadIdx.x + shift ) / dst_w;
     const float  read_y  = ( blockIdx.y + shift ) / dst_h;
 
@@ -72,7 +72,7 @@ void horiz_level( cudaTextureObject_t src_linear_tex,
     const float  read_y  = ( blockIdx.y + shift ) / dst_h;
 
     const int    span      =  d_gauss.abs_o0.span[level];
-    const float* filter    = &d_gauss.abs_o0.filter[level*GAUSS_ALIGN];
+    const float* filter    = &d_gauss.abs_o0.u.filter_n[level*GAUSS_ALIGN];
 
     float out = 0.0f;
 
@@ -109,7 +109,7 @@ void horiz_all( cudaTextureObject_t src_linear_tex,
     for( int dst_level=0; dst_level < max_level; dst_level++ )
     {
         const int    span      =  d_gauss.abs_o0.span[dst_level];
-        const float* filter    = &d_gauss.abs_o0.filter[dst_level*GAUSS_ALIGN];
+        const float* filter    = &d_gauss.abs_o0.u.filter_n[dst_level*GAUSS_ALIGN];
 
         float out = 0.0f;
 

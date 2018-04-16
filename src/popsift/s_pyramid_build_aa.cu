@@ -21,7 +21,7 @@ void horiz( cudaTextureObject_t src_point_texture,
 {
     const int    src_level = dst_level - 1;
     const int    span      =  d_gauss.inc.span[dst_level];
-    const float* filter    = &d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
+    const float* filter    = &d_gauss.inc.u.filter_n[dst_level*GAUSS_ALIGN];
 
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
     const int off_y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -58,7 +58,7 @@ void vert( cudaTextureObject_t src_point_texture,
            const int           dst_level )
 {
     const int    span   =  d_gauss.inc.span[dst_level];
-    const float* filter = &d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
+    const float* filter = &d_gauss.inc.u.filter_n[dst_level*GAUSS_ALIGN];
     int block_x = blockIdx.x * blockDim.x;
     int block_y = blockIdx.y * blockDim.y;
     int idx     = threadIdx.x;
@@ -97,7 +97,7 @@ void vert_abs0( cudaTextureObject_t src_point_texture,
            const int           dst_level )
 {
     const int    span   =  d_gauss.abs_o0.span[dst_level];
-    const float* filter = &d_gauss.abs_o0.filter[dst_level*GAUSS_ALIGN];
+    const float* filter = &d_gauss.abs_o0.u.filter_n[dst_level*GAUSS_ALIGN];
     int block_x = blockIdx.x * blockDim.x;
     int block_y = blockIdx.y * blockDim.y;
     int idx     = threadIdx.x;
@@ -142,7 +142,7 @@ void vert_all_abs0( cudaTextureObject_t src_point_texture,
     for( int dst_level=start_level; dst_level<max_level; dst_level++ )
     {
         const int    span   =  d_gauss.abs_o0.span[dst_level];
-        const float* filter = &d_gauss.abs_o0.filter[dst_level*GAUSS_ALIGN];
+        const float* filter = &d_gauss.abs_o0.u.filter_n[dst_level*GAUSS_ALIGN];
 
         int idx = threadIdx.x;
         int idy;

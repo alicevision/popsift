@@ -22,46 +22,50 @@ __align__(128) GaussInfo h_gauss;
 
 
 __global__
-void print_gauss_filter_symbol( int columns )
+void print_gauss_filter_symbol( int columns, bool use_hardware_interpol )
 {
-    printf( "\n"
-            "Gauss tables\n"
-            "      level span sigma : center value -> edge value\n"
-            "    relative sigma\n" );
+    if( use_hardware_interpol )
+    {
+        printf( "\n"
+                "Gauss tables for hardware interpolation\n"
+                "      level span sigma : center value -> ( interpolation value, multiplier ) [one edge value] \n" );
 
-    for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
-        int span = d_gauss.inc.span[lvl] + d_gauss.inc.span[lvl] - 1;
+        for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
+            int span = d_gauss.inc.i_span[lvl] + d_gauss.inc.i_span[lvl] - 1;
 
-        printf("      %d %d ", lvl, span );
-        printf("%2.6f: ", d_gauss.inc.sigma[lvl] );
-        int m = min( d_gauss.inc.span[lvl], columns );
-        for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.inc.filter[lvl*GAUSS_ALIGN+x] );
+            printf("      %d %d ", lvl, span );
+            printf("%2.6f: ", d_gauss.inc.sigma[lvl] );
+            int m = min( d_gauss.inc.i_span[lvl], columns );
+            for( int x=0; x<m; x++ ) {
+                printf("%0.8f ", d_gauss.inc.u.filter_i[lvl*GAUSS_ALIGN+x] );
+            }
+            if( m < d_gauss.inc.i_span[lvl] )
+                printf("...\n");
+            else
+                printf("\n");
         }
-        if( m < d_gauss.inc.span[lvl] )
-            printf("...\n");
-        else
-            printf("\n");
     }
-    printf("\n");
+    else
+    {
+        printf( "\n"
+                "Gauss tables\n"
+                "      level span sigma : center value -> edge value\n"
+                "    relative sigma\n" );
 
-    printf( "\n"
-            "Gauss tables for hardware interpolation\n"
-            "      level span sigma : center value -> ( interpolation value, multiplier ) [one edge value] \n" );
+        for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
+            int span = d_gauss.inc.span[lvl] + d_gauss.inc.span[lvl] - 1;
 
-    for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
-        int span = d_gauss.inc.i_span[lvl] + d_gauss.inc.i_span[lvl] - 1;
-
-        printf("      %d %d ", lvl, span );
-        printf("%2.6f: ", d_gauss.inc.sigma[lvl] );
-        int m = min( d_gauss.inc.i_span[lvl], columns );
-        for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.inc.i_filter[lvl*GAUSS_ALIGN+x] );
+            printf("      %d %d ", lvl, span );
+            printf("%2.6f: ", d_gauss.inc.sigma[lvl] );
+            int m = min( d_gauss.inc.span[lvl], columns );
+            for( int x=0; x<m; x++ ) {
+                printf("%0.8f ", d_gauss.inc.u.filter_n[lvl*GAUSS_ALIGN+x] );
+            }
+            if( m < d_gauss.inc.span[lvl] )
+                printf("...\n");
+            else
+                printf("\n");
         }
-        if( m < d_gauss.inc.i_span[lvl] )
-            printf("...\n");
-        else
-            printf("\n");
     }
     printf("\n");
 
@@ -76,7 +80,7 @@ void print_gauss_filter_symbol( int columns )
         printf("      %d %d %2.6f: ", lvl, span, d_gauss.abs_o0.sigma[lvl] );
         int m = min( d_gauss.abs_o0.span[lvl], columns );
         for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.abs_o0.filter[lvl*GAUSS_ALIGN+x] );
+            printf("%0.8f ", d_gauss.abs_o0.u.filter_n[lvl*GAUSS_ALIGN+x] );
         }
         if( m < d_gauss.abs_o0.span[lvl] )
             printf("...\n");
@@ -93,7 +97,7 @@ void print_gauss_filter_symbol( int columns )
         printf("      %d %d %2.6f: ", lvl, span, d_gauss.abs_oN.sigma[lvl] );
         int m = min( d_gauss.abs_oN.span[lvl], columns );
         for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.abs_oN.filter[lvl*GAUSS_ALIGN+x] );
+            printf("%0.8f ", d_gauss.abs_oN.u.filter_n[lvl*GAUSS_ALIGN+x] );
         }
         if( m < d_gauss.abs_oN.span[lvl] )
             printf("...\n");
@@ -110,7 +114,7 @@ void print_gauss_filter_symbol( int columns )
         printf("      %d %d %2.6f: ", lvl, span, d_gauss.dd.sigma[lvl] );
         int m = min( d_gauss.dd.span[lvl], columns );
         for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.dd.filter[lvl*GAUSS_ALIGN+x] );
+            printf("%0.8f ", d_gauss.dd.u.filter_n[lvl*GAUSS_ALIGN+x] );
         }
         if( m < d_gauss.dd.span[lvl] )
             printf("...\n");
@@ -185,7 +189,7 @@ void init_filter( const Config& conf,
         h_gauss.inc.sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
     }
 
-    h_gauss.inc.computeBlurTable( &h_gauss );
+    h_gauss.inc.computeBlurTable( conf, &h_gauss );
 
     /* abs_o0 :
      * Gauss table to create octave 0 of the absolute filters directly from
@@ -196,7 +200,7 @@ void init_filter( const Config& conf,
         h_gauss.abs_o0.sigma[lvl]  = sqrt( fabs( sigmaS * sigmaS - initial_blur * initial_blur ) );
     }
 
-    h_gauss.abs_o0.computeBlurTable( &h_gauss );
+    h_gauss.abs_o0.computeBlurTable( conf, &h_gauss );
 
     /* abs_oN :
      * Gauss tables to create levels 1 and above directly from level 0 of every
@@ -212,7 +216,7 @@ void init_filter( const Config& conf,
         h_gauss.abs_oN.sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
     }
 
-    h_gauss.abs_oN.computeBlurTable( &h_gauss );
+    h_gauss.abs_oN.computeBlurTable( conf, &h_gauss );
 
     /* dd :
      * The direct-downscaling kernels make use of the assumption that downscaling
@@ -233,7 +237,7 @@ void init_filter( const Config& conf,
 
         // sigma / 2^i
         h_gauss.dd.sigma[oct] = scalbnf( b, -oct );
-        h_gauss.dd.computeBlurTable( &h_gauss );
+        h_gauss.dd.computeBlurTable( conf, &h_gauss );
     }
 
     cudaError_t err;
@@ -244,10 +248,11 @@ void init_filter( const Config& conf,
                               cudaMemcpyHostToDevice );
     POP_CUDA_FATAL_TEST( err, "cudaMemcpyToSymbol failed for Gauss kernel initialization: " );
 
-    if( conf.ifPrintGaussTables() ) {
+    if( conf.ifPrintGaussTables() )
+    {
         print_gauss_filter_symbol
             <<<1,1>>>
-            ( 10 );
+            ( 10, conf.getGaussMode() == Config::VLFeat_Relative_All );
 
         POP_SYNC_CHK;
 
@@ -332,14 +337,14 @@ __host__
 void GaussTable<LEVELS>::clearTables( )
 {
     for( int i=0; i<GAUSS_ALIGN * LEVELS; i++ ) {
-        filter[i]   = 0.0f;
-        i_filter[i] = 0.0f;
+        u.filter_n[i]  = 0.0f;
+        // u.filter_i[i] = 0.0f;
     }
 }
 
 template<int LEVELS>
 __host__
-void GaussTable<LEVELS>::computeBlurTable( const GaussInfo* info )
+void GaussTable<LEVELS>::computeBlurTable( const Config& conf, const GaussInfo* info )
 {
     for( int level=0; level<LEVELS; level++ ) {
         span[level] = min( info->getSpan( sigma[level] ), GAUSS_ALIGN-1 );
@@ -354,26 +359,26 @@ void GaussTable<LEVELS>::computeBlurTable( const GaussInfo* info )
         const float sig = sigma[level];
         const int   spn = span[level];
         double sum = 1.0;
-        filter[level*GAUSS_ALIGN + 0] = 1.0;
+        u.filter_n[level*GAUSS_ALIGN + 0] = 1.0;
         for( int x = 1; x < spn; x++ ) {
             const float val = exp( -0.5 * (pow( double(x)/sig, 2.0) ) );
-            filter[level*GAUSS_ALIGN + x] = val;
+            u.filter_n[level*GAUSS_ALIGN + x] = val;
             sum += 2.0f * val;
         }
         for( int x = 0; x < spn; x++ ) {
-            filter[level*GAUSS_ALIGN + x] /= sum;
+            u.filter_n[level*GAUSS_ALIGN + x] /= sum;
         }
         for( int x = spn; x < GAUSS_ALIGN; x++ ) {
-            filter[level*GAUSS_ALIGN + x] = 0;
+            u.filter_n[level*GAUSS_ALIGN + x] = 0;
         }
     }
 
-    transformBlurTable();
+    transformBlurTable( conf );
 }
 
 template<int LEVELS>
 __host__
-void GaussTable<LEVELS>::transformBlurTable( )
+void GaussTable<LEVELS>::transformBlurTable( const Config& conf )
 {
     for( int level=0; level<LEVELS; level++ ) {
         i_span[level] = span[level];
@@ -382,30 +387,33 @@ void GaussTable<LEVELS>::transformBlurTable( )
         }
     }
 
-    for( int level=0; level<LEVELS; level++ ) {
-        /* We want to use the hardware linear interpolation for one
-         * multiplication, reducing software multiplications to half
-         *
-         * ax + by = v * ( ux + (1-u)y )
-         * u = aa + ab
-         * v = 1/(a+b)
-         */
-        const int   spn = i_span[level];
-        for( int x = 1; x < spn; x += 2 ) {
-            float a = filter[level*GAUSS_ALIGN + x];
-            float b = filter[level*GAUSS_ALIGN + x + 1];
-            float u = a / (a+b);
-            float v = a+b;
-            i_filter[level*GAUSS_ALIGN + x]     = u; // ratios are odd
-            i_filter[level*GAUSS_ALIGN + x + 1] = v; // multipliers are even
-        }
+    if( conf.getGaussMode() == Config::VLFeat_Relative_All )
+    {
+        for( int level=0; level<LEVELS; level++ ) {
+            /* We want to use the hardware linear interpolation for one
+             * multiplication, reducing software multiplications to half
+             *
+             * ax + by = v * ( ux + (1-u)y )
+             * u = aa + ab
+             * v = 1/(a+b)
+             */
+            const int   spn = i_span[level];
+            for( int x = 1; x < spn; x += 2 ) {
+                float a = u.filter_n[level*GAUSS_ALIGN + x];
+                float b = u.filter_n[level*GAUSS_ALIGN + x + 1];
+                float u = a / (a+b);
+                float v = a+b;
+                this->u.filter_i[level*GAUSS_ALIGN + x]     = u; // ratios are odd
+                this->u.filter_i[level*GAUSS_ALIGN + x + 1] = v; // multipliers are even
+            }
 
-        // center stays the same
-        i_filter[level*GAUSS_ALIGN] = filter[level*GAUSS_ALIGN];
+            // center stays the same
+            // u.filter_i[level*GAUSS_ALIGN] = u.filter_n[level*GAUSS_ALIGN];
 
-        // outside of span is 0
-        for( int x = spn; x < GAUSS_ALIGN; x++ ) {
-            i_filter[level*GAUSS_ALIGN + x] = 0;
+            // outside of span is 0
+            for( int x = spn; x < GAUSS_ALIGN; x++ ) {
+                u.filter_i[level*GAUSS_ALIGN + x] = 0;
+            }
         }
     }
 }

@@ -54,11 +54,6 @@ void Config::setMode( Config::SiftMode m )
     _sift_mode = m;
 }
 
-void Config::setGaussMode( Config::GaussMode m )
-{
-    _gauss_mode = m;
-}
-
 void Config::setDescMode( const std::string& text )
 {
     if( text == "loop" )
@@ -78,6 +73,11 @@ void Config::setDescMode( const std::string& text )
 void Config::setDescMode( Config::DescMode m )
 {
     _desc_mode = m;
+}
+
+void Config::setGaussMode( Config::GaussMode m )
+{
+    _gauss_mode = m;
 }
 
 void Config::setGaussMode( const std::string& m )

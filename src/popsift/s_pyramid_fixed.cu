@@ -79,7 +79,7 @@ void octave_fixed( cudaTextureObject_t src_data,
     const int IDz   = threadIdx.z;
     const int level = IDz + 1;
 
-    const float* filter = &d_gauss.abs_oN.filter[level*GAUSS_ALIGN];
+    const float* filter = &d_gauss.abs_oN.u.filter_n[level*GAUSS_ALIGN];
 
     const int idx = blockIdx.x * WIDTH      + IDx;
     const int idy = blockIdx.y * blockDim.y + IDy;
@@ -158,7 +158,7 @@ void octave_fixed( cudaTextureObject_t src_data,
     const int IDy   = threadIdx.y;
     const int level = threadIdx.z;
 
-    const float* filter = &d_gauss.abs_o0.filter[level*GAUSS_ALIGN];
+    const float* filter = &d_gauss.abs_o0.u.filter_n[level*GAUSS_ALIGN];
 
     const int idx = blockIdx.x * WIDTH      + IDx;
     const int idy = blockIdx.y * blockDim.y + IDy;
