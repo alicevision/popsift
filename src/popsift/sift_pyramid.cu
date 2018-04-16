@@ -76,10 +76,19 @@ __global__
     printf("\n");
 }
 
+Plane2D<float>* Pyramid::clone_layer_to_plane2D( int octave, int layer )
+{
+    if( octave < 0 || octave >= _num_octaves )
+    {
+        POP_FATAL( "Trying to clone plane from on-existing octave" );
+    }
+    return _octaves[octave].clone_layer_to_plane2D( layer );
+}
+
 void Pyramid::download_and_save_array( const char* basename )
 {
     for( int o=0; o<_num_octaves; o++ )
-    _octaves[o].download_and_save_array( basename, o );
+        _octaves[o].download_and_save_array( basename, o );
 }
 
 /*
@@ -262,10 +271,9 @@ void prep_features( Descriptor* descriptor_base, int up_fac )
 
     fet.xpos    = xpos;
     fet.ypos    = ypos;
-    fet.sigma   = sigma;
+    fet.scale   = sigma;
     fet.num_ori = num_ori;
-
-    fet.debug_octave = octave;
+    fet.octave  = octave;
 
     int ori;
     for( ori = 0; ori<num_ori; ori++ ) {
@@ -300,6 +308,7 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
     nvtxRangePushA( "register host memory" );
     features->pin( );
     nvtxRangePop();
+
     popcuda_memcpy_async( features->getFeatures(),
                           dobuf_shadow.features,
                           hct.ext_total * sizeof(Feature),
@@ -311,11 +320,12 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
                           hct.ori_total * sizeof(Descriptor),
                           cudaMemcpyDeviceToHost,
                           _download_stream );
+
     cudaStreamSynchronize( _download_stream );
     nvtxRangePushA( "unregister host memory" );
     features->unpin( );
-    nvtxRangePop();
-    nvtxRangePop();
+    nvtxRangePop(); // unregister host memory
+    nvtxRangePop(); // download descriptors
 
     return features;
 }
@@ -405,10 +415,10 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* 
 
     for( int ext_idx = 0; ext_idx<hct.ext_total; ext_idx++ ) {
         const Feature& ext = features->getFeatures()[ext_idx];
-        const int   octave  = ext.debug_octave;
+        const int   octave  = ext.octave;
         const float xpos    = ext.xpos  * pow(2.0f, octave - up_fac);
         const float ypos    = ext.ypos  * pow(2.0f, octave - up_fac);
-        const float sigma   = ext.sigma * pow(2.0f, octave - up_fac);
+        const float scale   = ext.scale * pow(2.0f, octave - up_fac);
         for( int ori = 0; ori<ext.num_ori; ori++ ) {
             // const int   ori_idx = ext.idx_ori + ori;
             float       dom_ori = ext.orientation[ori];
@@ -422,14 +432,14 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* 
                 ostr << setprecision(5)
                      << xpos << " "
                      << ypos << " "
-                     << sigma << " "
+                     << scale << " "
                      << dom_ori << " ";
             else
                 ostr << setprecision(5)
                      << xpos << " " << ypos << " "
-                     << 1.0f / (sigma * sigma)
+                     << 1.0f / (scale * scale)
                      << " 0 "
-                     << 1.0f / (sigma * sigma) << " ";
+                     << 1.0f / (scale * scale) << " ";
 
             if (really) {
                 for (int i = 0; i<128; i++) {

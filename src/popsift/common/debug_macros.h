@@ -30,12 +30,16 @@ void pop_check_last_error( const char* file, size_t      line );
 
 namespace popsift {
 namespace cuda {
+
+// Allocate with cudaMalloc, exit with error message in case of failure
 void malloc_dev( void** ptr, int sz,
                  const char* file, int line );
 
+// Allocate with cudaMallocHost, exit with error message in case of failure
 void malloc_hst( void** ptr, int sz,
                  const char* file, int line );
 
+// Allocate with cudaMalloc, exit with error message in case of failure
 template<class T>
 T* malloc_devT( int num, const char* file, int line ) {
     void* ptr;
@@ -43,6 +47,7 @@ T* malloc_devT( int num, const char* file, int line ) {
     return (T*)ptr;
 }
 
+// Allocate with cudaMallocHost, exit with error message in case of failure
 template<class T>
 T* malloc_hstT( int num, const char* file, int line ) {
     void* ptr;

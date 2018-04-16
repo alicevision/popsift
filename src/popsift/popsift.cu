@@ -12,6 +12,7 @@
 #include "popsift.h"
 #include "gauss_filter.h"
 #include "common/write_plane_2d.h"
+#include "common/debug_macros.h"
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
 #include "common/assist.h"
@@ -21,6 +22,7 @@ using namespace std;
 
 PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode, ImageMode imode )
     : _image_mode( imode )
+    , _proc_mode( mode )
 {
     if( imode == ByteImages )
     {
@@ -37,10 +39,21 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
     configure( config, true );
 
     _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
-    if( mode == popsift::Config::ExtractingMode )
+    switch( mode )
+    {
+    case popsift::Config::ExtractingMode :
         _pipe._thread_stage2 = new boost::thread( &PopSift::extractDownloadLoop, this );
-    else
+       break;
+    case popsift::Config::MatchingMode :
         _pipe._thread_stage2 = new boost::thread( &PopSift::matchPrepareLoop, this );
+        break;
+    case popsift::Config::RegistrationMode :
+        _pipe._thread_stage2 = new boost::thread( &PopSift::registrationPrepareLoop, this );
+        break;
+    default :
+        POP_FATAL( "Programming error: PopSift started with unknown processing moed" );
+        break;
+    }
 }
 
 PopSift::PopSift( ImageMode imode )
@@ -143,6 +156,23 @@ void PopSift::uninit( )
     _pipe._pyramid    = 0;
 }
 
+template<class T>
+static SiftJob* newJob( int w, int h, const T* imageData, popsift::Config::ProcessingMode mode )
+{
+    switch( mode )
+    {
+    case popsift::Config::ExtractingMode :
+        return new SiftJob( w, h, imageData );
+    case popsift::Config::MatchingMode :
+        return new SiftJob( w, h, imageData );
+    case popsift::Config::RegistrationMode :
+        return new RegistrationJob( w, h, imageData );
+    default :
+        POP_FATAL( "Programming error: new Job created with unknown processing moed" );
+        break;
+    }
+}
+
 SiftJob* PopSift::enqueue( int                  w,
                            int                  h,
                            const unsigned char* imageData )
@@ -154,7 +184,7 @@ SiftJob* PopSift::enqueue( int                  w,
         exit( -1 );
     }
 
-    SiftJob* job = new SiftJob( w, h, imageData );
+    SiftJob* job = newJob<unsigned char>( w, h, imageData, _proc_mode );
     _pipe._queue_stage1.push( job );
     return job;
 }
@@ -170,7 +200,7 @@ SiftJob* PopSift::enqueue( int          w,
         exit( -1 );
     }
 
-    SiftJob* job = new SiftJob( w, h, imageData );
+    SiftJob* job = newJob<float>( w, h, imageData, _proc_mode );
     _pipe._queue_stage1.push( job );
     return job;
 }
@@ -209,8 +239,6 @@ void PopSift::extractDownloadLoop( )
         if( log_to_file ) {
             int octaves = p._pyramid->getNumOctaves();
 
-            // for( int o=0; o<octaves; o++ ) { p._pyramid->download_descriptors( _config, o ); }
-
             int levels  = p._pyramid->getNumLevels();
 
             p._pyramid->download_and_save_array( "pyramid" );
@@ -226,7 +254,8 @@ void PopSift::matchPrepareLoop( )
     Pipe& p = _pipe;
 
     SiftJob* job;
-    while( ( job = p._queue_stage2.pull() ) != 0 ) {
+    while( ( job = p._queue_stage2.pull() ) != 0 )
+    {
         popsift::ImageBase* img = job->getImg();
 
         private_init( img->getWidth(), img->getHeight() );
@@ -243,6 +272,39 @@ void PopSift::matchPrepareLoop( )
         job->setFeatures( features );
     }
 }
+
+void PopSift::registrationPrepareLoop( )
+{
+    Pipe& p = _pipe;
+
+    SiftJob* siftjob;
+    while( ( siftjob = p._queue_stage2.pull() ) != 0 )
+    {
+        RegistrationJob* job = dynamic_cast<RegistrationJob*>( siftjob );
+        POP_CHECK_NON_NULL( job, "registration loop jobs must have type RegistrationJob" );
+
+        popsift::ImageBase* img = job->getImg();
+
+        private_init( img->getWidth(), img->getHeight() );
+
+        p._pyramid->step1( _config, img );
+        p._unused.push( img ); // uploaded input image no longer needed, release for reuse
+
+        p._pyramid->step2( _config );
+
+        popsift::FeaturesDev* features = p._pyramid->clone_device_descriptors( _config );
+
+        cudaDeviceSynchronize();
+
+        job->setPlane( p._pyramid->clone_layer_to_plane2D( 0, 0 ) );
+
+        job->setFeatures( features );
+    }
+}
+
+/*********************************************************************************
+ * SiftJob
+ *********************************************************************************/
 
 SiftJob::SiftJob( int w, int h, const unsigned char* imageData )
     : _w(w)
@@ -324,5 +386,31 @@ popsift::FeaturesHost* SiftJob::getHost()
 popsift::FeaturesDev* SiftJob::getDev()
 {
     return dynamic_cast<popsift::FeaturesDev*>( _f.get() );
+}
+
+/*********************************************************************************
+ * RegistrationJob
+ *********************************************************************************/
+
+RegistrationJob::RegistrationJob( int w, int h, const unsigned char* imageData )
+    : SiftJob( w, h, imageData )
+    , _blurred_input( 0 )
+{ }
+
+RegistrationJob::RegistrationJob( int w, int h, const float* imageData )
+    : SiftJob( w, h, imageData )
+    , _blurred_input( 0 )
+{ }
+
+RegistrationJob::~RegistrationJob( )
+{
+    _blurred_input->freeDev();
+    delete _blurred_input;
+}
+
+void RegistrationJob::setPlane( popsift::Plane2D<float>* plane )
+{
+    if( _blurred_input ) delete _blurred_input;
+    _blurred_input = plane;
 }
 

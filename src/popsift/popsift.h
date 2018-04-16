@@ -17,6 +17,7 @@
 
 #include "sift_conf.h"
 #include "sift_extremum.h"
+#include "common/plane_2d.h"
 
 
 #ifdef USE_NVTX
@@ -56,7 +57,7 @@ public:
     /** Constructor for float images, value range [0..1[ */
     SiftJob( int w, int h, const float* imageData );
 
-    ~SiftJob( );
+    virtual ~SiftJob( );
 
     popsift::FeaturesHost* get();    // should be deprecated, same as getHost()
     popsift::FeaturesBase* getBase();
@@ -68,6 +69,27 @@ public:
 
     /** fulfill the promise */
     void setFeatures( popsift::FeaturesBase* f );
+};
+
+class RegistrationJob : public SiftJob
+{
+    /* Some data from the Pyramid must be retained for registration.
+     * We don't know yet what that is, this is experimental.
+     */
+    popsift::Plane2D<float>* _blurred_input;
+
+public:
+    /** Constructor for byte images, value range 0..255 */
+    RegistrationJob( int w, int h, const unsigned char* imageData );
+
+    /** Constructor for float images, value range [0..1[ */
+    RegistrationJob( int w, int h, const float* imageData );
+
+    virtual ~RegistrationJob( );
+
+    void setPlane( popsift::Plane2D<float>* plane );
+
+    inline popsift::Plane2D<float>* getPlane() const { return _blurred_input; }
 };
 
 class PopSift
@@ -152,17 +174,22 @@ private:
     /* Worker function: Extract SIFT features, clone results in device memory */
     void matchPrepareLoop( );
 
+    /* Worker function: Extract SIFT features, clone results in device memory, keep some images */
+    void registrationPrepareLoop( );
+
 private:
-    Pipe            _pipe;
-    popsift::Config _config;
+    Pipe             _pipe;
+    popsift::Config  _config;
 
     /* Keep a copy of the config to avoid unnecessary re-configurations
      * in configure()
      */
-    popsift::Config _shadow_config;
+    popsift::Config  _shadow_config;
 
-    int             _last_init_w; /* to support depreacted interface */
-    int             _last_init_h; /* to support depreacted interface */
-    ImageMode       _image_mode;
+    int              _last_init_w; /* to support depreacted interface */
+    int              _last_init_h; /* to support depreacted interface */
+    ImageMode        _image_mode;
+
+    popsift::Config::ProcessingMode  _proc_mode;
 };
 

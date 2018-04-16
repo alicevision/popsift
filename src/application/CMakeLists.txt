@@ -63,6 +63,21 @@ target_link_libraries(popsift-match PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 set_target_properties(popsift-match  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}" )
 
 #############################################################
+# popsift-register
+#############################################################
+
+add_executable(popsift-register register.cpp pgmread.cpp pgmread.h)
+
+set_property(TARGET popsift-register PROPERTY CXX_STANDARD 11)
+
+target_compile_options(popsift-register PRIVATE ${PD_COMPILE_OPTIONS} )
+target_include_directories(popsift-register PUBLIC ${PD_INCLUDE_DIRS})
+target_compile_definitions(popsift-register PRIVATE ${Boost_DEFINITIONS} BOOST_ALL_DYN_LINK BOOST_ALL_NO_LIB)
+target_link_libraries(popsift-register PUBLIC PopSift::popsift ${PD_LINK_LIBS})
+
+set_target_properties(popsift-register  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}" )
+
+#############################################################
 # installation
 #############################################################
 

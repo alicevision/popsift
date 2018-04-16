@@ -19,6 +19,9 @@
 
 #include <cuda_runtime.h>
 
+#include <thrust/device_ptr.h>
+#include <thrust/equal.h>
+
 #include "plane_2d.h"
 #include "debug_macros.h"
 
@@ -230,6 +233,28 @@ void PlaneBase::waitAndCheck( cudaStream_t stream ) const
     POP_CUDA_FATAL_TEST( err, "Failed in error check after async 2D plane operation: " );
 }
 #endif // PLANE2D_CUDA_OP_DEBUG
+
+bool deviceEqual( Plane2D_float* left, Plane2D_float* right )
+{
+    const int l_w = left ->getWidth();
+    const int l_h = left ->getHeight();
+    const int l_p = left ->getPitch();
+    const int r_w = right->getWidth();
+    const int r_h = right->getHeight();
+    const int r_p = right->getPitch();
+
+    if( l_w != r_w ) return false;
+    if( l_h != r_h ) return false;
+    if( l_p != r_p ) return false;
+
+    int size = l_h * l_p / sizeof( float );
+
+    thrust::device_ptr<float> lptr = thrust::device_pointer_cast( left->getData() );
+    thrust::device_ptr<float> rptr = thrust::device_pointer_cast( right->getData() );
+    thrust::device_ptr<float> lend = lptr + size;
+
+    return thrust::equal( lptr, lend, rptr );
+}
 
 } // namespace popsift
 

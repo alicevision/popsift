@@ -1,9 +1,14 @@
-build*/
+BUILD/
+Build/
+build/
 
 popsift/playground/try-gauss
 popsift/playground/try-gauss-param
 popsift/playground/try-gauss-interpolate
 popsift/playground/try-libav
+popsift/BUILD
+popsift/Build
+popsift/build
 
 # Prerequisites
 *.d

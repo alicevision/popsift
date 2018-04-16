@@ -19,7 +19,7 @@ CUDA_ADD_LIBRARY(popsift STATIC
 	popsift/sift_extremum.h
 	popsift/sift_extremum.cu popsift/s_extrema.cu
 	popsift/s_orientation.cu
-        popsift/s_filtergrid.cu
+    popsift/s_filtergrid.cu
 	popsift/sift_desc.cu
 	popsift/s_desc_loop.cu popsift/s_desc_loop.h
 	popsift/s_desc_iloop.cu popsift/s_desc_iloop.h
@@ -31,6 +31,7 @@ CUDA_ADD_LIBRARY(popsift STATIC
 	popsift/s_desc_normalize.h
 	popsift/s_gradiant.h
 	popsift/s_solve.h
+    popsift/registration.cu popsift/registration.h
 	popsift/common/assist.cu popsift/common/assist.h
 	popsift/common/clamp.h
 	popsift/common/plane_2d.cu popsift/common/plane_2d.h

@@ -93,6 +93,8 @@ template <typename T> struct PlaneT : public PlaneBase
     __host__ __device__ PlaneT( T* d ) : data(d) { }
 
     __host__ __device__ inline size_t elemSize() const { return elem_size; }
+
+    __host__ __device__ inline T* getData() const { return data; }
 };
 
 /*************************************************************
@@ -506,6 +508,8 @@ typedef Plane2D<uint16_t>     Plane2D_uint16;
 typedef Plane2D<float>        Plane2D_float;
 typedef Plane2D<uchar2>       Plane2D_uchar_2;
 typedef Plane2D<float4>       Plane2D_float_4;
+
+bool deviceEqual( Plane2D_float* left, Plane2D_float* right );
 
 } // namespace popsift
 

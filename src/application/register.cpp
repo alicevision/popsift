@@ -23,6 +23,8 @@
 #include <popsift/features.h>
 #include <popsift/sift_conf.h>
 #include <popsift/common/device_prop.h>
+#include <popsift/common/debug_macros.h>
+#include <popsift/registration.h>
 
 #ifdef USE_DEVIL
 #include <devil_cpp_wrapper.hpp>
@@ -161,12 +163,12 @@ static void collectFilenames( list<string>& inputFiles, const boost::filesystem:
     }
 }
 
-SiftJob* process_image( const string& inputFile, PopSift& PopSift )
+RegistrationJob* process_image( const string& inputFile, PopSift& PopSift )
 {
     int w;
     int h;
     unsigned char* image_data;
-    SiftJob* job;
+    RegistrationJob* job;
 
     nvtxRangePushA( "load and convert image" );
 #ifdef USE_DEVIL
@@ -189,7 +191,8 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
         nvtxRangePop( );
 
         // PopSift.init( w, h );
-        job = PopSift.enqueue( w, h, image_data );
+        job = dynamic_cast<RegistrationJob*>( PopSift.enqueue( w, h, image_data ) );
+        POP_CHECK_NON_NULL( job, "SiftJob must have type RegistrationJob in this application" );
 
         img.Clear();
     }
@@ -204,12 +207,23 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
         nvtxRangePop( );
 
         // PopSift.init( w, h );
-        job = PopSift.enqueue( w, h, image_data );
+        job = dynamic_cast<RegistrationJob*>( PopSift.enqueue( w, h, image_data ) );
+        POP_CHECK_NON_NULL( job, "SiftJob must have type RegistrationJob in this application" );
 
         delete [] image_data;
     }
 
     return job;
+}
+
+void debug_checkIdentity( popsift::Plane2D<float>* dev_plane_l, popsift::Plane2D<float>* dev_plane_r )
+{
+    bool eq = popsift::deviceEqual( dev_plane_l, dev_plane_r );
+
+    if( eq )
+        cout << "Planes are equal" << endl;
+    else
+        cout << "Planes are not equal" << endl;
 }
 
 int main(int argc, char **argv)
@@ -248,10 +262,10 @@ int main(int argc, char **argv)
     deviceInfo.set( 0, print_dev_info );
     if( print_dev_info ) deviceInfo.print( );
 
-    PopSift PopSift( config, popsift::Config::MatchingMode );
+    PopSift PopSift( config, popsift::Config::RegistrationMode );
 
-    SiftJob* lJob = process_image( lFile, PopSift );
-    SiftJob* rJob = process_image( rFile, PopSift );
+    RegistrationJob* lJob = process_image( lFile, PopSift );
+    RegistrationJob* rJob = process_image( rFile, PopSift );
 
     popsift::FeaturesDev* lFeatures = lJob->getDev();
     cout << "Number of features:    " << lFeatures->getFeatureCount() << endl;
@@ -262,8 +276,17 @@ int main(int argc, char **argv)
     cout << "Number of descriptors: " << rFeatures->getDescriptorCount() << endl;
 
     // lFeatures->matchAndPrint( rFeatures );
-    lFeatures->matchAndPrintAccepted( rFeatures );
-    // lFeatures->checkIdentity( rFeatures );
+    // lFeatures->matchAndPrintAccepted( rFeatures );
+    lFeatures->checkIdentity( rFeatures );
+
+    debug_checkIdentity( lJob->getPlane(), rJob->getPlane() );
+
+    popsift::Registration reg;
+    reg.setKeypointsA( lFeatures );
+    reg.setKeypointsB( rFeatures );
+    reg.setPlaneA( lJob->getPlane() );
+    reg.setPlaneB( rJob->getPlane() );
+    reg.compute( );
 
     delete lFeatures;
     delete rFeatures;

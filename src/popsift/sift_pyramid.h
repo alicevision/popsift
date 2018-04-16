@@ -13,6 +13,7 @@
 #include "sift_conf.h"
 #include "sift_constants.h"
 #include "features.h"
+#include "common/plane_2d.h"
 
 #include "s_image.h"
 #include "sift_octave.h"
@@ -104,6 +105,11 @@ public:
 
     /** step 3 (alternative): make copy of descriptors on device side */
     FeaturesDev* clone_device_descriptors( const Config& conf );
+
+    /** Allocate space for one layer in device memory, and copy that
+     *  layer into the new plane. Gives valid results after pyramid
+     *  building. */
+    Plane2D<float>* clone_layer_to_plane2D( int octave, int layer );
 
     void download_and_save_array( const char* basename );
 

@@ -1,10 +1,10 @@
 /*
-* Copyright 2016, Simula Research Laboratory
-*
-* This Source Code Form is subject to the terms of the Mozilla Public
-* License, v. 2.0. If a copy of the MPL was not distributed with this
-* file, You can obtain one at http://mozilla.org/MPL/2.0/.
-*/
+ * Copyright 2016, Simula Research Laboratory
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
 #include <sstream>
 #include <sys/stat.h>
 #ifdef _WIN32
@@ -107,6 +107,35 @@ void Octave::free()
  * Debug output: write an octave/level to disk as PGM
  *************************************************************/
 
+popsift::Plane2D<float>* Octave::clone_layer_to_plane2D( int layer )
+{
+    if( layer < 0 || layer >= _levels )
+    {
+        POP_FATAL( "Trying to clone non-existing level in octave" );
+    }
+
+    int width  = getWidth();
+    int height = getHeight();
+
+    popsift::Plane2D<float>* plane = new popsift::Plane2D<float>;
+
+    plane->allocDev( width, height );
+
+    cudaMemcpy3DParms s = { 0 };
+    memset( &s, 0, sizeof(cudaMemcpy3DParms) );
+    s.srcArray = _data;
+    s.srcPos   = make_cudaPos( 0, 0, layer );
+    s.dstPtr   = make_cudaPitchedPtr( plane->getData(), plane->getPitch(), width, height );
+    s.extent   = make_cudaExtent( width, height, 1 );
+    s.kind     = cudaMemcpyDeviceToDevice;
+
+    cudaError_t err;
+    err = cudaMemcpy3D(&s);
+    POP_CUDA_FATAL_TEST(err, "cudaMemcpy3D failed: ");
+    
+    return plane;
+}
+
 void Octave::download_and_save_array( const char* basename, int octave )
 {
     struct stat st = { 0 };
@@ -135,8 +164,7 @@ void Octave::download_and_save_array( const char* basename, int octave )
         mkdir("dir-dog-dump", 0700);
     }
 
-    float* array;
-    POP_CUDA_MALLOC_HOST(&array, width * height * _levels * sizeof(float));
+    float* array = popsift::cuda::malloc_hstT<float>( width * height * _levels, __FILE__, __LINE__ );
 
     cudaMemcpy3DParms s = { 0 };
     memset( &s, 0, sizeof(cudaMemcpy3DParms) );
@@ -183,7 +211,7 @@ void Octave::download_and_save_array( const char* basename, int octave )
         popsift::dump_plane2Dfloat(qstr.str().c_str(), false, p);
     }
 
-    POP_CUDA_FREE_HOST(array);
+    cudaFreeHost(array);
 }
 
 void Octave::alloc_data_planes()

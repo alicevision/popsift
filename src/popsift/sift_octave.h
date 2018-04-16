@@ -14,6 +14,7 @@
 #include "sift_conf.h"
 #include "sift_extremum.h"
 #include "sift_constants.h"
+#include "common/plane_2d.h"
 
 namespace popsift {
 
@@ -55,8 +56,6 @@ class Octave
     cudaTextureObject_t   _dog_3d_tex_point;
     LinearTexture         _dog_3d_tex_linear;
 
-    // one CUDA stream per level
-    // consider whether some of them can be removed
     cudaStream_t _stream;
     cudaEvent_t  _scale_done;
     cudaEvent_t  _extrema_done;
@@ -142,6 +141,11 @@ public:
                 int           gauss_group );
     void free();
 
+    /** Allocate space for one layer in device memory, and copy that
+     *  layer into the new plane.
+     */
+    Plane2D<float>* clone_layer_to_plane2D( int layer );
+
     /**
      * debug:
      * download a level and write to disk
@@ -169,3 +173,4 @@ private:
 };
 
 } // namespace popsift
+
