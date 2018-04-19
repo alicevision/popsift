@@ -101,6 +101,46 @@ void Registration::private_destroyMatches( int3* match_a_to_b, int* good_match_a
     _keypt_a->match_freeMatchTable( match_a_to_b );
 }
 
+struct Transformation
+{
+};
+
+class AffineTrans : public Transformation
+{
+    float v[6];
+
+public:
+    __device__ inline float&       A(int y, int x)       { return v[(y<<1)+x]; }
+    __device__ inline float&       t(int x)              { return v[4+x]; }
+    __device__ inline const float& A(int y, int x) const { return v[(y<<1)+x]; }
+    __device__ inline const float& t(int x) const        { return v[4+x]; }
+
+    __device__ inline void initA( float a11, float a12 )
+    {
+        A(0,0) =  a11;
+        A(0,1) = -a12;
+        A(1,0) =  a12;
+        A(1,1) =  a11;
+    }
+    __device__ inline void initt( float ax, float ay, float bx, float by )
+    {
+        t(0) = bx - ( ax * A(0,0) + ay * A(0,1) );
+        t(1) = by - ( ax * A(1,0) + ay * A(1,1) );
+    }
+};
+
+/** A simple Weighting class with equal weight for all pixel in the sampling grid.
+ *  The grid size is T x T.
+ */
+template <int T>
+class ConstantWeight
+{
+public:
+    __device__ inline float operator()( int y, int x ) const {
+        return ( 1.0f / float(T*T) );
+    }
+};
+
 __global__
 void print_pu( const Feature*      aptr,
                const Feature*      bptr,
@@ -110,44 +150,66 @@ void print_pu( const Feature*      aptr,
 {
     int2  keypt = matches[blockIdx.x];
 
-    float diff = 0.0f;
-
     const Feature& a = aptr[keypt.x];
     const Feature& b = bptr[keypt.y];
 
-    const float ascale = a.scale * DESC_MAGNIFY;
-    const float bscale = b.scale * DESC_MAGNIFY;
-    const float scale_ratio = bscale / ascale;
+    // const float ascale      = a.scale * DESC_MAGNIFY; - never used
+    const float bscale      = b.scale * DESC_MAGNIFY;
+    const float scale_ratio = b.scale / a.scale;
 
-    const float ax = a.xpos;
-    const float ay = a.ypos;
-    const float bx = b.xpos;
-    const float by = b.ypos;
+    const float& ax = a.xpos;
+    const float& ay = a.ypos;
+    const float& bx = b.xpos;
+    const float& by = b.ypos;
 
-    float cos_a;
-    float sin_a;
-    float cos_b;
-    float sin_b;
-    __sincosf( a.orientation[0], &sin_a, &cos_a );
-    __sincosf( b.orientation[0], &sin_b, &cos_b );
+    // 1. take the rotation of both points
+    // const float cos_a = cosf( a.orientation[0] );
+    // const float sin_a = sinf( a.orientation[0] );
+    // const float cos_b = cosf( b.orientation[0] );
+    // const float sin_b = sinf( b.orientation[0] );
+    //
+    // 2. we have no use for the rotation of the target
+    // image, only the difference of orientations matters.
+    // const float cos_a = 1.0f;
+    // const float sin_a = 0.0f;
+    // const float cos_b = cosf( a.orientation[0] - b.orientation[0] );
+    // const float sin_b = sinf( a.orientation[0] - b.orientation[0] );
+    //
+    // 3. use __sincosf for a little bit of speed-up, but slightly more
+    // inaccurate than option 2
+    // const float cos_a = 1.0f; - never used
+    // const float sin_a = 0.0f; - never used
+    float       cos_b;
+    float       sin_b;
+    __sincosf( a.orientation[0] - b.orientation[0], &sin_b, &cos_b );
 
-    const float a11 = scale_ratio * (  cos_a * cos_b + sin_a * sin_b );
-    const float a12 = scale_ratio * (  cos_a * sin_b - cos_b * sin_a );
-    float4 A_ab = make_float4( a11, -a12, a12, a11 );
-    float2 t_ab = make_float2( bx - ( ax * A_ab.x + ay * A_ab.y ),
-                               by - ( ax * A_ab.z + ay * A_ab.w ) );
+    // 1. original using variable orientation of a
+    // const float a11 = scale_ratio * (  cos_a * cos_b + sin_a * sin_b );
+    // const float a12 = scale_ratio * (  cos_a * sin_b - cos_b * sin_a );
+    //
+    // 2. use only relative orientation, cos_a->1 sin_a->0
+    const float a11 = scale_ratio * cos_b;
+    const float a12 = scale_ratio * sin_b;
 
-    const float step  = ( 1.0f / 31.0f ) * bscale;
+    AffineTrans trans;
+    trans.initA( a11, a12 );
+    trans.initt( ax, ay, bx, by );
 
+    ConstantWeight<32> weight;
+
+    float diff = 0.0f;
+
+    const float step  = ( 1.0f / ( float(32)-1.0f ) ) * bscale;
+
+    float       col   = bx - 0.5f * bscale;
     const float row   = by - 0.5f * bscale + threadIdx.x * step;
-    const float bstop = bx + 0.5f*bscale + step/2.0f; /* last term is for float inaccuracy */
-    for( float col=bx-0.5f*bscale; col <= bstop; col+=step )
+    for( int i=0; i<32; col += step, i++ )
     {
-        diff += readTex( texB, bx+col, by+row );
-
-        float rx = A_ab.x * (bx+col) + A_ab.y * (by+row) + t_ab.x;
-        float ry = A_ab.z * (bx+col) + A_ab.w * (by+row) + t_ab.y;
-        diff -= readTex( texA, rx, ry );
+        const float rx = trans.A(0,0) * (bx+col) + trans.A(0,1) * (by+row) + trans.t(0);
+        const float ry = trans.A(1,0) * (bx+col) + trans.A(1,1) * (by+row) + trans.t(1);
+        diff = diff
+             + weight(i,threadIdx.x) * ( readTex( texB, bx+col, by+row )
+                                       - readTex( texA, rx, ry ) );
     }
 
     diff += __shfl_down( diff, 16 );
@@ -159,6 +221,13 @@ void print_pu( const Feature*      aptr,
 
     if( threadIdx.x == 0 )
     {
+#if 0
+        if( diff != 0 ) {
+            printf( "A=[ [ %8.6f %8.6f ] [ %8.6f %8.6f ] ] t=[ %8.6f %8.6f ]\n",
+                    A_ab[0][0], A_ab[0][1], A_ab[1][0], A_ab[1][1],
+                    t_ab[0], t_ab[1] );
+        }
+#else
         printf("%4.2f,%4.2f,%4.2f,%4.2f to %4.2f,%4.2f,%4.2f,%4.2f dist %4.2f\n",
                 a.xpos,
                 a.ypos,
@@ -169,6 +238,7 @@ void print_pu( const Feature*      aptr,
                 a.scale - b.scale,
                 a.orientation[0] - b.orientation[0],
                 diff );
+#endif
     }
 }
 
