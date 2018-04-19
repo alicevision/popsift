@@ -14,6 +14,7 @@
 #include "registration.h"
 #include "common/debug_macros.h"
 #include "common/assist.h"
+#include "common/write_plane_2d.h"
 
 namespace popsift {
 
@@ -146,7 +147,8 @@ void print_pu( const Feature*      aptr,
                const Feature*      bptr,
                const int2*         matches,
                cudaTextureObject_t texA,
-               cudaTextureObject_t texB )
+               cudaTextureObject_t texB,
+               Plane2D<float>      debugPlane )
 {
     int2  keypt = matches[blockIdx.x];
 
@@ -154,7 +156,7 @@ void print_pu( const Feature*      aptr,
     const Feature& b = bptr[keypt.y];
 
     // const float ascale      = a.scale * DESC_MAGNIFY; - never used
-    const float bscale      = b.scale * DESC_MAGNIFY;
+    const float bscale      = b.scale * DESC_MAGNIFY * 100;
     const float scale_ratio = b.scale / a.scale;
 
     const float& ax = a.xpos;
@@ -201,15 +203,23 @@ void print_pu( const Feature*      aptr,
 
     const float step  = ( 1.0f / ( float(32)-1.0f ) ) * bscale;
 
+    int debug_plane_idx = blockIdx.x - 100;
+
     float       col   = bx - 0.5f * bscale;
     const float row   = by - 0.5f * bscale + threadIdx.x * step;
     for( int i=0; i<32; col += step, i++ )
     {
         const float rx = trans.A(0,0) * (bx+col) + trans.A(0,1) * (by+row) + trans.t(0);
         const float ry = trans.A(1,0) * (bx+col) + trans.A(1,1) * (by+row) + trans.t(1);
+        const float src = readTex( texB, bx+col, by+row );
+        const float tgt = readTex( texA, rx, ry );
         diff = diff
-             + weight(i,threadIdx.x) * ( readTex( texB, bx+col, by+row )
-                                       - readTex( texA, rx, ry ) );
+             + weight(i,threadIdx.x) * ( src - tgt );
+        if( debug_plane_idx >= 0 && debug_plane_idx < 10 )
+        {
+            debugPlane.ptr( debug_plane_idx * 32 + threadIdx.x )[   i] = tgt;
+            debugPlane.ptr( debug_plane_idx * 32 + threadIdx.x )[32+i] = src;
+        }
     }
 
     diff += __shfl_down( diff, 16 );
@@ -228,22 +238,30 @@ void print_pu( const Feature*      aptr,
                     t_ab[0], t_ab[1] );
         }
 #else
-        printf("%4.2f,%4.2f,%4.2f,%4.2f to %4.2f,%4.2f,%4.2f,%4.2f dist %4.2f\n",
+        if( debug_plane_idx >= 0 && debug_plane_idx < 10 )
+        {
+        printf("%4d %4.2f,%4.2f,%4.2f to %4.2f,%4.2f,%4.2f dist %4.2f\n",
+                blockIdx.x,
                 a.xpos,
                 a.ypos,
                 a.scale,
-                a.orientation[0],
-                a.xpos - b.xpos,
-                a.ypos - b.ypos,
-                a.scale - b.scale,
-                a.orientation[0] - b.orientation[0],
+                b.xpos,
+                b.ypos,
+                b.scale,
                 diff );
+        }
 #endif
     }
 }
 
 void Registration::compute( )
 {
+    Plane2D<float> devDebugPlane;
+    Plane2D<float> hstDebugPlane;
+
+    devDebugPlane.allocDev ( 64, 10*32 );
+    hstDebugPlane.allocHost( 64, 10*32, CudaAllocated );
+
     cudaTextureObject_t texA;
     cudaTextureObject_t texB;
 
@@ -260,7 +278,11 @@ void Registration::compute( )
           _keypt_b->getFeatures(),
           thrust::raw_pointer_cast( matching_features.data() ),
           texA,
-          texB );
+          texB,
+          devDebugPlane );
+
+    hstDebugPlane.memcpyFromDevice( devDebugPlane );
+    write_plane2D( "test.pgm", hstDebugPlane );
 
     std::cout << "Doing nothing" << std::endl;
 
