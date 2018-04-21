@@ -437,11 +437,11 @@ namespace popsift {
 	//fix end value //another variable setting offset from a kernel in case of multilvl
 	//could also have seperate stream for dot product..? based on depth and interval size
 	if (start_idx[idx] == 0) offset = 3;
-	__syncthreads;
+	__syncthreads; //remove?
 	
         struct Desc *lptr = (struct Desc *)((&l_tra[indexes[idx]])) + offset;
 
-	for( int i = start_idx[idx]; i< stop_idx[idx]; i++ )
+	for( int i = start_idx[idx]; i < stop_idx[idx]; i++ )
 	{
 	    //const float4* rptr = (const float4*)( &r_[indexes[i]] );
 	    const struct Desc *rptr = (struct Desc *)((&r_tra[indexes[idx]])) + offset;
@@ -791,8 +791,25 @@ HASH TABLE - fix seperate file.
     
 
 #define HASH_ENTRIES     1024 //increase
+    struct Entry;
+    struct Inner_Table;
+    
+/*
+ * struct: Inner_Table
+ * -------------------
+ * Hash table within each entry of main hash table
+ * 
+ * Count: Number of entries in our table.
+ * Entries: List of entries. Each address 
+ * here is a pointer to an entry. 
+ */
+    struct Inner_Table
+    {
+	size_t count;
+	Entry **entries;
+    };
 
-
+    
 /*
  * struct: Entry
  * --------------
@@ -807,11 +824,14 @@ HASH TABLE - fix seperate file.
     {
 	struct Desc key;
 	unsigned int begin;
-	unsigned int end; 
-	Entry *next = NULL; 
+	unsigned int end;
+	Inner_Table next_table;
+	Entry *next = NULL;
+	
     };
 
 
+    
 /*
  * struct: Table
  * --------------
@@ -821,31 +841,20 @@ HASH TABLE - fix seperate file.
  * Entries: List of entries. Each address 
  * here is a pointer to an entry. 
  * Pool: Unused entries. Pre allocated.
+ * Entries for inner table is also supplied from pool.
  */
     struct Table
     {
 	size_t count;
 	Entry   **entries;
-	Entry   *pool; 
+	Entry   *pool;
+	
     };
 
     
-/*
- * struct: Inner_Table
- * -------------------
- * Hash table within each entry of main hash table
- * 
- * Count: Number of entries in our table.
- * Entries: List of entries. Each address 
- * here is a pointer to an entry. 
- * Pool: Unused entries. Pre allocated.
- */
-    struct Inner_Table
-    {
-	size_t count;
-	Entry   **entries;
-	Entry   *pool; 
-    };
+
+
+    
 
     struct bloom_filter 
     {
@@ -933,15 +942,68 @@ HASH TABLE - fix seperate file.
     }
 
 
-    void initialize_table( Table &table, int entries, int elements )
+    void initialize_table( Table &table, int entries, int elements ) //elements should be 2 times descriptors
     {
 	printf("init: entries: %d\t elements: %d\n", entries, elements);
 	table.count = entries;
 	cudaMalloc( (void**)&table.entries, entries * sizeof(Entry*) );
 	cudaMemset( table.entries, 0, entries * sizeof(Entry*) );
-	cudaMalloc( (void**)&table.pool, elements *sizeof(Entry) ); 
+	cudaMalloc( (void**)&table.pool, elements * sizeof(Entry) ); 
+	
+	//allocate all the entries we need
+	Entry ** alloc_entries;
+	cudaMalloc((void**)&alloc_entries, entries * entries * sizeof(Entry*));
+	Entry **itr = alloc_entries;
+
+
+	//Entry *alloc_entries = (Entry*)malloc(entries * entries * sizeof(Entry));
+	//pointer cpu copied to gpU???
+	
+	Entry *tmp = (Entry *)malloc(elements * sizeof(Entry));	
+	for (int i = 0; i < entries; i++)
+	{
+	    tmp[i].next_table.entries = itr;
+	    itr += entries;
+	}
+
+	cudaMemcpy(table.pool, tmp, elements * sizeof(Entry), cudaMemcpyHostToDevice);
+	
     }
 
+
+
+    void initialize_table_async( Table &table, int entries, int elements ) //elements should be 2 times descriptors
+    {
+	printf("init: entries: %d\t elements: %d\n", entries, elements);
+	table.count = entries;
+	cudaMalloc( (void**)&table.entries, entries * sizeof(Entry*) );
+	cudaMemsetAsync( table.entries, 0, entries * sizeof(Entry*) );
+	cudaMalloc( (void**)&table.pool, elements * sizeof(Entry) ); 
+
+
+	/*
+	//allocate all the entries we need
+	Entry ** alloc_entries;
+	cudaMalloc((void**)&alloc_entries, entries * entries * sizeof(Entry*));
+	Entry **itr = alloc_entries;
+
+
+	//Entry *alloc_entries = (Entry*)malloc(entries * entries * sizeof(Entry));
+	//pointer cpu copied to gpU???
+	
+	Entry *tmp = (Entry *)malloc(elements * sizeof(Entry));	
+	for (int i = 0; i < entries; i++)
+	{
+	    tmp[i].next_table.entries = itr;
+	    itr += entries;
+	}
+
+	cudaMemcpy(table.pool, tmp, elements * sizeof(Entry), cudaMemcpyHostToDevice);
+	*/
+    }
+
+
+    
 
     void free_table( Table &table )
     {
@@ -985,8 +1047,6 @@ HASH TABLE - fix seperate file.
 	for (size_t i=0; i<table.count; i++)
 	{
 	    Entry   *current = table.entries[i];
-	    //printf("entry ptr %ld\n",  table.entries[i]);
-
 	    while (current != NULL)
 	    {
 		if (current->end - current->begin > 1)
@@ -1009,44 +1069,13 @@ HASH TABLE - fix seperate file.
 	free( table.pool );
 	free( table.entries ); 
     }
-
-/*
-  __device__ //This must be fixed.. //might have been pointer issue.. //pointer from cpu?
-  int compareKey(struct Desc *A, struct Desc *B)
-  {
-  int i = 0;
-  while ( i < DESC_SEQ && A->descriptor[i] == B->descriptor[i] ) i++;
-  if (i == 4)	{ return -1;}
-  return 1;
-  }
-*/
-
-    /*  __device__ //This must be fixed.. //might have been pointer issue.. //pointer from cpu?
-	int compareKey(unsigned int *A, unsigned int *B)
-	{
-	int i = 0;
-	while ( i < DESC_SEQ && A[i] == B[i] )
-	{
-	i++;
-	}
-	//printf("cmp: %d %d\n", A[i-1], B[i-1]);
-	if (i == 4)	{  return -1;}
-	return 1;
-	}
-    */
     
     __device__ //compare with hamming dinstance here? might be good
     int compareKey(unsigned char *A, unsigned char *B)
     {
 	int i = 0;
-	while ( i < DESC_SEQ * DESC_SEQ && A[i] == B[i] )
-	{
-	    i++;
-	}
-
-	//printf("i: %d\n", i); 
-	//printf("cmp: %d %d\n", A[i-1], B[i-1]);
-	if (i == 16)	{  return -1;}
+	while ( i < DESC_SEQ * DESC_SEQ && A[i] == B[i] ) i++;
+	if (i == 16) return -1;
 	return 1;
     }
 
@@ -1069,48 +1098,18 @@ HASH TABLE - fix seperate file.
     {
 	int tid = threadIdx.x + blockIdx.x * blockDim.x;
 	int stride = blockDim.x * gridDim.x;
-	//struct Desc *keys
-	//   float * destination = (float*)(des[block].features);
-	//
-    
 	while (tid < elements)
 	{
+	    
 	    //cast so we only use first 16bytes, we use the indirect lookup sorted list to find
-	    //corresponding key value pair... values is host vector? error //pointer caster minnet til pointer?
+	    //corresponding key value pair... skip first two layers as they are both zero.
+	    
+	    struct Desc *key = (struct Desc *)((&keys[values[tid]])) + 2;
+	    //struct Desc *key2 = (struct Desc *)((&keys[values[tid]])) + 3;
 
-	
-	    struct Desc *key = (struct Desc *)((&keys[values[tid]])) + 2; //I think this works, all zero's in first two layers though.. expected.. skip them?
+	    size_t hashValue = hash((unsigned int *)key, table.count );
+	    //size_t hashValue2 = hash((unsigned int *)key2, table.count );
 
-
-//struct Desc *key1 = (struct Desc *)((&keys[values[tid]])) + 3;
-	    //struct Desc *key2 = (struct Desc *)((&keys[values[tid]])) + 5;
-	    //struct Descriptor tmp = keys[values[tid]];
-
-	    /*if (threadIdx.x == 0 && blockIdx.x == 0) { 
-	      printf("key0: %d\n", *key);
-	      printf("key1: %d\n", *key1);
-	      printf("key2: %d\n", *key2);
-		
-	      //printFeature((unsigned int *)&key->descriptor[0]);
-	      }*/
-	
-	    //printf("key: %p\n", &keys[values[tid]]);
-	    //printf("key: %.4f\n", key.descriptor[3]);
-
-	    size_t hashValue = hash((unsigned int *)key, table.count ); //cast to unsigned char?
-
-	    //printf("hashval: %ld\n", hashValue);
-	    //printf("key: %d\t %d\t %d\t %d\t\n", key[0], key[1], key[2], key[3]);
-
-	    unsigned int *w = (unsigned int *)key;
-
-//if (hashValue == 1023)
-	    //{
-	    //printf("key: %d\t %d\t %d\t %d\t hashval: %ld\n", w[0], w[1], w[2], w[3], hashValue);
-	    //}
-	
-	
-	
 	    for (int i=0; i<32; i++)
 	    {
 		if ((tid % 32) == i)
@@ -1120,9 +1119,16 @@ HASH TABLE - fix seperate file.
 		    //location->value = values[tid];
 		    location->begin = tid; //values[tid]?
 		    location->end = tid + 1;
+
+		    /* second layer
+		    Entry *location2 = &(table.pool[tid + (elements / 2)]);
+		    memcpy(&(location2->key), key2, sizeof(struct Desc));
+		    location2->begin = tid; //values[tid]?
+		    location2->end = tid + 1;
+		    */
+
 		    lock[hashValue].lock();
 
-		
 		    Entry *ptr = table.entries[hashValue];
 		    int exists = 1;
 		    while (ptr != NULL)
@@ -1135,14 +1141,20 @@ HASH TABLE - fix seperate file.
 		
 		    if (exists == 1)
 		    {
+			//set up second layer first
+			//location2->next = location->next_table.entries[hashValue2];
+			//location->next_table.entries[0] = location2;
+
+			//Inner_Table it  = location->next_table; //should be ptr?
+			//	it.entries[1] = NULL;
+			//add entry to table
 			location->next = table.entries[hashValue];
 			table.entries[hashValue] = location;
+
+
 		    }
 		    else
 		    {
-			//printf("exists\n");
-			//ptr->end++; //begin / end ---- how am i sure to increase end, not decrease begin? needs fixing..
-
 			/******************************************************
 			 *
 			 * This solution did not work as expected...huge overlapping sectors..
@@ -1155,11 +1167,6 @@ HASH TABLE - fix seperate file.
 			 ********************************************************/
 			if (location->begin < ptr->begin) ptr->begin = location->begin;
 			if (location->end > ptr->end) ptr->end = location->end;
-
-			//if (location->begin < ptr->begin) ptr->begin--;
-			//if (location->end > ptr->end) ptr->end++;
-		    
-		    
 		    }
 		
 		    lock[hashValue].unlock();
@@ -1350,9 +1357,8 @@ BLOOM FILTER end
     	unsigned long long x, t;
     	int i;
 
-	for ( i = 0; i <= 7; i++ )     // Load 8 bytes from the
-		x = x << 8 | A[1*i];      // input array and pack
-								  // them into x.
+	for ( i = 0; i <= 7; i++ )
+		x = x << 8 | A[1*i];
 
 	t = (x ^ (x >> 7)) & 0x00AA00AA00AA00AALL;
 	x = x ^ t ^ (t << 7);
@@ -1448,20 +1454,6 @@ BLOOM FILTER end
        
     }
 
-/*
-  __global__ void
-  compute_distance_transposed_hamming( int3* match_matrix, Descriptor * l, int l_len, Descriptor* r, int r_len , Descriptor * l_tra, Descriptor *r_tra) {
-
-  if(blockIdx.x > l_len)
-  return;
-
-  transpose(l, l_tra, l_len);
-	
-  //if(blockIdx.x == 0 && threadIdx.x == 0)
-  //    printFeature((unsigned int*)l_tra[blockIdx.x].features);		       
-	
-	
-  }*/
     
 #define DIMENSIONS 128
 
@@ -1547,7 +1539,6 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
             return;
 
         transpose(src, des, len);
-       
     }
 
     __global__ void
@@ -1565,17 +1556,9 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
     }
 
 
-    //a bit-wise IEEE floating-point standard single
-    //precision (32-bit) NaN would be:
-    //s111 1111 1xxx xxxx xxxx xxxx xxxx xxxx
-    //where s is the sign 
-    struct compare_descriptors { //fix for
-	// template <typename T>
+    struct compare_descriptors { 
 	__host__ __device__
-	// bool operator()(const T &l, const T &r) const {
 	int operator()(const Descriptor &l, const Descriptor &r) const {
-	    //for(int i = 0; i < 128; i++) {
-
 	    unsigned char *a, *b;
 	    a = (unsigned char*)l.features;
 	    b = (unsigned char*)r.features;
@@ -1586,78 +1569,24 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    
 	    int i = 0;
 
-	    //i-1 is used, should be + 1?
 	    while(i < 512) {
-			    
-		if(a[i] < b[i]) {
-		    //printf("%d\t%d\n", a[i], b[i]);
-		    return 2;
-		}
-			    
-		if(a[i] > b[i]) {
-		    //printf("%d\t%d\n", a[i], b[i]);				
-		    return 0;
-		}
+		if(a[i] < b[i]) return 2;
+		if(a[i] > b[i]) return 0;
 		
-		if(a[i+1] < b[i+1])
-		    return 2;
-
-		if(a[i+1] > b[i+1])
-		    return 0;
-
+		if(a[i+1] < b[i+1]) return 2;
+		if(a[i+1] > b[i+1]) return 0;
 		
-		if(a[i+2] < b[i+2])
-		    return 2;
-
-		if(a[i+2] > b[i+2])
-		    return 0;
-
+		if(a[i+2] < b[i+2]) return 2;
+		if(a[i+2] > b[i+2]) return 0;
 		
-		if(a[i+3] < b[i+3])
-		    return 2;
-
-		if(a[i+3] > b[i+3])
-		    return 0;
+		if(a[i+3] < b[i+3]) return 2;
+		if(a[i+3] > b[i+3]) return 0;
+		
 		i+=4;
-		//printf("%d\n", a[i]);
-		
-		/*
-		  if((unsigned int)l.features[i] < (unsigned int)r.features[i]) {
-			
-		  return true;
-		  }
-		  if((unsigned int)l.features[i] > (unsigned int)r.features[i])
-		  return false;
-		  i++;
-		*/
 	    }
+	    
 	    return 1;
-	    
-
-	    /*
-	      if(l.features[0] > r.features[0])
-	      return true;
-	      if(l.features[0] < r.features[0])
-	      return false;
-	      if(l.features[1] > r.features[1])
-	      return true;
-	      if(l.features[1] < r.features[1])
-	      return false;
-	      if(l.features[2] > r.features[2])
-	      return true;
-	    
-	      return false;
-	    */
 	}
-    };
-
-    struct ILookup
-    {
-	__device__
-	inline bool operator()( int a, int b ) const
-	    {
-		return true; // a < b;
-	    }
     };
 
     struct IndirectLookup
@@ -1668,59 +1597,15 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	__device__
 	inline bool operator()( int a, int b ) const
 	    {
-		int x = compare_descriptors()(base[a], base[b]);//operator()( base[a], base[b] );
+		int x = compare_descriptors()(base[a], base[b]);
                 switch(x)
                 {
                 case 0 : return false;
                 case 2 : return true;
                 }
+		
                 return ( a < b );
 	    }
-    };
-
-    struct char_array {
-	float v[128];
-	//float w;
-    };
-
-    struct cmp_test2 {
-	template<typename T>
-	__host__ __device__
-	bool operator()(const T &a, const T &b) const {
-	    	    
-	    /*
-	      for(int i = 0; i <= 1; i++) {
-	      if(a.v[i] < b.v[i])
-	      return true;
-	      if(b.v[i] > a.v[i])
-	      return false;
-	      }	    
-	      return false;
-	    */
-
-	    int i = 0;
-
-	    while(i < 128) {
-		if(a.v[i] < b.v[i])
-		    return true;
-		if(b.v[i] < a.v[i])
-		    return false;
-		i++;
-	    }
-	    //if(a.v[1] < b.v[1])
-	    //return true;
-	    
-	    return false;
-	}
-    };
-
-    struct cmp_test {
-	char_array *base;
-	cmp_test(char_array *b) : base(b){}
-	__host__ __device__
-	inline bool operator() (int a, int b) const {
-	    return cmp_test2()(base[a], base[b]);
-	}
     };
 
     
@@ -1769,19 +1654,16 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    printf("Matches: %d\n", counter);
   
     }
+    
 
-    //__host__ sometimes error?
     Descriptor * gpu_init(int SIZE) {
 	Descriptor *tmp;
 
 	cudaError_t err = cudaMalloc((void **)&tmp, SIZE * sizeof(Descriptor));
 	if(err != cudaSuccess)
-	    printf("%s\n", cudaGetErrorString(err));
-//	cudaMemset(tmp, 0, SIZE*sizeof(Descriptor));  //no function??
-	
+	    printf("%s\n", cudaGetErrorString(err));	
 	return tmp;
     }
-
 
 
     
@@ -1822,7 +1704,7 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	else
 	{
 
-
+#if 0
 
 	    dim3 grid_r;
 	    grid.x = r_len;
@@ -1830,9 +1712,7 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    grid.z = 1;
 
 	    //transpose first set of descritors
-
 	    //sort the transposed descriptors
-
 	    //transpose and compare with the second set
 	
 	
@@ -1840,10 +1720,6 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    Descriptor *r_copy = gpu_init(r_len);
 
 	    //TRANSPOSE
-            POP_CHK;
-	    //compute_distance_transposed_hamming
-	    //<<<grid,block>>>
-	    //	( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len , l_copy, r_copy);
 
 	    //two streams..
 	    cudaStream_t stream1, stream2;
@@ -1856,7 +1732,8 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    float elapsedTime;
 	    
 	    cudaEventRecord( start, 0 );
-/*
+
+	    /*
 	    transpose_descriptors
 		<<<l_len,block>>>
 		( getDescriptors(), l_len, l_copy);
@@ -1866,8 +1743,8 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    transpose_descriptors
 		<<<r_len,block>>>
 		( other->getDescriptors(), r_len , r_copy);
-*/
-	    /*
+
+	    
 	    transpose_descriptors_64
 		<<<l_len,64,0,stream1>>>
 		( getDescriptors(), l_copy);
@@ -1875,15 +1752,17 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    transpose_descriptors_64
 		<<<r_len,64,0,stream2>>>
 		( other->getDescriptors(), r_copy);
+	    
 	    */
-	    	    transpose_descriptors_64
+
+	    transpose_descriptors_64
 		<<<l_len,64,0>>>
 		( getDescriptors(), l_copy);
 
 	    transpose_descriptors_64
 		<<<r_len,64>>>
 		( other->getDescriptors(), r_copy);
-	    
+
 	    cudaEventRecord( stop, 0 );
 	    cudaEventSynchronize( stop );
 	    cudaEventElapsedTime( &elapsedTime, start, stop );
@@ -1892,185 +1771,27 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    cudaDeviceSynchronize();
             POP_CHK;
 	    
-	    const int SIZE = r_len;
-	  
-
-	    //thrust::device_ptr<int> off_ptr = thrust::device_pointer_cast();
-
-
-	    /*thrust::device_ptr<Descriptor> d_ptr(l_copy);
-	      thrust::device_vector<int> B(SIZE);
-	      thrust::sequence(B.begin(), B.end());
-	      thrust::sort(B.begin(), B.end(), IndirectLookup(l_copy));
-	      thrust::host_vector<int> H = B;
-	      thrust::copy(H.begin(), H.end(), std::ostream_iterator<int>(std::cout, " "));
-	      int cnter = 0;
-	      for(int i = 0; i < SIZE; i++) {
-	      for(int j = 0; j < SIZE; j++) {
-	      if(i != j) {
-	      if (H[j] == H[i]) {
-	      cnter++;
-	      }
-	      }
-		    
-	      }
-	      }
-	      std::cout << "l_len: " <<  SIZE << " cnt: " << cnter << std::endl;
-	      std::exit(1);
-	    */
-	    
-#if 0
-	    int *desc_index = popsift::cuda::malloc_devT<int>(SIZE, __FILE__, __LINE__ );
-            POP_CHK;
-	    //thrust::sequence(thrust::device, desc_index, desc_index+SIZE);
-	    	   
-	    thrust::device_ptr<int> d = thrust::device_pointer_cast(desc_index);	    
-	    thrust::sequence(d, d+SIZE);
-            thrust::host_vector<int> hsorted( SIZE );
-            thrust::copy( d, d+SIZE, hsorted.begin() );
-            thrust::sort( hsorted.begin(), hsorted.end() );
-            thrust::copy( hsorted.begin(), hsorted.end(), std::ostream_iterator<int>(std::cout, " ") );
-            cout << endl;
-	    
-	    int *t1 = thrust::raw_pointer_cast(d);
-
-	    //int c[SIZE];
-	    //cudaMemcpy(c, t1, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
-
-
-	    //thrust::sort(thrust::device, desc_index, desc_index+SIZE, IndirectLookup(l_copy));
-	    
-	    int b[SIZE];
-
-	    cudaMemcpy(
-		b,
-	        t1,
-		SIZE*sizeof(int),
-		cudaMemcpyDeviceToHost);
-
-
-	    //thrust::sort(b, b+SIZE, thrust::greater<int>());
-
-            IndirectLookup il_obj( l_copy );
-	    thrust::sort( d, d+SIZE, il_obj );
-
-            // thrust::host_vector<int> hsorted( SIZE );
-            thrust::copy( d, d+SIZE, hsorted.begin() );
-            thrust::sort( hsorted.begin(), hsorted.end() );
-            thrust::copy( hsorted.begin(), hsorted.end(), std::ostream_iterator<int>(std::cout, " ") );
-            cout << endl;
-	   
-/*
-  thrust::sort(
-  thrust::device,
-  desc_index,
-  desc_index+SIZE,
-  IndirectLookup(l_copy) //Issue here
-  );
-*/
-
-	
-	    int a[SIZE];
-
-	    int *t2 = thrust::raw_pointer_cast(d);
-	    cudaMemcpy(a, t2, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
-
-#else
+	    const int SIZE = r_len; //unnessecary variable...
 	    thrust::device_vector<int> d( SIZE );
 	    thrust::sequence( d.begin(), d.end() );
-
-            thrust::host_vector<int> b( SIZE );
-            thrust::copy( d.begin(), d.end(), b.begin() );
-	    	    
-            thrust::host_vector<int> hsorted( SIZE );
-            thrust::copy( d.begin(), d.end(), hsorted.begin() );
-            thrust::sort( hsorted.begin(), hsorted.end() );
-            //thrust::copy( hsorted.begin(), hsorted.end(), std::ostream_iterator<int>(std::cout, " ") );
-            cout << endl;
-
-            IndirectLookup il_obj( r_copy ); //lcopy vs rcopy here. think r is best choise
+            IndirectLookup il_obj( r_copy ); //lcopy vs rcopy here. think r is best choise as it aligns with the standard setup. 
 	    thrust::sort( d.begin(), d.end(), il_obj );
-
-            // thrust::host_vector<int> hsorted( SIZE );
-            thrust::copy( d.begin(), d.end(), hsorted.begin() );
-            thrust::sort( hsorted.begin(), hsorted.end() );
-            //thrust::copy( hsorted.begin(), hsorted.end(), std::ostream_iterator<int>(std::cout, " ") );
-            cout << endl;
-
-            thrust::host_vector<int> a( SIZE );
-            thrust::copy( d.begin(), d.end(), a.begin() );
-#endif
+	    thrust::device_ptr<int> indexes = &d[0];
 	    
-
-	    //cudaMemcpy(a, desc_index, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
-
-	    //thrust::sort(a, a+SIZE, thrust::greater<int>());
-	    
-	    //    for(int i = 0; i < SIZE; i++)
-	    //	  printf("%d\t%d\n", b[i], a[i]);
-
-	    int counter = 0;
-	    
-	    bool success = true;
-	    for(int i = 0; i < SIZE; i++) {
-		bool tmp = false;
-		for(int j = 0; j < SIZE; j++) {		    
-		    if(b[i] == a[j])
-			tmp = true;
-		}
-		if(tmp == false) {
-		    success = false;
-		    counter++;
-		}
-	    }
-
-            printf("Number of descriptors %d\n", r_len );
-	    Descriptor *tmp = (Descriptor*)malloc(r_len*sizeof(Descriptor));
-
-	    cudaMemcpy(tmp, r_copy, r_len*sizeof(Descriptor), cudaMemcpyDeviceToHost);
-
-	    int print = 0;
-	    
-	    if(success) {
-		printf("SUCCESS\n");
-		if(print) {
-		    printFeature((unsigned int*)&tmp[a[500]]);
-		    printFeature((unsigned int*)&tmp[a[501]]);
-		    printFeature((unsigned int*)&tmp[a[502]]);
-		}
-	    }
-	    else
-		printf("ERROR %d indexes missing\n", counter);
-
 	    //Hash Table setup
 	    //**********************************************
 	    // init can be done earlier during kernel call
 	    //**********************************************
-	  
-	    //int *indexes = thrust::raw_pointer_cast(d);
 
-	    thrust::device_ptr<int> indexes = &d[0];
-	    
-
+	    //record time
 	    cudaEventRecord( start, 0 );
 
-	    //Set up the bloom filter
-	    //bloom_filter bloom;
-	    //initialize_bloom_filter(bloom, SIZE);
-	    //bloom_add_filters
-	    //	<<<60, 256,0,stream2>>>
-	    //	( bloom, r_copy, SIZE );
-
-	    //cudaDeviceSynchronize();
-
-
-	    
 	    Table table; 
-	    initialize_table( table, HASH_ENTRIES, SIZE ); //hash entries set equal to size for max performance
+	    initialize_table( table, HASH_ENTRIES, SIZE * 2 ); //hash entries set equal to size for max performance
 	    
 
 	    
-	    //initialize mutual exclution locks.
+	    //initialize mutual exclution locks. //is this good code? what happens here
 	    Lock lock[HASH_ENTRIES];
 	    Lock *dev_lock;
 	    cudaMalloc( (void**)&dev_lock, HASH_ENTRIES * sizeof( Lock ) );
@@ -2132,19 +1853,13 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    */
 	    
  //working dot product in section
+
 	    compute_dot_in_section
 		<<<grid,block>>>
 		( match_matrix, getDescriptors(), l_len, other->getDescriptors(),  r_len, indexes, dev_start_idx, dev_stop_idx );
 
 	    cudaDeviceSynchronize();
 
-		/*
-		  bloom_filter_check
-		  <<<60, 256>>>
-		  ( bloom, l_copy, SIZE );
-		  cudaDeviceSynchronize();
-		  
-		*/
 
 	    
 	    //create array of keys? This can be done in the transpose kernel of the gpu.
@@ -2158,79 +1873,77 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    //**********************************************
 	    // init can be done earlier during kernel call
 	    //**********************************************
-	  
 
-/*
-  int *ind = popsift::cuda::malloc_devT<int>(SIZE, __FILE__, __LINE__ );
-  thrust::sequence(thrust::device, ind, ind+SIZE);	    	   
-	    
-  struct char_array *data;
-  cudaMalloc(&data, sizeof(char_array)*SIZE);
 
-  float da[SIZE*128];
-  for(int i = 0; i < SIZE*128; i++)
-  da[i] = rand()%100;
-
-  cudaMemcpy(data, da, sizeof(Descriptor)*SIZE, cudaMemcpyDeviceToDevice);
+	   
+#else
+	    //Allocation
+	    //Descriptor *l_copy = getDescriptors();
+	    //Descriptor *r_copy = other->getDescriptors();
 
 	    
-	  
-  int copy1[SIZE];
-  cudaMemcpy(copy1, ind, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
-  //thrust::sort(copy1, copy1+SIZE, thrust::greater<int>());
+	    Descriptor *l_copy = gpu_init(l_len);
+	    Descriptor *r_copy = gpu_init(r_len);
 
-  thrust::sort(thrust::device, ind, ind+SIZE, cmp_test(data));
+	    const int SIZE = r_len; //unnessecary variable...
+	    Table table; 
+	    initialize_table_async( table, HASH_ENTRIES, SIZE * 2 ); //hash entries set equal to size for max performance
 	    
-  int copy[SIZE];
-  cudaMemcpy(copy, ind, SIZE*sizeof(int), cudaMemcpyDeviceToHost);
+	    //initialize mutual exclution locks. 
+	    Lock lock[HASH_ENTRIES];
+	    Lock *dev_lock;
+	    cudaMalloc( (void**)&dev_lock, HASH_ENTRIES * sizeof( Lock ) );
+	    cudaMemcpyAsync( dev_lock, lock, HASH_ENTRIES * sizeof( Lock ), cudaMemcpyHostToDevice );
 
-  //thrust::sort(copy, copy+SIZE);
-
-
-  bool error = false;
-
-  for(int i = 0; i < SIZE; i++) {
-  bool tmp = false;
-  for(int j = 0; j < SIZE; j++)  {
-  if(copy1[i] == copy[j])
-  tmp = true;
-  }
-  if(!tmp)
-  error = true;
-  }
-
-  for(int i = 0; i < SIZE; i++)
-  printf("%d\t%d\n", copy1[i], copy[i]);
-
-  if(error)
-  printf("ERRORRRRRRRRRR\n");
-  else {
-  struct char_array *tp = (struct char_array*)malloc(SIZE*sizeof(char_array));
-  cudaMemcpy(tp, data, sizeof(char_array)*SIZE, cudaMemcpyDeviceToHost);
-  for(int i = 0; i < SIZE-1; i++) {
-  for(int j = 0; j < 128; j++){
-  if(tp[copy[i]].v[j] < tp[copy[i+1]].v[j])
-  continue;
-  else if(tp[copy[i]].v[j] < tp[copy[i+1]].v[j])
-  printf("%f\t%f\n", tp[copy[0]].v[0], tp[copy[1]].v[0]);
-  }
-  }
-		    
-  //printf("%f\t%f\t%f\n", tp[copy[0]].v[0], tp[copy[1]].v[0], tp[copy[2]].v[0]);
-  }
-*/
-
-	    /*
-	     * Stumbled upon the error
-	     * seems like the issue is that the floats are an array (memory error?)	    
-	     */
+	    //Lookup arrays
+	    unsigned int *dev_start_idx;
+	    unsigned int *dev_stop_idx;
 	    
+	    cudaMalloc((void **)&dev_start_idx, l_len * sizeof(unsigned int));
+	    cudaMalloc((void **)&dev_stop_idx, l_len * sizeof(unsigned int));
 
-		
 	    
+	    
+	    //TRANSPOSE
+	    //two streams..
+	    cudaStream_t stream1, stream2;
+	    cudaStreamCreate( &stream1 );
+	    cudaStreamCreate( &stream2 );
+
+
+	    transpose_descriptors_64
+		<<<r_len,64,0,stream1>>>
+		( other->getDescriptors(), r_copy);
+
+	    
+	    transpose_descriptors_64
+		<<<l_len,64,0,stream2>>>
+		( getDescriptors(), l_copy);
+
+
+	    
+	    thrust::device_vector<int> d( SIZE );
+	    thrust::device_ptr<int> indexes = &d[0];
+	    
+	    thrust::sequence(thrust::cuda::par.on(stream1), d.begin(), d.end() );
+            IndirectLookup il_obj( r_copy ); //lcopy vs rcopy here. think r is best choise as it aligns with the standard setup. 
+	    thrust::sort(thrust::cuda::par.on(stream1), d.begin(), d.end(), il_obj );
+
+	    add_to_table<<<60,256,0,stream1>>>( r_copy, indexes, table, dev_lock, SIZE );
+
+	    get_section_from_table
+		<<<60, 256,0,stream1>>>
+		( table, l_copy, l_len, r_len, dev_start_idx, dev_stop_idx );
+	    
+	    compute_dot_in_section
+		<<<grid,block,0,stream1>>>
+		( match_matrix, getDescriptors(), l_len, other->getDescriptors(),  r_len, indexes, dev_start_idx, dev_stop_idx );
+
+	    
+#endif
 	    
 	}
-
+	
 	show_distance
 	    <<<1,32>>>
 	    ( match_matrix,
