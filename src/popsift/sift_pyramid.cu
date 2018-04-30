@@ -91,30 +91,6 @@ void Pyramid::download_and_save_array( const char* basename )
         _octaves[o].download_and_save_array( basename, o );
 }
 
-/*
- * Note this is only for debug output. FeaturesHost has functions for final writing.
- */
-void Pyramid::save_descriptors( const Config& conf, FeaturesHost* features, const char* basename )
-{
-#warning remove function
-    struct stat st = { 0 };
-    if (stat("dir-desc", &st) == -1) {
-        mkdir("dir-desc", 0700);
-    }
-    ostringstream ostr;
-    ostr << "dir-desc/desc-" << basename << ".txt";
-    ofstream of(ostr.str().c_str());
-    writeDescriptor( conf, of, features, true, true );
-
-    if (stat("dir-fpt", &st) == -1) {
-        mkdir("dir-fpt", 0700);
-    }
-    ostringstream ostr2;
-    ostr2 << "dir-fpt/desc-" << basename << ".txt";
-    ofstream of2(ostr2.str().c_str());
-    writeDescriptor( conf, of2, features, false, true );
-}
-
 Pyramid::Pyramid( const Config& config,
                   int width,
                   int height )
@@ -403,54 +379,6 @@ void Pyramid::writeDescCountersToDevice( cudaStream_t s )
 int* Pyramid::getNumberOfBlocks( int octave )
 {
     return &_d_extrema_num_blocks[octave];
-}
-
-/*
- * Note this is only for debug output. FeaturesHost has functions for final writing.
- */
-void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* features, bool really, bool with_orientation )
-{
-#warning remove this
-    if( features->getFeatureCount() == 0 ) return;
-
-    const float up_fac = conf.getUpscaleFactor();
-
-    for( int ext_idx = 0; ext_idx<hct.ext_total; ext_idx++ ) {
-        const Feature& ext = features->getFeatures()[ext_idx];
-        const int   octave  = ext.octave;
-        const float xpos    = ext.xpos  * pow(2.0f, octave - up_fac);
-        const float ypos    = ext.ypos  * pow(2.0f, octave - up_fac);
-        const float scale   = ext.scale * pow(2.0f, octave - up_fac);
-        for( int ori = 0; ori<ext.num_ori; ori++ ) {
-            // const int   ori_idx = ext.idx_ori + ori;
-            float       dom_ori = ext.orientation[ori];
-
-            dom_ori = dom_ori / M_PI2 * 360;
-            if (dom_ori < 0) dom_ori += 360;
-
-            const Descriptor& desc  = *ext.desc[ori]; // hbuf.desc[ori_idx];
-
-            if( with_orientation )
-                ostr << setprecision(5)
-                     << xpos << " "
-                     << ypos << " "
-                     << scale << " "
-                     << dom_ori << " ";
-            else
-                ostr << setprecision(5)
-                     << xpos << " " << ypos << " "
-                     << 1.0f / (scale * scale)
-                     << " 0 "
-                     << 1.0f / (scale * scale) << " ";
-
-            if (really) {
-                for (int i = 0; i<128; i++) {
-                    ostr << desc.features[i] << " ";
-                }
-            }
-            ostr << endl;
-        }
-    }
 }
 
 

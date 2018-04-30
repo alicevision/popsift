@@ -113,8 +113,6 @@ public:
 
     void download_and_save_array( const char* basename );
 
-    void save_descriptors( const Config& conf, FeaturesHost* features, const char* basename );
-
     inline int getNumOctaves() const { return _num_octaves; }
     inline int getNumLevels()  const { return _levels; }
 
@@ -166,7 +164,6 @@ private:
     void writeDescCountersToDevice( );
     void writeDescCountersToDevice( cudaStream_t s );
     int* getNumberOfBlocks( int octave );
-    void writeDescriptor( const Config& conf, std::ostream& ostr, FeaturesHost* features, bool really, bool with_orientation );
 
     void clone_device_descriptors_sub( const Config& conf, FeaturesDev* features );
 
