@@ -264,7 +264,7 @@ int main(int argc, char **argv)
     deviceInfo.set( 0, print_dev_info );
     if( print_dev_info ) deviceInfo.print( );
 
-    PopSift PopSift( config, new TaskRegister( config ) );
+    PopSift PopSift( config, std::make_shared<TaskRegister>( config ) );
 
     RegistrationJob* lJob = process_image( lFile, PopSift );
     RegistrationJob* rJob = process_image( rFile, PopSift );

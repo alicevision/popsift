@@ -19,6 +19,7 @@
 #include "sift_features.h"
 #include "sift_task_extract.h"
 #include "register/reg_task.h"
+#include "match/match_task.h"
 
 using namespace std;
 
@@ -46,13 +47,13 @@ PopSift::PopSift( const popsift::Config& config,
     switch( mode )
     {
     case popsift::Config::ExtractingMode :
-        _task = new TaskExtract( config );
+        _task = std::make_shared<TaskExtract>( config );
         break;
     case popsift::Config::MatchingMode :
-        _task = new TaskMatch( config );
+        _task = std::make_shared<TaskMatch>( config );
         break;
     case popsift::Config::RegistrationMode :
-        _task = new TaskRegister( config );
+        _task = std::make_shared<TaskRegister>( config );
         break;
     }
     _task->setOperator( this );
@@ -60,7 +61,7 @@ PopSift::PopSift( const popsift::Config& config,
     _pipe._thread_stage2 = new boost::thread( &Task::loop, _task );
 }
 
-PopSift::PopSift( const popsift::Config& config, Task* task, ImageMode imode )
+PopSift::PopSift( const popsift::Config& config, std::shared_ptr<Task> task, ImageMode imode )
     : _image_mode( imode )
     , _task( task )
 {
@@ -102,7 +103,7 @@ PopSift::PopSift( ImageMode imode )
 
     _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
 
-    _task = new TaskExtract( _config );
+    _task = std::make_shared<TaskExtract>( _config );
     _task->setOperator( this );
 
     _pipe._thread_stage2 = new boost::thread( &Task::loop, _task );

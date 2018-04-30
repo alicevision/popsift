@@ -136,29 +136,3 @@ void TaskExtract::writeDescriptors( ostream& ostr, popsift::FeaturesHost* featur
     }
 }
 
-/*********************************************************************************
- * TaskMatch
- *********************************************************************************/
-
-void TaskMatch::loop( )
-{
-    matchPrepareLoop();
-}
-
-void TaskMatch::matchPrepareLoop( )
-{
-    SiftJob* job;
-    while( ( job = _op->getNextJob() ) != 0 )
-    {
-        popsift::FeaturesDev* features;
-
-        popsift::ImageBase* img = job->getImg();
-        _op->uploadImageFromJob( img );
-        _op->returnImageToPool( img );
-        _op->findKeypoints( );
-        features = _op->cloneFeaturesOnDevice( );
-
-        job->setFeatures( features );
-    }
-}
-

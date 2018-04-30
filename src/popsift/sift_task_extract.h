@@ -35,18 +35,3 @@ private:
     void writeDescriptors( std::ostream& ostr, popsift::FeaturesHost* features, bool really, bool with_orientation );
 };
 
-/*********************************************************************************
- * TaskMatch
- *********************************************************************************/
-
-class TaskMatch : public TaskExtract
-{
-public:
-    TaskMatch( const popsift::Config& config ) : TaskExtract(config) { }
-
-    virtual void loop();
-private:
-    /* Worker function: Extract SIFT features, clone results in device memory */
-    void matchPrepareLoop( );
-};
-

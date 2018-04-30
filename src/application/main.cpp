@@ -300,7 +300,7 @@ int main(int argc, char **argv)
     if( print_dev_info ) deviceInfo.print( );
 
     PopSift PopSift( config,
-                     new TaskExtract( config ),
+                     std::make_shared<TaskExtract>( config ),
                      float_mode ? PopSift::FloatImages : PopSift::ByteImages );
 
     std::queue<SiftJob*> jobs;

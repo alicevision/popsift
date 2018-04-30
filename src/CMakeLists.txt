@@ -47,6 +47,7 @@ CUDA_ADD_LIBRARY(popsift STATIC
 	popsift/register/reg_task.cu     popsift/register/reg_task.h
 	popsift/register/reg_job.cu      popsift/register/reg_job.h
 	popsift/register/registration.cu popsift/register/registration.h
+	popsift/match/match_task.cu popsift/match/match_task.h
 	)
 
 # BUILD_INTERFACE allows to include the directory with source only when target is

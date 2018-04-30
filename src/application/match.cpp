@@ -22,7 +22,7 @@
 #include <popsift/popsift.h>
 #include <popsift/sift_features.h>
 #include <popsift/sift_conf.h>
-#include <popsift/sift_task_extract.h>
+#include <popsift/match/match_task.h>
 #include <popsift/common/device_prop.h>
 
 #ifdef USE_DEVIL
@@ -249,7 +249,7 @@ int main(int argc, char **argv)
     deviceInfo.set( 0, print_dev_info );
     if( print_dev_info ) deviceInfo.print( );
 
-    PopSift PopSift( config, new TaskMatch( config ) );
+    PopSift PopSift( config, std::make_shared<TaskMatch>( config ) );
 
     SiftJob* lJob = process_image( lFile, PopSift );
     SiftJob* rJob = process_image( rFile, PopSift );

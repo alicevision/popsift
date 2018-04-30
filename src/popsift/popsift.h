@@ -77,7 +77,7 @@ public:
              popsift::Config::ProcessingMode mode  = popsift::Config::ExtractingMode,
              ImageMode                       imode = ByteImages );
     PopSift( const popsift::Config&          config,
-             Task*                           task,
+             std::shared_ptr<Task>           task,
              ImageMode                       imode = ByteImages );
     ~PopSift();
 
@@ -196,7 +196,7 @@ private:
     /* The tasks refer to alternative worker functions for Jobs submitted by
      * a calling application. The choice of method is made by the mode parameter
      * in the PopSift constructor. */
-    Task* _task;
+    std::shared_ptr<Task> _task;
 
     // popsift::Config::ProcessingMode  _proc_mode;
 };
