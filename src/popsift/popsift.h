@@ -17,6 +17,7 @@
 
 #include "sift_conf.h"
 #include "sift_extremum.h"
+#include "sift_job.h"
 #include "common/plane_2d.h"
 
 
@@ -37,60 +38,6 @@ namespace popsift
     class FeaturesDev;
 
 }; // namespace popsift
-
-class SiftJob
-{
-    std::promise<popsift::FeaturesBase*> _p;
-    std::future <popsift::FeaturesBase*> _f;
-    int                 _w;
-    int                 _h;
-    unsigned char*      _imageData;
-    popsift::ImageBase* _img;
-#ifdef USE_NVTX
-    nvtxRangeId_t       _nvtx_id;
-#endif
-
-public:
-    /** Constructor for byte images, value range 0..255 */
-    SiftJob( int w, int h, const unsigned char* imageData );
-
-    /** Constructor for float images, value range [0..1[ */
-    SiftJob( int w, int h, const float* imageData );
-
-    virtual ~SiftJob( );
-
-    popsift::FeaturesHost* get();    // should be deprecated, same as getHost()
-    popsift::FeaturesBase* getBase();
-    popsift::FeaturesHost* getHost();
-    popsift::FeaturesDev*  getDev();
-
-    void setImg( popsift::ImageBase* img );
-    popsift::ImageBase* getImg();
-
-    /** fulfill the promise */
-    void setFeatures( popsift::FeaturesBase* f );
-};
-
-class RegistrationJob : public SiftJob
-{
-    /* Some data from the Pyramid must be retained for registration.
-     * We don't know yet what that is, this is experimental.
-     */
-    popsift::Plane2D<float>* _blurred_input;
-
-public:
-    /** Constructor for byte images, value range 0..255 */
-    RegistrationJob( int w, int h, const unsigned char* imageData );
-
-    /** Constructor for float images, value range [0..1[ */
-    RegistrationJob( int w, int h, const float* imageData );
-
-    virtual ~RegistrationJob( );
-
-    void setPlane( popsift::Plane2D<float>* plane );
-
-    inline popsift::Plane2D<float>* getPlane() const { return _blurred_input; }
-};
 
 class PopSift
 {
