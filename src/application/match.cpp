@@ -23,6 +23,7 @@
 #include <popsift/sift_features.h>
 #include <popsift/sift_conf.h>
 #include <popsift/match/match_task.h>
+#include <popsift/match/match_brute_force.h>
 #include <popsift/common/device_prop.h>
 
 #ifdef USE_DEVIL
@@ -262,8 +263,13 @@ int main(int argc, char **argv)
     cout << "Number of features:    " << rFeatures->getFeatureCount() << endl;
     cout << "Number of descriptors: " << rFeatures->getDescriptorCount() << endl;
 
+    popsift::BruteForceMatcher matcher( lFeatures, rFeatures );
+    matcher.matchAndPrint();
+    matcher.matchAndPrintAccepted();
+    matcher.checkIdentity();
+
     // lFeatures->matchAndPrint( rFeatures );
-    lFeatures->matchAndPrintAccepted( rFeatures );
+    // lFeatures->matchAndPrintAccepted( rFeatures );
     // lFeatures->checkIdentity( rFeatures );
 
     delete lFeatures;

@@ -28,8 +28,8 @@ private:
     void private_makeTexture( cudaTextureObject_t& tex, const Plane2D<float>* plane );
     void private_destroyTexture( cudaTextureObject_t& tex );
 
-    void private_makeMatches( int3*& match_a_to_b, int& good_match_len, int*& good_match_a );
-    void private_destroyMatches( int3* match_a_to_b, int* good_match_a );
+    // void private_makeMatches( int3*& match_a_to_b, int& good_match_len, int*& good_match_a );
+    // void private_destroyMatches( int3* match_a_to_b, int* good_match_a );
 
 private:
     const FeaturesDev*    _keypt_a;

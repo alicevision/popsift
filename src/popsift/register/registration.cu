@@ -15,6 +15,7 @@
 #include "../common/debug_macros.h"
 #include "../common/assist.h"
 #include "../common/write_plane_2d.h"
+#include "../match/match_brute_force.h"
 
 namespace popsift {
 
@@ -84,16 +85,19 @@ void Registration::private_destroyTexture( cudaTextureObject_t& tex )
     POP_CUDA_FATAL_TEST( err, "Could not destroy texture object at end of registration: " );
 }
 
+#if 0
 void Registration::private_makeMatches( int3*& match_a_to_b, int& good_match_len, int*& good_match_a )
 {
-    match_a_to_b = _keypt_a->match_AllocMatchTable( );
+    BruteForceMatcher bfm( _keypt_a, _keypt_b );
 
-    _keypt_a->match_computeMatchTable( match_a_to_b, _keypt_b );
+    match_a_to_b = bfm.match_AllocMatchTable( );
 
-    int a_len = _keypt_a->getDescriptorCount( );
-    int b_len = _keypt_b->getDescriptorCount( );
+    bfm.match_computeMatchTable( match_a_to_b );
 
-    good_match_a = _keypt_a->match_getAcceptedIndex( match_a_to_b, good_match_len );
+    // int a_len = _keypt_a->getDescriptorCount( );
+    // int b_len = _keypt_b->getDescriptorCount( );
+
+    good_match_a = bfm.match_getAcceptedIndex( match_a_to_b, good_match_len );
 }
 
 void Registration::private_destroyMatches( int3* match_a_to_b, int* good_match_a )
@@ -101,6 +105,7 @@ void Registration::private_destroyMatches( int3* match_a_to_b, int* good_match_a
     _keypt_a->match_freeAcceptedIndex( good_match_a );
     _keypt_a->match_freeMatchTable( match_a_to_b );
 }
+#endif
 
 struct Transformation
 {
@@ -268,8 +273,10 @@ void Registration::compute( )
     private_makeTexture( texA, _plane_a );
     private_makeTexture( texB, _plane_b );
 
+    BruteForceMatcher bfm( _keypt_a, _keypt_b );
+
     thrust::device_vector<int2> matching_features;
-    _keypt_a->match_getAcceptedFeatureMatches( matching_features, _keypt_b );
+    bfm.match_getAcceptedFeatureMatches( matching_features );
 
     int size = matching_features.end() - matching_features.begin();
     print_pu

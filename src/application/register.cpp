@@ -27,6 +27,7 @@
 #include <popsift/register/reg_task.h>
 #include <popsift/register/reg_job.h>
 #include <popsift/register/registration.h>
+#include <popsift/match/match_brute_force.h>
 
 #ifdef USE_DEVIL
 #include <devil_cpp_wrapper.hpp>
@@ -277,9 +278,11 @@ int main(int argc, char **argv)
     cout << "Number of features:    " << rFeatures->getFeatureCount() << endl;
     cout << "Number of descriptors: " << rFeatures->getDescriptorCount() << endl;
 
-    // lFeatures->matchAndPrint( rFeatures );
-    // lFeatures->matchAndPrintAccepted( rFeatures );
-    lFeatures->checkIdentity( rFeatures );
+    popsift::BruteForceMatcher bfm( lFeatures, rFeatures );
+
+    // bfm.matchAndPrint( );
+    // bfm.matchAndPrintAccepted( );
+    bfm.checkIdentity( );
 
     debug_checkIdentity( lJob->getPlane(), rJob->getPlane() );
 
