@@ -15,11 +15,50 @@
 #include "common/debug_macros.h"
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
-#include "sift_task_extract.h"
 #include "common/assist.h"
 #include "sift_features.h"
+#include "sift_task_extract.h"
+#include "register/reg_task.h"
 
 using namespace std;
+
+PopSift::PopSift( const popsift::Config& config,
+                  popsift::Config::ProcessingMode mode,
+                  ImageMode imode )
+    : _image_mode( imode )
+{
+    if( imode == ByteImages )
+    {
+        _pipe._unused.push( new popsift::Image);
+        _pipe._unused.push( new popsift::Image);
+    }
+    else
+    {
+        _pipe._unused.push( new popsift::ImageFloat );
+        _pipe._unused.push( new popsift::ImageFloat );
+    }
+    _pipe._pyramid    = 0;
+
+    configure( config, true );
+
+    _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
+
+    switch( mode )
+    {
+    case popsift::Config::ExtractingMode :
+        _task = new TaskExtract( config );
+        break;
+    case popsift::Config::MatchingMode :
+        _task = new TaskMatch( config );
+        break;
+    case popsift::Config::RegistrationMode :
+        _task = new TaskRegister( config );
+        break;
+    }
+    _task->setOperator( this );
+
+    _pipe._thread_stage2 = new boost::thread( &Task::loop, _task );
+}
 
 PopSift::PopSift( const popsift::Config& config, Task* task, ImageMode imode )
     : _image_mode( imode )

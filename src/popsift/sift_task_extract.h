@@ -17,7 +17,7 @@
 class TaskExtract : public Task
 {
 public:
-    TaskExtract( popsift::Config& config ) : Task(config) { }
+    TaskExtract( const popsift::Config& config ) : Task(config) { }
 
     virtual void loop();
 
@@ -42,7 +42,7 @@ private:
 class TaskMatch : public TaskExtract
 {
 public:
-    TaskMatch( popsift::Config& config ) : TaskExtract(config) { }
+    TaskMatch( const popsift::Config& config ) : TaskExtract(config) { }
 
     virtual void loop();
 private:

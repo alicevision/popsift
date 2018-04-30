@@ -74,8 +74,10 @@ public:
      */
     PopSift( ImageMode imode = ByteImages );
     PopSift( const popsift::Config&          config,
+             popsift::Config::ProcessingMode mode  = popsift::Config::ExtractingMode,
+             ImageMode                       imode = ByteImages );
+    PopSift( const popsift::Config&          config,
              Task*                           task,
-             // popsift::Config::ProcessingMode mode  = popsift::Config::ExtractingMode,
              ImageMode                       imode = ByteImages );
     ~PopSift();
 

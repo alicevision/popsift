@@ -29,7 +29,7 @@ class SiftJob;
 class Task
 {
 public:
-    Task( popsift::Config& config ) : _config(config) { }
+    Task( const popsift::Config& config ) : _config(config) { }
 
     virtual void loop() = 0;
 
@@ -38,7 +38,7 @@ public:
     virtual SiftJob* newJob( int w, int h, const unsigned char* imageData ) = 0;
     virtual SiftJob* newJob( int w, int h, const float*         imageData ) = 0;
 protected:
-    PopSift*         _op;
-    popsift::Config& _config;
+    PopSift*               _op;
+    const popsift::Config& _config;
 };
 

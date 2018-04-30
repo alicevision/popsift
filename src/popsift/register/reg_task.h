@@ -17,7 +17,7 @@
 class TaskRegister : public Task
 {
 public:
-    TaskRegister( popsift::Config& config ) : Task(config) { }
+    TaskRegister( const popsift::Config& config ) : Task(config) { }
 
     virtual void loop();
 
