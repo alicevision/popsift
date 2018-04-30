@@ -10,7 +10,7 @@
 #include "sift_job.h"
 #include "s_image.h"
 #include "common/assist.h"
-#include "features.h"
+#include "sift_features.h"
 
 using namespace std;
 
@@ -98,31 +98,5 @@ popsift::FeaturesHost* SiftJob::getHost()
 popsift::FeaturesDev* SiftJob::getDev()
 {
     return dynamic_cast<popsift::FeaturesDev*>( _f.get() );
-}
-
-/*********************************************************************************
- * RegistrationJob
- *********************************************************************************/
-
-RegistrationJob::RegistrationJob( int w, int h, const unsigned char* imageData )
-    : SiftJob( w, h, imageData )
-    , _blurred_input( 0 )
-{ }
-
-RegistrationJob::RegistrationJob( int w, int h, const float* imageData )
-    : SiftJob( w, h, imageData )
-    , _blurred_input( 0 )
-{ }
-
-RegistrationJob::~RegistrationJob( )
-{
-    _blurred_input->freeDev();
-    delete _blurred_input;
-}
-
-void RegistrationJob::setPlane( popsift::Plane2D<float>* plane )
-{
-    if( _blurred_input ) delete _blurred_input;
-    _blurred_input = plane;
 }
 

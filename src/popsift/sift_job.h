@@ -8,10 +8,7 @@
 #pragma once
 
 #include <future>
-
-#include "sift_conf.h"
-#include "common/plane_2d.h"
-
+// #include "sift_conf.h"
 
 #ifdef USE_NVTX
 #include <nvToolsExtCuda.h>
@@ -61,26 +58,5 @@ public:
 
     /** fulfill the promise */
     void setFeatures( popsift::FeaturesBase* f );
-};
-
-class RegistrationJob : public SiftJob
-{
-    /* Some data from the Pyramid must be retained for registration.
-     * We don't know yet what that is, this is experimental.
-     */
-    popsift::Plane2D<float>* _blurred_input;
-
-public:
-    /** Constructor for byte images, value range 0..255 */
-    RegistrationJob( int w, int h, const unsigned char* imageData );
-
-    /** Constructor for float images, value range [0..1[ */
-    RegistrationJob( int w, int h, const float* imageData );
-
-    virtual ~RegistrationJob( );
-
-    void setPlane( popsift::Plane2D<float>* plane );
-
-    inline popsift::Plane2D<float>* getPlane() const { return _blurred_input; }
 };
 

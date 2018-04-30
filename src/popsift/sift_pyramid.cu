@@ -96,6 +96,7 @@ void Pyramid::download_and_save_array( const char* basename )
  */
 void Pyramid::save_descriptors( const Config& conf, FeaturesHost* features, const char* basename )
 {
+#warning remove function
     struct stat st = { 0 };
     if (stat("dir-desc", &st) == -1) {
         mkdir("dir-desc", 0700);
@@ -409,6 +410,7 @@ int* Pyramid::getNumberOfBlocks( int octave )
  */
 void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* features, bool really, bool with_orientation )
 {
+#warning remove this
     if( features->getFeatureCount() == 0 ) return;
 
     const float up_fac = conf.getUpscaleFactor();

@@ -7,5 +7,5 @@
  */
 
 /*
- * All code moved to features.h
+ * All code moved to sift_features.h
  */

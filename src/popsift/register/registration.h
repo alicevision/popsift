@@ -7,9 +7,8 @@
  */
 #pragma once
 
-// #include "sift_constants.h"
-#include "features.h"
-#include "common/plane_2d.h"
+#include "../sift_features.h"
+#include "../common/plane_2d.h"
 
 namespace popsift {
 

@@ -98,8 +98,9 @@ public:
     /** Unpin keypoint and descriptor memory */
     void unpin( );
 
-    inline Feature*    getFeatures()    { return _ext; }
-    inline Descriptor* getDescriptors() { return _ori; }
+    inline Feature*       getFeatures()               { return _ext; }
+    inline const Feature& getFeature( int idx ) const { return _ext[idx]; }
+    inline Descriptor*    getDescriptors()            { return _ori; }
 
     void print( std::ostream& ostr, bool write_as_uchar ) const;
 
@@ -202,3 +203,4 @@ public:
 };
 
 } // namespace popsift
+

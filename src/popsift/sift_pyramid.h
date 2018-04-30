@@ -12,7 +12,7 @@
 
 #include "sift_conf.h"
 #include "sift_constants.h"
-#include "features.h"
+#include "sift_features.h"
 #include "common/plane_2d.h"
 
 #include "s_image.h"

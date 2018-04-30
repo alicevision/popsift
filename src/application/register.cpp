@@ -20,11 +20,13 @@
 #include <boost/filesystem.hpp>
 
 #include <popsift/popsift.h>
-#include <popsift/features.h>
+#include <popsift/sift_features.h>
 #include <popsift/sift_conf.h>
 #include <popsift/common/device_prop.h>
 #include <popsift/common/debug_macros.h>
-#include <popsift/registration.h>
+#include <popsift/register/reg_task.h>
+#include <popsift/register/reg_job.h>
+#include <popsift/register/registration.h>
 
 #ifdef USE_DEVIL
 #include <devil_cpp_wrapper.hpp>
@@ -262,7 +264,7 @@ int main(int argc, char **argv)
     deviceInfo.set( 0, print_dev_info );
     if( print_dev_info ) deviceInfo.print( );
 
-    PopSift PopSift( config, popsift::Config::RegistrationMode );
+    PopSift PopSift( config, new TaskRegister( config ) );
 
     RegistrationJob* lJob = process_image( lFile, PopSift );
     RegistrationJob* rJob = process_image( rFile, PopSift );

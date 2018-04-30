@@ -12,9 +12,9 @@
 #include <thrust/system/cuda/execution_policy.h>
 
 #include "registration.h"
-#include "common/debug_macros.h"
-#include "common/assist.h"
-#include "common/write_plane_2d.h"
+#include "../common/debug_macros.h"
+#include "../common/assist.h"
+#include "../common/write_plane_2d.h"
 
 namespace popsift {
 

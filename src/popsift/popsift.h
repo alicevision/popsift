@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <iostream>
 #include <vector>
 #include <stack>
 #include <queue>
@@ -18,6 +19,7 @@
 #include "sift_conf.h"
 #include "sift_extremum.h"
 #include "sift_job.h"
+#include "sift_task.h"
 #include "common/plane_2d.h"
 
 
@@ -38,6 +40,12 @@ namespace popsift
     class FeaturesDev;
 
 }; // namespace popsift
+
+class PopSift;
+
+/*********************************************************************************
+ * PopSift
+ *********************************************************************************/
 
 class PopSift
 {
@@ -66,7 +74,8 @@ public:
      */
     PopSift( ImageMode imode = ByteImages );
     PopSift( const popsift::Config&          config,
-             popsift::Config::ProcessingMode mode  = popsift::Config::ExtractingMode,
+             Task*                           task,
+             // popsift::Config::ProcessingMode mode  = popsift::Config::ExtractingMode,
              ImageMode                       imode = ByteImages );
     ~PopSift();
 
@@ -107,22 +116,63 @@ public:
         return f;
     }
 
+    /** Get next job from second level queue.
+     *  Called by a Task loop.
+     */
+    SiftJob* getNextJob( );
+
+    /** Uploading an image into the GPU.
+     *  Called by a Task loop.
+     */
+    void uploadImageFromJob( popsift::ImageBase* img );
+
+    /** Return GPU-sided memory for image to the pool.
+     *  Called by a Task loop.
+     */
+    void returnImageToPool( popsift::ImageBase* img );
+
+    /** Run main SIFT algorithm to completion.
+     *  Called by a Task loop.
+     */
+    void findKeypoints( );
+
+    /** Allocate host-side memory dynamically and copy keypoints and
+     *  descriptors from device.
+     *  Called by a Task loop.
+     */
+    popsift::FeaturesHost* downloadFeaturesToHost( );
+
+    /** Allocate device-side memory dynamically and copy keypoints and
+     *  descriptors from device.
+     *  Called by a Task loop.
+     */
+    popsift::FeaturesDev* cloneFeaturesOnDevice( );
+
+    /** Allocate device-side memory dynamically and copy an entire layer
+     *  from the pyramid.
+     *  Called by a Task loop.
+     */
+    popsift::Plane2D<float>* cloneLayerOnDevice( int octave, int level );
+
+    /** Get current number of octaves for pipe.
+     *  Called by a Task loop.
+     */
+    int getNumOctaves( );
+
+    /** Get current number of levels for pipe.
+     *  Called by a Task loop.
+     */
+    int getNumLevels( );
+
+    /** Take all layers of the Pyramid and the DoG pyramid and write
+     *  them to disk.
+     *  Called by a Task loop.
+     */
+    void logPyramid( const char* basename );
+
 private:
     bool private_init( int w, int h );
     void uploadImages( );
-
-    /* The following method are alternative worker functions for Jobs submitted by
-     * a calling application. The choice of method is made by the mode parameter
-     * in the PopSift constructor. */
-
-    /* Worker function: Extract SIFT features and download to host */
-    void extractDownloadLoop( );
-
-    /* Worker function: Extract SIFT features, clone results in device memory */
-    void matchPrepareLoop( );
-
-    /* Worker function: Extract SIFT features, clone results in device memory, keep some images */
-    void registrationPrepareLoop( );
 
 private:
     Pipe             _pipe;
@@ -137,6 +187,15 @@ private:
     int              _last_init_h; /* to support depreacted interface */
     ImageMode        _image_mode;
 
-    popsift::Config::ProcessingMode  _proc_mode;
+private:
+    /* Different operating modes are hidden behind the Task class.
+     * The processing mode will eventually become irrelevant.
+     */
+    /* The tasks refer to alternative worker functions for Jobs submitted by
+     * a calling application. The choice of method is made by the mode parameter
+     * in the PopSift constructor. */
+    Task* _task;
+
+    // popsift::Config::ProcessingMode  _proc_mode;
 };
 

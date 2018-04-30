@@ -23,7 +23,7 @@
 #include <thrust/equal.h>
 #include <thrust/unique.h>
 
-#include "features.h"
+#include "sift_features.h"
 #include "sift_extremum.h"
 #include "common/debug_macros.h"
 

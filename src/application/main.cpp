@@ -20,8 +20,9 @@
 #include <boost/filesystem.hpp>
 
 #include <popsift/popsift.h>
-#include <popsift/features.h>
+#include <popsift/sift_features.h>
 #include <popsift/sift_conf.h>
+#include <popsift/sift_task_extract.h>
 #include <popsift/common/device_prop.h>
 
 #ifdef USE_DEVIL
@@ -299,7 +300,7 @@ int main(int argc, char **argv)
     if( print_dev_info ) deviceInfo.print( );
 
     PopSift PopSift( config,
-                     popsift::Config::ExtractingMode,
+                     new TaskExtract( config ),
                      float_mode ? PopSift::FloatImages : PopSift::ByteImages );
 
     std::queue<SiftJob*> jobs;
