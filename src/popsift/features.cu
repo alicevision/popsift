@@ -268,7 +268,67 @@ namespace popsift {
 	    match_matrix[blockIdx.x] = make_int3( match_1st_idx, match_2nd_idx, accept );
 	}
     }
+
+
+    __global__ void
+    compute_distance_dot_256( int3* match_matrix, const Descriptor* l, const int l_len, const Descriptor* r, const int r_len )
+    {
+	const int idx = threadIdx.y + blockIdx.x * 2;
+	if ( idx >= l_len ) return;
+
+	float match_1st_val = -1.0f;
+	float match_2nd_val = -1.0f;
+	int   match_1st_idx = 0;
+	int   match_2nd_idx = 0;
+
   
+
+	const float4* lptr = (const float4*)( &l[idx] );
+
+	for( int i=0; i<r_len; i++ )
+	{
+	    const float4* rptr = (const float4*)( &r[i] );
+	    const float   res  = dot_l2_in_t0( lptr, rptr );
+
+	
+	    if( threadIdx.x == 0 )
+	    {
+		if( res > match_1st_val )
+		{
+		    match_2nd_val = match_1st_val;
+		    match_2nd_idx = match_1st_idx;
+		    match_1st_val = res;
+		    match_1st_idx = i;
+		}
+		else if( res > match_2nd_val )
+		{
+		    match_2nd_val = res;
+		    match_2nd_idx = i;
+		}
+	    }
+
+	    __syncthreads();	
+	}
+    
+	
+	const int one = __shfl(match_1st_idx, 0);
+	const int two = __shfl(match_2nd_idx, 0);
+  
+	const float4* rptr = (const float4*)( &r[one] );
+	const float res2 = l2_in_t0( lptr, rptr );
+	const float4* rptr2 = (const float4*)( &r[two] );
+	const float res3 = l2_in_t0( lptr, rptr2 );
+	
+	
+
+	if( threadIdx.x == 0 )
+	{
+	    const bool accept = (res2/res3 < 0.8f );
+	    match_matrix[idx] = make_int3( match_1st_idx, match_2nd_idx, accept );
+	}
+    }
+
+    
   
     __global__ void
     compute_distance_dot( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len )
@@ -326,11 +386,41 @@ namespace popsift {
 	}
     }
 
+
+        __global__ void
+	compute_dot_no_sync( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len, float *norm )
+    {
+	float match_1st_val = -1.0f;
+	float match_2nd_val = -1.0f;
+	int   match_1st_idx = 0;
+	int   match_2nd_idx = 0;
+	int j;
+	
+	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	float *res = norm + tid * r_len;
+
+	const float* lptr = (const float *)( &l[tid] );
+
+	for( int i=0; i<r_len; i++ )
+	{
+
+	    const float *rptr = (const float *)( &r[i] );
+	    res[i] = 0.0f;
+	    
+	    for (j = 0; j < 128; j++)
+	    {
+		res[i] += lptr[j] * rptr[j];
+	    }
+	}
+    }
+
+
+    
     __global__ void
     compute_dot_in_section( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len, thrust::device_ptr<int> indexes, unsigned int *start_idx, unsigned int *stop_idx )
     {
 	
-	if( blockIdx.x >= l_len ) return; //redundant?
+	if( blockIdx.x >= l_len ) return; 
 	const int idx = blockIdx.x;
 	
 	float match_1st_val = -1.0f;
@@ -383,11 +473,127 @@ namespace popsift {
 	}
     }
 
+
+   __global__ void
+    compute_dot_sorted_section( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len, unsigned int *start_idx, unsigned int *stop_idx )
+    {
+	
+	if( blockIdx.x >= l_len ) return; //redundant?
+	const int idx = blockIdx.x;
+	
+	float match_1st_val = -1.0f;
+	float match_2nd_val = -1.0f;
+	int   match_1st_idx = 0;
+	int   match_2nd_idx = 0;
+
+  
+
+	const float4* lptr = (const float4*)( &l[idx] );
+
+	for( int i = start_idx[idx]; i< stop_idx[idx]; i++ )
+	{
+	    const float4* rptr = (const float4*)( &r[i] );
+	    const float   res  = dot_l2_in_t0( lptr, rptr );
+
+	
+	    if( threadIdx.x == 0 )
+	    {
+		if( res > match_1st_val )
+		{
+		    match_2nd_val = match_1st_val;
+		    match_2nd_idx = match_1st_idx;
+		    match_1st_val = res;
+		    match_1st_idx = i;
+		}
+		else if( res > match_2nd_val )
+		{
+		    match_2nd_val = res;
+		    match_2nd_idx = i;
+		}
+	    }
+
+	    __syncthreads();	
+	}
+    
+    
+	const int one = __shfl(match_1st_idx, 0);
+	const int two = __shfl(match_2nd_idx, 0);
+  
+	const float4* rptr = (const float4*)( &r[one] );
+	const float res2 = l2_in_t0( lptr, rptr );
+	const float4* rptr2 = (const float4*)( &r[two] );
+	const float res3 = l2_in_t0( lptr, rptr2 );
+
+	if( threadIdx.x == 0 )
+	{
+	    bool accept = (res2/res3 < 0.8f );
+	    match_matrix[blockIdx.x] = make_int3( match_1st_idx, match_2nd_idx, accept );
+	}
+    }
+
+ __global__ void
+    compute_dot_sorted_section_org( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len, unsigned int *start_idx, unsigned int *stop_idx )
+    {
+	
+	if( blockIdx.x >= l_len ) return; //redundant?
+	const int idx = blockIdx.x;
+	
+	float match_1st_val = -1.0f;
+	float match_2nd_val = -1.0f;
+	int   match_1st_idx = 0;
+	int   match_2nd_idx = 0;
+
+	int begin = start_idx[idx];
+	int end = stop_idx[idx];
+
+	const float4* lptr = (const float4*)( &l[idx] );
+	
+	for( int i = begin; i < end; i++ )
+	{
+	    const float4* rptr = (const float4*)( &r[i] );
+	    const float   res  = dot_l2_in_t0( lptr, rptr );
+
+	
+	    if( threadIdx.x == 0 )
+	    {
+		if( res > match_1st_val )
+		{
+		    match_2nd_val = match_1st_val;
+		    match_2nd_idx = match_1st_idx;
+		    match_1st_val = res;
+		    match_1st_idx = i;
+		}
+		else if( res > match_2nd_val )
+		{
+		    match_2nd_val = res;
+		    match_2nd_idx = i;
+		}
+	    }
+
+	    __syncthreads();	
+	}
+    
+    
+	const int one = __shfl(match_1st_idx, 0);
+	const int two = __shfl(match_2nd_idx, 0);
+  
+	const float4* rptr = (const float4*)( &r[one] );
+	const float res2 = l2_in_t0( lptr, rptr );
+	const float4* rptr2 = (const float4*)( &r[two] );
+	const float res3 = l2_in_t0( lptr, rptr2 );
+
+	if( threadIdx.x == 0 )
+	{
+	    bool accept = (res2/res3 < 0.8f );
+	    match_matrix[blockIdx.x] = make_int3( match_1st_idx, match_2nd_idx, accept );
+	}
+    }
+
+    
+    
     #define DESC_SEQ 4
-        //16 bytes of concecutive memory (4 floats/ints)
     struct Desc 
     {
-	//unsigned int descriptor[DESC_SEQ]; 
 	float descriptor[DESC_SEQ]; //float makes a difference?
     };
 
@@ -414,37 +620,32 @@ namespace popsift {
     __global__ void
     compute_distance_hamming( int3* match_matrix, Descriptor* l, Descriptor* l_tra, int l_len, Descriptor* r, Descriptor* r_tra, int r_len, thrust::device_ptr<int> indexes, unsigned int *start_idx, unsigned int *stop_idx )
     {
-	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
 	int stride = blockDim.x * gridDim.x;
 	
 	const int idx = blockIdx.x;
         int offset = 2;
-	
-	//float match_1st_val = -1.0f;
-	//float match_2nd_val = -1.0f;
 
+        
         int match_1st_val = 128;
 	int match_2nd_val = 128;
 	int match_1st_idx = 0;
 	int match_2nd_idx = 0;
 
-	
-
-	//while (tid < elements)
-	//{
-	//const float4* lptr = (const float4*)( &l_tra[idx] );
-
-	//fix end value //another variable setting offset from a kernel in case of multilvl
-	//could also have seperate stream for dot product..? based on depth and interval size
 	if (start_idx[idx] == 0) offset = 3;
 	__syncthreads; //remove?
-	
-        struct Desc *lptr = (struct Desc *)((&l_tra[indexes[idx]])) + offset;
 
-	for( int i = start_idx[idx]; i < stop_idx[idx]; i++ )
+
+	int begin = start_idx[idx];
+	int end = stop_idx[idx];
+
+        struct Desc *lptr = (struct Desc *)((&l_tra[idx])) + offset;
+
+	    
+	for( int i = begin; i < end; i++ )
 	{
 	    //const float4* rptr = (const float4*)( &r_[indexes[i]] );
-	    const struct Desc *rptr = (struct Desc *)((&r_tra[indexes[idx]])) + offset;
+	    const struct Desc *rptr = (struct Desc *)((&r_tra[idx])) + offset;
 
 		
 	    //const float   res  = dot_l2_in_t0( lptr, rptr );
@@ -509,7 +710,7 @@ namespace popsift {
 	    match_matrix[blockIdx.x] = make_int3( indexes[match_1st_idx], indexes[match_2nd_idx], accept );
 	}
 	
-	// tid += stride;
+	// idx += stride;
 	//}
     }
 
@@ -540,13 +741,6 @@ namespace popsift {
 	int match_2nd_idx = 0;
 
 	
-
-	//while (tid < elements)
-	//{
-	//const float4* lptr = (const float4*)( &l_tra[idx] );
-
-	//fix end value //another variable setting offset from a kernel in case of multilvl
-	//could also have seperate stream for dot product..? based on depth and interval size
 	if (start_idx[idx] == 0) offset = 3;
 	__syncthreads;
 	
@@ -944,7 +1138,7 @@ HASH TABLE - fix seperate file.
 
     void initialize_table( Table &table, int entries, int elements ) //elements should be 2 times descriptors
     {
-	printf("init: entries: %d\t elements: %d\n", entries, elements);
+	//printf("init: entries: %d\t elements: %d\n", entries, elements);
 	table.count = entries;
 	cudaMalloc( (void**)&table.entries, entries * sizeof(Entry*) );
 	cudaMemset( table.entries, 0, entries * sizeof(Entry*) );
@@ -955,9 +1149,6 @@ HASH TABLE - fix seperate file.
 	cudaMalloc((void**)&alloc_entries, entries * entries * sizeof(Entry*));
 	Entry **itr = alloc_entries;
 
-
-	//Entry *alloc_entries = (Entry*)malloc(entries * entries * sizeof(Entry));
-	//pointer cpu copied to gpU???
 	
 	Entry *tmp = (Entry *)malloc(elements * sizeof(Entry));	
 	for (int i = 0; i < entries; i++)
@@ -974,7 +1165,7 @@ HASH TABLE - fix seperate file.
 
     void initialize_table_async( Table &table, int entries, int elements ) //elements should be 2 times descriptors
     {
-	printf("init: entries: %d\t elements: %d\n", entries, elements);
+	//printf("init: entries: %d\t elements: %d\n", entries, elements);
 	table.count = entries;
 	cudaMalloc( (void**)&table.entries, entries * sizeof(Entry*) );
 	cudaMemsetAsync( table.entries, 0, entries * sizeof(Entry*) );
@@ -989,7 +1180,6 @@ HASH TABLE - fix seperate file.
 
 
 	//Entry *alloc_entries = (Entry*)malloc(entries * entries * sizeof(Entry));
-	//pointer cpu copied to gpU???
 	
 	Entry *tmp = (Entry *)malloc(elements * sizeof(Entry));	
 	for (int i = 0; i < entries; i++)
@@ -1002,14 +1192,12 @@ HASH TABLE - fix seperate file.
 	*/
     }
 
-
-    
-
     void free_table( Table &table )
     {
 	cudaFree( table.pool );
-	cudaFree( table.entries ); 
+	cudaFree( table.entries );
     }
+
 
 
     void copy_table_to_host( const Table &table, Table &hostTable, unsigned int elements )
@@ -1070,7 +1258,7 @@ HASH TABLE - fix seperate file.
 	free( table.entries ); 
     }
     
-    __device__ //compare with hamming dinstance here? might be good
+    __device__ 
     int compareKey(unsigned char *A, unsigned char *B)
     {
 	int i = 0;
@@ -1090,8 +1278,6 @@ HASH TABLE - fix seperate file.
     }
 
 
-
-//we need a check for equal key
     //might be possible to do this in some sort of log n format due to sorted keys
     __global__ void
     add_to_table( struct Descriptor *keys, thrust::device_ptr<int> values, Table table, Lock *lock, unsigned int elements)
@@ -1155,16 +1341,6 @@ HASH TABLE - fix seperate file.
 		    }
 		    else
 		    {
-			/******************************************************
-			 *
-			 * This solution did not work as expected...huge overlapping sectors..
-			 * Is this because of some mistake in the sorting? might be. 
-			 * Could also just be some fallacies in the code...
-			 *
-			 * If mistake in sort, get around this by storing every index,  
-			 * creating an interable list? -- SOLVED. Did not get sector from sorted lookup. 
-			 *
-			 ********************************************************/
 			if (location->begin < ptr->begin) ptr->begin = location->begin;
 			if (location->end > ptr->end) ptr->end = location->end;
 		    }
@@ -1185,28 +1361,16 @@ HASH TABLE - fix seperate file.
 	int tid = threadIdx.x + blockIdx.x * blockDim.x;
 	int stride = blockDim.x * gridDim.x;
 	int check;
-	//Search area - set to max if no key match is found - how do i return these in a good way?
-	//two unsigned int arrays allocated on the gpu?
+	//Search area - set to max if no key match is found
 	
 	while (tid < elements)
 	{
 	    struct Desc *key = (struct Desc *)(&keys[tid]) + 2; //+2 because second layer is currently stored.
-	    // bloom_filter bloom,
-	    //check = bloom_check(bloom.bits, key, bloom.size);
-	    //if (check == 0)
-	    //{
-	    //	start_idx[tid] = 0;
-	    //	stop_idx[tid] = l_len;
-	    //	tid += stride;
-	    //	continue;
-	    //}
-	    
 	    size_t hashValue = hash((unsigned int *)key, table.count );
-
 	    Entry *ptr = table.entries[hashValue];
 	    int exists = 1;
 	    int cnt = 0;
-	    //This while loop might not be very fast..splits inside warp if threads
+
 	    while (ptr != NULL)
 	    {
 		exists = compareKey((unsigned char *)&(ptr->key), (unsigned char *)key);
@@ -1224,13 +1388,6 @@ HASH TABLE - fix seperate file.
 		start_idx[tid] = 0;
 		stop_idx[tid] = l_len;
 
-		//if (tid == 0)
-		//{
-		//unsigned char * p1 = (unsigned char *)key;
-		//printf("key:\t");
-		//printf(" %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n", p1[0], p1[1], p1[2], p1[3], p1[4], p1[5], p1[6], p1[7], p1[8], p1[9], p1[10], p1[11], p1[12], p1[13], p1[14], p1[15]);
-		
-		//}
 	    }
 	
 	    tid += stride;
@@ -1486,7 +1643,7 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	396, 268, 140, 12, 
 	385, 257, 129, 1, 
 	389, 261, 133, 5, 
-	393, 365, 137, 9, 
+	393, 265, 137, 9, 
 	397, 269, 141, 13, 
 	386, 258, 130, 2, 
 	390, 262, 134, 6, 
@@ -1524,7 +1681,39 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	} 
 
 	transpose8rS64(C, R);
+	offset = 0;
+	for (i = 0; i < 8; i++) {
+	    ptr_res[offset] = R[i];
+	    offset += 16;
+	} 
+    }
 
+        __global__ void
+    transpose_descriptors_reverse_64(Descriptor *src, Descriptor *des)
+    {
+    
+	unsigned char *ptr = (unsigned char *)(src + blockIdx.x);
+	unsigned char *ptr_res = (unsigned char *)(des + blockIdx.x);
+
+	int i;
+	int start_pos, end_pos;
+	int offset = 0;
+	unsigned char C[8];                        //Local8x8 src
+	unsigned char R[8];                        //Local8x8 des
+
+	start_pos = gpu_write_back[threadIdx.x];     //get ending index
+        end_pos = gpu_idx[threadIdx.x];          //get starting index
+	ptr += start_pos;                          //set starting index
+	ptr_res += end_pos;                        //set write back position
+
+	//prepare 8x8 blocks for transpose
+	for (i = 0; i < 8; i++) {
+	    C[i] = ptr[offset];
+	    offset += 16;
+	} 
+
+	transpose8rS64(C, R);
+	__syncthreads(); //not nessesary when src and des are different buffers
 	offset = 0;
 	for (i = 0; i < 8; i++) {
 	    ptr_res[offset] = R[i];
@@ -1608,7 +1797,20 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    }
     };
 
-    
+    __global__ void
+    sort_descriptors_block(Descriptor *src, Descriptor *des, int elements, thrust::device_ptr<int> indexes )
+    {
+	int tid = threadIdx.x;
+	int blockid = blockIdx.x;
+
+	float *ptr = (float *)(src + blockid);
+	float *ptr_res = (float *)(des + indexes[blockid]);
+
+	ptr_res[tid] = ptr[tid];
+	
+    }
+
+	    
     __global__ void
     show_distance( int3*       match_matrix,
 		   Feature*    l_ext,
@@ -1672,14 +1874,22 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 
 	int l_len = getDescriptorCount( );
 	int r_len = other->getDescriptorCount( );
-        POP_CHK;
+   
+	cudaEvent_t start, stop;
+	cudaEventCreate( &start );
+	cudaEventCreate( &stop );
+	float elapsedTime;
 
+	cudaEventRecord( start, 0 );
+   
 	//cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1000000);
-        POP_CHK;
 
 	int3* match_matrix = popsift::cuda::malloc_devT<int3>( l_len, __FILE__, __LINE__ );    
         POP_CHK;
-    
+	
+	int offset = l_len % 2;
+	offset = 0;
+#if 0
 	dim3 grid;
 	grid.x = l_len;
 	grid.y = 1;
@@ -1689,199 +1899,143 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	block.y = 1;
 	block.z = 1;
 
+#else
+    
+	dim3 grid;
+	grid.x = (l_len/2) + offset;
+	grid.y = 1;
+	grid.z = 1;
+	dim3 block;
+	block.x = 32;
+	block.y = 2;
+	block.z = 1;
+#endif
+	
 	if ( config.getModeMatching() == popsift::Config::l2 )
 	{
-	    compute_distance_l2
+	     compute_distance_l2
 		<<<grid,block>>>
 		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
+
+#if 0
+	     float *buffer = (float *)malloc(r_len * 128 * sizeof(float));
+	     cudaMemcpy(buffer, other->getDescriptors(), r_len * 128 * sizeof(float), cudaMemcpyDeviceToHost);
+	     FILE *file;
+	     file = fopen("siftdescR.txt", "wb");
+	     fwrite(buffer, sizeof(float), r_len * 128, file);
+	     fclose(file);
+#endif
+	     
 	}
 	else if ( config.getModeMatching() == popsift::Config::dot )
 	{
+#if 0
 	    compute_distance_dot
 		<<<grid,block>>>
 		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
+#elif 1
+	    
+
+	    compute_distance_dot_256
+		<<<grid,block>>>
+		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
+	    
+#elif 0
+	    
+	    float *norm;
+
+	    cudaMalloc((void **)&norm, l_len * r_len * sizeof(float));
+	    
+	    compute_dot_no_sync
+		<<<l_len/128,128>>>
+		( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len, norm);
+#endif
 	}
 	else
 	{
 
-#if 0
-
-	    dim3 grid_r;
-	    grid.x = r_len;
-	    grid.y = 1;
-	    grid.z = 1;
-
-	    //transpose first set of descritors
-	    //sort the transposed descriptors
-	    //transpose and compare with the second set
-	
-	
+#if 1
+	    
 	    Descriptor *l_copy = gpu_init(l_len);
 	    Descriptor *r_copy = gpu_init(r_len);
+	    //Descriptor *tmpbuff = gpu_init(r_len); //hamming
 
+
+	    const int SIZE = r_len; //unnessecary variable...
+	    Table table; 
+	    initialize_table_async( table, HASH_ENTRIES, SIZE * 2 ); //hash entries set equal to size for max performance
+	    
+	    //initialize mutual exclution locks. 
+	    Lock lock[HASH_ENTRIES];
+	    Lock *dev_lock;
+	    cudaMalloc( (void**)&dev_lock, HASH_ENTRIES * sizeof( Lock ) );
+	    cudaMemcpyAsync( dev_lock, lock, HASH_ENTRIES * sizeof( Lock ), cudaMemcpyHostToDevice );
+
+	    //Lookup arrays
+	    unsigned int *dev_start_idx;
+	    unsigned int *dev_stop_idx;
+	    
+	    cudaMalloc((void **)&dev_start_idx, l_len * sizeof(unsigned int));
+	    cudaMalloc((void **)&dev_stop_idx, l_len * sizeof(unsigned int));
+
+	    
+	    
 	    //TRANSPOSE
-
 	    //two streams..
 	    cudaStream_t stream1, stream2;
 	    cudaStreamCreate( &stream1 );
 	    cudaStreamCreate( &stream2 );
 
-	    cudaEvent_t start, stop;
-	    cudaEventCreate( &start );
-	    cudaEventCreate( &stop );
-	    float elapsedTime;
-	    
-	    cudaEventRecord( start, 0 );
 
-	    /*
-	    transpose_descriptors
-		<<<l_len,block>>>
-		( getDescriptors(), l_len, l_copy);
+	    transpose_descriptors_64
+		<<<r_len,64,0,stream1>>>
+		( other->getDescriptors(), r_copy );
 
-	    POP_CHK;
-
-	    transpose_descriptors
-		<<<r_len,block>>>
-		( other->getDescriptors(), r_len , r_copy);
-
-	    
+	    //should be stream2
 	    transpose_descriptors_64
 		<<<l_len,64,0,stream1>>>
-		( getDescriptors(), l_copy);
+		( getDescriptors(), l_copy );
 
-	    transpose_descriptors_64
-		<<<r_len,64,0,stream2>>>
-		( other->getDescriptors(), r_copy);
 	    
-	    */
-
-	    transpose_descriptors_64
-		<<<l_len,64,0>>>
-		( getDescriptors(), l_copy);
-
-	    transpose_descriptors_64
-		<<<r_len,64>>>
-		( other->getDescriptors(), r_copy);
-
-	    cudaEventRecord( stop, 0 );
-	    cudaEventSynchronize( stop );
-	    cudaEventElapsedTime( &elapsedTime, start, stop );
-	    printf( "Time to transpose:  %3.1f ms\n", elapsedTime );
 	    
-	    cudaDeviceSynchronize();
-            POP_CHK;
-	    
-	    const int SIZE = r_len; //unnessecary variable...
 	    thrust::device_vector<int> d( SIZE );
-	    thrust::sequence( d.begin(), d.end() );
-            IndirectLookup il_obj( r_copy ); //lcopy vs rcopy here. think r is best choise as it aligns with the standard setup. 
-	    thrust::sort( d.begin(), d.end(), il_obj );
 	    thrust::device_ptr<int> indexes = &d[0];
 	    
-	    //Hash Table setup
-	    //**********************************************
-	    // init can be done earlier during kernel call
-	    //**********************************************
-
-	    //record time
-	    cudaEventRecord( start, 0 );
-
-	    Table table; 
-	    initialize_table( table, HASH_ENTRIES, SIZE * 2 ); //hash entries set equal to size for max performance
-	    
-
-	    
-	    //initialize mutual exclution locks. //is this good code? what happens here
-	    Lock lock[HASH_ENTRIES];
-	    Lock *dev_lock;
-	    cudaMalloc( (void**)&dev_lock, HASH_ENTRIES * sizeof( Lock ) );
-	    cudaMemcpy( dev_lock, lock, HASH_ENTRIES * sizeof( Lock ), cudaMemcpyHostToDevice );
+	    thrust::sequence(thrust::cuda::par.on(stream1), d.begin(), d.end() );
+            IndirectLookup il_obj( r_copy ); //lcopy vs rcopy here. think r is best choise as it aligns with the standard setup. 
+	    thrust::sort(thrust::cuda::par.on(stream1), d.begin(), d.end(), il_obj );
 
 	    add_to_table<<<60,256,0,stream1>>>( r_copy, indexes, table, dev_lock, SIZE );
-	    
-	    cudaEventRecord( stop, 0 );
-	    cudaEventSynchronize( stop );
-	    //printf("add table call\n");
-	    POP_CHK;
-	    float elapsedTimeh;
-	    cudaEventElapsedTime( &elapsedTimeh, start, stop );
-	    printf( "Time to hash:  %3.1f ms\n", elapsedTimeh );
-	    //verify_table( table, SIZE ); 
 
-	    cudaEventDestroy( start );
-	    cudaEventDestroy( stop );
-
-	    unsigned int *h_start_idx = (unsigned int *)malloc(l_len * sizeof(unsigned int));
-	    unsigned int *h_stop_idx = (unsigned int *)malloc(l_len * sizeof(unsigned int));
-	    
-	    unsigned int *dev_start_idx;
-	    unsigned int *dev_stop_idx;
-
-	    
-	    cudaMalloc((void **)&dev_start_idx, l_len * sizeof(unsigned int));
-	    cudaMalloc((void **)&dev_stop_idx, l_len * sizeof(unsigned int));
-	    POP_CHK;
-	    
-	    //Probably better to utilize threads as well.
 	    get_section_from_table
-		<<<60, 256>>>
+		<<<60, 256,0,stream1>>>
 		( table, l_copy, l_len, r_len, dev_start_idx, dev_stop_idx );
+
+	    sort_descriptors_block
+	    	<<<r_len,128,0,stream1>>>
+	    	( other->getDescriptors(), r_copy, r_len, indexes );
 	    
-	    cudaDeviceSynchronize();
-	    cudaMemcpy( h_start_idx, dev_start_idx, l_len * sizeof(unsigned int), cudaMemcpyDeviceToHost );
-	    cudaMemcpy( h_stop_idx, dev_stop_idx, l_len * sizeof(unsigned int), cudaMemcpyDeviceToHost );
 	    
-	    POP_CHK;
+	    compute_dot_sorted_section_org
+		<<<grid,block,0,stream1>>>
+		( match_matrix, getDescriptors(), l_len, r_copy, r_len, dev_start_idx, dev_stop_idx );
+
+	    cudaFree( r_copy );
+	    cudaFree( l_copy );
+
+	    cudaFree( dev_lock );
+
+	    cudaFree( dev_start_idx );
+	    cudaFree( dev_stop_idx );
 	    
-	    int print_func = 0;
-	    if (print_func)
-	    {
-		for (int i = 0; i < l_len; i++) { //is this in the sorted! ?
-		    printf("num: %d\t start: %d\t stop: %d\n", i, h_start_idx[i], h_stop_idx[i]);
-		}
-	    }
+	    free_table(table);
 
-/* Working hamming, few matches	    
-	    compute_distance_hamming
-		<<<l_len,1>>>
-		( match_matrix, getDescriptors(), l_copy, l_len, other->getDescriptors(), r_copy, r_len, indexes, dev_start_idx, dev_stop_idx );
-*/
-	    /*
-	    compute_distance_hamming_levels
-		<<<l_len,1>>>
-		( match_matrix, getDescriptors(), l_copy, l_len, other->getDescriptors(), r_copy, r_len, indexes, dev_start_idx, dev_stop_idx );
-	    */
+	    cudaStreamDestroy(stream1);
+	    cudaStreamDestroy(stream2);
 	    
- //working dot product in section
-
-	    compute_dot_in_section
-		<<<grid,block>>>
-		( match_matrix, getDescriptors(), l_len, other->getDescriptors(),  r_len, indexes, dev_start_idx, dev_stop_idx );
-
-	    cudaDeviceSynchronize();
-
-
 	    
-	    //create array of keys? This can be done in the transpose kernel of the gpu.
-	    //might not be needed, can use (some 128 bit struct...*)descriptor
-	    //This way all treads (or blocks depending on implementation) can get
-	    //its string by descriptor[tid] and a cast.
-
-	    //Add a pointer to a table inside the table? set to void. points to next "level"
-
-	    //Hash Table setup
-	    //**********************************************
-	    // init can be done earlier during kernel call
-	    //**********************************************
-
-
-	   
 #else
 	    //Allocation
-	    //Descriptor *l_copy = getDescriptors();
-	    //Descriptor *r_copy = other->getDescriptors();
-
-	    
 	    Descriptor *l_copy = gpu_init(l_len);
 	    Descriptor *r_copy = gpu_init(r_len);
 
@@ -1934,7 +2088,8 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 	    get_section_from_table
 		<<<60, 256,0,stream1>>>
 		( table, l_copy, l_len, r_len, dev_start_idx, dev_stop_idx );
-	    
+
+
 	    compute_dot_in_section
 		<<<grid,block,0,stream1>>>
 		( match_matrix, getDescriptors(), l_len, other->getDescriptors(),  r_len, indexes, dev_start_idx, dev_stop_idx );
@@ -1943,7 +2098,14 @@ __device__ __constant__ unsigned int gpu_write_back[64] =
 #endif
 	    
 	}
-	
+
+	cudaEventRecord( stop, 0 );
+	cudaEventSynchronize( stop );
+	cudaEventElapsedTime( &elapsedTime, start, stop );
+	printf( "Run-time:  %3.1f ms\n", elapsedTime );
+
+
+	    
 	show_distance
 	    <<<1,32>>>
 	    ( match_matrix,
