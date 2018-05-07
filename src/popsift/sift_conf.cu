@@ -198,7 +198,7 @@ void Config::setNormMode( const std::string& m )
     if( m == "RootSift" ) setNormMode( Config::RootSift );
     else if( m == "classic" ) setNormMode( Config::Classic );
     else
-        POP_FATAL( string("Bad Normalization mode.\n") + getGaussModeUsage() );
+        POP_FATAL( string("Bad Normalization mode.\n") + getNormModeUsage() );
 }
 
 Config::NormMode Config::getNormModeDefault( )
@@ -212,7 +212,7 @@ const char* Config::getNormModeUsage( )
         "Choice of descriptor normalization modes. "
         "Options are: "
         "RootSift (L1-like, default), "
-        "Classic (L2-like)";
+        "classic (L2-like)";
 }
 
 /**

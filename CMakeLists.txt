@@ -123,6 +123,9 @@ endif(CUDA_VERSION>=7.5)
 # library required for CUDA dynamic parallelism, forgotten by CMake 3.4
 cuda_find_library_local_first(CUDA_CUDADEVRT_LIBRARY cudadevrt "\"cudadevrt\" library")
 
+# library required for CuBlas matrix multiplication
+cuda_find_library_local_first(CUDA_CUBLAS_LIBRARY cublas "\"cublas\" library")
+
 if(PopSift_USE_NVTX_PROFILING)
   # library required for NVTX profiling of the CPU
   cuda_find_library_local_first(CUDA_NVTX_LIBRARY nvToolsExt "NVTX library")

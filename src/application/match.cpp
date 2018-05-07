@@ -24,6 +24,7 @@
 #include <popsift/sift_conf.h>
 #include <popsift/match/match_task.h>
 #include <popsift/match/match_brute_force.h>
+#include <popsift/match/match_brute_blas.h>
 #include <popsift/common/device_prop.h>
 
 #ifdef USE_DEVIL
@@ -46,6 +47,28 @@ static bool write_as_uchar  = false;
 static bool dont_write      = false;
 static bool pgmread_loading = false;
 
+enum MatchMode
+{
+    BruteForce,
+    BruteBlas
+};
+
+static MatchMode match_mode = BruteForce;
+
+static void selectMatcher( const string& m )
+{
+    if( m == "brute-force" )
+        match_mode = BruteForce;
+    else if( m == "brute-blas" )
+        match_mode = BruteBlas;
+    else
+    {
+        cerr << "Use --matcher with brute-force or brute-blas" << endl;
+        exit( -1 );
+    }
+
+}
+
 static void parseargs(int argc, char** argv, popsift::Config& config, string& lFile, string& rFile) {
     using namespace boost::program_options;
 
@@ -57,8 +80,9 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
             ("log", bool_switch()->notifier([&](bool i) {if(i) config.setLogMode(popsift::Config::All); }), "Write debugging files")
 
             ("left,l",  value<std::string>(&lFile)->required(), "\"Left\"  input file")
-            ("right,r", value<std::string>(&rFile)->required(), "\"Right\" input file");
-    
+            ("right,r", value<std::string>(&rFile)->required(), "\"Right\" input file")
+            ( "matcher", value<std::string>()->notifier([&](const std::string& s) { selectMatcher(s); }),
+              "Select the matching implementation: brute-force (default, slow, works always), brute-blas (brute force suing CuBlas, works only for L2 nornmalization" );
     }
     options_description parameters("Parameters");
     {
@@ -263,14 +287,20 @@ int main(int argc, char **argv)
     cout << "Number of features:    " << rFeatures->getFeatureCount() << endl;
     cout << "Number of descriptors: " << rFeatures->getDescriptorCount() << endl;
 
-    popsift::BruteForceMatcher matcher( lFeatures, rFeatures );
-    matcher.matchAndPrint();
-    matcher.matchAndPrintAccepted();
-    matcher.checkIdentity();
-
-    // lFeatures->matchAndPrint( rFeatures );
-    // lFeatures->matchAndPrintAccepted( rFeatures );
-    // lFeatures->checkIdentity( rFeatures );
+    if( match_mode == BruteForce )
+    {
+        popsift::BruteForceMatcher matcher( lFeatures, rFeatures );
+        matcher.matchAndPrint();
+        matcher.matchAndPrintAccepted();
+        matcher.checkIdentity();
+    }
+    else if( match_mode == BruteBlas )
+    {
+        popsift::BruteForceBlasMatcher matcher( lFeatures, rFeatures );
+        matcher.matchAndPrint();
+        matcher.matchAndPrintAccepted();
+        matcher.checkIdentity();
+    }
 
     delete lFeatures;
     delete rFeatures;

@@ -42,6 +42,8 @@ CUDA_ADD_LIBRARY(popsift STATIC
 	popsift/common/excl_blk_prefix_sum.h
 	popsift/common/vec_macros.h
 	popsift/common/clamp.h
+	popsift/common/cublas_init.cu    popsift/common/cublas_init.h
+	popsift/common/cublas_matrix.cu  popsift/common/cublas_matrix.h
 	popsift/sift_task.h
 	popsift/sift_task_extract.cu popsift/sift_task_extract.h
 	popsift/register/reg_task.cu     popsift/register/reg_task.h
@@ -49,6 +51,7 @@ CUDA_ADD_LIBRARY(popsift STATIC
 	popsift/register/registration.cu popsift/register/registration.h
 	popsift/match/match_task.cu        popsift/match/match_task.h
 	popsift/match/match_brute_force.cu popsift/match/match_brute_force.h
+	popsift/match/match_brute_blas.cu  popsift/match/match_brute_blas.h
 	)
 
 # BUILD_INTERFACE allows to include the directory with source only when target is
@@ -63,7 +66,9 @@ set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 
 # cannot use PRIVATE here as there is a bug in FindCUDA and CUDA_ADD_LIBRARY
 # https://gitlab.kitware.com/cmake/cmake/issues/16097
- target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
+ target_link_libraries(popsift ${Boost_LIBRARIES}
+                               ${CUDA_CUDADEVRT_LIBRARY}
+                               ${CUDA_CUBLAS_LIBRARY})
 
 
 # EXPORTING THE LIBRARY
