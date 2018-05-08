@@ -37,6 +37,43 @@ __host__ __device__ bool operator==( const int2& l, const int2& r );
 
 namespace popsift {
 
+/**
+ * Compute L2 distance of two arrays of 32 float4 groups.
+ * Kernel configuration must be <<<:,32>>>, 32 threads per warp, 1 warp per block.
+ */
+__device__ inline float
+l2_in_t0( const float4* lptr, const float4* rptr )
+{
+    const float4  lval = lptr[threadIdx.x];
+    const float4  rval = rptr[threadIdx.x];
+    const float4  mval = make_float4( lval.x - rval.x,
+			              lval.y - rval.y,
+			              lval.z - rval.z,
+			              lval.w - rval.w );
+    float   res = mval.x * mval.x
+	        + mval.y * mval.y
+	        + mval.z * mval.z
+	        + mval.w * mval.w;
+    res += __shfl_down( res, 16 );
+    res += __shfl_down( res,  8 );
+    res += __shfl_down( res,  4 );
+    res += __shfl_down( res,  2 );
+    res += __shfl_down( res,  1 );
+    return res;
+}
+
+/**
+ * Compute L2 distance of two arrays of 128 float groups
+ * Kernel configuration must be <<<:,32>>>, 32 threads per warp, 1 warp per block.
+ */
+__device__ inline float
+l2_in_t0( const float* l, const float* r )
+{
+    const float4* lptr = (const float4*)l;
+    const float4* rptr = (const float4*)r;
+    return l2_in_t0( lptr, rptr );
+}
+
 /*************************************************************
  * FeaturesDev - device and global functions
  *************************************************************/
@@ -44,17 +81,20 @@ namespace popsift {
 __global__ void
 compute_distance( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, int r_len );
 
+#undef COMPUTE_32
+
+#ifdef COMPUTE_32
 /* Find the first and second best index and value from a full brute force projection.
  * All "right" distances for one "left" line are in one row.
  * Start with <<<rows,32>>>.
  */
 __global__ void
-compute_distance( int3* match_matrix, const float* array, int rows, int cols )
+compute_distance( int3* match_matrix, const float* array, int rows, int cols, Descriptor* l, Descriptor* r )
 {
     if( blockIdx.x >= rows ) return;
 
-    float match_1st_val = CUDART_INF_F;
-    float match_2nd_val = CUDART_INF_F;
+    float match_1st_val = -CUDART_INF_F;
+    float match_2nd_val = -CUDART_INF_F;
     int   match_1st_idx = 0;
     int   match_2nd_idx = 0;
 
@@ -66,14 +106,14 @@ compute_distance( int3* match_matrix, const float* array, int rows, int cols )
     {
         const float  res  = line[i];
 
-        if( i<cols && res < match_1st_val )
+        if( i<cols && res > match_1st_val )
         {
             match_2nd_val = match_1st_val;
             match_2nd_idx = match_1st_idx;
             match_1st_val = res;
             match_1st_idx = i;
         }
-        else if( i<cols && res < match_2nd_val )
+        else if( i<cols && res > match_2nd_val )
         {
             match_2nd_val = res;
             match_2nd_idx = i;
@@ -116,11 +156,69 @@ compute_distance( int3* match_matrix, const float* array, int rows, int cols )
 
     if( threadIdx.x == 0 )
     {
+        float x1 = fminf( 1.0f, fmaxf( -1.0f, match_1st_val ) );
+        float y1 = sinf( acosf( x1 ) );
+        float x2 = fminf( 1.0f, fmaxf( -1.0f, match_2nd_val ) );
+        float y2 = sinf( acosf( x2 ) );
+        match_1st_val = sqrtf( ( x1-1.0f ) * ( x1-1.0f ) + y1*y1 );
+        match_2nd_val = sqrtf( ( x2-1.0f ) * ( x2-1.0f ) + y2*y2 );
+
         // printf( "idx %4d : 1st %7.3f 2nd %7.3f\n", idx, match_1st_val, match_2nd_val );
         bool accept = ( match_2nd_val == 0 ) || ( match_1st_val / match_2nd_val < 0.8f );
         match_matrix[blockIdx.x] = make_int3( match_1st_idx, match_2nd_idx, accept );
     }
 }
+#else
+/* Start with <<<rows,1>>>. */
+__global__ void
+compute_distance( int3* match_matrix, const float* array, int rows, int cols, Descriptor* l, Descriptor* r )
+{
+    if( blockIdx.x >= rows ) return;
+
+    float match_1st_val = -CUDART_INF_F;
+    float match_2nd_val = -CUDART_INF_F;
+    int   match_1st_idx = 0;
+    int   match_2nd_idx = 0;
+
+    int   row_offset = blockIdx.x * cols;
+
+    const float* line = &array[row_offset];
+
+    for( int i=0; i<cols; i+=1 )
+    {
+        const float  res  = line[i];
+
+        if( i<cols && res > match_1st_val )
+        {
+            match_2nd_val = match_1st_val;
+            match_2nd_idx = match_1st_idx;
+            match_1st_val = res;
+            match_1st_idx = i;
+        }
+        else if( i<cols && res > match_2nd_val )
+        {
+            match_2nd_val = res;
+            match_2nd_idx = i;
+        }
+    }
+
+    printf("dist %5.3f vs %5.3f\n",
+        l2_in_t0( r[blockIdx.x].features, l[match_1st_idx].features ),
+        l2_in_t0( r[blockIdx.x].features, l[match_2nd_idx].features ) );
+
+    // bool accept = ( match_2nd_val < 0.8f );
+
+    float x1 = fminf( 1.0f, fmaxf( -1.0f, match_1st_val ) );
+    float y1 = sinf( acosf( x1 ) );
+    float x2 = fminf( 1.0f, fmaxf( -1.0f, match_2nd_val ) );
+    float y2 = sinf( acosf( x2 ) );
+    match_1st_val = sqrtf( ( x1-1.0f ) * ( x1-1.0f ) + y1*y1 );
+    match_2nd_val = sqrtf( ( x2-1.0f ) * ( x2-1.0f ) + y2*y2 );
+
+    bool accept = ( match_2nd_val == 0 ) || ( match_1st_val / match_2nd_val < 0.8f );
+    match_matrix[blockIdx.x] = make_int3( match_1st_idx, match_2nd_idx, accept );
+}
+#endif
 
 __global__ void
 show_distance( int3*       match_matrix,
@@ -276,10 +374,15 @@ void BruteForceBlasMatcher::match_computeMatchTable( int3* match_matrix )
 
     cublasHandle_t handle;
     cublas_init( &handle, __FILE__, __LINE__ );
-    cerr << "Calling setATransMul" << endl;
+    // cerr << "Calling setATransMul" << endl;
     _table.setATransMult( handle, rmx, lmx );
-    cerr << "Done with setATransMul" << endl;
-    sleep( 1 );
+
+    // CuFortMatrix local( _table.rows(), _table.cols(), CuFortMatrix::OnHost );
+    // local = _table;
+    // cout << local;
+
+    // cerr << "Done with setATransMul" << endl;
+    // sleep( 1 );
     cudaDeviceSynchronize();
     cublas_uninit( handle );
 
@@ -288,13 +391,17 @@ void BruteForceBlasMatcher::match_computeMatchTable( int3* match_matrix )
     grid.y = 1;
     grid.z = 1;
     dim3 block;
+#ifdef COMPUTE_32
     block.x = 32;
+#else
+    block.x = 1;
+#endif
     block.y = 1;
     block.z = 1;
 
     compute_distance
         <<<grid,block>>>
-        ( match_matrix, _table.data(), _table.cols(), _table.rows() );
+        ( match_matrix, _table.data(), _table.cols(), _table.rows(), _l->getDescriptors(), _r->getDescriptors() );
 
     POP_SYNC_CHK;
 }
