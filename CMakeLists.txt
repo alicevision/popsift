@@ -59,19 +59,19 @@ endif()
 #
 if(CUDA_VERSION_MAJOR GREATER 7)
   set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 60 61 62)
-else(CUDA_VERSION_MAJOR GREATER 7)
+else()
   set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 )
-endif(CUDA_VERSION_MAJOR GREATER 7)
+endif()
 set(PopSift_CUDA_CC_LIST ${PopSift_CUDA_CC_LIST_BASIC} CACHE STRING "CUDA CC versions to compile")
 
 if(PopSift_USE_NVTX_PROFILING)
   message(STATUS "PROFILING CPU CODE: NVTX is in use")
-endif(PopSift_USE_NVTX_PROFILING)
+endif()
 
 if(PopSift_ERRCHK_AFTER_KERNEL)
   message(STATUS "Synchronizing and checking errors after every kernel call")
   set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-DERRCHK_AFTER_KERNEL")
-endif(PopSift_ERRCHK_AFTER_KERNEL)
+endif()
 
 set(CUDA_SEPARABLE_COMPILATION ON)
 
@@ -81,7 +81,7 @@ if(UNIX AND NOT APPLE)
   # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;-warn-double-usage")
   set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--keep")
   set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--source-in-ptx")
-endif(UNIX AND NOT APPLE)
+endif()
 
 # The following if should not be necessary, but apparently there is a bug in FindCUDA.cmake that
 # generate an empty string in the nvcc command line causing the compilation to fail.
@@ -102,7 +102,7 @@ endif()
 list(SORT PopSift_CUDA_CC_LIST)
 foreach(PopSift_CC_VERSION ${PopSift_CUDA_CC_LIST})
   set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-gencode;arch=compute_${PopSift_CC_VERSION},code=sm_${PopSift_CC_VERSION}")
-endforeach(PopSift_CC_VERSION)
+endforeach()
 
 #
 # Use the highest request CUDA CC for CUDA JIT compilation
@@ -126,23 +126,23 @@ if( ( CUDA_VERSION VERSION_EQUAL "7.5" ) OR ( CUDA_VERSION VERSION_GREATER "7.5"
     set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;-warn-spills")
     set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;--warn-on-local-memory-usage")
     set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;--warn-on-spills")
-  endif(PopSift_NVCC_WARNINGS)
-endif( ( CUDA_VERSION VERSION_EQUAL "7.5" ) OR ( CUDA_VERSION VERSION_GREATER "7.5") )
+  endif()
+endif()
 
 if(PopSift_USE_NORMF)
   if( CUDA_VERSION VERSION_GREATER "7.4")
     set(HAVE_NORMF   1)
-  endif( CUDA_VERSION VERSION_GREATER "7.4")
-endif(PopSift_USE_NORMF)
+  endif()
+endif()
 
 if( ( CUDA_VERSION VERSION_EQUAL "9.0" ) OR ( CUDA_VERSION VERSION_GREATER "9.0") )
   set(HAVE_SHFL_DOWN_SYNC   1)
-endif( ( CUDA_VERSION VERSION_EQUAL "9.0" ) OR ( CUDA_VERSION VERSION_GREATER "9.0") )
+endif()
 
 if(NOT PopSift_USE_GRID_FILTER)
   message(STATUS "Disabling grid filter compilation")
   set(DISABLE_GRID_FILTER   1)
-endif(NOT PopSift_USE_GRID_FILTER)
+endif()
 
 # library required for CUDA dynamic parallelism, forgotten by CMake 3.4
 cuda_find_library_local_first(CUDA_CUDADEVRT_LIBRARY cudadevrt "\"cudadevrt\" library")
@@ -151,13 +151,13 @@ if(PopSift_USE_NVTX_PROFILING)
   # library required for NVTX profiling of the CPU
   cuda_find_library_local_first(CUDA_NVTX_LIBRARY nvToolsExt "NVTX library")
   add_definitions(-DUSE_NVTX)
-endif(PopSift_USE_NVTX_PROFILING)
+endif()
 
 add_subdirectory(src)
 
 if(PopSift_USE_TEST_CMD)
-add_subdirectory(testScripts)
-endif(PopSift_USE_TEST_CMD)
+  add_subdirectory(testScripts)
+endif()
 
 ########### Add uninstall target ###############
 CONFIGURE_FILE(
