@@ -1,6 +1,6 @@
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
-CUDA_INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
+CUDA_INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}/popsift)
 
 CUDA_ADD_LIBRARY(popsift STATIC
 	popsift/popsift.cu popsift/popsift.h
@@ -42,6 +42,10 @@ CUDA_ADD_LIBRARY(popsift STATIC
 	popsift/common/vec_macros.h
 	popsift/common/clamp.h )
 
+configure_file(popsift/sift_config.h.in
+               ${CMAKE_CURRENT_BINARY_DIR}/popsift/sift_config.h
+	       @ONLY)
+
 # BUILD_INTERFACE allows to include the directory with source only when target is
 # built in the building tree (ie, not from an install location)
 target_include_directories(popsift 
@@ -54,7 +58,7 @@ set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 
 # cannot use PRIVATE here as there is a bug in FindCUDA and CUDA_ADD_LIBRARY
 # https://gitlab.kitware.com/cmake/cmake/issues/16097
- target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
+target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
 
 
 # EXPORTING THE LIBRARY
@@ -101,6 +105,10 @@ install(TARGETS popsift
 
 # Headers:
 install(DIRECTORY "popsift"
+        DESTINATION "${include_install_dir}"
+        FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
+
+install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/popsift"
         DESTINATION "${include_install_dir}"
         FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
 

@@ -7,6 +7,8 @@
  */
 #pragma once
 #include "s_desc_normalize.h"
+#include "common/assist.h"
+#include "sift_config.h"
 
 using namespace popsift;
 using namespace std;
@@ -48,7 +50,7 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
     float4 descr;
     descr = ptr4[threadIdx.x];
 
-#if __CUDACC_VER__ >= 70500
+#ifdef HAVE_NORMF
     // normf() is an elegant function: sqrt(sum_0^127{v^2})
     // It exists from CUDA 7.5 but the trouble with CUB on the GTX 980 Ti forces
     // us to with CUDA 7.0 right now
@@ -59,7 +61,7 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
         norm = normf( 128, src_desc );
     }
     __syncthreads();
-    norm = __shfl( norm, 0 );
+    norm = popsift::shuffle( norm, 0 );
 
     descr.x = min( descr.x, 0.2f*norm );
     descr.y = min( descr.y, 0.2f*norm );
@@ -70,33 +72,33 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
          + descr.y * descr.y
          + descr.z * descr.z
          + descr.w * descr.w;
-    norm += __shfl_down( norm, 16 );
-    norm += __shfl_down( norm,  8 );
-    norm += __shfl_down( norm,  4 );
-    norm += __shfl_down( norm,  2 );
-    norm += __shfl_down( norm,  1 );
+    norm += popsift::shuffle_down( norm, 16 );
+    norm += popsift::shuffle_down( norm,  8 );
+    norm += popsift::shuffle_down( norm,  4 );
+    norm += popsift::shuffle_down( norm,  2 );
+    norm += popsift::shuffle_down( norm,  1 );
     if( threadIdx.x == 0 ) {
         // norm = __fsqrt_rn( norm );
         // norm = __fdividef( 512.0f, norm );
         norm = __frsqrt_rn( norm ); // inverse square root
         norm = scalbnf( norm, d_consts.norm_multi );
     }
-#else
+#else // not HAVE_NORMF
     float norm;
 
     norm = descr.x * descr.x
          + descr.y * descr.y
          + descr.z * descr.z
          + descr.w * descr.w;
-    norm += __shfl_down( norm, 16 );
-    norm += __shfl_down( norm,  8 );
-    norm += __shfl_down( norm,  4 );
-    norm += __shfl_down( norm,  2 );
-    norm += __shfl_down( norm,  1 );
+    norm += popsift::shuffle_down( norm, 16 );
+    norm += popsift::shuffle_down( norm,  8 );
+    norm += popsift::shuffle_down( norm,  4 );
+    norm += popsift::shuffle_down( norm,  2 );
+    norm += popsift::shuffle_down( norm,  1 );
     if( threadIdx.x == 0 ) {
         norm = __fsqrt_rn( norm );
     }
-    norm = __shfl( norm,  0 );
+    norm = popsift::shuffle( norm,  0 );
 
     descr.x = min( descr.x, 0.2f*norm );
     descr.y = min( descr.y, 0.2f*norm );
@@ -107,19 +109,19 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
          + descr.y * descr.y
          + descr.z * descr.z
          + descr.w * descr.w;
-    norm += __shfl_down( norm, 16 );
-    norm += __shfl_down( norm,  8 );
-    norm += __shfl_down( norm,  4 );
-    norm += __shfl_down( norm,  2 );
-    norm += __shfl_down( norm,  1 );
+    norm += popsift::shuffle_down( norm, 16 );
+    norm += popsift::shuffle_down( norm,  8 );
+    norm += popsift::shuffle_down( norm,  4 );
+    norm += popsift::shuffle_down( norm,  2 );
+    norm += popsift::shuffle_down( norm,  1 );
     if( threadIdx.x == 0 ) {
         // norm = __fsqrt_rn( norm );
         // norm = __fdividef( 512.0f, norm );
         norm = __frsqrt_rn( norm ); // inverse square root
         norm = scalbnf( norm, d_consts.norm_multi );
     }
-#endif
-    norm = __shfl( norm,  0 );
+#endif // HAVE_NORMF
+    norm = popsift::shuffle( norm,  0 );
 
     descr.x = descr.x * norm;
     descr.y = descr.y * norm;

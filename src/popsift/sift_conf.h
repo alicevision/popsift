@@ -181,11 +181,10 @@ struct Config
         return _max_extrema;
     }
 
-    /* Filtering extrema is only possible when CUDA version is >= 8.0
-     * The reason is that we use Thrust. This allows runtime testing.
-     *
-     * Note: re-writing the filtering code is possible, either older
-     *       Thrust semantics, CUDA CUB or doing everything from scratch.
+    /* Have we enabled filtering? This is a compile time decision.
+     * The reason is that we use Thrust, which increases compile 
+     * considerably and can be deactivated at the CMake level when
+     * you work on something else.
      */
     bool getCanFilterExtrema() const;
 

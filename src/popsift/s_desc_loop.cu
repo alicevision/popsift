@@ -124,12 +124,12 @@ void ext_desc_loop_sub( const float         ang,
 
     /* reduction here */
     for (int i = 0; i < 8; i++) {
-        dpt[i] += __shfl_down( dpt[i], 16 );
-        dpt[i] += __shfl_down( dpt[i], 8 );
-        dpt[i] += __shfl_down( dpt[i], 4 );
-        dpt[i] += __shfl_down( dpt[i], 2 );
-        dpt[i] += __shfl_down( dpt[i], 1 );
-        dpt[i]  = __shfl     ( dpt[i], 0 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 16 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 8 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 4 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 2 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 1 );
+        dpt[i]  = popsift::shuffle     ( dpt[i], 0 );
     }
 
     if( threadIdx.x < 8 ) {
