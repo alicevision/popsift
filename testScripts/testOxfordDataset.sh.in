@@ -20,7 +20,7 @@ if [ $# -gt 0 ]
 then
   dataset_list=$*
 else
-  dataset_list=boat bikes trees graf wall bark leuven ubc
+  dataset_list="boat bikes trees graf wall bark leuven ubc"
 fi
 
 for dataset in $dataset_list
