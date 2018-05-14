@@ -1,5 +1,13 @@
 #!/bin/bash
 
+cd @CMAKE_CURRENT_SOURCE_DIR@
+if [ ! -f reference.tgz ]
+then
+  echo -n "Fetching reference values. "
+  wget http://heim.ifi.uio.no/griff/LADIO/files/reference.tgz
+  echo "Done."
+fi
+
 echo "Making directory @CMAKE_SOURCE_DIR@/oxford"
 mkdir -p @CMAKE_SOURCE_DIR@/oxford
 echo "Changing to directory @CMAKE_SOURCE_DIR@/oxford"
