@@ -26,6 +26,7 @@ using namespace std;
 #include <thrust/transform_scan.h>
 #include <thrust/sort.h>
 #include <thrust/execution_policy.h>
+#include <thrust/iterator/discard_iterator.h>
 
 namespace popsift
 {
@@ -322,7 +323,7 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 }
 }; // namespace popsift
 
-#else // (__CUDACC_VER__ >= 80000) && not defined(DISABLE_GRID_FILTER)
+#else // not defined(DISABLE_GRID_FILTER)
 
 namespace popsift
 {
@@ -334,5 +335,5 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 }
 }; // namespace popsift
 
-#endif // (__CUDACC_VER__ >= 80000) && not defined(DISABLE_GRID_FILTER)
+#endif // not defined(DISABLE_GRID_FILTER)
 

@@ -79,10 +79,10 @@ void ext_desc_notile_sub( const float x, const float y, const int level,
 
     for( int i=0; i<8; i++ )
     {
-        dpt[i] += __shfl_down( dpt[i], 4, 8 ); // add n+4
-        dpt[i] += __shfl_down( dpt[i], 2, 8 ); // add n+2
-        dpt[i] += __shfl_down( dpt[i], 1, 8 ); // add n+1
-        dpt[i]  = __shfl     ( dpt[i], 0, 8 ); // move 0 to all
+        dpt[i] += popsift::shuffle_down( dpt[i], 4, 8 ); // add n+4
+        dpt[i] += popsift::shuffle_down( dpt[i], 2, 8 ); // add n+2
+        dpt[i] += popsift::shuffle_down( dpt[i], 1, 8 ); // add n+1
+        dpt[i]  = popsift::shuffle     ( dpt[i], 0, 8 ); // move 0 to all
     }
 
     __syncthreads();

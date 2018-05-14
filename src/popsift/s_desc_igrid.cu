@@ -64,10 +64,10 @@ void ext_desc_igrid_sub( const float x, const float y, const int level,
 
     /* reduction here */
     for (int i = 0; i < 8; i++) {
-        dpt[i] += __shfl_xor( dpt[i], 1, 16 );
-        dpt[i] += __shfl_xor( dpt[i], 2, 16 );
-        dpt[i] += __shfl_xor( dpt[i], 4, 16 );
-        dpt[i] += __shfl_xor( dpt[i], 8, 16 );
+        dpt[i] += popsift::shuffle_xor( dpt[i], 1, 16 );
+        dpt[i] += popsift::shuffle_xor( dpt[i], 2, 16 );
+        dpt[i] += popsift::shuffle_xor( dpt[i], 4, 16 );
+        dpt[i] += popsift::shuffle_xor( dpt[i], 8, 16 );
     }
 
     if( threadIdx.x < 8 ) {

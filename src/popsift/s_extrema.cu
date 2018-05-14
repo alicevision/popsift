@@ -21,9 +21,9 @@ namespace popsift{
 
 template<int HEIGHT>
 __device__ static inline
-uint32_t extrema_count( int indicator, int* extrema_counter )
+uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
 {
-    uint32_t mask = __ballot( indicator ); // bitfield of warps with results
+    uint32_t mask = popsift::ballot( indicator ); // bitfield of warps with results
 
     int ct = __popc( mask );          // horizontal reduce
 
@@ -34,7 +34,7 @@ uint32_t extrema_count( int indicator, int* extrema_counter )
         write_index = atomicAdd( extrema_counter, ct );
     }
     // broadcast from thread 0 to all threads in warp
-    write_index = __shfl( write_index, 0 );
+    write_index = popsift::shuffle( write_index, 0 );
 
     // this thread's offset: count only bits below the bit of the own
     // thread index; this provides the 0 result and every result up to ct

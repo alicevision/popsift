@@ -10,6 +10,7 @@ OPTION(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code
 OPTION(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 OPTION(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
 OPTION(PopSift_BOOST_USE_STATIC_LIBS "Link with static Boost libraries" OFF)
+OPTION(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
 
 if(PopSift_BOOST_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS ON)
@@ -118,13 +119,22 @@ set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;legacy")
 
 message(STATUS "CUDA Version is ${CUDA_VERSION}")
 message(STATUS "Compiling for CUDA CCs: ${PopSift_CUDA_CC_LIST}")
-if(CUDA_VERSION>=7.5)
-  set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;-warn-lmem-usage")
-  set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;-warn-spills")
-  set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;--warn-on-local-memory-usage")
-  set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;--warn-on-spills")
-else(CUDA_VERSION>=7.5)
-endif(CUDA_VERSION>=7.5)
+if( ( CUDA_VERSION VERSION_EQUAL "7.5" ) OR ( CUDA_VERSION VERSION_GREATER "7.5") )
+  if(PopSift_NVCC_WARNINGS)
+    set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;-warn-lmem-usage")
+    set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;-warn-spills")
+    set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;--warn-on-local-memory-usage")
+    set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;--warn-on-spills")
+  endif(PopSift_NVCC_WARNINGS)
+endif( ( CUDA_VERSION VERSION_EQUAL "7.5" ) OR ( CUDA_VERSION VERSION_GREATER "7.5") )
+
+if( CUDA_VERSION VERSION_GREATER "7.4")
+  set(HAVE_NORMF   1)
+endif( CUDA_VERSION VERSION_GREATER "7.4")
+
+if( ( CUDA_VERSION VERSION_EQUAL "9.0" ) OR ( CUDA_VERSION VERSION_GREATER "9.0") )
+  set(HAVE_SHFL_DOWN_SYNC   1)
+endif( ( CUDA_VERSION VERSION_EQUAL "9.0" ) OR ( CUDA_VERSION VERSION_GREATER "9.0") )
 
 # library required for CUDA dynamic parallelism, forgotten by CMake 3.4
 cuda_find_library_local_first(CUDA_CUDADEVRT_LIBRARY cudadevrt "\"cudadevrt\" library")

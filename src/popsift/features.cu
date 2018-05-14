@@ -17,6 +17,7 @@
 
 #include "features.h"
 #include "sift_extremum.h"
+#include "common/assist.h"
 #include "common/debug_macros.h"
 
 using namespace std;
@@ -188,11 +189,11 @@ l2_in_t0( const float4* lptr, const float4* rptr )
 	        + mval.y * mval.y
 	        + mval.z * mval.z
 	        + mval.w * mval.w;
-    res += __shfl_down( res, 16 );
-    res += __shfl_down( res,  8 );
-    res += __shfl_down( res,  4 );
-    res += __shfl_down( res,  2 );
-    res += __shfl_down( res,  1 );
+    res += shuffle_down( res, 16 );
+    res += shuffle_down( res,  8 );
+    res += shuffle_down( res,  4 );
+    res += shuffle_down( res,  2 );
+    res += shuffle_down( res,  1 );
     return res;
 }
 
