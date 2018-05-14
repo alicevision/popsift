@@ -7,6 +7,7 @@
  */
 #pragma once
 #include "s_desc_normalize.h"
+#include "common/assist.h"
 
 using namespace popsift;
 using namespace std;
@@ -50,13 +51,13 @@ void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, const
 
     float sum = descr.x + descr.y + descr.z + descr.w;
 
-    sum += __shfl_down( sum, 16 );
-    sum += __shfl_down( sum,  8 );
-    sum += __shfl_down( sum,  4 );
-    sum += __shfl_down( sum,  2 );
-    sum += __shfl_down( sum,  1 );
+    sum += popsift::shuffle_down( sum, 16 );
+    sum += popsift::shuffle_down( sum,  8 );
+    sum += popsift::shuffle_down( sum,  4 );
+    sum += popsift::shuffle_down( sum,  2 );
+    sum += popsift::shuffle_down( sum,  1 );
 
-    sum = __shfl( sum,  0 );
+    sum = popsift::shuffle( sum,  0 );
 
     float val;
     val = scalbnf( __fsqrt_rn( __fdividef( descr.x, sum ) ),
