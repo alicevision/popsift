@@ -2,7 +2,7 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
 CUDA_INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 
-CUDA_ADD_LIBRARY(popsift STATIC
+CUDA_ADD_LIBRARY(popsift
 	popsift/popsift.cu popsift/popsift.h
 	popsift/features.cu popsift/features.h
 	popsift/sift_constants.cu popsift/sift_constants.h
