@@ -2,4 +2,5 @@
 
 #cmakedefine HAVE_SHFL_DOWN_SYNC @HAVE_SHFL_DOWN_SYNC@
 #cmakedefine HAVE_NORMF          @HAVE_NORMF@
+#cmakedefine DISABLE_GRID_FILTER @DISABLE_GRID_FILTER@
 

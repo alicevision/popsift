@@ -135,6 +135,11 @@ if( ( CUDA_VERSION VERSION_EQUAL "9.0" ) OR ( CUDA_VERSION VERSION_GREATER "9.0"
   set(HAVE_SHFL_DOWN_SYNC   1)
 endif( ( CUDA_VERSION VERSION_EQUAL "9.0" ) OR ( CUDA_VERSION VERSION_GREATER "9.0") )
 
+if(NOT PopSift_USE_GRID_FILTER)
+  message(STATUS "Disabling grid filter compilation")
+  set(DISABLE_GRID_FILTER   1)
+endif(NOT PopSift_USE_GRID_FILTER)
+
 # library required for CUDA dynamic parallelism, forgotten by CMake 3.4
 cuda_find_library_local_first(CUDA_CUDADEVRT_LIBRARY cudadevrt "\"cudadevrt\" library")
 
@@ -143,11 +148,6 @@ if(PopSift_USE_NVTX_PROFILING)
   cuda_find_library_local_first(CUDA_NVTX_LIBRARY nvToolsExt "NVTX library")
   add_definitions(-DUSE_NVTX)
 endif(PopSift_USE_NVTX_PROFILING)
-
-if(NOT PopSift_USE_GRID_FILTER)
-  message(STATUS "Disabling grid filter compilation")
-  add_definitions(-DDISABLE_GRID_FILTER)
-endif(NOT PopSift_USE_GRID_FILTER)
 
 add_subdirectory(src)
 
