@@ -39,11 +39,11 @@ void horiz( cudaTextureObject_t src_point_texture,
     int shiftval = 0;
     for( int offset=span-1; offset>0; offset-- ) {
         shiftval += 1;
-        const float D1 = __shfl_down( A, shiftval );
-        const float D2 = __shfl_up  ( C, span - shiftval );
+        const float D1 = popsift::shuffle_down( A, shiftval );
+        const float D2 = popsift::shuffle_up  ( C, span - shiftval );
         const float D  = threadIdx.x < (32 - shiftval) ? D1 : D2;
-        const float E1 = __shfl_up  ( B, shiftval );
-        const float E2 = __shfl_down( C, span - shiftval );
+        const float E1 = popsift::shuffle_up  ( B, shiftval );
+        const float E2 = popsift::shuffle_down( C, span - shiftval );
         const float E  = threadIdx.x > shiftval        ? E1 : E2;
         g = filter[offset];
         out += ( D + E ) * g;

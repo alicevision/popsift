@@ -121,7 +121,7 @@ const char* Config::getGaussModeUsage( )
 
 bool Config::getCanFilterExtrema() const
 {
-#if __CUDACC_VER__ >= 80000
+#if __CUDACC_VER_MAJOR__ >= 8
     return true;
 #else
     return false;

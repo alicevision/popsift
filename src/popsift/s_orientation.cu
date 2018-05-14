@@ -16,6 +16,7 @@
 #include "common/excl_blk_prefix_sum.h"
 #include "common/warp_bitonic_sort.h"
 #include "common/debug_macros.h"
+#include "common/assist.h"
 
 #ifdef USE_NVTX
 #include <nvToolsExtCuda.h>
@@ -101,7 +102,7 @@ void ori_par( const int           octave,
     int hy = ymax - ymin + 1;
     int loops = wx * hy;
 
-    for( int i = threadIdx.x; ::__any(i < loops); i += blockDim.x )
+    for( int i = threadIdx.x; popsift::any(i < loops); i += blockDim.x )
     {
         if( i < loops ) {
             int yy = i / wx + ymin;
@@ -179,7 +180,7 @@ void ori_par( const int           octave,
     __shared__ float refined_angle[64];
     __shared__ float yval         [64];
 
-    for( int bin = threadIdx.x; ::__any( bin < ORI_NBINS ); bin += blockDim.x ) {
+    for( int bin = threadIdx.x; popsift::any( bin < ORI_NBINS ); bin += blockDim.x ) {
         const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
         const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
 
@@ -212,7 +213,7 @@ void ori_par( const int           octave,
     // All threads retrieve the yval of thread 0, the largest
     // of all yvals.
     const float best_val = yval[best_index.x];
-    const float yval_ref = 0.8f * __shfl( best_val, 0 );
+    const float yval_ref = 0.8f * popsift::shuffle( best_val, 0 );
     const bool  valid    = ( best_val >= yval_ref );
     bool        written  = false;
 
@@ -229,7 +230,7 @@ void ori_par( const int           octave,
         }
     }
 
-    int angles = __popc( __ballot( written ) );
+    int angles = __popc( popsift::ballot( written ) );
     if( threadIdx.x == 0 ) {
         ext->xpos    = iext->xpos;
         ext->ypos    = iext->ypos;
