@@ -7,6 +7,7 @@
  */
 #include "sift_pyramid.h"
 #include "sift_extremum.h"
+#include "sift_config.h"
 
 #ifdef USE_NVTX
 #include <nvToolsExtCuda.h>
