@@ -8,6 +8,7 @@ OPTION(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
 OPTION(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after every kernel." OFF)
 OPTION(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
 OPTION(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
+OPTION(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -135,6 +136,10 @@ if(NOT PopSift_USE_GRID_FILTER)
 endif(NOT PopSift_USE_GRID_FILTER)
 
 add_subdirectory(src)
+
+if(PopSift_USE_TEST_CMD)
+add_subdirectory(testScripts)
+endif(PopSift_USE_TEST_CMD)
 
 ########### Add uninstall target ###############
 CONFIGURE_FILE(
