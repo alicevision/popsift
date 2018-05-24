@@ -15,6 +15,13 @@
 
 #undef USE_DOG_TEX_LINEAR
 
+#ifdef _MSC_VER
+#define DEPRECATED(func) __declspec(deprecated) func
+#elif defined(__GNUC__) || defined(__clang__)
+#define DEPRECATED(func) func __attribute__ ((deprecated))
+#else
+#endif
+
 namespace popsift
 {
 
@@ -158,8 +165,7 @@ struct Config
      */
     void               setNormMode( NormMode m );
     void               setNormMode( const std::string& m );
-    void               setNormNode( const std::string& m );
-    void               setUseRootSift( bool on ) __attribute__ ((deprecated));
+    DEPRECATED(void    setUseRootSift( bool on ));
     bool               getUseRootSift( ) const;
     NormMode           getNormMode( NormMode m ) const;
     static NormMode    getNormModeDefault( ); // Call this from the constructor.
