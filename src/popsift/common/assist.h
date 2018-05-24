@@ -9,7 +9,12 @@
 
 #include <cuda_runtime.h>
 #include <iostream>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
 #include <pthread.h> // for pthread_self
+#endif
 
 #include "sift_config.h"
 
@@ -75,6 +80,14 @@ float readTex( cudaTextureObject_t tex, float x, float y )
     return tex2D<float>( tex, x+0.5f, y+0.5f );
 }
 
+static size_t getCurrentThreadId()
+{
+#ifdef _WIN32
+    return GetCurrentThreadId();
+#else
+    return pthread_self();
+#endif
+}
 
 /*********************************************************************************
  * For a debug output to cerr with thread ID at the line start
@@ -93,6 +106,34 @@ static inline unsigned int microhash( int val )
                        ^ ( ( val & ( 0xf << 28 ) ) >> 28 ) );
     return ret;
 }
-#define DERR std::cerr << std::hex << popsift::microhash(pthread_self()) << std::dec << "    "
+#define DERR std::cerr << std::hex << popsift::microhash(getCurrentThreadId()) << std::dec << "    "
+
+
+__host__
+static size_t getPageSize()
+{
+#ifdef _WIN32
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return si.dwPageSize;
+#else
+    return sysconf(_SC_PAGESIZE);
+#endif
+}
+
+static void* memalign(size_t alignment, size_t size)
+{
+#ifdef _WIN32
+    return _aligned_malloc(size, alignment);
+#else
+    void* ret;
+    int err = posix_memalign( &ret, alignment, size );
+    if( err != 0 ) {
+        errno = err;
+        ret = 0;
+    }
+    return ret;
+#endif
+}
 
 }; // namespace popsift

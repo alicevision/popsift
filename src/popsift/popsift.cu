@@ -6,7 +6,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include <fstream>
-#include <pthread.h> // for pthread_self
 
 #include "sift_constants.h"
 #include "popsift.h"

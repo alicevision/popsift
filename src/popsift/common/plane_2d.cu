@@ -20,6 +20,7 @@
 #include <cuda_runtime.h>
 
 #include "plane_2d.h"
+#include "assist.h"
 #include "debug_macros.h"
 
 using namespace std;
@@ -46,18 +47,6 @@ void PlaneBase::freeDev2D( void* data )
 }
 
 __host__
-static long GetPageSize()
-{
-#ifdef _WIN32
-    SYSTEM_INFO si;
-    GetSystemInfo(&si);
-    return si.dwPageSize;
-#else
-    return sysconf(_SC_PAGESIZE);
-#endif
-}
-
-__host__
 void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
 {
     int sz = w * h * elemSize;
@@ -78,15 +67,9 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
              << "    Cause: " << buf << endl;
         exit( -1 );
     } else if( m == PageAligned ) {
-        void* ptr;
-
-#ifdef _WIN32
-        ptr = _aligned_malloc(sz, GetPageSize());
-        if (ptr) return ptr;
-#else
-        int retval = posix_memalign( &ptr, GetPageSize(), sz );
-        if( retval == 0 ) return ptr;
-#endif
+        void* ptr = memalign(getPageSize(), sz);
+        if(ptr)
+            return ptr;
 
 #ifdef _GNU_SOURCE
         char b[100];
