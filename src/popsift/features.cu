@@ -7,10 +7,7 @@
  */
 #include <iomanip>
 #include <iostream>
-#include <unistd.h>
-#ifndef __APPLE__
-#include <malloc.h>
-#endif
+
 #include <stdlib.h>
 #include <errno.h>
 #include <math_constants.h>
@@ -58,25 +55,12 @@ FeaturesHost::~FeaturesHost( )
     free( _ori );
 }
 
-#ifdef __APPLE__
-static void* memalign( size_t alignment, size_t size )
-{
-    void* ret;
-    int err = posix_memalign( &ret, alignment, size );
-    if( err != 0 ) {
-        errno = err;
-        ret = 0;
-    }
-    return ret;
-}
-#endif
-
 void FeaturesHost::reset( int num_ext, int num_ori )
 {
     if( _ext != 0 ) { free( _ext ); _ext = 0; }
     if( _ori != 0 ) { free( _ori ); _ori = 0; }
 
-    _ext = (Feature*)memalign( sysconf(_SC_PAGESIZE), num_ext * sizeof(Feature) );
+    _ext = (Feature*)memalign( getPageSize(), num_ext * sizeof(Feature) );
     if( _ext == 0 ) {
         cerr << __FILE__ << ":" << __LINE__ << " Runtime error:" << endl
              << "    Failed to (re)allocate memory for downloading " << num_ext << " features" << endl;
@@ -84,7 +68,7 @@ void FeaturesHost::reset( int num_ext, int num_ori )
         if( errno == ENOMEM ) cerr << "    Not enough memory." << endl;
         exit( -1 );
     }
-    _ori = (Descriptor*)memalign( sysconf(_SC_PAGESIZE), num_ori * sizeof(Descriptor) );
+    _ori = (Descriptor*)memalign( getPageSize(), num_ori * sizeof(Descriptor) );
     if( _ori == 0 ) {
         cerr << __FILE__ << ":" << __LINE__ << " Runtime error:" << endl
              << "    Failed to (re)allocate memory for downloading " << num_ori << " descriptors" << endl;

@@ -25,6 +25,7 @@
 
 using namespace popsift;
 
+__device__
 static const float stepbase =  - 2.5f + 1.0f / 16.0f;
 
 __device__ static inline
