@@ -22,6 +22,7 @@ before_build:
     - ls -l
 
 build:
+  verbosity: detailed
   project: $(APPVEYOR_BUILD_FOLDER)\build\PopSift.sln
   parallel: true
 
