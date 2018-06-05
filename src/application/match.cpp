@@ -151,12 +151,17 @@ static void collectFilenames( list<string>& inputFiles, const boost::filesystem:
     std::copy( boost::filesystem::directory_iterator( inputFile ),
                boost::filesystem::directory_iterator(),
                std::back_inserter(vec) );
-    for( auto it = vec.begin(); it!=vec.end(); it++ ) {
-        if( boost::filesystem::is_regular_file( *it ) ) {
-            string s( it->c_str() );
-            inputFiles.push_back( s );
-        } else if( boost::filesystem::is_directory( *it ) ) {
-            collectFilenames( inputFiles, *it );
+    for (const auto& currPath : vec)
+    {
+        if( boost::filesystem::is_regular_file(currPath) )
+        {
+//            string s(it.c_str() );
+//            inputFiles.push_back( s );
+            inputFiles.push_back( currPath.string() );
+
+        } else if( boost::filesystem::is_directory(currPath) )
+        {
+            collectFilenames( inputFiles, currPath);
         }
     }
 }
