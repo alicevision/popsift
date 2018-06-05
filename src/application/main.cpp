@@ -159,8 +159,6 @@ static void collectFilenames( list<string>& inputFiles, const boost::filesystem:
     {
         if( boost::filesystem::is_regular_file(currPath) )
         {
-//            string s(it.c_str() );
-//            inputFiles.push_back( s );
             inputFiles.push_back( currPath.string() );
         }
         else if( boost::filesystem::is_directory(currPath) )
