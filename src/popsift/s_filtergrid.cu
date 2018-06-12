@@ -18,7 +18,7 @@
 
 using namespace std;
 
-#if not defined(DISABLE_GRID_FILTER)
+#if not POPSIFT_IS_DEFINED(POPSIFT_DISABLE_GRID_FILTER)
 
 #include <thrust/device_vector.h>
 #include <thrust/sequence.h>

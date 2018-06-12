@@ -129,19 +129,23 @@ if( ( CUDA_VERSION VERSION_EQUAL "7.5" ) OR ( CUDA_VERSION VERSION_GREATER "7.5"
   endif()
 endif()
 
-if(PopSift_USE_NORMF)
-  if( CUDA_VERSION VERSION_GREATER "7.4")
-    set(HAVE_NORMF   1)
-  endif()
+if(PopSift_USE_NORMF AND CUDA_VERSION VERSION_GREATER "7.4")
+  set(HAVE_NORMF   1)
+else()
+  set(HAVE_NORMF   0)
 endif()
 
 if( ( CUDA_VERSION VERSION_EQUAL "9.0" ) OR ( CUDA_VERSION VERSION_GREATER "9.0") )
   set(HAVE_SHFL_DOWN_SYNC   1)
+else()
+  set(HAVE_SHFL_DOWN_SYNC   0)
 endif()
 
 if(NOT PopSift_USE_GRID_FILTER)
   message(STATUS "Disabling grid filter compilation")
   set(DISABLE_GRID_FILTER   1)
+else()
+  set(DISABLE_GRID_FILTER   0)
 endif()
 
 # library required for CUDA dynamic parallelism, forgotten by CMake 3.4

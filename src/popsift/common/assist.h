@@ -26,7 +26,7 @@ std::ostream& operator<<( std::ostream& ostr, const dim3& p );
 /*
  * Assistance with compatibility-breaking builtin function changes
  */
-#ifdef HAVE_SHFL_DOWN_SYNC
+#if POPSIFT_IS_DEFINED(POPSIFT_HAVE_SHFL_DOWN_SYNC)
 template<typename T> __device__ inline T shuffle     ( T variable, int src   ) { return __shfl_sync     ( 0xffffffff, variable, src   ); }
 template<typename T> __device__ inline T shuffle_up  ( T variable, int delta ) { return __shfl_up_sync  ( 0xffffffff, variable, delta ); }
 template<typename T> __device__ inline T shuffle_down( T variable, int delta ) { return __shfl_down_sync( 0xffffffff, variable, delta ); }
