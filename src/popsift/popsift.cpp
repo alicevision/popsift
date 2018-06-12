@@ -7,14 +7,9 @@
  */
 #include <fstream>
 
-#include "sift_constants.h"
 #include "popsift.h"
 #include "gauss_filter.h"
-#include "common/write_plane_2d.h"
 #include "sift_pyramid.h"
-#include "sift_extremum.h"
-#include "common/assist.h"
-#include "features.h"
 
 using namespace std;
 

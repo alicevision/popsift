@@ -3,7 +3,7 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 CUDA_INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}/popsift)
 
 CUDA_ADD_LIBRARY(popsift
-	popsift/popsift.cu popsift/popsift.h
+	popsift/popsift.cpp popsift/popsift.h
 	popsift/features.cu popsift/features.h
 	popsift/sift_constants.cu popsift/sift_constants.h
 	popsift/sift_conf.cu popsift/sift_conf.h
