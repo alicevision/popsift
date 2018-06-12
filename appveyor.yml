@@ -11,15 +11,16 @@ configuration:
 install:
     - cmd: >-
           call cudaInstallAppveyor.cmd
-#    - vcpkg update
-#    - vcpkg install --featurepackages boost-system:x64-windows boost-program-options:x64-windows boost-thread:x64-windows boost-filesystem:x64-windows
-#    - vcpkg install --featurepackages devil:x64-windows
+    - vcpkg upgrade --no-dry-run
+    - vcpkg install
+          boost-system boost-program-options boost-thread boost-filesystem
+          --triplet %PLATFORM%-windows
+          # devil
 
 before_build:
     - md build
     - cd build
-#    - cmake -G "Visual Studio 14 2015" -A x64 -T v140,host=x64 -DPopSift_BUILD_EXAMPLES:BOOL=OFF -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_TOOLCHAIN_FILE=c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake ..
-    - cmake -G "Visual Studio 14 2015" -A x64 -T v140,host=x64 -DPopSift_BUILD_EXAMPLES:BOOL=ON -DCMAKE_BUILD_TYPE=%configuration% -DBOOST_ROOT:PATH=C:\Libraries\boost_1_66_0 -DCMAKE_TOOLCHAIN_FILE=c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake ..
+    - cmake -G "Visual Studio 14 2015" -A x64 -T v140,host=x64 -DPopSift_BUILD_EXAMPLES:BOOL=OFF -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_TOOLCHAIN_FILE=c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake ..
     - ls -l
 
 build:
