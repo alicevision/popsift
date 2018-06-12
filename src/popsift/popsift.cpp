@@ -105,8 +105,7 @@ bool PopSift::private_init( int w, int h )
     }
 
     if( _config.octaves < 0 ) {
-        int oct = _config.octaves;
-        oct = max(int (floor( logf( (float)min( w, h ) )
+        int oct = max(int (floor( logf( (float)min( w, h ) )
                             / logf( 2.0f ) ) - 3.0f + scaleFactor ), 1);
         _config.octaves = oct;
     }
@@ -201,11 +200,9 @@ void PopSift::extractDownloadLoop( )
 
         bool log_to_file = ( _config.getLogMode() == popsift::Config::All );
         if( log_to_file ) {
-            int octaves = p._pyramid->getNumOctaves();
-
+            // int octaves = p._pyramid->getNumOctaves();
             // for( int o=0; o<octaves; o++ ) { p._pyramid->download_descriptors( _config, o ); }
-
-            int levels  = p._pyramid->getNumLevels();
+            // int levels  = p._pyramid->getNumLevels();
 
             p._pyramid->download_and_save_array( "pyramid" );
             p._pyramid->save_descriptors( _config, features, "pyramid" );
