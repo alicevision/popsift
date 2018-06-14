@@ -13,7 +13,7 @@ else()
 endif()
 
 find_package(Boost 1.53.0 REQUIRED COMPONENTS program_options system filesystem)
-find_package(DevIL REQUIRED COMPONENTS IL ILU) # yields IL_FOUND, IL_LIBRARIES, IL_INCLUDE_DIR
+find_package(DevIL COMPONENTS IL ILU) # yields IL_FOUND, IL_LIBRARIES, IL_INCLUDE_DIR
 
 set(PD_INCLUDE_DIRS    ${Boost_INCLUDE_DIRS})
 set(PD_LINK_LIBS       ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
@@ -24,7 +24,7 @@ if(IL_FOUND OR DevIL_FOUND)
   list(APPEND PD_INCLUDE_DIRS ${IL_INCLUDE_DIR})
   list(APPEND PD_LINK_LIBS    ${IL_LIBRARIES} ${ILU_LIBRARIES})
 else()
-  message(STATUS "DevIL not found")
+  message(WARNING "DevIL not found -- Falling back to pgmread")
   set(PD_COMPILE_OPTIONS "" )
 endif()
 

@@ -50,7 +50,7 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
     float4 descr;
     descr = ptr4[threadIdx.x];
 
-#ifdef HAVE_NORMF
+#if POPSIFT_IS_DEFINED(POPSIFT_HAVE_NORMF)
     // normf() is an elegant function: sqrt(sum_0^127{v^2})
     // It exists from CUDA 7.5 but the trouble with CUB on the GTX 980 Ti forces
     // us to with CUDA 7.0 right now
