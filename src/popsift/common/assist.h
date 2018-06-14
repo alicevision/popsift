@@ -13,7 +13,7 @@
 #include <windows.h>
 #else
 #include <unistd.h>
-#include <pthread.h> // for pthread_self
+#include <thread>
 #endif
 
 #include "sift_config.h"
@@ -80,13 +80,9 @@ float readTex( cudaTextureObject_t tex, float x, float y )
     return tex2D<float>( tex, x+0.5f, y+0.5f );
 }
 
-static size_t getCurrentThreadId()
+inline std::thread::id getCurrentThreadId()
 {
-#ifdef _WIN32
-    return GetCurrentThreadId();
-#else
-    return pthread_self();
-#endif
+    return std::this_thread::get_id();
 }
 
 /*********************************************************************************
@@ -106,6 +102,13 @@ static inline unsigned int microhash( int val )
                        ^ ( ( val & ( 0xf << 28 ) ) >> 28 ) );
     return ret;
 }
+
+static inline unsigned int microhash( const std::thread::id& id )
+{
+    std::hash<std::thread::id> hasher;
+    return microhash( hasher(id) );
+}
+
 #define DERR std::cerr << std::hex << popsift::microhash(getCurrentThreadId()) << std::dec << "    "
 
 
