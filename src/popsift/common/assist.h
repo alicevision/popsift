@@ -9,11 +9,11 @@
 
 #include <cuda_runtime.h>
 #include <iostream>
+#include <thread>
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <unistd.h>
-#include <thread>
 #endif
 
 #include "sift_config.h"
