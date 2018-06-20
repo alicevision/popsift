@@ -16,8 +16,6 @@
 #define nvtxRangePop()
 #endif
 
-using namespace std;
-
 #if not POPSIFT_IS_DEFINED(POPSIFT_DISABLE_GRID_FILTER)
 
 #include <thrust/device_vector.h>
