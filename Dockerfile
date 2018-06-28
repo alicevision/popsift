@@ -10,8 +10,6 @@
 ARG CUDA_TAG=9.2-devel
 FROM nvidia/cuda:$CUDA_TAG
 
-ARG		PYTHON
-
 # OS/Version (FILE): cat /etc/issue.net
 # Cuda version (ENV): $CUDA_VERSION
 
