@@ -35,5 +35,6 @@ RUN apt-get clean && apt-get update && apt-get install -y --no-install-recommend
         libboost-thread-dev \
  && rm -rf /var/lib/apt/lists/*
 
-RUN cd /opt/popsift && mkdir build && cd build && cmake .. && make install -j8
 COPY . /opt/popsift
+WORKDIR /opt/popsift
+RUN mkdir build && cd build && cmake .. && make install -j
