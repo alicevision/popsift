@@ -15,7 +15,7 @@ FROM nvidia/cuda:$CUDA_TAG
 # Cuda version (ENV): $CUDA_VERSION
 
 # System update
-RUN apt-get clean && apt-get update && apt-get install -y \
+RUN apt-get clean && apt-get update && apt-get install -y --no-install-recommends\
 				build-essential \
 				cmake \
 				git \
