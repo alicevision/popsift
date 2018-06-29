@@ -38,4 +38,4 @@ RUN apt-get clean && apt-get update && apt-get install -y --no-install-recommend
 
 COPY . /opt/popsift
 WORKDIR /opt/popsift
-RUN mkdir build && cd build && cmake .. && make install -j
+RUN mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make install -j
