@@ -32,7 +32,8 @@ RUN apt-get clean && apt-get update && apt-get install -y --no-install-recommend
         libboost-filesystem-dev \
         libboost-system-dev \
         libboost-program-options-dev \
-        libboost-thread-dev
+        libboost-thread-dev \
+ && rm -rf /var/lib/apt/lists/*
 
 ADD . /opt/popsift
 RUN cd /opt/popsift && mkdir build && cd build && cmake .. && make install -j8
