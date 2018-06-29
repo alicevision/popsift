@@ -7,6 +7,7 @@
 # then execute with nvidia docker (https://github.com/nvidia/nvidia-docker/wiki/Installation-(version-2.0))
 # docker run -it --runtime=nvidia popsift
 
+LABEL maintainer="AliceVision Team alicevision@googlegroups.com"
 ARG CUDA_TAG=9.2-devel
 FROM nvidia/cuda:$CUDA_TAG
 
