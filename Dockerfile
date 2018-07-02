@@ -17,18 +17,18 @@ LABEL maintainer="AliceVision Team alicevision@googlegroups.com"
 
 # System update
 RUN apt-get clean && apt-get update && apt-get install -y --no-install-recommends\
-				build-essential \
-				cmake \
-				git \
-				wget \
-				unzip \
-				yasm \
-				pkg-config \
-				libtool \
-				nasm \
-				automake \
-				libpng12-dev \
-				libjpeg-turbo8-dev \
+        build-essential \
+        cmake \
+        git \
+        wget \
+        unzip \
+        yasm \
+        pkg-config \
+        libtool \
+        nasm \
+        automake \
+        libpng12-dev \
+        libjpeg-turbo8-dev \
         libdevil-dev \
         libboost-filesystem-dev \
         libboost-system-dev \
@@ -37,5 +37,5 @@ RUN apt-get clean && apt-get update && apt-get install -y --no-install-recommend
  && rm -rf /var/lib/apt/lists/*
 
 COPY . /opt/popsift
-WORKDIR /opt/popsift
-RUN mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make install -j
+WORKDIR /opt/popsift/build
+RUN cmake .. -DCMAKE_BUILD_TYPE=Release && make install -j
