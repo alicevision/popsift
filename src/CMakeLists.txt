@@ -58,7 +58,7 @@ set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 
 # cannot use PRIVATE here as there is a bug in FindCUDA and CUDA_ADD_LIBRARY
 # https://gitlab.kitware.com/cmake/cmake/issues/16097
-target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
+target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
 
 
 # EXPORTING THE LIBRARY
