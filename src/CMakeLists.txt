@@ -126,5 +126,6 @@ install(EXPORT "${targets_export_name}"
 
 if(PopSift_BUILD_EXAMPLES)
   add_subdirectory(application)
+  add_subdirectory(cgtuebingen_pqt)
 endif()
 
