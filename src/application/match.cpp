@@ -38,13 +38,16 @@
 
 using namespace std;
 
-static bool print_dev_info  = false;
-static bool print_time_info = false;
-static bool write_as_uchar  = false;
-static bool dont_write      = false;
-static bool pgmread_loading = false;
+static bool print_dev_info   = false;
+static bool print_time_info  = false;
+static bool write_as_uchar   = false;
+static bool dont_write       = false;
+static bool pgmread_loading  = false;
+static bool left_file_descs  = false;
+static bool right_file_descs = false;
 
-static void parseargs(int argc, char** argv, popsift::Config& config, string& lFile, string& rFile) {
+static void parseargs(int argc, char** argv, popsift::Config& config, string& lFile, string& rFile)
+{
     using namespace boost::program_options;
 
     options_description options("Options");
@@ -55,7 +58,10 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
             ("log", bool_switch()->notifier([&](bool i) {if(i) config.setLogMode(popsift::Config::All); }), "Write debugging files")
 
             ("left,l",  value<std::string>(&lFile)->required(), "\"Left\"  input file")
-            ("right,r", value<std::string>(&rFile)->required(), "\"Right\" input file");
+            ("right,r", value<std::string>(&rFile)->required(), "\"Right\" input file")
+            ("left-descfile", bool_switch()->notifier([&](bool i) {if(i) left_file_descs=true; }), "Left input file contains descriptors instead of image")
+            ("right-descfile", bool_switch()->notifier([&](bool i) {if(i) right_file_descs=true; }), "Right input file contains descriptors instead of image")
+            ;
     
     }
     options_description parameters("Parameters");
@@ -254,16 +260,48 @@ int main(int argc, char **argv)
 
     PopSift PopSift( config, popsift::Config::MatchingMode );
 
-    SiftJob* lJob = process_image( lFile, PopSift );
-    SiftJob* rJob = process_image( rFile, PopSift );
+    popsift::FeaturesDev* lFeatures;
+    popsift::FeaturesDev* rFeatures;
 
-    popsift::FeaturesDev* lFeatures = lJob->getDev();
-    cout << "Number of features:    " << lFeatures->getFeatureCount() << endl;
-    cout << "Number of descriptors: " << lFeatures->getDescriptorCount() << endl;
+    if( left_file_descs )
+    {
+        popsift::FeaturesHost features;
+        std::ifstream descstream( lFile );
+        if( !descstream.is_open() )
+        {
+            cerr << "failed to open left file " << lFile << endl;
+            exit( -1 );
+        }
+        features.readBinary( descstream );
+        lFeatures = features.toDevice();
+    }
+    else
+    {
+        SiftJob* lJob = process_image( lFile, PopSift );
+        lFeatures = lJob->getDev();
+    }
+    cerr << "Number of left  features:    " << lFeatures->getFeatureCount() << endl;
+    cerr << "Number of left  descriptors: " << lFeatures->getDescriptorCount() << endl;
 
-    popsift::FeaturesDev* rFeatures = rJob->getDev();
-    cout << "Number of features:    " << rFeatures->getFeatureCount() << endl;
-    cout << "Number of descriptors: " << rFeatures->getDescriptorCount() << endl;
+    if( right_file_descs )
+    {
+        popsift::FeaturesHost features;
+        std::ifstream descstream( rFile );
+        if( !descstream.is_open() )
+        {
+            cerr << "failed to open right file " << lFile << endl;
+            exit( -1 );
+        }
+        features.readBinary( descstream );
+        rFeatures = features.toDevice();
+    }
+    else
+    {
+        SiftJob* rJob = process_image( rFile, PopSift );
+        rFeatures = rJob->getDev();
+    }
+    cerr << "Number of right features:    " << rFeatures->getFeatureCount() << endl;
+    cerr << "Number of right descriptors: " << rFeatures->getDescriptorCount() << endl;
 
     lFeatures->match( rFeatures );
 

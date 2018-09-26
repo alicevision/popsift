@@ -286,6 +286,70 @@ bool FeaturesHost::readBinary( std::istream& ostr )
     return true;
 }
 
+__global__
+void fix_descriptor_pointers( Feature*    features,
+                              int         feature_count,
+                              Descriptor* old_base_ptr,
+                              Descriptor* new_base_ptr )
+{
+    const int idx = blockIdx.x * 32 + threadIdx.x;
+    if( idx > feature_count ) return;
+    Feature& f = features[idx];
+    for( int ori=0; ori<f.num_ori; ori++ )
+    {
+        f.desc[ori] = (Descriptor*)( (char*)(f.desc[ori]) - (char*)(old_base_ptr) + (char*)(new_base_ptr) );
+    }
+}
+
+__global__
+void fix_reverse_map( Feature*    features,
+                      int         feature_count,
+                      Descriptor* desc_base,
+                      int*        reverseMap )
+{
+    const int idx = blockIdx.x * 32 + threadIdx.x;
+    if( idx > feature_count ) return;
+    Feature& f = features[idx];
+    for( int ori=0; ori<f.num_ori; ori++ )
+    {
+        
+        Descriptor* desc_this = f.desc[ori];
+        int offset = desc_this - desc_base;
+        reverseMap[offset] = idx;
+    }
+}
+
+FeaturesDev* FeaturesHost::toDevice()
+{
+    FeaturesDev* dev_features = new FeaturesDev( getFeatureCount(), getDescriptorCount() );
+    pin();
+    popcuda_memcpy_sync( dev_features->getFeatures(),
+                         getFeatures(),
+                         getFeatureCount() * sizeof(Feature),
+                         cudaMemcpyHostToDevice );
+
+    popcuda_memcpy_sync( dev_features->getDescriptors(),
+                         getDescriptors(),
+                         getDescriptorCount() * sizeof(Descriptor),
+                         cudaMemcpyHostToDevice );
+    unpin();
+    
+    dim3 grid( grid_divide( getFeatureCount(), 32 ) );
+    fix_descriptor_pointers
+        <<<grid,32>>>
+        ( dev_features->getFeatures(),
+          getFeatureCount(),
+          getDescriptors(),
+          dev_features->getDescriptors() );
+    fix_reverse_map
+        <<<grid,32>>>
+        ( dev_features->getFeatures(),
+          dev_features->getFeatureCount(),
+          dev_features->getDescriptors(),
+          dev_features->getReverseMap() );
+    return dev_features;
+}
+
 std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature )
 {
     feature.print( ostr, false );

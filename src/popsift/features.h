@@ -15,6 +15,7 @@
 namespace popsift {
 
 struct Descriptor; // float features[128];
+class FeaturesDev;
 
 /* This is a data structure that is returned to a calling program.
  * The xpos/ypos information in feature is scale-adapted.
@@ -100,6 +101,8 @@ public:
 
     // Read binary data from disc again, only for debug purposes
     void debugCompareBinary( std::istream& verify, bool write_as_uchar ) const;
+
+    FeaturesDev* toDevice();
 
 protected:
     friend class Pyramid;
