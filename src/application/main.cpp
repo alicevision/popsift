@@ -44,6 +44,8 @@ static bool write_as_uchar  = false;
 static bool dont_write      = false;
 static bool pgmread_loading = false;
 static bool float_mode      = false;
+static bool binary_writing  = false;
+static bool ascii_writing   = true;
 
 static void parseargs(int argc, char** argv, popsift::Config& config, string& inputFile) {
     using namespace boost::program_options;
@@ -55,8 +57,10 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
             ("verbose,v", bool_switch()->notifier([&](bool i) {if(i) config.setVerbose(); }), "")
             ("log,l", bool_switch()->notifier([&](bool i) {if(i) config.setLogMode(popsift::Config::All); }), "Write debugging files")
 
-            ("input-file,i", value<std::string>(&inputFile)->required(), "Input file");
-    
+            ("input-file,i", value<std::string>(&inputFile)->required(), "Input file")
+            ("write-ascii,a", value<bool>()->notifier([&](bool i) {ascii_writing=i;}), "Write descriptors in ASCII mode")
+            ("write-binary,b", value<bool>()->notifier([&](bool i) {binary_writing=i;}), "Write descriptors in binary mode")
+            ;
     }
     options_description parameters("Parameters");
     {
@@ -253,8 +257,24 @@ void read_job( SiftJob* job, bool really_write )
     if( really_write ) {
         nvtxRangePushA( "Writing features to disk" );
 
-        std::ofstream of( "output-features.txt" );
-        feature_list->print( of, write_as_uchar );
+        if( binary_writing )
+        {
+            std::ofstream of( "output-features.bin" );
+            feature_list->writeBinary( of, write_as_uchar );
+            of.close();
+#if 0
+            // for debugging of binary writing purposes only
+            std::ifstream verify( "output-features.bin" );
+            feature_list->debugCompareBinary( verify, write_as_uchar );
+            verify.close();
+#endif
+        }
+
+        if( ascii_writing )
+        {
+            std::ofstream of( "output-features.txt" );
+            feature_list->print( of, write_as_uchar );
+        }
     }
     delete feature_list;
 

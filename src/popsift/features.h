@@ -31,6 +31,8 @@ struct Feature
     Descriptor* desc[ORIENTATION_MAX_COUNT];
 
     void print( std::ostream& ostr, bool write_as_uchar ) const;
+    void writeBinaryKeypoint( std::ostream& ostr ) const;
+    int  writeBinaryDescriptor( std::ostream& ostr, bool write_as_uchar ) const;
 };
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
@@ -87,7 +89,17 @@ public:
     inline Feature*    getFeatures()    { return _ext; }
     inline Descriptor* getDescriptors() { return _ori; }
 
+    // write to ostream in human-readable ASCII form
     void print( std::ostream& ostr, bool write_as_uchar ) const;
+
+    // write to ostream in binary form (with ASCII header)
+    void writeBinary( std::ostream& ostr, bool write_as_uchar ) const;
+
+    // read from istream in binary form (with ASCII header)
+    bool readBinary( std::istream& ostr );
+
+    // Read binary data from disc again, only for debug purposes
+    void debugCompareBinary( std::istream& verify, bool write_as_uchar ) const;
 
 protected:
     friend class Pyramid;

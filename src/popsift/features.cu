@@ -7,6 +7,7 @@
  */
 #include <iomanip>
 #include <iostream>
+#include <fstream>
 
 #include <stdlib.h>
 #include <errno.h>
@@ -113,6 +114,176 @@ void FeaturesHost::print( std::ostream& ostr, bool write_as_uchar ) const
     for( int i=0; i<size(); i++ ) {
         _ext[i].print( ostr, write_as_uchar );
     }
+}
+
+void FeaturesHost::writeBinary( std::ostream& ostr, bool write_as_uchar ) const
+{
+    if( write_as_uchar )
+    {
+        ostr << "1 # writes descriptor as 128 uchars" << std::endl;
+    }
+    else
+    {
+        ostr << "0 # writes descriptor as 128 floats" << std::endl;
+    }
+
+    uint32_t num = getDescriptorCount();
+
+    ostr << num << " # number of descriptors" << std::endl;
+
+    for( int i=0; i<size(); i++ )
+    {
+        _ext[i].writeBinaryKeypoint( ostr );
+    }
+    int descriptors_written = 0;
+    for( int i=0; i<size(); i++ )
+    {
+        descriptors_written += _ext[i].writeBinaryDescriptor( ostr, write_as_uchar );
+    }
+    std::cerr << "Written " << descriptors_written << " descriptors" << std::endl;
+}
+
+void FeaturesHost::debugCompareBinary( std::istream& verify, bool write_as_uchar ) const
+{
+    FeaturesHost dummy;
+    dummy.readBinary( verify );
+    if( getDescriptorCount() == dummy.getDescriptorCount() )
+    {
+        int read_ori_idx  = 0;
+        int read_desc_idx = 0;
+
+        for( int desc=0; desc<getDescriptorCount(); desc++ )
+        {
+            if( _ext[read_ori_idx].xpos != dummy._ext[desc].xpos )
+            {
+                std::cerr << "Written xpos bad on re-reading: "
+                          << _ext[read_ori_idx].xpos << " vs " << dummy._ext[desc].xpos
+                          << " for descriptor #" << desc
+                          << std::endl;
+                return;
+            }
+
+            if( _ext[read_ori_idx].ypos != dummy._ext[desc].ypos )
+            {
+                std::cerr << "Written ypos bad on re-reading: "
+                          << _ext[read_ori_idx].ypos << " vs " << dummy._ext[desc].ypos
+                          << " for descriptor #" << desc
+                          << std::endl;
+                return;
+            }
+
+            if( _ext[read_ori_idx].sigma != dummy._ext[desc].sigma )
+            {
+                std::cerr << "Written sigma bad on re-reading: "
+                          << _ext[read_ori_idx].sigma << " vs " << dummy._ext[desc].sigma
+                          << " for descriptor #" << desc
+                          << std::endl;
+                return;
+            }
+
+            if( _ext[read_ori_idx].orientation[read_desc_idx] != dummy._ext[desc].orientation[0] )
+            {
+                std::cerr << "Written orientation bad on re-reading: "
+                          << _ext[read_ori_idx].orientation[read_desc_idx] << " vs " << dummy._ext[desc].orientation[0]
+                          << " for descriptor #" << desc
+                          << std::endl;
+                return;
+            }
+
+            read_desc_idx++;
+            if( read_desc_idx >= _ext[read_ori_idx].num_ori )
+            {
+                read_ori_idx++;
+                read_desc_idx = 0;
+            }
+        }
+
+        for( int desc=0; desc<getDescriptorCount(); desc++ )
+        {
+            for( int d=0; d<128; d++ )
+            {
+                float actual = _ori[desc].features[d];
+                float reread = dummy._ori[desc].features[d];
+                if( write_as_uchar )
+                {
+                    actual = (unsigned char)roundf(actual);
+                }
+
+                if( actual != reread )
+                {
+                    std::cerr << "Difference in descriptor " << desc << " dim " << d << ": "
+                              << actual << " vs " << reread
+                              << std::endl;
+                    break;
+                }
+            }
+        }
+    }
+    else
+    {
+        std::cerr << "Wrote " << getDescriptorCount() << " descriptors, reading " << dummy.getDescriptorCount() << std::endl;
+    }
+}
+
+bool FeaturesHost::readBinary( std::istream& ostr )
+{
+    bool written_as_uchar = false;
+    int  num_descriptors  = 0;
+
+    {
+        char buffer[1024];
+        ostr.getline( buffer, 1024 );
+        written_as_uchar = ( buffer[0] == '1' );
+        ostr >> num_descriptors;
+        ostr.getline( buffer, 1024 ); // read rest of line and discard
+    }
+
+    if( num_descriptors <= 0 )
+    {
+        return false;
+    }
+
+    reset( num_descriptors, num_descriptors ); // descriptors written multiple times
+
+    for( int i=0; i<num_descriptors; i++ )
+    {
+        float desc[4];
+        ostr.read( (char*)desc, 4*sizeof(float) );
+        _ext[i].debug_octave   = 0;
+        _ext[i].xpos           = desc[0];
+        _ext[i].ypos           = desc[1];
+        _ext[i].sigma          = desc[2];
+        _ext[i].num_ori        = 1;
+        _ext[i].orientation[0] = desc[3];
+        _ext[i].desc[0]        = &_ori[i];
+    }
+
+    if( written_as_uchar )
+    {
+        std::cerr << "Reading " << num_descriptors << " uchar descriptors" << std::endl;
+        unsigned char* v = new unsigned char[128 * num_descriptors];
+        unsigned char* vit = v;
+        ostr.read( (char*)v, 128 * num_descriptors * sizeof(unsigned char) );
+        for( int i=0; i<num_descriptors; i++ )
+        {
+            for( int d=0; d<128; d++ )
+            {
+                _ori[i].features[d] = *vit;
+                vit++;
+            }
+        }
+        delete [] v;
+    }
+    else
+    {
+        std::cerr << "Reading " << num_descriptors << " float descriptors" << std::endl;
+
+        // Descriptor contains only features[128], linear read should be equivalent to
+        // for( int i=0; i<num_descriptors; i++ ) ostr.read( (char*)(_ori[i].features), 128 * sizeof(float) );
+        ostr.read( (char*)(_ori[0].features), 128 * num_descriptors * sizeof(float) );
+    }
+
+    return true;
 }
 
 std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature )
@@ -241,9 +412,9 @@ show_distance( int3*       match_matrix,
         const float4* lptr  = (const float4*)( &l_ori[i] );
         const float4* rptr1 = (const float4*)( &r_ori[match_matrix[i].x] );
         const float4* rptr2 = (const float4*)( &r_ori[match_matrix[i].y] );
-	float d1 = l2_in_t0( lptr, rptr1 );
-	float d2 = l2_in_t0( lptr, rptr2 );
-	if( threadIdx.x == 0 )
+        float d1 = l2_in_t0( lptr, rptr1 );
+        float d2 = l2_in_t0( lptr, rptr2 );
+        if( threadIdx.x == 0 )
         {
             if( match_matrix[i].z )
                 printf( "accept feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f\n",
@@ -327,6 +498,44 @@ void Feature::print( std::ostream& ostr, bool write_as_uchar ) const
     }
 }
 
+void Feature::writeBinaryKeypoint( std::ostream& ostr ) const
+{
+    float keypoint[4];
+    keypoint[0] = xpos;
+    keypoint[1] = ypos;
+    keypoint[2] = sigma;
+
+    for( int ori=0; ori<num_ori; ori++ )
+    {
+        keypoint[3] = orientation[ori];
+        ostr.write( (const char*)keypoint, 4*sizeof(float) );
+    }
+}
+
+int Feature::writeBinaryDescriptor( std::ostream& ostr, bool write_as_uchar ) const
+{
+    int descriptors_written = 0;
+    for( int ori=0; ori<num_ori; ori++ )
+    {
+        if( write_as_uchar )
+        {
+            unsigned char buffer[128];
+            for( int i=0; i<128; i++ )
+            {
+                buffer[i] = (unsigned char)( roundf(desc[ori]->features[i]) );
+            }
+            ostr.write( (const char*)buffer, 128 * sizeof(unsigned char) );
+            descriptors_written++;
+        }
+        else
+        {
+            ostr.write( (const char*)(desc[ori]->features), 128 * sizeof(float) );
+            descriptors_written++;
+        }
+    }
+    return descriptors_written;
+}
+
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature )
 {
     feature.print( ostr, false );
@@ -334,3 +543,4 @@ std::ostream& operator<<( std::ostream& ostr, const Feature& feature )
 }
 
 } // namespace popsift
+
