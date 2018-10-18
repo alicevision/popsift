@@ -101,20 +101,16 @@ void PlaneBase::freeHost2D( void* data, PlaneMapMode m )
 {
     if (!data)
         return;
-    if (m == CudaAllocated) {
+    else if (m == CudaAllocated) {
         cudaFreeHost(data);
         return;
     }
-    if (m == Unaligned) {
+    else if (m == Unaligned) {
         free(data);
         return;
     }
-    if (m == PageAligned) {
-#ifdef _WIN32
-	_aligned_free(data);
-#else
-	free(data);
-#endif
+    else if (m == PageAligned) {
+        memalign_free( data );
         return;
     }
     assert(!"Invalid PlaneMapMode");

@@ -51,8 +51,8 @@ FeaturesHost::FeaturesHost( int num_ext, int num_ori )
 
 FeaturesHost::~FeaturesHost( )
 {
-    free( _ext );
-    free( _ori );
+    memalign_free( _ext );
+    memalign_free( _ori );
 }
 
 void FeaturesHost::reset( int num_ext, int num_ori )
