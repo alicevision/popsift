@@ -139,4 +139,13 @@ static void* memalign(size_t alignment, size_t size)
 #endif
 }
 
+static void memalign_free( void* ptr )
+{
+#ifdef _WIN32
+    _aligned_free( ptr );
+#else
+    free( ptr );
+#endif
+}
+
 }; // namespace popsift
