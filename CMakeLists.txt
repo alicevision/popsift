@@ -54,6 +54,8 @@ if(BUILD_SHARED_LIBS)
   set(CUDA_USE_STATIC_CUDA_RUNTIME OFF)
   # Workaround to force deactivation of cuda static runtime for cmake < 3.10
   set(CUDA_cudart_static_LIBRARY 0)
+  # Auto-build dll exports on Windows
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 else()
   message(STATUS "BUILD_SHARED_LIBS OFF")
   option(CUDA_USE_STATIC_CUDA_RUNTIME "Use the static version of the CUDA runtime library if available" ON)
