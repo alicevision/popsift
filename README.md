@@ -80,6 +80,28 @@ License
 PopSift is licensed under [MPL v2 license](LICENSE.md).
 However, SIFT is patented in the US and perhaps other countries, and this license does not release users of this code from any requirements that may arise from such patents.
 
+Cite Us
+--------
+
+If you use PopSift for your publication, please cite us as:
+```bibtex
+@inproceedings{Griwodz2018Popsift,
+	 author = {Griwodz, Carsten and Calvet, Lilian and Halvorsen, P{\aa}l},
+	 title = {Popsift: A Faithful SIFT Implementation for Real-time Applications},
+	 booktitle = {Proceedings of the 9th {ACM} Multimedia Systems Conference},
+	 series = {MMSys '18},
+	 year = {2018},
+	 isbn = {978-1-4503-5192-8},
+	 location = {Amsterdam, Netherlands},
+	 pages = {415--420},
+	 numpages = {6},
+	 doi = {10.1145/3204949.3208136},
+	 acmid = {3208136},
+	 publisher = {ACM},
+	 address = {New York, NY, USA},
+} 
+```
+
 
 Authors
 -------
