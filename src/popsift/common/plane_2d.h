@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <cuda_runtime.h>
 #include <iostream>
+#include <sstream>
 
 #define PLANE2D_CUDA_OP_DEBUG
 
@@ -285,10 +286,18 @@ public:
     }
 
     /** Overwrite the width and height information. Useful if smaller
-     *  planes should be loaded into larger preallocated planes
+     *  planes should be loaded into larger preallocated host planes
      *  without actually allocating again, but dangerous.
+     *  @warning: step is updated (host side)
      */
-    __host__ void resetDimensions( int w, int h );
+    __host__ void resetDimensionsHost( int w, int h );
+
+    /** Overwrite the width and height information. Useful if smaller
+     *  planes should be loaded into larger preallocated device planes
+     *  without actually allocating again, but dangerous.
+     *  @warning: step is not updated (device side)
+     */
+    __host__ void resetDimensionsDev( int w, int h );
 
     /** cuda memcpy from this (plane allocated on host) to
      *  parameter (plane allocated on device) */
@@ -350,16 +359,29 @@ public:
 
 template <typename T>
 __host__
-void Plane2D<T>::resetDimensions( int w, int h )
+void Plane2D<T>::resetDimensionsHost( int w, int h )
 {
-    if( w*sizeof(T) > this->getPitch() ) {
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
-                  << "    Error: trying to reinterpret plane width to " << w << " units a " << sizeof(T) << " bytes, "
-                     "only " << this->getPitch() << " bytes allocated" << std::endl;
-        exit( -1 );
+    this->_cols = w;
+    this->_rows = h;
+    // on the host side, memory is contiguous (no padding) => step must be updated to match data
+    this->step  = w * this->elemSize();
+}
+
+template <typename T>
+__host__
+void Plane2D<T>::resetDimensionsDev( int w, int h )
+{
+    // validate pitch
+    if( w * this->elemSize() > this->getPitch() ) {
+        std::stringstream err; 
+        err << __FILE__ << ":" << __LINE__ << std::endl
+        << " Error: trying to reinterpret plane width to " << w << " units a " << sizeof(T) << " bytes, "
+        << "only " << this->getPitch() << " bytes allocated";
+        throw std::runtime_error(err.str());
     }
     this->_cols = w;
     this->_rows = h;
+    // on the device side, memory is NOT contiguous (may be padded) => step can not be changed without reallocation
 }
 
 template <typename T>

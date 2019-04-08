@@ -74,7 +74,7 @@ void Image::load( void* input )
      * is in CUDA-allocated pinned host memory, which makes the H2D copy
      * much faster.
      */
-    memcpy( _input_image_h.data, input, _w*_h );
+    memcpy( _input_image_h.data, input, _w*_h ); // assume that host Plane2D has no pitch
     _input_image_h.memcpyToDevice( _input_image_d );
 }
 
@@ -94,8 +94,8 @@ void Image::resetDimensions( int w, int h )
     _h = h;
 
     if( w <= _max_w && h <= _max_h ) {
-        _input_image_h.resetDimensions( w, h );
-        _input_image_d.resetDimensions( w, h );
+        _input_image_h.resetDimensionsHost( w, h );
+        _input_image_d.resetDimensionsDev( w, h );
 
         destroyTexture( );
         createTexture( );
@@ -108,8 +108,8 @@ void Image::resetDimensions( int w, int h )
         _input_image_d.freeDev( );
         _input_image_h.allocHost( _max_w, _max_h, popsift::CudaAllocated );
         _input_image_d.allocDev(  _max_w, _max_h );
-        _input_image_h.resetDimensions( w, h );
-        _input_image_d.resetDimensions( w, h );
+        _input_image_h.resetDimensionsHost( w, h );
+        _input_image_d.resetDimensionsDev( w, h );
 
         destroyTexture( );
         createTexture( );
@@ -198,7 +198,7 @@ void ImageFloat::load( void* input )
      * is in CUDA-allocated pinned host memory, which makes the H2D copy
      * much faster.
      */
-    memcpy( _input_image_h.data, input, _w*_h*sizeof(float) );
+    memcpy( _input_image_h.data, input, _w*_h*sizeof(float) ); // assume that host Plane2D has no pitch
     _input_image_h.memcpyToDevice( _input_image_d );
 }
 
@@ -218,8 +218,8 @@ void ImageFloat::resetDimensions( int w, int h )
     _h = h;
 
     if( w <= _max_w && h <= _max_h ) {
-        _input_image_h.resetDimensions( w, h );
-        _input_image_d.resetDimensions( w, h );
+        _input_image_h.resetDimensionsHost( w, h );
+        _input_image_d.resetDimensionsDev( w, h );
 
         destroyTexture( );
         createTexture( );
@@ -232,8 +232,8 @@ void ImageFloat::resetDimensions( int w, int h )
         _input_image_d.freeDev( );
         _input_image_h.allocHost( _max_w, _max_h, popsift::CudaAllocated );
         _input_image_d.allocDev(  _max_w, _max_h );
-        _input_image_h.resetDimensions( w, h );
-        _input_image_d.resetDimensions( w, h );
+        _input_image_h.resetDimensionsHost( w, h );
+        _input_image_d.resetDimensionsDev( w, h );
 
         destroyTexture( );
         createTexture( );
