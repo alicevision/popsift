@@ -159,7 +159,7 @@ void Image::createTexture( )
     _input_image_resDesc.res.pitch2D.desc.z       = 0;
     _input_image_resDesc.res.pitch2D.desc.w       = 0;
     assert( _input_image_d.elemSize() == 1 );
-    _input_image_resDesc.res.pitch2D.pitchInBytes = _input_image_d.step;
+    _input_image_resDesc.res.pitch2D.pitchInBytes = _input_image_d.getPitchInBytes();
     _input_image_resDesc.res.pitch2D.width        = _input_image_d.getCols();
     _input_image_resDesc.res.pitch2D.height       = _input_image_d.getRows();
 
@@ -283,7 +283,7 @@ void ImageFloat::createTexture( )
     _input_image_resDesc.res.pitch2D.desc.z       = 0;
     _input_image_resDesc.res.pitch2D.desc.w       = 0;
     assert( _input_image_d.elemSize() == 4 );
-    _input_image_resDesc.res.pitch2D.pitchInBytes = _input_image_d.step; /* the step in Plane2D is in bytes */
+    _input_image_resDesc.res.pitch2D.pitchInBytes = _input_image_d.getPitchInBytes();
     _input_image_resDesc.res.pitch2D.width        = _input_image_d.getCols();
     _input_image_resDesc.res.pitch2D.height       = _input_image_d.getRows();
 
