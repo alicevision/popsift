@@ -74,7 +74,7 @@ void Image::load( void* input )
      * is in CUDA-allocated pinned host memory, which makes the H2D copy
      * much faster.
      */
-    memcpy( _input_image_h.data, input, _w*_h );
+    memcpy( _input_image_h.data, input, _w*_h ); // assume that host Plane2D has no pitch
     _input_image_h.memcpyToDevice( _input_image_d );
 }
 
@@ -94,8 +94,8 @@ void Image::resetDimensions( int w, int h )
     _h = h;
 
     if( w <= _max_w && h <= _max_h ) {
-        _input_image_h.resetDimensions( w, h );
-        _input_image_d.resetDimensions( w, h );
+        _input_image_h.resetDimensionsHost( w, h );
+        _input_image_d.resetDimensionsDev( w, h );
 
         destroyTexture( );
         createTexture( );
@@ -108,8 +108,8 @@ void Image::resetDimensions( int w, int h )
         _input_image_d.freeDev( );
         _input_image_h.allocHost( _max_w, _max_h, popsift::CudaAllocated );
         _input_image_d.allocDev(  _max_w, _max_h );
-        _input_image_h.resetDimensions( w, h );
-        _input_image_d.resetDimensions( w, h );
+        _input_image_h.resetDimensionsHost( w, h );
+        _input_image_d.resetDimensionsDev( w, h );
 
         destroyTexture( );
         createTexture( );
@@ -159,7 +159,7 @@ void Image::createTexture( )
     _input_image_resDesc.res.pitch2D.desc.z       = 0;
     _input_image_resDesc.res.pitch2D.desc.w       = 0;
     assert( _input_image_d.elemSize() == 1 );
-    _input_image_resDesc.res.pitch2D.pitchInBytes = _input_image_d.step;
+    _input_image_resDesc.res.pitch2D.pitchInBytes = _input_image_d.getPitchInBytes();
     _input_image_resDesc.res.pitch2D.width        = _input_image_d.getCols();
     _input_image_resDesc.res.pitch2D.height       = _input_image_d.getRows();
 
@@ -198,7 +198,7 @@ void ImageFloat::load( void* input )
      * is in CUDA-allocated pinned host memory, which makes the H2D copy
      * much faster.
      */
-    memcpy( _input_image_h.data, input, _w*_h*sizeof(float) );
+    memcpy( _input_image_h.data, input, _w*_h*sizeof(float) ); // assume that host Plane2D has no pitch
     _input_image_h.memcpyToDevice( _input_image_d );
 }
 
@@ -218,8 +218,8 @@ void ImageFloat::resetDimensions( int w, int h )
     _h = h;
 
     if( w <= _max_w && h <= _max_h ) {
-        _input_image_h.resetDimensions( w, h );
-        _input_image_d.resetDimensions( w, h );
+        _input_image_h.resetDimensionsHost( w, h );
+        _input_image_d.resetDimensionsDev( w, h );
 
         destroyTexture( );
         createTexture( );
@@ -232,8 +232,8 @@ void ImageFloat::resetDimensions( int w, int h )
         _input_image_d.freeDev( );
         _input_image_h.allocHost( _max_w, _max_h, popsift::CudaAllocated );
         _input_image_d.allocDev(  _max_w, _max_h );
-        _input_image_h.resetDimensions( w, h );
-        _input_image_d.resetDimensions( w, h );
+        _input_image_h.resetDimensionsHost( w, h );
+        _input_image_d.resetDimensionsDev( w, h );
 
         destroyTexture( );
         createTexture( );
@@ -283,7 +283,7 @@ void ImageFloat::createTexture( )
     _input_image_resDesc.res.pitch2D.desc.z       = 0;
     _input_image_resDesc.res.pitch2D.desc.w       = 0;
     assert( _input_image_d.elemSize() == 4 );
-    _input_image_resDesc.res.pitch2D.pitchInBytes = _input_image_d.step; /* the step in Plane2D is in bytes */
+    _input_image_resDesc.res.pitch2D.pitchInBytes = _input_image_d.getPitchInBytes();
     _input_image_resDesc.res.pitch2D.width        = _input_image_d.getCols();
     _input_image_resDesc.res.pitch2D.height       = _input_image_d.getRows();
 

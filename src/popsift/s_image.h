@@ -26,7 +26,7 @@ struct ImageBase
 
     virtual ~ImageBase( );
 
-    /** Reallocation that takes care of pitch/step when new dimensions
+    /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
     virtual void resetDimensions( int w, int h ) = 0;
@@ -76,7 +76,7 @@ struct Image : public ImageBase
 
     virtual ~Image( );
 
-    /** Reallocation that takes care of pitch/step when new dimensions
+    /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
     virtual void resetDimensions( int w, int h );
@@ -116,7 +116,7 @@ struct ImageFloat : public ImageBase
 
     virtual ~ImageFloat( );
 
-    /** Reallocation that takes care of pitch/step when new dimensions
+    /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
     virtual void resetDimensions( int w, int h );
