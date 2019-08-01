@@ -12,7 +12,7 @@ Most of the dependencies can be installed from the common repositories (apt, yum
 
 Boost >= 1.55 ([atomic, chrono, date-time, system, thread]-dev)
 CUDA >= 7.0
-DevIL (libdevil-dev)
+DevIL (libdevil-dev) (only required for the application)
 
 Build
 -----
