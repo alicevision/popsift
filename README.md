@@ -5,6 +5,14 @@ PopSift
 PopSift is an implementation of the SIFT algorithm in CUDA.
 PopSift tries to stick as closely as possible to David Lowe's famous paper (Lowe, D. G. (2004). Distinctive Image Features from Scale-Invariant Keypoints. International Journal of Computer Vision, 60(2), 91–110. doi:10.1023/B:VISI.0000029664.99615.94), while extracting features from an image in real-time at least on an NVidia GTX 980 Ti GPU.
 
+Dependencies
+------------
+
+Most of the dependencies can be installed from the common repositories (apt, yum etc):
+
+Boost >= 1.55 ([atomic, chrono, date-time, system, thread]-dev)
+CUDA >= 7.0
+DevIL (libdevil-dev)
 
 Build
 -----
