@@ -12,9 +12,18 @@ OPTION(PopSift_USE_NORMF "The __normf function computes Euclidian distance on la
 OPTION(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
 OPTION(PopSift_BOOST_USE_STATIC_LIBS "Link with static Boost libraries" OFF)
 OPTION(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
+option(PopSift_BUILD_SHARED_LIBS "Build libraries as shared libraries" ON)
 
 if(PopSift_BOOST_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS ON)
+endif()
+
+if(NOT BUILD_SHARED_LIBS)
+  if(PopSift_BUILD_SHARED_LIBS)
+    set(BUILD_SHARED_LIBS ON)
+  else()
+    set(BUILD_SHARED_LIBS OFF)
+  endif()
 endif()
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE)
@@ -56,6 +65,7 @@ if(BUILD_SHARED_LIBS)
   set(CUDA_cudart_static_LIBRARY 0)
   # Auto-build dll exports on Windows
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+  list(APPEND CUDA_NVCC_FLAGS --cudart shared)
 else()
   message(STATUS "BUILD_SHARED_LIBS OFF")
   option(CUDA_USE_STATIC_CUDA_RUNTIME "Use the static version of the CUDA runtime library if available" ON)
