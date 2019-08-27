@@ -8,6 +8,8 @@
 #include <iomanip>
 #include <iostream>
 #include <fstream>
+#include <vector>
+#include <algorithm>
 
 #include <stdlib.h>
 #include <errno.h>
@@ -21,6 +23,240 @@
 using namespace std;
 
 namespace popsift {
+
+/*************************************************************
+ * class Centroid
+ *************************************************************/
+
+template<int M> // M = 1 .. 7
+class Centroid
+{
+    static const int range = ( 1 << (M-1) );
+    static const int len   = ( 1 << ( 7 - (M-1) ) );
+
+    float center[len];
+    float variance[len];
+    int count;
+
+public:
+    void reset()
+    {
+        for( int d=0; d<len; d++ )
+            variance[d] = 0;
+        count = 0;
+    }
+
+    float descSum( const Descriptor& data, int d )
+    {
+        float sum = 0.0f;
+        for( int i=0; i<range; i++ )
+            sum += data.features[d*range+i];
+        return sum;
+    }
+
+    void addToCenter( const Descriptor& data )
+    {
+        for(int d=0; d<len; d++)
+        {
+            center[d] += descSum( data, d );
+        }
+        count += 1;
+    }
+
+    void normalizeCenter( )
+    {
+        if( count > 1 )
+            for( int d=0; d<len; d++ )
+                center[d] /= count;
+        count = 0;
+    }
+
+    void addToVariance( const Descriptor& data )
+    {
+        for(int d=0; d<len; d++)
+        {
+            variance[d] += fabsf( center[d] - descSum( data, d ) );
+        }
+        count += 1;
+    }
+
+    void normalizeVariance( )
+    {
+        if( count > 1 )
+            for( int d=0; d<len; d++ )
+                variance[d] /= count;
+        count = 0;
+    }
+
+    void addVariance( const Centroid& c )
+    {
+        for( int d=0; d<len; d++ )
+            center[d] = c.center[d] + c.variance[d];
+    }
+
+    void subVariance( const Centroid& c )
+    {
+        for( int d=0; d<len; d++ )
+            center[d] = c.center[d] - c.variance[d];
+    }
+
+    float l2dist( const Descriptor& desc )
+    {
+        float sum = 0.0f;
+        for( int d=0; d<len; d++ )
+            sum += powf( center[d] - descSum( desc, d ), 2 );
+        sum = sqrtf( sum );
+        return sum;
+    }
+
+    void printCenter( ostream& ostr ) const
+    {
+        for( int d=0; d<len; d++ )
+        {
+            ostr<< std::setprecision(2) << center[d] << " ";
+        }
+    }
+};
+
+/*************************************************************
+ * class LindeBuzoGray
+ *
+ * Some sources claim that Linde-Buzo-Gray is a k-means algorithm.
+ * That is not really the case. Centroids are not recomputed from
+ * all nodes during refinement, but only internally refined.
+ * That provides a more homogeneous sets but it does not create
+ * centroids that for a Voronoi diagram.
+ *
+ * This class implements a true k-means algorithm as well, which
+ * can be chosen by calling run(local=false) instead of run().
+ *************************************************************/
+
+template<int M>
+class LindeBuzoGray
+{
+    const int                      _rounds;
+
+    std::vector<Centroid<M> >      _centroids;
+
+    const Descriptor* const        _data;
+    const int                      _len;
+    std::vector<int>               _centerIdx;
+
+public:
+    LindeBuzoGray( const Descriptor* const descriptorList, int len, int powerOf2 )
+        : _rounds( powerOf2 )
+        , _centroids( 1 << _rounds )
+        , _data( descriptorList )
+        , _len( len )
+        , _centerIdx( len, 0 )
+    {
+        std::cout << "Creating Linde-Buzo-Gray with " << len << " elements for " << _rounds << " rounds (" << _centroids.size() << " centroids)" << std::endl;
+    }
+
+    void run( bool local = true )
+    {
+        initCenterIdx();
+        for( int r=0; r<_rounds; r++ )
+        {
+            computeCentroids();
+            newCenters( r );
+            if( local )
+                findNewCentroidLocal( );
+            else
+                findNewCentroidGlobal( r+1 );
+
+            debugPrintCentroids( std::cout, r+1 );
+
+            debugClosestPointCount( std::cout, r+1 );
+        }
+    }
+
+private:
+    void initCenterIdx()
+    {
+        for(auto& c : _centerIdx) c = 0;
+    }
+
+    void computeCentroids( )
+    {
+        for(auto& c : _centroids) c.reset();
+
+        for( int i=0; i<_len; i++)
+        {
+            int ctr = _centerIdx[i];
+            _centroids[ctr].addToCenter( _data[i] );
+        }
+
+        for(auto& c : _centroids) c.normalizeCenter();
+
+        for( int i=0; i<_len; i++)
+        {
+            int ctr = _centerIdx[i];
+            _centroids[ctr].addToVariance( _data[i] );
+        }
+
+        for(auto& c : _centroids) c.normalizeVariance();
+    }
+
+    void newCenters( int round )
+    {
+        int last = 1 << round;
+
+        for( int i=last-1; i>=0; i-- )
+        {
+            _centroids[i*2+1].addVariance( _centroids[i] );
+            _centroids[i*2+0].subVariance( _centroids[i] );
+        }
+    }
+
+    void findNewCentroidLocal( )
+    {
+        for( int i=0; i<_len; i++)
+        {
+            int ctr = _centerIdx[i];
+            const float dist0 = _centroids[ctr*2+0].l2dist( _data[i] );
+            const float dist1 = _centroids[ctr*2+1].l2dist( _data[i] );
+            _centerIdx[i] = dist0 < dist1 ? ctr*2+0 : ctr*2+1;
+        }
+    }
+
+    void findNewCentroidGlobal( int round )
+    {
+        int num = 1 << round;
+        std::vector<float> dist( num );
+
+        for( int i=0; i<_len; i++)
+        {
+            for( int c=0; c<num; c++ )
+            {
+                dist[c] = _centroids[c].l2dist( _data[i] );
+            }
+            _centerIdx[i] = std::min_element( dist.begin(), dist.end() ) - dist.begin();
+        }
+    }
+
+    void debugPrintCentroids( ostream& ostr, int round )
+    {
+        int num = 1 << round;
+        for( int i=0; i<num; i++ )
+        {
+            ostr<< i << ": ";
+            _centroids[i].printCenter( ostr );
+            ostr<< std::endl;
+        }
+    }
+
+    void debugClosestPointCount( ostream& ostr, int round )
+    {
+        int num = 1 << round;
+        for( int i=0; i<num; i++ )
+        {
+            ostr<< i << ": " << std::count( _centerIdx.begin(), _centerIdx.end(), i ) << std::endl;
+        }
+    }
+};
+
+
 
 /*************************************************************
  * FeaturesBase
@@ -348,6 +584,19 @@ FeaturesDev* FeaturesHost::toDevice()
           dev_features->getDescriptors(),
           dev_features->getReverseMap() );
     return dev_features;
+}
+
+void FeaturesHost::match( FeaturesHost* other )
+{
+    int         l_len  = getDescriptorCount( );
+    Descriptor* l_ori  = getDescriptors( );
+    // const int   rounds = 7; // 2**7=128 centroids
+    // const int   rounds = 3;
+    // const int   rounds = 3;
+    const int   rounds = 4;
+
+    LindeBuzoGray<5> lbg( l_ori, l_len, rounds );
+    lbg.run( true );
 }
 
 std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature )

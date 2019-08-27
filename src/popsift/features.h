@@ -102,6 +102,9 @@ public:
     // Read binary data from disc again, only for debug purposes
     void debugCompareBinary( std::istream& verify, bool write_as_uchar ) const;
 
+    // an experimental Linde-Buzo-Gray implementation on the host
+    void match( FeaturesHost* other );
+
     FeaturesDev* toDevice();
 
 protected:
