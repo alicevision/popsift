@@ -10,6 +10,7 @@
 #include <fstream>
 #include <vector>
 #include <algorithm>
+#include <limits>
 
 #include <stdlib.h>
 #include <errno.h>
@@ -36,7 +37,8 @@ class Centroid
 
     float center[len];
     float variance[len];
-    int count;
+    int   count;
+    int   _memberCount;
 
 public:
     void reset()
@@ -46,15 +48,30 @@ public:
         count = 0;
     }
 
-    float descSum( const Descriptor& data, int d )
+    void resetMemberCount()
+    {
+        _memberCount = 0;
+    }
+
+    void incMemberCount()
+    {
+        _memberCount++;
+    }
+
+    int getMemberCount() const
+    {
+        return _memberCount;
+    }
+
+    float descSum( const Descriptor* data, int d )
     {
         float sum = 0.0f;
         for( int i=0; i<range; i++ )
-            sum += data.features[d*range+i];
+            sum += data->features[d*range+i];
         return sum;
     }
 
-    void addToCenter( const Descriptor& data )
+    void addToCenter( const Descriptor* data )
     {
         for(int d=0; d<len; d++)
         {
@@ -71,7 +88,7 @@ public:
         count = 0;
     }
 
-    void addToVariance( const Descriptor& data )
+    void addToVariance( const Descriptor* data )
     {
         for(int d=0; d<len; d++)
         {
@@ -100,11 +117,13 @@ public:
             center[d] = c.center[d] - c.variance[d];
     }
 
-    float l2dist( const Descriptor& desc )
+    float l2dist( const Descriptor* desc )
     {
         float sum = 0.0f;
         for( int d=0; d<len; d++ )
+        {
             sum += powf( center[d] - descSum( desc, d ), 2 );
+        }
         sum = sqrtf( sum );
         return sum;
     }
@@ -134,23 +153,23 @@ public:
 template<int M>
 class LindeBuzoGray
 {
-    const int                      _rounds;
+    const int                       _rounds;
 
-    std::vector<Centroid<M> >      _centroids;
+    std::vector<Centroid<M> >       _centroids;
 
-    const Descriptor* const        _data;
-    const int                      _len;
-    std::vector<int>               _centerIdx;
+    const std::vector<Descriptor*>& _data;
+    const int                       _len;
+    std::vector<int>                _centerIdx;
 
 public:
-    LindeBuzoGray( const Descriptor* const descriptorList, int len, int powerOf2 )
+    LindeBuzoGray( const std::vector<Descriptor*>& descriptorList, int powerOf2 )
         : _rounds( powerOf2 )
         , _centroids( 1 << _rounds )
         , _data( descriptorList )
-        , _len( len )
-        , _centerIdx( len, 0 )
+        , _len( descriptorList.size() )
+        , _centerIdx( _len, 0 )
     {
-        std::cout << "Creating Linde-Buzo-Gray with " << len << " elements for " << _rounds << " rounds (" << _centroids.size() << " centroids)" << std::endl;
+        std::cout << "Creating Linde-Buzo-Gray with " << _len << " elements for " << _rounds << " rounds (" << _centroids.size() << " centroids)" << std::endl;
     }
 
     void run( bool local = true )
@@ -165,9 +184,42 @@ public:
             else
                 findNewCentroidGlobal( r+1 );
 
-            debugPrintCentroids( std::cout, r+1 );
+            // debugPrintCentroids( std::cout, r+1 );
 
             debugClosestPointCount( std::cout, r+1 );
+        }
+    }
+
+    const Centroid<M>& getCentroid( int centroidIdx ) const
+    {
+        return _centroids[centroidIdx];
+    }
+
+    int getCenter( int descIdx ) const
+    {
+        return _centerIdx[descIdx];
+    }
+
+    void findBestMatches( const Descriptor& desc, int& idx1, float& val1, int& idx2, float& val2 )
+    {
+        idx1 = idx2 = -1;
+        val1 = val2 = std::numeric_limits<float>::max();
+
+        for( int i=0; i<(1<<_rounds); i++ )
+        {
+            float f = _centroids[i].l2dist( &desc );
+            if( f < val1 )
+            {
+                val2 = val1;
+                val1 = f;
+                idx2 = idx1;
+                idx1 = i;
+            }
+            else if( f < val2 )
+            {
+                val2 = f;
+                idx2 = i;
+            }
         }
     }
 
@@ -214,9 +266,15 @@ private:
         for( int i=0; i<_len; i++)
         {
             int ctr = _centerIdx[i];
+            _centroids[ctr*2+0].resetMemberCount();
+            _centroids[ctr*2+1].resetMemberCount();
             const float dist0 = _centroids[ctr*2+0].l2dist( _data[i] );
             const float dist1 = _centroids[ctr*2+1].l2dist( _data[i] );
-            _centerIdx[i] = dist0 < dist1 ? ctr*2+0 : ctr*2+1;
+            const int   centr = dist0 < dist1
+                              ? ctr*2+0
+                              : ctr*2+1;
+            _centerIdx[i] = centr;
+            _centroids[centr].incMemberCount();
         }
     }
 
@@ -225,13 +283,20 @@ private:
         int num = 1 << round;
         std::vector<float> dist( num );
 
+        for( int c=0; c<num; c++ )
+        {
+            _centroids[c].resetMemberCount();
+        }
+
         for( int i=0; i<_len; i++)
         {
             for( int c=0; c<num; c++ )
             {
                 dist[c] = _centroids[c].l2dist( _data[i] );
             }
-            _centerIdx[i] = std::min_element( dist.begin(), dist.end() ) - dist.begin();
+            const int centr = std::min_element( dist.begin(), dist.end() ) - dist.begin();
+            _centerIdx[i] = centr;
+            _centroids[centr].incMemberCount();
         }
     }
 
@@ -256,7 +321,123 @@ private:
     }
 };
 
+/*************************************************************
+ * class PqtAnn
+ * Inspired by the paper 10.1109/CVPR.2016.223
+ *************************************************************/
 
+class PqtAnn
+{
+    static const int level1_rounds   = 4;
+    static const int level1_clusters = 1 << level1_rounds;
+    static const int level2_rounds   = 5;
+    static const int level2_clusters = 1 << level1_rounds;
+
+    template<int M>
+    struct Level
+    {
+        vector<Descriptor*> desc; // copied from caller
+        LindeBuzoGray<M>*   lbg;
+
+        Level( )
+            : lbg( 0 )
+        { }
+
+        Level( const std::vector<Descriptor*>& descriptorList, int rounds )
+            : desc( descriptorList )
+        {
+            lbg = new LindeBuzoGray<M>( desc, rounds );
+        }
+
+        ~Level( )
+        {
+            delete lbg;
+        }
+
+        void makeLbg( int rounds )
+        {
+            lbg = new LindeBuzoGray<M>( desc, rounds );
+        }
+    };
+
+    Level<5>              _level1;
+    std::vector<Level<1>> _level2;
+public:
+    PqtAnn( const std::vector<Descriptor*>& descriptorList )
+        : _level1( descriptorList, level1_rounds )
+    { }
+
+    void run( )
+    {
+        _level1.lbg->run( );
+
+        _level2.resize( level1_clusters );
+
+        for( int lvl1ctr=0; lvl1ctr<level1_clusters; lvl1ctr++ )
+        {
+            const int memCt = _level1.lbg->getCentroid(lvl1ctr).getMemberCount();
+            _level2[lvl1ctr].desc.reserve( memCt );
+        }
+
+        for( int descIdx=0; descIdx<_level1.desc.size(); descIdx++ )
+        {
+            int centroidIdx = _level1.lbg->getCenter( descIdx );
+            _level2[centroidIdx].desc.push_back( _level1.desc[descIdx] );
+        }
+
+        for( int lvl1ctr=0; lvl1ctr<level1_clusters; lvl1ctr++ )
+        {
+            _level2[lvl1ctr].makeLbg( level2_rounds );
+            _level2[lvl1ctr].lbg->run();
+        }
+    }
+
+    void findMatch( const Descriptor& desc )
+    {
+        int   idx1, idx2;
+        float val1, val2;
+
+        _level1.lbg->findBestMatches( desc, idx1, val1, idx2, val2 );
+
+        std::cout << "matches -"
+                  << setprecision(3);
+
+        if( idx1 >= 0 )
+        {
+            int   idx3, idx4;
+            float val3, val4;
+            _level2[idx1].lbg->findBestMatches( desc, idx3, val3, idx4, val4 );
+
+            if( idx4 >= 0 )
+            {
+                std::cout << " 0: " << val3;
+                std::cout << " 1: " << val4;
+            }
+            else if( idx3 >= 0 )
+            {
+                std::cout << " 0: " << val3;
+            }
+        }
+
+        if( idx2 >= 0 )
+        {
+            int   idx3, idx4;
+            float val3, val4;
+            _level2[idx2].lbg->findBestMatches( desc, idx3, val3, idx4, val4 );
+
+            if( idx4 >= 0 )
+            {
+                std::cout << " 2: " << val3;
+                std::cout << " 3: " << val4;
+            }
+            else if( idx3 >= 0 )
+            {
+                std::cout << " 2: " << val3;
+            }
+        }
+        std::cout << std::endl;
+    }
+};
 
 /*************************************************************
  * FeaturesBase
@@ -590,13 +771,24 @@ void FeaturesHost::match( FeaturesHost* other )
 {
     int         l_len  = getDescriptorCount( );
     Descriptor* l_ori  = getDescriptors( );
-    // const int   rounds = 7; // 2**7=128 centroids
-    // const int   rounds = 3;
-    // const int   rounds = 3;
-    const int   rounds = 4;
 
-    LindeBuzoGray<5> lbg( l_ori, l_len, rounds );
-    lbg.run( true );
+    std::vector<Descriptor*> ori( l_len );
+    for( int i=0; i<l_len; i++ )
+        ori[i] = &l_ori[i];
+
+    // const int   rounds = 4;
+    // LindeBuzoGray<5> lbg( ori, rounds );
+    // lbg.run( true );
+
+    PqtAnn pqt( ori );
+    pqt.run();
+
+    int         r_len  = getDescriptorCount( );
+    Descriptor* r_ori  = getDescriptors( );
+    for( int i=0; i<r_len; i++ )
+    {
+        pqt.findMatch( r_ori[i] );
+    }
 }
 
 std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature )
