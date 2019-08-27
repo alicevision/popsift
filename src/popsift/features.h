@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "sift_constants.h"
+#include "sift_config.h"
 
 namespace popsift {
 

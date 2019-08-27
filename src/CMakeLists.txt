@@ -50,7 +50,8 @@ configure_file(popsift/sift_config.h.in
 # built in the building tree (ie, not from an install location)
 target_include_directories(popsift 
             PUBLIC ${Boost_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS}
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>")
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/popsift>")
 
 
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
