@@ -263,17 +263,19 @@ int main(int argc, char **argv)
     popsift::FeaturesDev* lFeatures;
     popsift::FeaturesDev* rFeatures;
 
+    popsift::FeaturesHost leftHostFeatures;
+    popsift::FeaturesHost rightHostFeatures;
+
     if( left_file_descs )
     {
-        popsift::FeaturesHost features;
         std::ifstream descstream( lFile );
         if( !descstream.is_open() )
         {
             cerr << "failed to open left file " << lFile << endl;
             exit( -1 );
         }
-        features.readBinary( descstream );
-        lFeatures = features.toDevice();
+        leftHostFeatures.readBinary( descstream );
+        lFeatures = leftHostFeatures.toDevice();
     }
     else
     {
@@ -285,15 +287,14 @@ int main(int argc, char **argv)
 
     if( right_file_descs )
     {
-        popsift::FeaturesHost features;
         std::ifstream descstream( rFile );
         if( !descstream.is_open() )
         {
             cerr << "failed to open right file " << lFile << endl;
             exit( -1 );
         }
-        features.readBinary( descstream );
-        rFeatures = features.toDevice();
+        rightHostFeatures.readBinary( descstream );
+        rFeatures = rightHostFeatures.toDevice();
     }
     else
     {
@@ -302,6 +303,13 @@ int main(int argc, char **argv)
     }
     cerr << "Number of right features:    " << rFeatures->getFeatureCount() << endl;
     cerr << "Number of right descriptors: " << rFeatures->getDescriptorCount() << endl;
+
+#if POPSIFT_IS_DEFINED(POPSIFT_BUILD_HOSTSIDE_MATCHING)
+    if( left_file_descs && right_file_descs )
+    {
+        leftHostFeatures.match( &rightHostFeatures );
+    }
+#endif
 
     lFeatures->match( rFeatures );
 
