@@ -74,7 +74,7 @@ endif()
 # Shortening the lists saves a lot of compile time.
 #
 if(CUDA_VERSION_MAJOR GREATER 7)
-  set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 60 61 62)
+  set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 60 61)
 else()
   set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 )
 endif()
@@ -92,7 +92,8 @@ endif()
 set(CUDA_SEPARABLE_COMPILATION ON)
 
 if(UNIX AND NOT APPLE)
-  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xcompiler;-rdynamic;-lineinfo")
+  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xcompiler;-rdynamic")
+  # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-lineinfo")
   # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;-v")
   # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;-warn-double-usage")
   set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--keep")
