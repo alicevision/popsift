@@ -20,7 +20,7 @@ namespace pqt {
 PerturbationProTree::PerturbationProTree(uint _dim, uint _p, uint _p2) :
 		ProTree(_dim, _p, _p2), d_multiCodeBook(NULL), d_multiCodeBook2(NULL), d_codeBookDistL2(
 		NULL), d_codeBookDistL1L2(NULL), d_lineIdx(NULL), d_lineLambda(
-		NULL), d_l2Idx(NULL), d_lineParts(0) {
+		NULL), d_l2Idx(NULL), d_lineParts(16) {
 
 	int y;
 	for (y = 0; y < 64; y++)
@@ -7662,7 +7662,9 @@ __global__ void lineClusterKernelFast(float *_lineLambda, float* _lineDist,
 	} // iter
 }
 
-void PerturbationProTree::lineDist(const float* _DB, uint _N) {
+void PerturbationProTree::lineDist(const float* _DB, uint _N)
+{
+std::cerr << "Enter " << __FUNCTION__ << std::endl;
 
 	d_lineParts = 16;
 

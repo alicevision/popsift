@@ -29,7 +29,7 @@ DEFINE_int32(lineparts  , 32                               , "vectorparts for re
 DEFINE_uint64(chunksize , 10000000                         , "number of vectors per chunk");
 DEFINE_uint64(hashsize  , 400000000                        , "maximal number of bins");
 DEFINE_string(basename  , "tmp"                            , "prefix for generated data");
-DEFINE_string(dataset   , "ANNSIFTDB/ANN_SIFT1M/base.umem" , "patch to vector dataset");
+DEFINE_string(dataset   , "/home/griff/GIT/popsift-samples/annsift/bigann_query.umem" , "patch to vector dataset");
 
 
 bool file_exists(const std::string & _name) {
