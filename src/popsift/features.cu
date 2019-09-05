@@ -14,721 +14,24 @@
 #include <set>
 #include <iterator>
 
+#include <stdlib.h> // for rand()
+
 #include <stdlib.h>
 #include <errno.h>
 #include <math_constants.h>
 
+#include "features_lbg.h"
 #include "features.h"
 #include "sift_extremum.h"
 #include "common/assist.h"
 #include "common/debug_macros.h"
 
-#undef KFINDER
-#define KFINDER_SMOOTH_8
 #define PQ_LBQ
 #undef BRUTE_FORCE
 
 using namespace std;
 
 namespace popsift {
-
-/* Classical Euclidean distance in 128 dimensions */
-struct L2Dist
-{
-    float operator()( const float* l, const float* r )
-    {
-        float sum = 0.0f;
-        for( int d=0; d<128; d++ )
-        {
-            float f = l[d] - r[d];
-            sum += ( f * f );
-        }
-        sum = sqrtf( sum );
-        return sum;
-    }
-
-    float operator()( const Descriptor& l, const Descriptor& r )
-    {
-        return this->operator()( l.features, r.features );
-    }
-
-    float operator()( const float* l, const Descriptor& r )
-    {
-        return this->operator()( l, r.features );
-    }
-};
-
-static float l2dist( const Descriptor& l, const Descriptor& r )
-{
-    L2Dist d;
-    return d( l, r );
-}
-
-static float l2dist( const float* l, const Descriptor& r )
-{
-    L2Dist d;
-    return d( l, r );
-}
-
-template<int LEN>
-static float subvec_l2dist( int base, const Descriptor& l, const Descriptor& r )
-{
-    float sum = 0.0f;
-    for( int d=0; d<LEN; d++ )
-    {
-        float f = l.features[base+d] - r.features[base+d];
-        sum += ( f * f );
-    }
-    sum = sqrtf( sum );
-    return sum;
-}
-
-template<int LEN>
-static float subvec_l2dist( int base, const float* l, const Descriptor& r )
-{
-    float sum = 0.0f;
-    for( int d=0; d<LEN; d++ )
-    {
-        float f = l[d] - r.features[base+d];
-        sum += ( f * f );
-    }
-    sum = sqrtf( sum );
-    return sum;
-}
-
-/* hm_dist: the Mahalanobis distance on a 128-dimensional hypersphere
- *     with uniform point distribution on the sphere.
- * Mahalanobis distance between 2 points l and r: sqrt( (l-r)^T S^-1 (l-r) )
- *     where S is the covariance matrix
- * For uniformly distributed points on a 128-dimensional sphere, the
- *     covariance matrix S=1/128*I => S^-1 = 128*I
- *
-static float hm_dist( const Descriptor& l, const Descriptor& r )
-{
-    float sum = 0.0f;
-    for( int d=0; d<128; d++ )
-    {
-        float f = l.features[d] - r.features[d];
-        sum += ( f * f );
-    }
-    sum = sqrtf( 128.0f * sum );
-    return sum;
-}
- *
- * While the Mahalanobis distance appears interesting for our cause, this
- * simplicity does in fact make it entirely uninteresting for our distance
- * tests that are only concerned with ordering.
- */
-
-/* ProjDist: We know that SIFT feature vectors are normalize to a length
- *     of 1, putting them onto a 128-dimensional hypersphere. We are only
- *     sorting distances to determine best bin, an a projection can do the
- *     job just as well as a Euclidean distance.
- */
-struct ProjDist
-{
-    float operator()( const float* l, const float* r )
-    {
-        float sum = 0.0f;
-        for( int d=0; d<128; d++ )
-        {
-            float f = l[d] * r[d];
-            sum += f;
-        }
-        return sum;
-    }
-
-    float operator()( const Descriptor& l, const Descriptor& r )
-    {
-        return this->operator()( l.features, r.features );
-    }
-
-    float operator()( const float* l, const Descriptor& r )
-    {
-        return this->operator()( l, r.features );
-    }
-};
-
-static float projdist( const Descriptor& l, const Descriptor& r )
-{
-    ProjDist d;
-    return d( l, r );
-}
-
-static float projdist( const float* l, const Descriptor& r )
-{
-    ProjDist d;
-    return d( l, r );
-}
-
-/*************************************************************
- * class Centroid
- *************************************************************/
-
-template<int LEN>
-class Centroid
-{
-    int   _base;
-    float _center[LEN];
-    float _variance[LEN];
-    int   _count;
-    int   _memberCount;
-
-public:
-    Centroid( ) = delete;
-
-    Centroid( int base )
-        : _base( base )
-    {
-        memset( _center, 0, sizeof(float)*LEN );
-    }
-
-    void reset()
-    {
-        memset( _variance, 0, sizeof(float)*LEN );
-        _count = 0;
-    }
-
-    void resetMemberCount()
-    {
-        _memberCount = 0;
-    }
-
-    void incMemberCount()
-    {
-        _memberCount++;
-    }
-
-    int getMemberCount() const
-    {
-        return _memberCount;
-    }
-
-    const float* getCenter() const
-    {
-        return _center;
-    }
-
-    void addToCenter( const Descriptor* data )
-    {
-        for( int d=0; d<LEN; d++ )
-        {
-            _center[d] += data->features[_base+d];
-        }
-        _count += 1;
-    }
-
-    void normalizeCenter( )
-    {
-        if( _count > 1 )
-            for( int d=0; d<LEN; d++ )
-                _center[d] /= _count;
-        _count = 0;
-    }
-
-    void addToVariance( const Descriptor* data )
-    {
-        for(int d=0; d<LEN; d++)
-        {
-            _variance[d] += fabsf( _center[d] - data->features[_base+d] );
-        }
-        _count += 1;
-    }
-
-    void normalizeVariance( )
-    {
-        if( _count > 1 )
-            for( int d=0; d<LEN; d++ )
-                _variance[d] /= _count;
-        _count = 0;
-    }
-
-    void addVariance( const Centroid& c )
-    {
-        for( int d=0; d<LEN; d++ )
-            _center[d] = c._center[d] + c._variance[d];
-    }
-
-    void subVariance( const Centroid& c )
-    {
-        for( int d=0; d<LEN; d++ )
-            _center[d] = c._center[d] - c._variance[d];
-    }
-
-    void printCenter( ostream& ostr ) const
-    {
-        for( int d=0; d<LEN; d++ )
-        {
-            ostr<< std::setprecision(2) << _center[d] << " ";
-        }
-    }
-};
-
-/*************************************************************
- * class LindeBuzoGray
- *
- * Some sources claim that Linde-Buzo-Gray is a k-means algorithm.
- * That is not really the case. Centroids are not recomputed from
- * all nodes during refinement, but only internally refined.
- * That provides a more homogeneous sets but it does not create
- * centroids that for a Voronoi diagram.
- *
- * This class implements a true k-means algorithm as well, which
- * can be chosen by calling run(local=false) instead of run().
- *************************************************************/
-
-template<int LEN>
-class LindeBuzoGray
-{
-    const int                       _base;  // base+LEN = 128
-
-    const int                       _rounds;
-
-    std::vector<Centroid<LEN>>      _centroids;
-
-    const std::vector<Descriptor*>& _data;
-    const int                       _data_len;
-    std::vector<int>                _centerIdx;
-
-public:
-    LindeBuzoGray( int base,
-                   const std::vector<Descriptor*>& descriptorList, int powerOf2 )
-        : _base( base )
-        , _rounds( powerOf2 )
-        , _centroids( 1 << _rounds, Centroid<LEN>(0) )
-        , _data( descriptorList )
-        , _data_len( descriptorList.size() )
-        , _centerIdx( _data_len, 0 )
-    {
-        std::cout << "Creating Linde-Buzo-Gray with " << _data_len << " elements for " << _rounds << " rounds (" << _centroids.size() << " centroids), " << LEN << " dims, base=" << _base << std::endl;
-    }
-
-    void run( bool local )
-    {
-        initCenterIdx();
-        for( int r=0; r<_rounds; r++ )
-        {
-            computeCentroids();
-            newCenters( r );
-            if( local )
-                findNewCentroidLocal( );
-            else
-                findNewCentroidGlobal( r+1 );
-
-            // debugPrintCentroids( std::cout, r+1 );
-
-        }
-        debugClosestPointCount( std::cout, _rounds );
-    }
-
-    const Centroid<LEN>& getCentroid( int centroidIdx ) const
-    {
-        return _centroids[centroidIdx];
-    }
-
-    int getCenter( int descIdx ) const
-    {
-        return _centerIdx[descIdx];
-    }
-
-    void findBestMatches( const Descriptor& desc, int& idx1, float& val1, int& idx2, float& val2 )
-    {
-        idx1 = idx2 = -1;
-        val1 = val2 = std::numeric_limits<float>::max();
-
-        for( int i=0; i<(1<<_rounds); i++ )
-        {
-            float f = subvec_l2dist<LEN>( _base, _centroids[i].getCenter(), desc );
-            if( f < val1 )
-            {
-                val2 = val1;
-                val1 = f;
-                idx2 = idx1;
-                idx1 = i;
-            }
-            else if( f < val2 )
-            {
-                val2 = f;
-                idx2 = i;
-            }
-        }
-    }
-
-    void findBestDescriptor( const Descriptor& desc, int idx,
-                             Descriptor*& d1, float& val1,
-                             Descriptor*& d2, float& val2 )
-    {
-        d1 = d2 = 0;
-        val1 = val2 = std::numeric_limits<float>::max();
-
-        for( int i=0; i<_data_len; i++ )
-        {
-            if( _centerIdx[i] == idx )
-            {
-                float f = subvec_l2dist<LEN>( _base, desc, *_data[i] );
-                if( f < val1 )
-                {
-                    val2 = val1;
-                    val1 = f;
-                    d2   = d1;
-                    d1   = _data[i];
-                }
-                else
-                {
-                    val2 = f;
-                    d2   = _data[i];
-                }
-            }
-        }
-    }
-
-private:
-    void initCenterIdx()
-    {
-        for(auto& c : _centerIdx) c = 0;
-    }
-
-    void computeCentroids( )
-    {
-        for(auto& c : _centroids) c.reset();
-
-        for( int i=0; i<_data_len; i++)
-        {
-            int ctr = _centerIdx[i];
-            _centroids[ctr].addToCenter( _data[i] );
-        }
-
-        for(auto& c : _centroids) c.normalizeCenter();
-
-        for( int i=0; i<_data_len; i++)
-        {
-            int ctr = _centerIdx[i];
-            _centroids[ctr].addToVariance( _data[i] );
-        }
-
-        for(auto& c : _centroids) c.normalizeVariance();
-    }
-
-    void newCenters( int round )
-    {
-        int last = 1 << round;
-
-        for( int i=last-1; i>=0; i-- )
-        {
-            _centroids[i*2+1].addVariance( _centroids[i] );
-            _centroids[i*2+0].subVariance( _centroids[i] );
-
-            std::cerr << i*2+0 << ". ";
-            _centroids[i*2+0].printCenter( std::cerr );
-            std::cerr << std::endl;
-            std::cerr << i*2+1 << ". ";
-            _centroids[i*2+1].printCenter( std::cerr );
-            std::cerr << std::endl;
-        }
-    }
-
-    void findNewCentroidLocal( )
-    {
-        for( int i=0; i<_data_len; i++)
-        {
-            int ctr = _centerIdx[i];
-            _centroids[ctr*2+0].resetMemberCount();
-            _centroids[ctr*2+1].resetMemberCount();
-            const float dist0 = subvec_l2dist<LEN>( _base, _centroids[ctr*2+0].getCenter(), *_data[i] );
-            const float dist1 = subvec_l2dist<LEN>( _base, _centroids[ctr*2+1].getCenter(), *_data[i] );
-            const int   centr = dist0 < dist1
-                              ? ctr*2+0
-                              : ctr*2+1;
-            _centerIdx[i] = centr;
-            _centroids[centr].incMemberCount();
-        }
-    }
-
-    void findNewCentroidGlobal( int round )
-    {
-        int num = 1 << round;
-        std::vector<float> dist( num );
-
-        for( int c=0; c<num; c++ )
-        {
-            _centroids[c].resetMemberCount();
-        }
-
-        for( int i=0; i<_data_len; i++)
-        {
-            for( int c=0; c<num; c++ )
-            {
-                dist[c] = subvec_l2dist<LEN>( _base, _centroids[c].getCenter(), *_data[i] );
-            }
-            const int centr = std::min_element( dist.begin(), dist.end() ) - dist.begin();
-            _centerIdx[i] = centr;
-            _centroids[centr].incMemberCount();
-        }
-    }
-
-    void debugPrintCentroids( ostream& ostr, int round )
-    {
-        int num = 1 << round;
-        for( int i=0; i<num; i++ )
-        {
-            ostr<< i << ": ";
-            _centroids[i].printCenter( ostr );
-            ostr<< std::endl;
-        }
-    }
-
-    void debugClosestPointCount( ostream& ostr, int round )
-    {
-        int num = 1 << round;
-        for( int i=0; i<num; i++ )
-        {
-            ostr<< i << ": " << std::count( _centerIdx.begin(), _centerIdx.end(), i ) << std::endl;
-        }
-    }
-};
-
-/*************************************************************
- * class PqtAnn
- * Inspired by the paper 10.1109/CVPR.2016.223
- *************************************************************/
-
-class PqtAnn
-{
-    static const int level1_rounds   = 4;
-    static const int level1_clusters = 1 << level1_rounds;
-    static const int level2_rounds   = 5;
-    static const int level2_clusters = 1 << level1_rounds;
-
-    struct Level
-    {
-        vector<Descriptor*> desc; // copied from caller
-        LindeBuzoGray<128>* lbg;
-
-        Level( )
-            : lbg( 0 )
-        { }
-
-        Level( const std::vector<Descriptor*>& descriptorList, int rounds )
-            : desc( descriptorList )
-        {
-            lbg = new LindeBuzoGray<128>( 0, desc, rounds );
-        }
-
-        ~Level( )
-        {
-            delete lbg;
-        }
-
-        void makeLbg( int rounds )
-        {
-            lbg = new LindeBuzoGray<128>( 0, desc, rounds );
-        }
-    };
-
-    Level              _level1;
-    std::vector<Level> _level2;
-public:
-    PqtAnn( const std::vector<Descriptor*>& descriptorList )
-        : _level1( descriptorList, level1_rounds )
-    { }
-
-    void run( )
-    {
-        _level1.lbg->run( false );
-
-        _level2.resize( level1_clusters );
-
-        for( int lvl1ctr=0; lvl1ctr<level1_clusters; lvl1ctr++ )
-        {
-            const int memCt = _level1.lbg->getCentroid(lvl1ctr).getMemberCount();
-            _level2[lvl1ctr].desc.reserve( memCt );
-        }
-
-        for( int descIdx=0; descIdx<_level1.desc.size(); descIdx++ )
-        {
-            int centroidIdx = _level1.lbg->getCenter( descIdx );
-            _level2[centroidIdx].desc.push_back( _level1.desc[descIdx] );
-        }
-
-        for( int lvl1ctr=0; lvl1ctr<level1_clusters; lvl1ctr++ )
-        {
-            _level2[lvl1ctr].makeLbg( level2_rounds );
-            _level2[lvl1ctr].lbg->run( false );
-        }
-    }
-
-    void findMatch( const Descriptor& desc )
-    {
-        int   idx1, idx2;
-        float val1, val2;
-        Descriptor* d5;
-        Descriptor* d6;
-
-#ifdef BRUTE_FORCE
-        float minval = std::numeric_limits<float>::max();
-        for( int x=0; x<_level1.desc.size(); x++ )
-        {
-            float f = l2dist( desc, *_level1.desc[x] );
-            if( f < minval ) minval = f;
-            if( f == 0.0f ) break;
-        }
-
-        std::cout << "min: " << std::setprecision(3) << minval << " ";
-#endif // BRUTE_FORCE
-
-#if 1
-        std::set<float> themins;
-#endif
-
-        _level1.lbg->findBestMatches( desc, idx1, val1, idx2, val2 );
-
-        // std::cout << "matches -" << setprecision(3);
-
-        // int h = 0;
-
-        if( idx1 >= 0 )
-        {
-            int   idx3, idx4;
-            float val3, val4, val5, val6;
-            _level2[idx1].lbg->findBestMatches( desc, idx3, val3, idx4, val4 );
-
-            _level2[idx1].lbg->findBestDescriptor( desc, idx3, d5, val5, d6, val6 );
-            // if( d5 != 0 ) std::cout << " " << h++ << ": " << val5;
-            // if( d6 != 0 ) std::cout << " " << h++ << ": " << val6;
-#if 1
-            if( d5 != 0 ) themins.insert( val5 );
-            if( d6 != 0 ) themins.insert( val6 );
-#endif
-
-            _level2[idx1].lbg->findBestDescriptor( desc, idx4, d5, val5, d6, val6 );
-            // if( d5 != 0 ) std::cout << " " << h++ << ": " << val5;
-            // if( d6 != 0 ) std::cout << " " << h++ << ": " << val6;
-#if 1
-            if( d5 != 0 ) themins.insert( val5 );
-            if( d6 != 0 ) themins.insert( val6 );
-#endif
-        }
-
-        if( idx2 >= 0 )
-        {
-            int   idx3, idx4;
-            float val3, val4, val5, val6;
-            _level2[idx2].lbg->findBestMatches( desc, idx3, val3, idx4, val4 );
-
-            _level2[idx1].lbg->findBestDescriptor( desc, idx3, d5, val5, d6, val6 );
-            // if( d5 != 0 ) std::cout << " " << h++ << ": " << val5;
-            // if( d6 != 0 ) std::cout << " " << h++ << ": " << val6;
-#if 1
-            if( d5 != 0 ) themins.insert( val5 );
-            if( d6 != 0 ) themins.insert( val6 );
-#endif
-
-            _level2[idx1].lbg->findBestDescriptor( desc, idx4, d5, val5, d6, val6 );
-            // if( d5 != 0 ) std::cout << " " << h++ << ": " << val5;
-            // if( d6 != 0 ) std::cout << " " << h++ << ": " << val6;
-#if 1
-            if( d5 != 0 ) themins.insert( val5 );
-            if( d6 != 0 ) themins.insert( val6 );
-#endif
-        }
-        // std::cout << std::endl;
-
-#if 1
-#ifdef BRUTE_FORCE
-        if( *themins.begin() == minval ) std::cout << "+++ "; else std::cout << "--- ";
-#endif
-        std::cout << "set: ";
-        std::copy( themins.begin(), themins.end(), std::ostream_iterator<float>( std::cout, " " ) );
-        std::cout << std::endl;
-#endif
-    }
-}; // class PqtAnn
-
-/*************************************************************
- * K-Finder
- *************************************************************/
-
-namespace kfind
-{
-    struct entry_t
-    {
-        uint8_t v[128];
-    };
-
-    bool operator<( const entry_t& l, const entry_t& r )
-    {
-        for( int i=0; i<128; i++ )
-        {
-            if( l.v[i] < r.v[i] ) return true;
-            if( l.v[i] > r.v[i] ) return false;
-        }
-        return false;
-    }
-
-    bool operator==( const entry_t& l, const entry_t& r )
-    {
-        if( memcmp( &l, &r, sizeof(entry_t) ) == 0 ) return true;
-        return false;
-    }
-
-    std::ostream& operator<<( std::ostream& ostr, const entry_t& e )
-    {
-        int sum = 0;
-        ostr << "{ ";
-#ifdef KFINDER_SMOOTH_8
-        for( int i=0; i<4; i++ )
-#else
-        for( int i=0; i<128; i++ )
-#endif
-        {
-            ostr << int(e.v[i]) << " ";
-            sum += e.v[i];
-        }
-        ostr << "(sum " << sum << ")}";
-        return ostr;
-    }
-};
-
-class KFinder
-{
-    std::set<kfind::entry_t> dSet;
-
-public:
-    void insert( int level, const Descriptor& desc )
-    {
-        kfind::entry_t a;
-#ifdef KFINDER_SMOOTH_8
-        for( int i=0; i<4; i++ )
-        {
-            float p = 0;
-            for( int j=0; j<32; j++ )
-                p += desc.features[i*8+j];
-            a.v[i] = ( (int)(255.0f * p) >> 1 );
-        }
-        for( int i=4; i<128; i++ )
-        {
-            a.v[i] = 0;
-        }
-#else
-        for( int i=0; i<128; i++ )
-        {
-            a.v[i] = ( (int)(255.0f * desc.features[i]) >> (8-level) );
-        }
-#endif
-
-        dSet.insert( a );
-    }
-
-    void printSet( std::ostream& ostr )
-    {
-        ostr << "Set size: " << dSet.size() << std::endl;
-
-        for( auto& e : dSet )
-        {
-            ostr << e << std::endl;
-        }
-    }
-};
 
 /*************************************************************
  * FeaturesBase
@@ -1058,31 +361,65 @@ FeaturesDev* FeaturesHost::toDevice()
     return dev_features;
 }
 
+class MajorMinorAxes
+{
+    struct A
+    {
+        int   majorIdx;
+        int   minorIdx;
+        float majorValue;
+        float minorValue;
+    };
+
+    std::vector<A> theList;
+
+public:
+    MajorMinorAxes( Descriptor* desc, int len )
+        : theList( len )
+    {
+        for( int i=0; i<len; i++ )
+        {
+            int&   max_1 = theList[i].majorIdx;
+            int&   max_2 = theList[i].minorIdx;
+            float& val_1 = theList[i].majorValue;
+            float& val_2 = theList[i].minorValue;
+            max_1 = 0;
+            max_2 = 0;
+            for( int d=0; d<128; d++ )
+            {
+                float v = desc[i].features[d];
+                if( v > max_1 )
+                {
+                    max_2 = max_1;
+                    max_1 = d;
+                    val_2 = val_1;
+                    val_1 = v;
+                }
+                else if( v > max_2 )
+                {
+                    max_2 = d;
+                    val_2 = v;
+                }
+            }
+            float sum = sqrt( val_1*val_1 + val_2*val_2 );
+            val_1 /= sum;
+            val_2 /= sum;
+        }
+    }
+};
+
 void FeaturesHost::match( FeaturesHost* other )
 {
     int         l_len  = getDescriptorCount( );
     Descriptor* l_ori  = getDescriptors( );
 
-#ifdef KFINDER
-    KFinder kfind;
-    for( int i=0; i<l_len; i++ )
-        kfind.insert( 2, l_ori[i] );
-    kfind.printSet( std::cout );
-#endif
-
+#if 1
+    MajorMinorAxes mma( l_ori, l_len );
+#else
     std::vector<Descriptor*> ori( l_len );
     for( int i=0; i<l_len; i++ )
         ori[i] = &l_ori[i];
 
-#ifdef PQ_LBQ
-    const int   rounds = 4;
-    LindeBuzoGray<8>* pq_lbg[16];
-    for( int i=0; i<16; i++ )
-    {
-        pq_lbg[i] = new LindeBuzoGray<8>( i*8, ori, rounds );
-        pq_lbg[i]->run( false );
-    }
-#endif
     // const int   rounds = 4;
     // LindeBuzoGray<5> lbg( ori, rounds );
     // lbg.run( true );
@@ -1096,6 +433,7 @@ void FeaturesHost::match( FeaturesHost* other )
     {
         pqt.findMatch( r_ori[i] );
     }
+#endif
 }
 
 std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature )
