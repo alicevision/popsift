@@ -1,5 +1,5 @@
 # CMake below 3.4 does not work with CUDA separable compilation at all
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.7)
 
 project(PopSift VERSION 1.0.0)
 
@@ -72,7 +72,11 @@ endif()
 # Default setting of the CUDA CC versions to compile.
 # Shortening the lists saves a lot of compile time.
 #
-if(CUDA_VERSION_MAJOR GREATER 7)
+if(CUDA_VERSION_MAJOR GREATER_EQUAL 10)
+  set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 60 61 62 70 72 75)
+elseif(CUDA_VERSION_MAJOR GREATER_EQUAL 9)
+  set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 60 61 62 70 72)
+elseif(CUDA_VERSION_MAJOR GREATER_EQUAL 8)
   set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 60 61 62)
 else()
   set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 )
