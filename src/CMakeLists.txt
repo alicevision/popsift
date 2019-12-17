@@ -2,6 +2,11 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
 CUDA_INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}/popsift)
 
+if(CUDA_VERSION_MAJOR GREATER_EQUAL 9)
+# regression test for radix sort
+set(REGRESSION_CODE popsift/regression/test_radix_sort.cu popsift/regression/test_radix_sort.h)
+endif()
+
 CUDA_ADD_LIBRARY(popsift
 	popsift/popsift.cpp popsift/popsift.h
 	popsift/features.cu popsift/features.h
@@ -31,6 +36,7 @@ CUDA_ADD_LIBRARY(popsift
 	popsift/s_desc_normalize.h
 	popsift/s_gradiant.h
 	popsift/s_solve.h
+	${REGRESSION_CODE}
 	popsift/common/assist.cu popsift/common/assist.h
 	popsift/common/clamp.h
 	popsift/common/plane_2d.cu popsift/common/plane_2d.h
