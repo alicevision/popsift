@@ -34,6 +34,9 @@ template<typename T> __device__ inline T shuffle_xor ( T variable, int delta ) {
 __device__ inline unsigned int ballot( unsigned int pred ) { return __ballot_sync   ( 0xffffffff, pred ); }
 __device__ inline int any            ( unsigned int pred ) { return __any_sync      ( 0xffffffff, pred ); }
 __device__ inline int all            ( unsigned int pred ) { return __all_sync      ( 0xffffffff, pred ); }
+__device__ inline void syncthreads() { __syncthreads(); }
+__device__ inline void syncwarp()    { __syncwarp( 0xffffffff ); }
+__device__ inline unsigned int activemask() { return __activemask(); }
 
 template<typename T> __device__ inline T shuffle     ( T variable, int src  , int ws ) { return __shfl_sync     ( 0xffffffff, variable, src  , ws ); }
 template<typename T> __device__ inline T shuffle_up  ( T variable, int delta, int ws ) { return __shfl_up_sync  ( 0xffffffff, variable, delta, ws ); }
@@ -47,6 +50,9 @@ template<typename T> __device__ inline T shuffle_xor ( T variable, int delta ) {
 __device__ inline unsigned int ballot( unsigned int pred ) { return __ballot   ( pred ); }
 __device__ inline int any            ( unsigned int pred ) { return __any      ( pred ); }
 __device__ inline int all            ( unsigned int pred ) { return __all      ( pred ); }
+__device__ inline void syncthreads() { __syncthreads(); }
+__device__ inline void syncwarp()    { }
+__device__ inline unsigned int activemask() { return 0xffffffff; }
 
 template<typename T> __device__ inline T shuffle     ( T variable, int src  , int ws ) { return __shfl     ( variable, src  , ws ); }
 template<typename T> __device__ inline T shuffle_up  ( T variable, int delta, int ws ) { return __shfl_up  ( variable, delta, ws ); }
