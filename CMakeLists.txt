@@ -95,7 +95,7 @@ endif()
 set(CUDA_SEPARABLE_COMPILATION ON)
 
 if(UNIX AND NOT APPLE)
-  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xcompiler;-rdynamic;-lineinfo")
+  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xcompiler;-rdynamic")
   # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;-v")
   # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;-warn-double-usage")
   set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--keep")
