@@ -71,10 +71,10 @@ void ori_par( const int           octave,
     const int              iext_off =  dobuf.i_ext_off[octave][extremum_index];
     const InitialExtremum* iext     = &dobuf.i_ext_dat[octave][iext_off];
 
-    __shared__ float hist   [ORI_NBINS];
-    __shared__ float sm_hist[ORI_NBINS];
+    __shared__ float _sh_hist   [ORI_NBINS];
+    __shared__ float _sh_sm_hist[ORI_NBINS];
 
-    for( int i = threadIdx.x; i < ORI_NBINS; i += blockDim.x )  hist[i] = 0.0f;
+    for( int i = threadIdx.x; i < ORI_NBINS; i += blockDim.x )  _sh_hist[i] = 0.0f;
 
     /* keypoint fractional geometry */
     const float x     = iext->xpos;
@@ -133,7 +133,7 @@ void ori_par( const int           octave,
 
                 bidx = (bidx == ORI_NBINS) ? 0 : bidx;
 
-                atomicAdd( &hist[bidx], weight );
+                atomicAdd( &_sh_hist[bidx], weight );
             }
         }
         __syncthreads();
@@ -144,18 +144,18 @@ void ori_par( const int           octave,
         for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
             int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
             int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            sm_hist[bin] = ( hist[prev] + hist[bin] + hist[next] ) / 3.0f;
+            _sh_sm_hist[bin] = ( _sh_hist[prev] + _sh_hist[bin] + _sh_hist[next] ) / 3.0f;
         }
         __syncthreads();
         for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
             int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
             int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            hist[bin] = ( sm_hist[prev] + sm_hist[bin] + sm_hist[next] ) / 3.0f;
+            _sh_hist[bin] = ( _sh_sm_hist[prev] + _sh_sm_hist[bin] + _sh_sm_hist[next] ) / 3.0f;
         }
         __syncthreads();
     }
     for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
-        sm_hist[bin] = hist[bin];
+        _sh_sm_hist[bin] = _sh_hist[bin];
     }
     __syncthreads();
 #else // not WITH_VLFEAT_SMOOTHING
@@ -168,51 +168,51 @@ void ori_par( const int           octave,
         if( prev1 < 0 )          prev1 += ORI_NBINS;
         if( next1 >= ORI_NBINS ) next1 -= ORI_NBINS;
         if( next2 >= ORI_NBINS ) next2 -= ORI_NBINS;
-        sm_hist[bin] = (   hist[prev2] + hist[next2]
-                         + ( hist[prev1] + hist[next1] ) * 4.0f
-                         +   hist[bin] * 6.0f ) / 16.0f;
+        _sh_sm_hist[bin] = ( _sh_hist[prev2] + _sh_hist[next2]
+                         + ( _sh_hist[prev1] + _sh_hist[next1] ) * 4.0f
+                         +   _sh_hist[bin] * 6.0f ) / 16.0f;
     }
     __syncthreads();
 #endif // not WITH_VLFEAT_SMOOTHING
 
     // sub-cell refinement of the histogram cell index, yielding the angle
     // not necessary to initialize, every cell is computed
-    __shared__ float refined_angle[64];
-    __shared__ float yval         [64];
+    __shared__ float _sh_refined_angle[64];
+    __shared__ float _sh_yval         [64];
 
     for( int bin = threadIdx.x; popsift::any( bin < ORI_NBINS ); bin += blockDim.x ) {
         const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
         const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
 
-        bool predicate = ( bin < ORI_NBINS ) && ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) );
+        bool predicate = ( bin < ORI_NBINS ) && ( _sh_sm_hist[bin] > max( _sh_sm_hist[prev], _sh_sm_hist[next] ) );
 
-        const float num  = predicate ?   3.0f * sm_hist[prev]
-                                       - 4.0f * sm_hist[bin]
-                                       + 1.0f * sm_hist[next]
+        const float num  = predicate ?   3.0f * _sh_sm_hist[prev]
+                                       - 4.0f * _sh_sm_hist[bin]
+                                       + 1.0f * _sh_sm_hist[next]
                                      : 0.0f;
-        // const float num  = predicate ?   2.0f * sm_hist[prev]
-        //                                - 4.0f * sm_hist[bin]
-        //                                + 2.0f * sm_hist[next]
+        // const float num  = predicate ?   2.0f * _sh_sm_hist[prev]
+        //                                - 4.0f * _sh_sm_hist[bin]
+        //                                + 2.0f * _sh_sm_hist[next]
         //                              : 0.0f;
-        const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
+        const float denB = predicate ? 2.0f * ( _sh_sm_hist[prev] - 2.0f * _sh_sm_hist[bin] + _sh_sm_hist[next] ) : 1.0f;
 
         const float newbin = __fdividef( num, denB ); // verified: accuracy OK
 
         predicate   = ( predicate && newbin >= 0.0f && newbin <= 2.0f );
 
-        refined_angle[bin] = predicate ? prev + newbin : -1;
-        yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
+        _sh_refined_angle[bin] = predicate ? prev + newbin : -1;
+        _sh_yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + _sh_sm_hist[prev] : -INFINITY;
     }
 
     int2 best_index = make_int2( threadIdx.x, threadIdx.x + 32 );
 
-    BitonicSort::Warp32<float> sorter( yval );
+    BitonicSort::Warp32<float> sorter( _sh_yval );
     sorter.sort64( best_index );
     __syncthreads();
 
     // All threads retrieve the yval of thread 0, the largest
     // of all yvals.
-    const float best_val = yval[best_index.x];
+    const float best_val = _sh_yval[best_index.x];
     const float yval_ref = 0.8f * popsift::shuffle( best_val, 0 );
     const bool  valid    = ( best_val >= yval_ref );
     bool        written  = false;
@@ -221,7 +221,7 @@ void ori_par( const int           octave,
 
     if( threadIdx.x < ORIENTATION_MAX_COUNT ) {
         if( valid ) {
-            float chosen_bin = refined_angle[best_index.x];
+            float chosen_bin = _sh_refined_angle[best_index.x];
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             // float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
             float th = ::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
