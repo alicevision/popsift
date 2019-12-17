@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
-project(PopsiftDemo)
+cmake_minimum_required(VERSION 3.7)
 
 if(TARGET popsift)
   # when compiled in the repository the target is already defined
@@ -61,6 +60,23 @@ target_compile_definitions(popsift-match PRIVATE ${Boost_DEFINITIONS} BOOST_ALL_
 target_link_libraries(popsift-match PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 
 set_target_properties(popsift-match  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}" )
+
+if(CUDA_VERSION_MAJOR GREATER_EQUAL 9)
+#############################################################
+# test_radix_sort
+#############################################################
+
+add_executable(test_radix_sort test_radix_sort.cpp)
+
+set_property(TARGET test_radix_sort PROPERTY CXX_STANDARD 11)
+
+target_compile_options(test_radix_sort PRIVATE ${PD_COMPILE_OPTIONS} )
+target_include_directories(test_radix_sort PUBLIC ${PD_INCLUDE_DIRS})
+target_compile_definitions(test_radix_sort PRIVATE ${Boost_DEFINITIONS} BOOST_ALL_DYN_LINK BOOST_ALL_NO_LIB)
+target_link_libraries(test_radix_sort PUBLIC PopSift::popsift ${PD_LINK_LIBS})
+
+set_target_properties(test_radix_sort  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}" )
+endif(CUDA_VERSION_MAJOR GREATER_EQUAL 9)
 
 #############################################################
 # installation
