@@ -40,13 +40,13 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
 
     if( not boost::filesystem::exists( input_file ) ) {
         cerr << "File " << input_file << " does not exist" << endl;
-        return 0;
+        return nullptr;
     }
 
     ifstream pgmfile( filename.c_str(), ios::binary );
     if( not pgmfile.is_open() ) {
         cerr << "File " << input_file << " could not be opened for reading" << endl;
-        return 0;
+        return nullptr;
     }
 
     string pgmtype;
@@ -54,7 +54,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         getline( pgmfile, pgmtype ); // this is the string version of getline()
         if( pgmfile.fail() ) {
             cerr << "File " << input_file << " is too short" << endl;
-            return 0;
+            return nullptr;
         }
         boost::algorithm::trim_left( pgmtype ); // nice because of trim
     } while( pgmtype.at(0) == '#' );
@@ -66,7 +66,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
     else if( pgmtype.substr(0,2) == "P6" ) type = 6;
     else {
         cerr << "File " << input_file << " can only contain P2, P3, P5 or P6 PGM images" << endl;
-        return 0;
+        return nullptr;
     }
 
     char  line[1000];
@@ -78,7 +78,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
 
         if( pgmfile.fail() ) {
             cerr << "File " << input_file << " is too short" << endl;
-            return 0;
+            return nullptr;
         }
         int num = pgmfile.gcount();
         parse = line;
@@ -91,20 +91,20 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             cerr << "Error in " << __FILE__ << ":" << __LINE__ << endl
                  << "File " << input_file << " PGM type header (" << type << ") must be followed by comments and WxH info" << endl
                  << "but line contains " << parse << endl;
-            return 0;
+            return nullptr;
         }
     } while( *parse == '#' );
 
     if( w <= 0 || h <= 0 ) {
         cerr << "File " << input_file << " has meaningless image size" << endl;
-        return 0;
+        return nullptr;
     }
 
     do {
         pgmfile.getline( line, 1000 );
         if( pgmfile.fail() ) {
             cerr << "File " << input_file << " is too short" << endl;
-            return 0;
+            return nullptr;
         }
         int num = pgmfile.gcount();
         parse = line;
@@ -115,7 +115,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         int ct = sscanf( parse, "%d", &maxval );
         if( ct != 1 ) {
             cerr << "File " << input_file << " PGM dimensions must be followed by comments and max value info" << endl;
-            return 0;
+            return nullptr;
         }
     } while( *parse == '#' );
 
@@ -135,7 +135,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             if( pgmfile.fail() ) {
                 cerr << "File " << input_file << " file too short" << endl;
                 delete [] input_data;
-                return 0;
+                return nullptr;
             }
         }
         break;
@@ -155,7 +155,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
                     cerr << "File " << input_file << " file too short" << endl;
                     delete [] i2;
                     delete [] input_data;
-                    return 0;
+                    return nullptr;
                 }
             }
             for( int i=0; i<w*h; i++ ) {
@@ -185,7 +185,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
                 cerr << "File " << input_file << " file too short" << endl;
                 delete [] i2;
                 delete [] input_data;
-                return 0;
+                return nullptr;
             }
             for( int i=0; i<w*h; i++ ) {
                 input_data[i] = (unsigned char)(i2[i] * 255.0 / maxval );
@@ -202,7 +202,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
                 cerr << "File " << input_file << " file too short" << endl;
                 delete [] i2;
                 delete [] input_data;
-                return 0;
+                return nullptr;
             }
             for( int i=0; i<w*h; i++ ) {
 #ifdef RGB2GRAY_IN_INT

@@ -213,8 +213,8 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
         nvtxRangePushA( "load and convert image - pgmread" );
 
         image_data = readPGMfile( inputFile, w, h );
-        if( image_data == 0 ) {
             exit( -1 );
+        if( image_data == nullptr ) {
         }
 
         nvtxRangePop( ); // "load and convert image - pgmread"
