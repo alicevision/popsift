@@ -304,10 +304,9 @@ int main(int argc, char **argv)
                      float_mode ? PopSift::FloatImages : PopSift::ByteImages );
 
     std::queue<SiftJob*> jobs;
-    for( auto it = inputFiles.begin(); it!=inputFiles.end(); it++ ) {
-        inputFile = it->c_str();
-
-        SiftJob* job = process_image( inputFile, PopSift );
+    for(const auto& currFile : inputFiles)
+    {
+        SiftJob* job = process_image( currFile, PopSift );
         jobs.push( job );
     }
 
