@@ -69,12 +69,13 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         return nullptr;
     }
 
-    char  line[1000];
     char* parse;
     int   maxval;
+    const int maxLineSize{1000};
+    char  line[maxLineSize];
 
     do {
-        pgmfile.getline( line, 1000 );
+        pgmfile.getline( line, maxLineSize );
 
         if( pgmfile.fail() ) {
             cerr << "File " << input_file << " is too short" << endl;
@@ -101,7 +102,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
     }
 
     do {
-        pgmfile.getline( line, 1000 );
+        pgmfile.getline( line, maxLineSize );
         if( pgmfile.fail() ) {
             cerr << "File " << input_file << " is too short" << endl;
             return nullptr;
