@@ -227,7 +227,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
         }
         else
         {
-            float* f_image_data = new float [w * h];
+            auto f_image_data = new float [w * h];
             for( int i=0; i<w*h; i++ )
             {
                 f_image_data[i] = float( image_data[i] ) / 256.0f;

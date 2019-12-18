@@ -120,7 +120,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         }
     } while( *parse == '#' );
 
-    unsigned char* input_data = new unsigned char[ w * h ];
+    auto input_data = new unsigned char[ w * h ];
 
     switch( type )
     {
@@ -142,7 +142,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         break;
     case 3 :
         {
-            unsigned char* i2 = new unsigned char[ w * h * 3 ];
+            auto i2 = new unsigned char[ w * h * 3 ];
             unsigned char* src = i2;
             for( int i=0; i<w*h*3; i++ ) {
                 int input;
@@ -180,7 +180,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         if( maxval < 256 ) {
             pgmfile.read( (char*)input_data, w*h );
         } else {
-            unsigned short* i2 = new unsigned short[ w * h ];
+            auto i2 = new unsigned short[ w * h ];
             pgmfile.read( (char*)i2, w*h*2 );
             if( pgmfile.fail() ) {
                 cerr << "File " << input_file << " file too short" << endl;
@@ -196,7 +196,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         break;
     case 6 :
         if( maxval < 256 ) {
-            unsigned char* i2 = new unsigned char[ w * h * 3 ];
+            auto i2 = new unsigned char[ w * h * 3 ];
             unsigned char* src = i2;
             pgmfile.read( (char*)i2, w*h*3 );
             if( pgmfile.fail() ) {
@@ -221,7 +221,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             }
             delete [] i2;
         } else {
-            unsigned short* i2 = new unsigned short[ w * h * 2 * 3 ];
+            auto i2 = new unsigned short[ w * h * 2 * 3 ];
             unsigned short* src = i2;
             pgmfile.read( (char*)i2, w*h*2*3 );
             if( pgmfile.fail() ) {
@@ -247,6 +247,9 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             delete [] i2;
         }
         break;
+
+    default:
+        throw std::runtime_error("unsupported type " + std::to_string(type));
     }
 
     return input_data;
