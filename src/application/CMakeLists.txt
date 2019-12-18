@@ -12,7 +12,6 @@ else()
   find_package(PopSift CONFIG REQUIRED)
 endif()
 
-find_package(Boost 1.53.0 REQUIRED COMPONENTS program_options system filesystem)
 find_package(DevIL COMPONENTS IL ILU) # yields IL_FOUND, IL_LIBRARIES, IL_INCLUDE_DIR
 
 set(Boost_INCLUDE_DIRS "")
