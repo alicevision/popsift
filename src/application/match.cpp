@@ -11,7 +11,7 @@
 #include <string>
 #include <cmath>
 #include <iomanip>
-#include <stdlib.h>
+#include <cstdlib>
 #include <stdexcept>
 #include <list>
 #include <string>
