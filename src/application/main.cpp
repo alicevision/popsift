@@ -213,8 +213,8 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
         nvtxRangePushA( "load and convert image - pgmread" );
 
         image_data = readPGMfile( inputFile, w, h );
-            exit( -1 );
         if( image_data == nullptr ) {
+            exit( EXIT_FAILURE );
         }
 
         nvtxRangePop( ); // "load and convert image - pgmread"
@@ -278,7 +278,7 @@ int main(int argc, char **argv)
     }
     catch (std::exception& e) {
         std::cout << e.what() << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
 
     if( boost::filesystem::exists( inputFile ) ) {
@@ -287,13 +287,13 @@ int main(int argc, char **argv)
             collectFilenames( inputFiles, inputFile );
             if( inputFiles.empty() ) {
                 cerr << "No files in directory, nothing to do" << endl;
-                exit( 0 );
+                return EXIT_SUCCESS;
             }
         } else if( boost::filesystem::is_regular_file( inputFile ) ) {
             inputFiles.push_back( inputFile );
         } else {
             cout << "Input file is neither regular file nor directory, nothing to do" << endl;
-            exit( -1 );
+            return EXIT_FAILURE;
         }
     }
 
@@ -324,5 +324,7 @@ int main(int argc, char **argv)
     }
 
     PopSift.uninit( );
+
+    return EXIT_SUCCESS;
 }
 

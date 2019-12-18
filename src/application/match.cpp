@@ -202,7 +202,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     {
         image_data = readPGMfile( inputFile, w, h );
         if( image_data == 0 ) {
-            exit( -1 );
+            exit( EXIT_FAILURE );
         }
 
         nvtxRangePop( );
@@ -231,20 +231,20 @@ int main(int argc, char **argv)
     }
     catch (std::exception& e) {
         std::cout << e.what() << std::endl;
-        exit(1);
+        return EXIT_SUCCESS;
     }
 
     if( boost::filesystem::exists( lFile ) ) {
         if( not boost::filesystem::is_regular_file( lFile ) ) {
             cout << "Input file " << lFile << " is not a regular file, nothing to do" << endl;
-            exit( -1 );
+            return EXIT_FAILURE;
         }
     }
 
     if( boost::filesystem::exists( rFile ) ) {
         if( not boost::filesystem::is_regular_file( rFile ) ) {
             cout << "Input file " << rFile << " is not a regular file, nothing to do" << endl;
-            exit( -1 );
+            return EXIT_FAILURE;
         }
     }
 
@@ -271,5 +271,7 @@ int main(int argc, char **argv)
     delete rFeatures;
 
     PopSift.uninit( );
+
+    return EXIT_SUCCESS;
 }
 
