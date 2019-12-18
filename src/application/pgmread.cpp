@@ -69,10 +69,10 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         return nullptr;
     }
 
-    char* parse;
-    int   maxval;
     const int maxLineSize{1000};
     char  line[maxLineSize];
+    char* parse{nullptr};
+    int   maxval{};
 
     do {
         pgmfile.getline( line, maxLineSize );

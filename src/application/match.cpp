@@ -38,11 +38,11 @@
 
 using namespace std;
 
-static bool print_dev_info  = false;
-static bool print_time_info = false;
-static bool write_as_uchar  = false;
-static bool dont_write      = false;
-static bool pgmread_loading = false;
+static bool print_dev_info  {false};
+static bool print_time_info {false};
+static bool write_as_uchar  {false};
+static bool dont_write      {false};
+static bool pgmread_loading {false};
 
 static void parseargs(int argc, char** argv, popsift::Config& config, string& lFile, string& rFile) {
     using namespace boost::program_options;
@@ -221,9 +221,8 @@ int main(int argc, char **argv)
     cudaDeviceReset();
 
     popsift::Config config;
-    string         lFile = "";
-    string         rFile = "";
-    const char*    appName   = argv[0];
+    string         lFile{};
+    string         rFile{};
 
     try {
         parseargs( argc, argv, config, lFile, rFile ); // Parse command line

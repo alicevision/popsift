@@ -268,8 +268,7 @@ int main(int argc, char **argv)
 
     popsift::Config config;
     list<string>   inputFiles;
-    string         inputFile = "";
-    const char*    appName   = argv[0];
+    string         inputFile{};
 
     try {
         parseargs( argc, argv, config, inputFile ); // Parse command line
