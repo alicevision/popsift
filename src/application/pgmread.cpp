@@ -87,7 +87,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             parse++;
         }
         if( *parse == '#' ) continue;
-        int ct = sscanf( parse, "%d %d", &w, &h );
+        const int ct = sscanf( parse, "%d %d", &w, &h );
         if( ct != 2 ) {
             cerr << "Error in " << __FILE__ << ":" << __LINE__ << endl
                  << "File " << input_file << " PGM type header (" << type << ") must be followed by comments and WxH info" << endl
@@ -113,7 +113,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             parse++;
         }
         if( *parse == '#' ) continue;
-        int ct = sscanf( parse, "%d", &maxval );
+        const int ct = sscanf( parse, "%d", &maxval );
         if( ct != 1 ) {
             cerr << "File " << input_file << " PGM dimensions must be followed by comments and max value info" << endl;
             return nullptr;
@@ -161,15 +161,15 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             }
             for( int i=0; i<w*h; i++ ) {
 #ifdef RGB2GRAY_IN_INT
-                unsigned int r = *src; src++;
-                unsigned int g = *src; src++;
-                unsigned int b = *src; src++;
-                unsigned int res = ( ( R_RATE*r+G_RATE*g+B_RATE*b ) >> RATE_SHIFT );
+                const unsigned int r = *src; src++;
+                const unsigned int g = *src; src++;
+                const unsigned int b = *src; src++;
+                const unsigned int res = ( ( R_RATE*r+G_RATE*g+B_RATE*b ) >> RATE_SHIFT );
                 input_data[i] = (unsigned char)res;
 #else // RGB2GRAY_IN_INT
-                float r = *src; src++;
-                float g = *src; src++;
-                float b = *src; src++;
+                const float r = *src; src++;
+                const float g = *src; src++;
+                const float b = *src; src++;
                 input_data[i] = (unsigned char)( R_RATE*r+G_RATE*g+B_RATE*b );
 #endif // RGB2GRAY_IN_INT
             }
