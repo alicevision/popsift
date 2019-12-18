@@ -167,8 +167,6 @@ static void collectFilenames( list<string>& inputFiles, const boost::filesystem:
 
 SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 {
-    int w;
-    int h;
     unsigned char* image_data;
     SiftJob* job;
 
@@ -185,8 +183,8 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
             cerr << "Failed converting image " << inputFile << " to unsigned greyscale image" << endl;
             exit( -1 );
         }
-        w = img.Width();
-        h = img.Height();
+        const auto w = img.Width();
+        const auto h = img.Height();
         cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
         image_data = img.GetData();
 
@@ -200,8 +198,10 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     else
 #endif
     {
+        int h{};
+        int w{};
         image_data = readPGMfile( inputFile, w, h );
-        if( image_data == 0 ) {
+        if( image_data == nullptr ) {
             exit( EXIT_FAILURE );
         }
 
