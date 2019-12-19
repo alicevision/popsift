@@ -78,50 +78,49 @@ void ext_desc_loop_sub( const float         ang,
 
     for( int i = threadIdx.x; popsift::any(i < loops); i+=blockDim.x )
     {
-        if( i < loops )
-        {
-            const int ii = i / wx + ymin;
-            const int jj = i % wx + xmin;     
+        if( i >= loops ) continue;
 
-            const float2 d = make_float2( jj - ptx, ii - pty );
+        const int ii = i / wx + ymin;
+        const int jj = i % wx + xmin;     
 
-            // const float nx = crsbp * dx + srsbp * dy;
-            // const float ny = crsbp * dy - srsbp * dx;
-            const float2 n = make_float2( ::fmaf( crsbp, d.x,  srsbp * d.y ),
-                                          ::fmaf( crsbp, d.y, -srsbp * d.x ) );
-            const float2 nn = abs(n);
-            if (nn.x < 1.0f && nn.y < 1.0f) {
-                float mod;
-                float th;
-                get_gradiant( mod, th, jj, ii, layer_tex, level );
+        const float2 d = make_float2( jj - ptx, ii - pty );
 
-                const float2 dn = n + offsetpt;
-                const float  ww = __expf( -scalbnf(dn.x*dn.x + dn.y*dn.y, -3));
-                // const float ww  = __expf(-0.125f * (dnx*dnx + dny*dny)); // speedup !
-                const float2 w  = make_float2( 1.0f - nn.x,
+        // const float nx = crsbp * dx + srsbp * dy;
+        // const float ny = crsbp * dy - srsbp * dx;
+        const float2 n = make_float2( ::fmaf( crsbp, d.x,  srsbp * d.y ),
+                                      ::fmaf( crsbp, d.y, -srsbp * d.x ) );
+        const float2 nn = abs(n);
+        if (nn.x < 1.0f && nn.y < 1.0f) {
+            float mod;
+            float th;
+            get_gradiant( mod, th, jj, ii, layer_tex, level );
+
+            const float2 dn = n + offsetpt;
+            const float  ww = __expf( -scalbnf(dn.x*dn.x + dn.y*dn.y, -3));
+            // const float ww  = __expf(-0.125f * (dnx*dnx + dny*dny)); // speedup !
+            const float2 w  = make_float2( 1.0f - nn.x,
                                            1.0f - nn.y );
-                const float wgt = ww * w.x * w.y * mod;
+            const float wgt = ww * w.x * w.y * mod;
 
-                th -= ang;
-                th += ( th <  0.0f  ? M_PI2 : 0.0f ); //  if (th <  0.0f ) th += M_PI2;
-                th -= ( th >= M_PI2 ? M_PI2 : 0.0f ); //  if (th >= M_PI2) th -= M_PI2;
+            th -= ang;
+            th += ( th <  0.0f  ? M_PI2 : 0.0f ); //  if (th <  0.0f ) th += M_PI2;
+            th -= ( th >= M_PI2 ? M_PI2 : 0.0f ); //  if (th >= M_PI2) th -= M_PI2;
 
-                const float tth  = __fmul_ru( th, M_4RPI ); // th * M_4RPI;
-                const int   fo0  = (int)floorf(tth);
-                const float do0  = tth - fo0;             
-                const float wgt1 = 1.0f - do0;
-                const float wgt2 = do0;
+            const float tth  = __fmul_ru( th, M_4RPI ); // th * M_4RPI;
+            const int   fo0  = (int)floorf(tth);
+            const float do0  = tth - fo0;             
+            const float wgt1 = 1.0f - do0;
+            const float wgt2 = do0;
 
-                int fo  = fo0 % DESC_BINS;
+            int fo  = fo0 % DESC_BINS;
     
-                    // maf: multiply-add
-                    // _ru - round to positive infinity equiv to froundf since always >=0
-                dpt[fo]   = __fmaf_ru( wgt1, wgt, dpt[fo] );   // dpt[fo]   += (wgt1*wgt);
-                dpt[fo+1] = __fmaf_ru( wgt2, wgt, dpt[fo+1] ); // dpt[fo+1] += (wgt2*wgt);
-            }
+                // maf: multiply-add
+                // _ru - round to positive infinity equiv to froundf since always >=0
+            dpt[fo]   = __fmaf_ru( wgt1, wgt, dpt[fo] );   // dpt[fo]   += (wgt1*wgt);
+            dpt[fo+1] = __fmaf_ru( wgt2, wgt, dpt[fo+1] ); // dpt[fo+1] += (wgt2*wgt);
         }
-        __syncthreads();
     }
+    __syncthreads();
 
     dpt[0] += dpt[8];
 
