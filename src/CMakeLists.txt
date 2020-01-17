@@ -123,6 +123,10 @@ install(FILES "${project_config}" "${version_config}"
 install(EXPORT "${targets_export_name}"
         NAMESPACE "${namespace}"
         DESTINATION "${config_install_dir}")
+	
+# Generate ${PROJECT_NAME}Targets.cmake in the build directory too in case
+# you need to use the library without installing it
+export(TARGETS popsift FILE "${generated_dir}/${targets_export_name}.cmake")
 
 if(PopSift_BUILD_EXAMPLES)
   add_subdirectory(application)
