@@ -42,15 +42,15 @@ CUDA_ADD_LIBRARY(popsift
 	popsift/common/vec_macros.h
 	popsift/common/clamp.h )
 
-configure_file(popsift/sift_config.h.in
-               ${CMAKE_CURRENT_BINARY_DIR}/popsift/sift_config.h
-	       @ONLY)
+
+# build directory containing the automatically generated files
+set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 # BUILD_INTERFACE allows to include the directory with source only when target is
 # built in the building tree (ie, not from an install location)
 target_include_directories(popsift 
             PUBLIC ${Boost_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS}
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>")
+            "$<BUILD_INTERFACE:${generated_dir}>")
 
 
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
@@ -67,9 +67,13 @@ target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY} ${CUD
 set(config_install_dir "lib/cmake/${PROJECT_NAME}")
 # include directory for install
 set(include_install_dir "include")
+# the name for the generated header version file
+set(popsift_version_header_name "${generated_dir}/version.hpp")
+# the name for the generated config.hpp
+set(popsift_config_header_name "${generated_dir}/sift_config.h")
+# where to install the generated files
+set(install_dir_generated "${include_install_dir}/popsift")
 
-# build directory containing the generated files
-set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 # Configuration
 set(version_config "${generated_dir}/${PROJECT_NAME}ConfigVersion.cmake")
@@ -91,6 +95,12 @@ write_basic_package_version_file("${version_config}" COMPATIBILITY SameMajorVers
 configure_package_config_file("${PROJECT_SOURCE_DIR}/cmake/Config.cmake.in"
                               "${project_config}"
                               INSTALL_DESTINATION "${config_install_dir}")
+
+# version file
+configure_file("${PROJECT_SOURCE_DIR}/cmake/version.hpp.in" ${popsift_version_header_name} @ONLY)
+# config file
+configure_file("${PROJECT_SOURCE_DIR}/cmake/sift_config.h.in" ${popsift_config_header_name} @ONLY)
+
 
 # Targets:
 #   * <prefix>/lib/libpopsift.a
@@ -123,6 +133,13 @@ install(FILES "${project_config}" "${version_config}"
 install(EXPORT "${targets_export_name}"
         NAMESPACE "${namespace}"
         DESTINATION "${config_install_dir}")
+
+# install the config and version generated files
+install( FILES "${popsift_config_header_name}"
+		DESTINATION "${install_dir_generated}")
+
+install( FILES "${popsift_version_header_name}"
+		DESTINATION "${install_dir_generated}")
 
 if(PopSift_BUILD_EXAMPLES)
   add_subdirectory(application)
