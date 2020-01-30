@@ -3,44 +3,44 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 CUDA_INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}/popsift)
 
 CUDA_ADD_LIBRARY(popsift
-	popsift/popsift.cpp popsift/popsift.h
-	popsift/features.cu popsift/features.h
-	popsift/sift_constants.cu popsift/sift_constants.h
-	popsift/sift_conf.cu popsift/sift_conf.h
-	popsift/gauss_filter.cu popsift/gauss_filter.h
-	popsift/s_image.cu popsift/s_image.h
-	popsift/sift_pyramid.cu popsift/sift_pyramid.h
-	popsift/sift_octave.cu popsift/sift_octave.h
-	popsift/s_pyramid_build.cu
-	popsift/s_pyramid_build_aa.cu popsift/s_pyramid_build_aa.h
-	popsift/s_pyramid_build_ai.cu popsift/s_pyramid_build_ai.h
-	popsift/s_pyramid_build_ra.cu popsift/s_pyramid_build_ra.h
-	popsift/s_pyramid_fixed.cu
-	popsift/sift_extremum.h
-	popsift/sift_extremum.cu popsift/s_extrema.cu
-	popsift/s_orientation.cu
+        popsift/popsift.cpp popsift/popsift.h
+        popsift/features.cu popsift/features.h
+        popsift/sift_constants.cu popsift/sift_constants.h
+        popsift/sift_conf.cu popsift/sift_conf.h
+        popsift/gauss_filter.cu popsift/gauss_filter.h
+        popsift/s_image.cu popsift/s_image.h
+        popsift/sift_pyramid.cu popsift/sift_pyramid.h
+        popsift/sift_octave.cu popsift/sift_octave.h
+        popsift/s_pyramid_build.cu
+        popsift/s_pyramid_build_aa.cu popsift/s_pyramid_build_aa.h
+        popsift/s_pyramid_build_ai.cu popsift/s_pyramid_build_ai.h
+        popsift/s_pyramid_build_ra.cu popsift/s_pyramid_build_ra.h
+        popsift/s_pyramid_fixed.cu
+        popsift/sift_extremum.h
+        popsift/sift_extremum.cu popsift/s_extrema.cu
+        popsift/s_orientation.cu
         popsift/s_filtergrid.cu
-	popsift/sift_desc.cu
-	popsift/s_desc_loop.cu popsift/s_desc_loop.h
-	popsift/s_desc_iloop.cu popsift/s_desc_iloop.h
-	popsift/s_desc_grid.cu popsift/s_desc_grid.h
-	popsift/s_desc_igrid.cu popsift/s_desc_igrid.h
-	popsift/s_desc_notile.cu popsift/s_desc_notile.h
-	popsift/s_desc_norm_rs.h
-	popsift/s_desc_norm_l2.h
-	popsift/s_desc_normalize.h
-	popsift/s_gradiant.h
-	popsift/s_solve.h
-	popsift/common/assist.cu popsift/common/assist.h
-	popsift/common/clamp.h
-	popsift/common/plane_2d.cu popsift/common/plane_2d.h
-	popsift/common/write_plane_2d.cu popsift/common/write_plane_2d.h
-	popsift/common/debug_macros.cu popsift/common/debug_macros.h
-	popsift/common/device_prop.cu popsift/common/device_prop.h
-	popsift/common/warp_bitonic_sort.h
-	popsift/common/excl_blk_prefix_sum.h
-	popsift/common/vec_macros.h
-	popsift/common/clamp.h )
+        popsift/sift_desc.cu
+        popsift/s_desc_loop.cu popsift/s_desc_loop.h
+        popsift/s_desc_iloop.cu popsift/s_desc_iloop.h
+        popsift/s_desc_grid.cu popsift/s_desc_grid.h
+        popsift/s_desc_igrid.cu popsift/s_desc_igrid.h
+        popsift/s_desc_notile.cu popsift/s_desc_notile.h
+        popsift/s_desc_norm_rs.h
+        popsift/s_desc_norm_l2.h
+        popsift/s_desc_normalize.h
+        popsift/s_gradiant.h
+        popsift/s_solve.h
+        popsift/common/assist.cu popsift/common/assist.h
+        popsift/common/clamp.h
+        popsift/common/plane_2d.cu popsift/common/plane_2d.h
+        popsift/common/write_plane_2d.cu popsift/common/write_plane_2d.h
+        popsift/common/debug_macros.cu popsift/common/debug_macros.h
+        popsift/common/device_prop.cu popsift/common/device_prop.h
+        popsift/common/warp_bitonic_sort.h
+        popsift/common/excl_blk_prefix_sum.h
+        popsift/common/vec_macros.h
+        popsift/common/clamp.h)
 
 
 # build directory containing the automatically generated files
