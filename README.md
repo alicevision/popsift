@@ -103,7 +103,7 @@ We acknowledge that there is at least one SIFT implementation that is vastly fas
 
 ## License
 
-PopSift is licensed under [MPL v2 license](LICENSE.md).
+PopSift is licensed under [MPL v2 license](COPYING.md).
 However, SIFT is patented in the US and perhaps other countries, and this license does not release users of this code from any requirements that may arise from such patents.
 
 ## Cite Us
