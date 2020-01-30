@@ -88,7 +88,7 @@ write_basic_package_version_file("${version_config}" COMPATIBILITY SameMajorVers
 # Use variables:
 #   * targets_export_name
 #   * PROJECT_NAME
-configure_package_config_file("cmake/Config.cmake.in"
+configure_package_config_file("${PROJECT_SOURCE_DIR}/cmake/Config.cmake.in"
                               "${project_config}"
                               INSTALL_DESTINATION "${config_install_dir}")
 
