@@ -3,15 +3,17 @@ cmake_minimum_required(VERSION 3.4)
 
 project(PopSift VERSION 1.0.0 LANGUAGES CXX)
 
-OPTION(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
-OPTION(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
-OPTION(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after every kernel." OFF)
-OPTION(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
-OPTION(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
-OPTION(PopSift_USE_NORMF "The __normf function computes Euclidian distance on large arrays. Fast but stability is uncertain." OFF)
-OPTION(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
-OPTION(PopSift_BOOST_USE_STATIC_LIBS "Link with static Boost libraries" OFF)
-OPTION(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
+
+option(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
+option(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
+option(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after every kernel." OFF)
+option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
+option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
+option(PopSift_USE_NORMF "The __normf function computes Euclidian distance on large arrays. Fast but stability is uncertain." OFF)
+option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
+option(PopSift_BOOST_USE_STATIC_LIBS "Link with static Boost libraries" OFF)
+option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
+
 
 if(PopSift_BOOST_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS ON)
