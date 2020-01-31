@@ -1,4 +1,3 @@
-CUDA_INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}/popsift)
 
 CUDA_ADD_LIBRARY(popsift
         popsift/popsift.cpp popsift/popsift.h
