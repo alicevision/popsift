@@ -16,6 +16,7 @@ option(PopSift_USE_NORMF "The __normf function computes Euclidian distance on la
 option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
 option(PopSift_BOOST_USE_STATIC_LIBS "Link with static Boost libraries" OFF)
 option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 
 if(PopSift_BOOST_USE_STATIC_LIBS)

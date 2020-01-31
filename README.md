@@ -37,7 +37,7 @@ Some build options are available:
 
 * `PopSift_BUILD_EXAMPLES` (default: `OFF`) enable building the applications that showcase the use of the library.
 
-* `BUILD_SHARED_LIBS` controls the type of library to build (`ON` for dynamic libraries, `OFF` for static)
+* `BUILD_SHARED_LIBS` (default: `ON`) controls the type of library to build (`ON` for shared libraries, `OFF` for static)
 
 
 ### Continuous integration: 
