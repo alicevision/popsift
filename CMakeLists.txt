@@ -54,6 +54,9 @@ include(GNUInstallDirs)
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -G")
 # set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -G")
 
+#################
+# BOOST
+#################
 find_package(Boost 1.53.0 REQUIRED COMPONENTS system thread)
 if(WIN32)
   add_definitions("-DBOOST_ALL_NO_LIB")
@@ -76,6 +79,9 @@ else()
   set(CUDA_USE_STATIC_CUDA_RUNTIME ON)
 endif()
 
+###################
+#  CUDA
+###################
 find_package(CUDA 7.0 REQUIRED)
 
 if(NOT CUDA_FOUND)
