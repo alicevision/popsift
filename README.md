@@ -35,7 +35,7 @@ make install
 
 Some build options are available:
 
-* `PopSift_BUILD_EXAMPLES` (default: `OFF`) enable building the applications that showcase the use of the library.
+* `PopSift_BUILD_EXAMPLES` (default: `ON`) enable building the applications that showcase the use of the library.
 
 * `BUILD_SHARED_LIBS` (default: `ON`) controls the type of library to build (`ON` for shared libraries, `OFF` for static)
 
@@ -128,7 +128,7 @@ If you use PopSift for your publication, please cite us as:
 ```
 
 
-## Authors
+## Acknowledgements
 
 PopSift was developed within the project [POPART](http://www.popartproject.eu), which has been funded by the European Commission in the Horizon 2020 framework.
 
