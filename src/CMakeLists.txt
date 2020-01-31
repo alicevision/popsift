@@ -47,8 +47,12 @@ set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
 # BUILD_INTERFACE allows to include the directory with source only when target is
 # built in the building tree (ie, not from an install location)
 target_include_directories(popsift 
-            PUBLIC ${Boost_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS}
-            "$<BUILD_INTERFACE:${generated_dir}>")
+            PUBLIC
+            $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
+            $<BUILD_INTERFACE:${generated_dir}>
+            $<INSTALL_INTERFACE:include/>
+            ${Boost_INCLUDE_DIRS}
+            ${CUDA_INCLUDE_DIRS})
 
 
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
