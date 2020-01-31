@@ -62,9 +62,9 @@ target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY} ${CUD
 # EXPORTING THE LIBRARY
 #
 # place to put the cmake-related files
-set(config_install_dir "lib/cmake/${PROJECT_NAME}")
+set(config_install_dir "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 # include directory for install
-set(include_install_dir "include")
+set(include_install_dir "${CMAKE_INSTALL_INCLUDEDIR}")
 # the name for the generated header version file
 set(popsift_version_header_name "${generated_dir}/version.hpp")
 # the name for the generated config.hpp
@@ -106,9 +106,9 @@ configure_file("${PROJECT_SOURCE_DIR}/cmake/sift_config.h.in" ${popsift_config_h
 #   * headers can be included by C++ code `#include <popsift/popsift.h>`
 install(TARGETS popsift
         EXPORT "${targets_export_name}"
-        LIBRARY DESTINATION "lib"
-        ARCHIVE DESTINATION "lib"
-        RUNTIME DESTINATION "bin"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
         INCLUDES DESTINATION "${include_install_dir}")
 
 # Headers:

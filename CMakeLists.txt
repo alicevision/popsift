@@ -42,6 +42,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ==============================================================================
+# GNUInstallDirs CMake module
+# - Define GNU standard installation directories
+# - Provides install directory variables as defined by the GNU Coding Standards.
+# ==============================================================================
+include(GNUInstallDirs)
+
+
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -G")
 # set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -G")
 
