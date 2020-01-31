@@ -1,7 +1,7 @@
 # CMake below 3.4 does not work with CUDA separable compilation at all
 cmake_minimum_required(VERSION 3.4)
 
-project(PopSift VERSION 1.0.0)
+project(PopSift VERSION 1.0.0 LANGUAGES CXX)
 
 OPTION(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
 OPTION(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
