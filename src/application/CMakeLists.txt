@@ -45,7 +45,7 @@ target_include_directories(popsift-demo PUBLIC ${PD_INCLUDE_DIRS})
 target_compile_definitions(popsift-demo PRIVATE ${Boost_DEFINITIONS} BOOST_ALL_DYN_LINK BOOST_ALL_NO_LIB)
 target_link_libraries(popsift-demo PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 
-set_target_properties(popsift-demo  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}" )
+set_target_properties(popsift-demo  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 
 #############################################################
 # popsift-match
@@ -60,7 +60,7 @@ target_include_directories(popsift-match PUBLIC ${PD_INCLUDE_DIRS})
 target_compile_definitions(popsift-match PRIVATE ${Boost_DEFINITIONS} BOOST_ALL_DYN_LINK BOOST_ALL_NO_LIB)
 target_link_libraries(popsift-match PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 
-set_target_properties(popsift-match  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}" )
+set_target_properties(popsift-match  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 
 #############################################################
 # installation

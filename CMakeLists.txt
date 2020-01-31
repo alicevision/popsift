@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 3.4)
 
 project(PopSift VERSION 1.0.0 LANGUAGES CXX)
 
+# Set build path as a folder named as the platform (linux, windows, darwin...) plus the processor type
+set(EXECUTABLE_OUTPUT_PATH "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+set(LIBRARY_OUTPUT_PATH "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 
 option(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
 option(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
