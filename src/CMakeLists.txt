@@ -41,14 +41,14 @@ CUDA_ADD_LIBRARY(popsift
 
 
 # build directory containing the automatically generated files
-set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(popsift_generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 # BUILD_INTERFACE allows to include the directory with source only when target is
 # built in the building tree (ie, not from an install location)
 target_include_directories(popsift 
             PUBLIC
             $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
-            $<BUILD_INTERFACE:${generated_dir}>
+            $<BUILD_INTERFACE:${popsift_generated_dir}>
             $<INSTALL_INTERFACE:include/>
             ${Boost_INCLUDE_DIRS}
             ${CUDA_INCLUDE_DIRS})
@@ -65,37 +65,37 @@ target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY} ${CUD
 # EXPORTING THE LIBRARY
 #
 # place to put the cmake-related files
-set(config_install_dir "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
+set(popsift_config_install_dir "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 # include directory for install
-set(include_install_dir "${CMAKE_INSTALL_INCLUDEDIR}")
+set(popsift_include_install_dir "${CMAKE_INSTALL_INCLUDEDIR}")
 # the name for the generated header version file
-set(popsift_version_header_name "${generated_dir}/version.hpp")
+set(popsift_version_header_name "${popsift_generated_dir}/version.hpp")
 # the name for the generated config.hpp
-set(popsift_config_header_name "${generated_dir}/sift_config.h")
+set(popsift_config_header_name "${popsift_generated_dir}/sift_config.h")
 # where to install the generated files
-set(install_dir_generated "${include_install_dir}/popsift")
+set(popsift_install_dir_generated "${popsift_include_install_dir}/popsift")
 
 
 # Configuration
-set(version_config "${generated_dir}/${PROJECT_NAME}ConfigVersion.cmake")
-set(project_config "${generated_dir}/${PROJECT_NAME}Config.cmake")
-set(targets_export_name "${PROJECT_NAME}Targets")
-set(namespace "${PROJECT_NAME}::")
+set(popsift_cmake_version_config "${popsift_generated_dir}/${PROJECT_NAME}ConfigVersion.cmake")
+set(popsift_cmake_project_config "${popsift_generated_dir}/${PROJECT_NAME}Config.cmake")
+set(popsift_targets_export_name "${PROJECT_NAME}Targets")
+set(popsift_namespace "${PROJECT_NAME}::")
 
 # Include module with fuction 'write_basic_package_version_file'
 include(CMakePackageConfigHelpers)
 
 # Configure '<PROJECT-NAME>ConfigVersion.cmake'
 # Note: major version number must be the same as requested
-write_basic_package_version_file("${version_config}" COMPATIBILITY SameMajorVersion)
+write_basic_package_version_file("${popsift_cmake_version_config}" COMPATIBILITY SameMajorVersion)
 
 # Configure '<PROJECT-NAME>Config.cmake'
 # Use variables:
-#   * targets_export_name
+#   * popsift_targets_export_name
 #   * PROJECT_NAME
 configure_package_config_file("${PROJECT_SOURCE_DIR}/cmake/Config.cmake.in"
-                              "${project_config}"
-                              INSTALL_DESTINATION "${config_install_dir}")
+                              "${popsift_cmake_project_config}"
+                              INSTALL_DESTINATION "${popsift_config_install_dir}")
 
 # version file
 configure_file("${PROJECT_SOURCE_DIR}/cmake/version.hpp.in" ${popsift_version_header_name} @ONLY)
@@ -108,39 +108,39 @@ configure_file("${PROJECT_SOURCE_DIR}/cmake/sift_config.h.in" ${popsift_config_h
 #   * header location after install: <prefix>/include/
 #   * headers can be included by C++ code `#include <popsift/popsift.h>`
 install(TARGETS popsift
-        EXPORT "${targets_export_name}"
+        EXPORT "${popsift_targets_export_name}"
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        INCLUDES DESTINATION "${include_install_dir}")
+        INCLUDES DESTINATION "${popsift_include_install_dir}")
 
 # Headers:
 install(DIRECTORY "popsift"
-        DESTINATION "${include_install_dir}"
+        DESTINATION "${popsift_include_install_dir}"
         FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
 
 install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/popsift"
-        DESTINATION "${include_install_dir}"
+        DESTINATION "${popsift_include_install_dir}"
         FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
 
 # Config
 #   * <prefix>/lib/cmake/${PROJECT_NAME}/${PROJECT_NAME}Config.cmake
 #   * <prefix>/lib/cmake/${PROJECT_NAME}${PROJECT_NAME}ConfigVersion.cmake
-install(FILES "${project_config}" "${version_config}"
-        DESTINATION "${config_install_dir}")
+install(FILES "${popsift_cmake_project_config}" "${popsift_cmake_version_config}"
+        DESTINATION "${popsift_config_install_dir}")
 
 # Config
 #   * <prefix>/lib/cmake/${PROJECT_NAME}/${PROJECT_NAME}Targets.cmake
-install(EXPORT "${targets_export_name}"
-        NAMESPACE "${namespace}"
-        DESTINATION "${config_install_dir}")
+install(EXPORT "${popsift_targets_export_name}"
+        NAMESPACE "${popsift_namespace}"
+        DESTINATION "${popsift_config_install_dir}")
 
 # install the config and version generated files
 install( FILES "${popsift_config_header_name}"
-		DESTINATION "${install_dir_generated}")
+		DESTINATION "${popsift_install_dir_generated}")
 
 install( FILES "${popsift_version_header_name}"
-		DESTINATION "${install_dir_generated}")
+		DESTINATION "${popsift_install_dir_generated}")
 
 if(PopSift_BUILD_EXAMPLES)
   add_subdirectory(application)
