@@ -189,7 +189,9 @@ cuda_find_library_local_first(CUDA_CUDADEVRT_LIBRARY cudadevrt "\"cudadevrt\" li
 if(PopSift_USE_NVTX_PROFILING)
   # library required for NVTX profiling of the CPU
   cuda_find_library_local_first(CUDA_NVTX_LIBRARY nvToolsExt "NVTX library")
-  add_definitions(-DUSE_NVTX)
+  set(PopSift_USE_NVTX 1)
+else()
+  set(PopSift_USE_NVTX 0)
 endif()
 
 add_subdirectory(src)

@@ -10,6 +10,7 @@
 #include "popsift.h"
 #include "gauss_filter.h"
 #include "sift_pyramid.h"
+#include "sift_config.h"
 
 using namespace std;
 
@@ -283,7 +284,7 @@ void SiftJob::setImg( popsift::ImageBase* img )
 
 popsift::ImageBase* SiftJob::getImg()
 {
-#ifdef USE_NVTX
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     _nvtx_id = nvtxRangeStartA( "inserting image" );
 #endif
     return _img;
@@ -292,7 +293,7 @@ popsift::ImageBase* SiftJob::getImg()
 void SiftJob::setFeatures( popsift::FeaturesBase* f )
 {
     _p.set_value( f );
-#ifdef USE_NVTX
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangeEnd( _nvtx_id );
 #endif
 }

@@ -20,8 +20,9 @@
 #include "s_desc_notile.h"
 #include "common/assist.h"
 #include "common/debug_macros.h"
+#include "sift_config.h"
 
-#ifdef USE_NVTX
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
 #else
 #define nvtxRangePushA(a)
