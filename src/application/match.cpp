@@ -22,6 +22,7 @@
 #include <popsift/popsift.h>
 #include <popsift/features.h>
 #include <popsift/sift_conf.h>
+#include <popsift/sift_config.h>
 #include <popsift/common/device_prop.h>
 
 #ifdef USE_DEVIL

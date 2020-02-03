@@ -49,6 +49,7 @@ target_include_directories(popsift
             PUBLIC
             $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
             $<BUILD_INTERFACE:${popsift_generated_dir}>
+            $<BUILD_INTERFACE:${popsift_generated_dir}/popsift>
             $<INSTALL_INTERFACE:include/>
             ${Boost_INCLUDE_DIRS}
             ${CUDA_INCLUDE_DIRS})
@@ -69,9 +70,9 @@ set(popsift_config_install_dir "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 # include directory for install
 set(popsift_include_install_dir "${CMAKE_INSTALL_INCLUDEDIR}")
 # the name for the generated header version file
-set(popsift_version_header_name "${popsift_generated_dir}/version.hpp")
+set(popsift_version_header_name "${popsift_generated_dir}/popsift/version.hpp")
 # the name for the generated config.hpp
-set(popsift_config_header_name "${popsift_generated_dir}/sift_config.h")
+set(popsift_config_header_name "${popsift_generated_dir}/popsift/sift_config.h")
 # where to install the generated files
 set(popsift_install_dir_generated "${popsift_include_install_dir}/popsift")
 
