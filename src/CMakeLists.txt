@@ -50,7 +50,7 @@ target_include_directories(popsift
             $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
             $<BUILD_INTERFACE:${popsift_generated_dir}>
             $<BUILD_INTERFACE:${popsift_generated_dir}/popsift>
-            $<INSTALL_INTERFACE:include/>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>
             ${Boost_INCLUDE_DIRS}
             ${CUDA_INCLUDE_DIRS})
 
