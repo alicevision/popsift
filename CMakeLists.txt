@@ -204,5 +204,27 @@ CONFIGURE_FILE(
   "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake"
   IMMEDIATE @ONLY)
 ADD_CUSTOM_TARGET(uninstall
-  "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake") 
+  "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake")
 
+
+######################################
+# SUMMARY
+######################################
+message("\n")
+message("******************************************")
+message("Building configuration:\n")
+message(STATUS "PopSift version: " ${PROJECT_VERSION})
+message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
+message(STATUS "Build Shared libs: " ${BUILD_SHARED_LIBS})
+message(STATUS "Build examples: " ${PopSift_BUILD_EXAMPLES})
+message(STATUS "Generate position independent code: " ${PopSift_USE_POSITION_INDEPENDENT_CODE})
+message(STATUS "Use CUDA NVTX for profiling: " ${PopSift_USE_NVTX_PROFILING})
+message(STATUS "Synchronize and check CUDA error after every kernel: " ${PopSift_ERRCHK_AFTER_KERNEL})
+message(STATUS "Grid filtering: " ${PopSift_USE_GRID_FILTER})
+message(STATUS "Testing step: " ${PopSift_USE_TEST_CMD})
+message(STATUS "Link with static Boost libraries: " ${PopSift_BOOST_USE_STATIC_LIBS})
+message(STATUS "Additional warning for CUDA nvcc: " ${PopSift_NVCC_WARNINGS})
+message(STATUS "Compiling for CUDA CCs: ${PopSift_CUDA_CC_LIST}")
+message(STATUS "Install path: " ${CMAKE_INSTALL_PREFIX})
+message("\n******************************************")
+message("\n")
