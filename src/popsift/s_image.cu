@@ -6,13 +6,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include "s_image.h"
-#include <iostream>
-#include <fstream>
 #include "common/debug_macros.h"
 #include "common/assist.h"
-#include <stdio.h>
-#include <assert.h>
 #include "sift_config.h"
+#include <iostream>
+#include <fstream>
+#include <cstdio>
+#include <cassert>
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>

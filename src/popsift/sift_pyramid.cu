@@ -9,7 +9,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <stdio.h>
+#include <cstdio>
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>

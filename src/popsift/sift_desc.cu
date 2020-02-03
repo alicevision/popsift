@@ -6,8 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include <iostream>
-#include <stdio.h>
-#include <iso646.h>
+#include <cstdio>
 
 #include "sift_pyramid.h"
 #include "sift_constants.h"
