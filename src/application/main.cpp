@@ -23,6 +23,7 @@
 #include <popsift/features.h>
 #include <popsift/sift_conf.h>
 #include <popsift/sift_config.h>
+#include <popsift/version.hpp>
 #include <popsift/common/device_prop.h>
 
 #ifdef USE_DEVIL
@@ -272,6 +273,8 @@ int main(int argc, char **argv)
     list<string>   inputFiles;
     string         inputFile = "";
     const char*    appName   = argv[0];
+
+    std::cout << "PopSift version: " << POPSIFT_VERSION_STRING << std::endl;
 
     try {
         parseargs( argc, argv, config, inputFile ); // Parse command line

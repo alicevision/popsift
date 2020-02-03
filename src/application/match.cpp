@@ -19,11 +19,12 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
-#include <popsift/popsift.h>
+#include <popsift/common/device_prop.h>
 #include <popsift/features.h>
+#include <popsift/popsift.h>
 #include <popsift/sift_conf.h>
 #include <popsift/sift_config.h>
-#include <popsift/common/device_prop.h>
+#include <popsift/version.hpp>
 
 #ifdef USE_DEVIL
 #include <devil_cpp_wrapper.hpp>
@@ -225,6 +226,8 @@ int main(int argc, char **argv)
     string         lFile = "";
     string         rFile = "";
     const char*    appName   = argv[0];
+
+    std::cout << "PopSift version: " << POPSIFT_VERSION_STRING << std::endl;
 
     try {
         parseargs( argc, argv, config, lFile, rFile ); // Parse command line
