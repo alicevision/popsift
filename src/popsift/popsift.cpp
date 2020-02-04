@@ -14,7 +14,7 @@
 using namespace std;
 
 PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode, ImageMode imode )
-    : _image_mode( imode )
+    : _image_mode( imode ), _isInit(true)
 {
     if( imode == ByteImages )
     {
@@ -38,7 +38,7 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
 }
 
 PopSift::PopSift( ImageMode imode )
-    : _image_mode( imode )
+    : _image_mode( imode ), _isInit(true)
 {
     if( imode == ByteImages )
     {
@@ -58,6 +58,10 @@ PopSift::PopSift( ImageMode imode )
 
 PopSift::~PopSift()
 {
+    if(_isInit)
+    {
+        uninit();
+    }
 }
 
 bool PopSift::configure( const popsift::Config& config, bool force )
@@ -121,19 +125,14 @@ bool PopSift::private_init( int w, int h )
 
 void PopSift::uninit( )
 {
-    _pipe._queue_stage1.push( 0 );
-    _pipe._thread_stage2->join();
-    _pipe._thread_stage1->join();
-    delete _pipe._thread_stage2;
-    delete _pipe._thread_stage1;
-
-    while( !_pipe._unused.empty() ) {
-        popsift::ImageBase* img = _pipe._unused.pull();
-        delete img;
+    if(!_isInit)
+    {
+        std::cout << "[warning] Attempt to release resources from an uninitialized instance" << std::endl;
+        return;
     }
+    _pipe.uninit();
 
-    delete _pipe._pyramid;
-    _pipe._pyramid    = 0;
+    _isInit = false;
 }
 
 SiftJob* PopSift::enqueue( int                  w,
@@ -317,3 +316,30 @@ popsift::FeaturesDev* SiftJob::getDev()
     return dynamic_cast<popsift::FeaturesDev*>( _f.get() );
 }
 
+void PopSift::Pipe::uninit()
+{
+    _queue_stage1.push( nullptr );
+    if(_thread_stage2 != nullptr)
+    {
+        _thread_stage2->join();
+        delete _thread_stage2;
+    }
+    if(_thread_stage1 != nullptr)
+    {
+        _thread_stage1->join();
+        delete _thread_stage1;
+    }
+
+    while( !_unused.empty() )
+    {
+        popsift::ImageBase* img = _unused.pull();
+        delete img;
+    }
+
+    if(_pyramid != nullptr)
+    {
+        delete _pyramid;
+        _pyramid    = nullptr;
+    }
+
+}

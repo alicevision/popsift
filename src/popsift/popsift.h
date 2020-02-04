@@ -82,6 +82,11 @@ class PopSift
         popsift::ImageBase*                    _current;
 
         popsift::Pyramid*                      _pyramid;
+
+        /**
+         * @brief Release the allocated resources, if any.
+         */
+        void uninit();
     };
 
 public:
@@ -95,8 +100,8 @@ public:
     /* We support more than 1 streams, but we support only one sigma and one
      * level parameters.
      */
-    PopSift( ImageMode imode = ByteImages );
-    PopSift( const popsift::Config&          config,
+    explicit PopSift( ImageMode imode = ByteImages );
+    explicit PopSift( const popsift::Config&          config,
              popsift::Config::ProcessingMode mode  = popsift::Config::ExtractingMode,
              ImageMode                       imode = ByteImages );
     ~PopSift();
@@ -118,10 +123,14 @@ public:
                        int          h,
                        const float* imageData );
 
-    /** deprecated */
+    /**
+     * @deprecated
+     * */
     inline void uninit( int /*pipe*/ ) { uninit(); }
 
-    /** deprecated */
+    /**
+     * @deprecated
+     **/
     inline bool init( int /*pipe*/, int w, int h ) {
         _last_init_w = w;
         _last_init_h = h;
@@ -164,5 +173,8 @@ private:
     int             _last_init_w; /* to support depreacted interface */
     int             _last_init_h; /* to support depreacted interface */
     ImageMode       _image_mode;
+
+    /// whether the object is initialized
+    bool            _isInit{false};
 };
 
