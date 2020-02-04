@@ -37,11 +37,12 @@ else()
   message(STATUS "Building in ${CMAKE_BUILD_TYPE} configuration")
 endif()
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
-set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_RELEASE}   -O3")
+# for some reason this line is necessary to propagate the standard to nvcc
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD 11)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 # ==============================================================================
 # GNUInstallDirs CMake module
@@ -50,9 +51,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # ==============================================================================
 include(GNUInstallDirs)
 
-
-# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -G")
-# set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -G")
 
 #################
 # BOOST
