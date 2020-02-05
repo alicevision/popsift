@@ -323,11 +323,13 @@ void PopSift::Pipe::uninit()
     {
         _thread_stage2->join();
         delete _thread_stage2;
+        _thread_stage2 = nullptr;
     }
     if(_thread_stage1 != nullptr)
     {
         _thread_stage1->join();
         delete _thread_stage1;
+        _thread_stage1 = nullptr;
     }
 
     while( !_unused.empty() )
