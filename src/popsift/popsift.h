@@ -74,13 +74,13 @@ class PopSift
 {
     struct Pipe
     {
-        boost::thread*                         _thread_stage1;
-        boost::thread*                         _thread_stage2;
+        boost::thread*                         _thread_stage1{nullptr};
+        boost::thread*                         _thread_stage2{nullptr};
         boost::sync_queue<SiftJob*>            _queue_stage1;
         boost::sync_queue<SiftJob*>            _queue_stage2;
         boost::sync_queue<popsift::ImageBase*> _unused;
 
-        popsift::Pyramid*                      _pyramid;
+        popsift::Pyramid*                      _pyramid{nullptr};
 
         /**
          * @brief Release the allocated resources, if any.
