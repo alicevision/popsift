@@ -11,7 +11,7 @@
 #include <string>
 #include <cmath>
 #include <iomanip>
-#include <stdlib.h>
+#include <cstdlib>
 #include <stdexcept>
 #include <list>
 #include <string>
@@ -38,11 +38,11 @@
 
 using namespace std;
 
-static bool print_dev_info  = false;
-static bool print_time_info = false;
-static bool write_as_uchar  = false;
-static bool dont_write      = false;
-static bool pgmread_loading = false;
+static bool print_dev_info  {false};
+static bool print_time_info {false};
+static bool write_as_uchar  {false};
+static bool dont_write      {false};
+static bool pgmread_loading {false};
 
 static void parseargs(int argc, char** argv, popsift::Config& config, string& lFile, string& rFile) {
     using namespace boost::program_options;
@@ -167,8 +167,6 @@ static void collectFilenames( list<string>& inputFiles, const boost::filesystem:
 
 SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 {
-    int w;
-    int h;
     unsigned char* image_data;
     SiftJob* job;
 
@@ -185,8 +183,8 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
             cerr << "Failed converting image " << inputFile << " to unsigned greyscale image" << endl;
             exit( -1 );
         }
-        w = img.Width();
-        h = img.Height();
+        const auto w = img.Width();
+        const auto h = img.Height();
         cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
         image_data = img.GetData();
 
@@ -200,9 +198,11 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     else
 #endif
     {
+        int h{};
+        int w{};
         image_data = readPGMfile( inputFile, w, h );
-        if( image_data == 0 ) {
-            exit( -1 );
+        if( image_data == nullptr ) {
+            exit( EXIT_FAILURE );
         }
 
         nvtxRangePop( );
@@ -221,9 +221,8 @@ int main(int argc, char **argv)
     cudaDeviceReset();
 
     popsift::Config config;
-    string         lFile = "";
-    string         rFile = "";
-    const char*    appName   = argv[0];
+    string         lFile{};
+    string         rFile{};
 
     try {
         parseargs( argc, argv, config, lFile, rFile ); // Parse command line
@@ -231,20 +230,20 @@ int main(int argc, char **argv)
     }
     catch (std::exception& e) {
         std::cout << e.what() << std::endl;
-        exit(1);
+        return EXIT_SUCCESS;
     }
 
     if( boost::filesystem::exists( lFile ) ) {
         if( not boost::filesystem::is_regular_file( lFile ) ) {
             cout << "Input file " << lFile << " is not a regular file, nothing to do" << endl;
-            exit( -1 );
+            return EXIT_FAILURE;
         }
     }
 
     if( boost::filesystem::exists( rFile ) ) {
         if( not boost::filesystem::is_regular_file( rFile ) ) {
             cout << "Input file " << rFile << " is not a regular file, nothing to do" << endl;
-            exit( -1 );
+            return EXIT_FAILURE;
         }
     }
 
@@ -271,5 +270,7 @@ int main(int argc, char **argv)
     delete rFeatures;
 
     PopSift.uninit( );
+
+    return EXIT_SUCCESS;
 }
 
