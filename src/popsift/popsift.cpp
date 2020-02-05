@@ -338,10 +338,7 @@ void PopSift::Pipe::uninit()
         delete img;
     }
 
-    if(_pyramid != nullptr)
-    {
-        delete _pyramid;
-        _pyramid    = nullptr;
-    }
+    delete _pyramid;
+    _pyramid    = nullptr;
 
 }
