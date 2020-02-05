@@ -76,8 +76,10 @@ void ext_desc_loop_sub( const float         ang,
 
     float dpt[9] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 
-    for( int i = threadIdx.x; i < loops; i+=blockDim.x )
+    for( int i = threadIdx.x; popsift::any(i < loops); i+=blockDim.x )
     {
+        if( i >= loops ) continue;
+
         const int ii = i / wx + ymin;
         const int jj = i % wx + xmin;     
 
@@ -111,14 +113,14 @@ void ext_desc_loop_sub( const float         ang,
             const float wgt2 = do0;
 
             int fo  = fo0 % DESC_BINS;
-
+    
                 // maf: multiply-add
                 // _ru - round to positive infinity equiv to froundf since always >=0
             dpt[fo]   = __fmaf_ru( wgt1, wgt, dpt[fo] );   // dpt[fo]   += (wgt1*wgt);
             dpt[fo+1] = __fmaf_ru( wgt2, wgt, dpt[fo+1] ); // dpt[fo+1] += (wgt2*wgt);
         }
-        __syncthreads();
     }
+    __syncthreads();
 
     dpt[0] += dpt[8];
 
