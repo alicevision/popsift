@@ -79,7 +79,6 @@ class PopSift
         boost::sync_queue<SiftJob*>            _queue_stage1;
         boost::sync_queue<SiftJob*>            _queue_stage2;
         boost::sync_queue<popsift::ImageBase*> _unused;
-        popsift::ImageBase*                    _current;
 
         popsift::Pyramid*                      _pyramid;
 
