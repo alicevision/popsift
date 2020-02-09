@@ -30,11 +30,11 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
 
     configure( config, true );
 
-    _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
+    _pipe._thread_stage1.reset( new boost::thread( &PopSift::uploadImages, this ));
     if( mode == popsift::Config::ExtractingMode )
-        _pipe._thread_stage2 = new boost::thread( &PopSift::extractDownloadLoop, this );
+        _pipe._thread_stage2.reset( new boost::thread( &PopSift::extractDownloadLoop, this ));
     else
-        _pipe._thread_stage2 = new boost::thread( &PopSift::matchPrepareLoop, this );
+        _pipe._thread_stage2.reset( new boost::thread( &PopSift::matchPrepareLoop, this ));
 }
 
 PopSift::PopSift( ImageMode imode )
@@ -52,8 +52,8 @@ PopSift::PopSift( ImageMode imode )
     }
     _pipe._pyramid    = nullptr;
 
-    _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
-    _pipe._thread_stage2 = new boost::thread( &PopSift::extractDownloadLoop, this );
+    _pipe._thread_stage1.reset( new boost::thread( &PopSift::uploadImages, this ));
+    _pipe._thread_stage2.reset( new boost::thread( &PopSift::extractDownloadLoop, this ));
 }
 
 PopSift::~PopSift()
@@ -322,14 +322,12 @@ void PopSift::Pipe::uninit()
     if(_thread_stage2 != nullptr)
     {
         _thread_stage2->join();
-        delete _thread_stage2;
-        _thread_stage2 = nullptr;
+        _thread_stage2.reset(nullptr);
     }
     if(_thread_stage1 != nullptr)
     {
         _thread_stage1->join();
-        delete _thread_stage1;
-        _thread_stage1 = nullptr;
+        _thread_stage1.reset(nullptr);
     }
 
     while( !_unused.empty() )
