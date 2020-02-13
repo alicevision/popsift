@@ -1,5 +1,5 @@
 # CMake below 3.4 does not work with CUDA separable compilation at all
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.12)
 
 project(PopSift VERSION 1.0.0 LANGUAGES CXX)
 
