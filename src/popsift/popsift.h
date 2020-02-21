@@ -74,8 +74,8 @@ class PopSift
 {
     struct Pipe
     {
-        std::unique_ptr<boost::thread>         _thread_stage1{nullptr};
-        std::unique_ptr<boost::thread>         _thread_stage2{nullptr};
+        std::unique_ptr<boost::thread>         _thread_stage1;
+        std::unique_ptr<boost::thread>         _thread_stage2;
         boost::sync_queue<SiftJob*>            _queue_stage1;
         boost::sync_queue<SiftJob*>            _queue_stage2;
         boost::sync_queue<popsift::ImageBase*> _unused;
