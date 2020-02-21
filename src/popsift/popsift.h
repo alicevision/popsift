@@ -96,6 +96,10 @@ public:
     };
 
 public:
+
+    PopSift() = delete;
+    PopSift(const PopSift&) = delete;
+
     /* We support more than 1 streams, but we support only one sigma and one
      * level parameters.
      */
@@ -174,6 +178,6 @@ private:
     ImageMode       _image_mode;
 
     /// whether the object is initialized
-    bool            _isInit{false};
+    bool            _isInit{true};
 };
 

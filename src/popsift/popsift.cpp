@@ -14,7 +14,7 @@
 using namespace std;
 
 PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode, ImageMode imode )
-    : _image_mode( imode ), _isInit(true)
+    : _image_mode( imode )
 {
     if( imode == ByteImages )
     {
@@ -38,7 +38,7 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
 }
 
 PopSift::PopSift( ImageMode imode )
-    : _image_mode( imode ), _isInit(true)
+    : _image_mode( imode )
 {
     if( imode == ByteImages )
     {
