@@ -50,7 +50,9 @@ Some build options are available:
 
 ## Usage
 
-Two artifacts are made: `libpopsift` and, if enabled, the test application `popsift-demo`. Calling `popsift-demo` without parameters shows the options.
+The main artifact created is `libpopsift`.
+If enabled, the test application `popsift-demo` is created as well.
+Calling `popsift-demo` without parameters shows the options.
 
 ### Using PopSift as third party
 
@@ -84,7 +86,9 @@ cmake .. -DPopSift_DIR=<prefix>/lib/cmake/PopSift/
 The caller must create a `popart::Config` struct (documented in `src/sift/sift_conf.h`) to control the behaviour of the PopSift, and instantiate an object of class `PopSift` (found in `src/sift/popsift.h`).
 
 After this, images can be enqueued for SIFT extraction using (`enqueue()`).  
-The only valid input format is a single plane of grayscale unsigned characters.
+A valid input is a single plane of grayscale values located in host memory.
+They can passed as a pointer to unsigned char, with a value range from 0 to 255, or as a pointer to float, with a value range from 0.0f to 1.0f.
+
 Only host memory limits the number of images that can be enqueued. 
 The `enqueue` function returns a pointer to a `SiftJob` immediately and performs the feature extraction asynchronously.
 The memory of the image passed to enqueue remains the caller's responsibility. Calling `SiftJob::get` on the returned job blocks until features are extracted, and returns them.
