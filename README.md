@@ -1,8 +1,9 @@
 
-# PopSift
+# PopSift  
 
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3728/badge)](https://bestpractices.coreinfrastructure.org/projects/3728)
 
-PopSift is an implementation of the SIFT algorithm in CUDA.
+PopSift is an open-source implementation of the SIFT algorithm in CUDA.
 PopSift tries to stick as closely as possible to David Lowe's famous paper [1], while extracting features from an image in real-time at least on an NVidia GTX 980 Ti GPU.
 
 ## HW requirements
