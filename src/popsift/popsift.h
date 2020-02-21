@@ -173,8 +173,8 @@ private:
      */
     popsift::Config _shadow_config;
 
-    int             _last_init_w; /* to support depreacted interface */
-    int             _last_init_h; /* to support depreacted interface */
+    int             _last_init_w{}; /* to support deprecated interface */
+    int             _last_init_h{}; /* to support deprecated interface */
     ImageMode       _image_mode;
 
     /// whether the object is initialized
