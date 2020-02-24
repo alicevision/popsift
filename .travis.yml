@@ -23,15 +23,18 @@ env:
   
   global:
     - NUM_CPU="`grep processor /proc/cpuinfo | wc -l`"; echo $NUM_CPU
-    - BUILD_TYPE="RELEASE"
     - BUILD_SYSTEM="`uname -s`"
     - BUILD_PROCESSOR="`uname -p`"
     - POPSIFT_SOURCE=${TRAVIS_BUILD_DIR}
-    - POPSIFT_BUILD=${TRAVIS_BUILD_DIR}/build
-    - POPSIFT_INSTALL=${POPSIFT_BUILD}/install
+    - POPSIFT_BUILD_RELEASE=${TRAVIS_BUILD_DIR}/build_release
+    - POPSIFT_BUILD_DEBUG=${TRAVIS_BUILD_DIR}/build_debug
+    - POPSIFT_INSTALL_RELEASE=${POPSIFT_BUILD_RELEASE}/install
+    - POPSIFT_INSTALL_DEBUG=${POPSIFT_BUILD_DEBUG}/install
     - POPSIFT_APP_SRC=${POPSIFT_SOURCE}/src/application
-    - POPSIFT_APP_BUILD=${POPSIFT_APP_SRC}/build
-    - POPSIFT_APP_INSTALL=${POPSIFT_APP_BUILD}/install
+    - POPSIFT_APP_BUILD_RELEASE=${POPSIFT_APP_SRC}/build_release
+    - POPSIFT_APP_BUILD_DEBUG=${POPSIFT_APP_SRC}/build_debug
+    - POPSIFT_APP_INSTALL_RELEASE=${POPSIFT_APP_BUILD_RELEASE}/install
+    - POPSIFT_APP_INSTALL_DEBUG=${POPSIFT_APP_BUILD_DEBUG}/install
     # CMAKE
     # - CMAKE_URL="https://cmake.org/files/v3.6/cmake-3.6.1-Linux-x86_64.tar.gz"
     - CMAKE_URL="https://cmake.org/files/v3.13/cmake-3.13.5-Linux-x86_64.tar.gz"
@@ -66,23 +69,44 @@ install:
   - sudo ln -s /usr/local/cuda-${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR} /usr/local/cuda
 
 before_script:
-  # Create build folder
-  - mkdir -p ${POPSIFT_BUILD}
-  - cd ${POPSIFT_BUILD}
   # Classic release build
+  # Create build folder
+  - mkdir -p ${POPSIFT_BUILD_RELEASE}
+  - cd ${POPSIFT_BUILD_RELEASE}
   - >
-     cmake . ${POPSIFT_SOURCE} -DCMAKE_INSTALL_PREFIX=${POPSIFT_INSTALL}
+     cmake . ${POPSIFT_SOURCE} -DCMAKE_INSTALL_PREFIX=${POPSIFT_INSTALL_RELEASE} -DCMAKE_BUILD_TYPE=Release
+
+  # Classic debug build
+  # Create build folder
+  - mkdir -p ${POPSIFT_BUILD_DEBUG}
+  - cd ${POPSIFT_BUILD_DEBUG}
+  - >
+   cmake . ${POPSIFT_SOURCE} -DCMAKE_INSTALL_PREFIX=${POPSIFT_INSTALL_DEBUG} -DCMAKE_BUILD_TYPE=Debug
 
 script:
+  - cd ${POPSIFT_BUILD_RELEASE}
 # limit GCC builds to a reduced number of thread for the virtual machine
   - make install -j 2 VERBOSE=1
 # Perform unit tests
   # - make test
 # Perform tests building application with PopSift as 3rd party
   - cd ${POPSIFT_APP_SRC}
-  - mkdir -p ${POPSIFT_APP_BUILD}
-  - cd ${POPSIFT_APP_BUILD}
-  - cmake .. -DPopSift_DIR=${POPSIFT_INSTALL}/lib/cmake/PopSift/ -DCMAKE_INSTALL_PREFIX=${POPSIFT_APP_INSTALL}
+  - mkdir -p ${POPSIFT_APP_BUILD_RELEASE}
+  - cd ${POPSIFT_APP_BUILD_RELEASE}
+  - cmake .. -DPopSift_DIR=${POPSIFT_INSTALL_RELEASE}/lib/cmake/PopSift/ -DCMAKE_INSTALL_PREFIX=${POPSIFT_APP_INSTALL_RELEASE} -DCMAKE_BUILD_TYPE=Release
+  - make install -j 2 VERBOSE=1
+
+# same for debug
+  - cd ${POPSIFT_BUILD_DEBUG}
+  # limit GCC builds to a reduced number of thread for the virtual machine
+  - make install -j 2 VERBOSE=1
+  # Perform unit tests
+  # - make test
+  # Perform tests building application with PopSift as 3rd party
+  - cd ${POPSIFT_APP_SRC}
+  - mkdir -p ${POPSIFT_APP_BUILD_DEBUG}
+  - cd ${POPSIFT_APP_BUILD_DEBUG}
+  - cmake .. -DPopSift_DIR=${POPSIFT_INSTALL_DEBUG}/lib/cmake/PopSift/ -DCMAKE_INSTALL_PREFIX=${POPSIFT_APP_INSTALL_DEBUG} -DCMAKE_BUILD_TYPE=Debug
   - make install -j 2 VERBOSE=1
 
 cache:
