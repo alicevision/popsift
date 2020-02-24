@@ -26,7 +26,6 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
         _pipe._unused.push( new popsift::ImageFloat );
         _pipe._unused.push( new popsift::ImageFloat );
     }
-    _pipe._pyramid    = nullptr;
 
     configure( config, true );
 
@@ -50,7 +49,6 @@ PopSift::PopSift( ImageMode imode )
         _pipe._unused.push( new popsift::ImageFloat );
         _pipe._unused.push( new popsift::ImageFloat );
     }
-    _pipe._pyramid    = nullptr;
 
     _pipe._thread_stage1.reset( new boost::thread( &PopSift::uploadImages, this ));
     _pipe._thread_stage2.reset( new boost::thread( &PopSift::extractDownloadLoop, this ));
