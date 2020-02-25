@@ -10,6 +10,7 @@ else()
   # See 5:
   #    * http://www.cmake.org/cmake/help/v3.0/command/find_package.html
   find_package(PopSift CONFIG REQUIRED)
+  message(STATUS "Found PopSift, version: ${PopSift_VERSION}")
 endif()
 
 find_package(Boost 1.53.0 REQUIRED COMPONENTS program_options system filesystem)
