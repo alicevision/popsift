@@ -17,7 +17,7 @@ function(ChooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
   find_package(CUDA ${MINCUDAVERSION} REQUIRED)
 
   if(NOT CUDA_FOUND)
-    message(FATAL_ERROR "Could not find CUDA >= 7.0")
+    message(FATAL_ERROR "Could not find CUDA >= ${MINCUDAVERSION}")
   endif()
 
   #
