@@ -26,15 +26,14 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
         _pipe._unused.push( new popsift::ImageFloat );
         _pipe._unused.push( new popsift::ImageFloat );
     }
-    _pipe._pyramid    = 0;
 
     configure( config, true );
 
-    _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
+    _pipe._thread_stage1.reset( new boost::thread( &PopSift::uploadImages, this ));
     if( mode == popsift::Config::ExtractingMode )
-        _pipe._thread_stage2 = new boost::thread( &PopSift::extractDownloadLoop, this );
+        _pipe._thread_stage2.reset( new boost::thread( &PopSift::extractDownloadLoop, this ));
     else
-        _pipe._thread_stage2 = new boost::thread( &PopSift::matchPrepareLoop, this );
+        _pipe._thread_stage2.reset( new boost::thread( &PopSift::matchPrepareLoop, this ));
 }
 
 PopSift::PopSift( ImageMode imode )
@@ -50,19 +49,22 @@ PopSift::PopSift( ImageMode imode )
         _pipe._unused.push( new popsift::ImageFloat );
         _pipe._unused.push( new popsift::ImageFloat );
     }
-    _pipe._pyramid    = 0;
 
-    _pipe._thread_stage1 = new boost::thread( &PopSift::uploadImages, this );
-    _pipe._thread_stage2 = new boost::thread( &PopSift::extractDownloadLoop, this );
+    _pipe._thread_stage1.reset( new boost::thread( &PopSift::uploadImages, this ));
+    _pipe._thread_stage2.reset( new boost::thread( &PopSift::extractDownloadLoop, this ));
 }
 
 PopSift::~PopSift()
 {
+    if(_isInit)
+    {
+        uninit();
+    }
 }
 
 bool PopSift::configure( const popsift::Config& config, bool force )
 {
-    if( _pipe._pyramid != 0 ) {
+    if( _pipe._pyramid != nullptr ) {
         return false;
     }
 
@@ -97,7 +99,7 @@ bool PopSift::private_init( int w, int h )
     float upscaleFactor = _config.getUpscaleFactor();
     float scaleFactor = 1.0f / powf( 2.0f, -upscaleFactor );
 
-    if( p._pyramid != 0 ) {
+    if( p._pyramid != nullptr ) {
         p._pyramid->resetDimensions( _config,
                                      ceilf( w * scaleFactor ),
                                      ceilf( h * scaleFactor ) );
@@ -121,19 +123,14 @@ bool PopSift::private_init( int w, int h )
 
 void PopSift::uninit( )
 {
-    _pipe._queue_stage1.push( 0 );
-    _pipe._thread_stage2->join();
-    _pipe._thread_stage1->join();
-    delete _pipe._thread_stage2;
-    delete _pipe._thread_stage1;
-
-    while( !_pipe._unused.empty() ) {
-        popsift::ImageBase* img = _pipe._unused.pull();
-        delete img;
+    if(!_isInit)
+    {
+        std::cout << "[warning] Attempt to release resources from an uninitialized instance" << std::endl;
+        return;
     }
+    _pipe.uninit();
 
-    delete _pipe._pyramid;
-    _pipe._pyramid    = 0;
+    _isInit = false;
 }
 
 SiftJob* PopSift::enqueue( int                  w,
@@ -171,12 +168,12 @@ SiftJob* PopSift::enqueue( int          w,
 void PopSift::uploadImages( )
 {
     SiftJob* job;
-    while( ( job = _pipe._queue_stage1.pull() ) != 0 ) {
+    while( ( job = _pipe._queue_stage1.pull() ) != nullptr ) {
         popsift::ImageBase* img = _pipe._unused.pull();
         job->setImg( img );
         _pipe._queue_stage2.push( job );
     }
-    _pipe._queue_stage2.push( 0 );
+    _pipe._queue_stage2.push( nullptr );
 }
 
 void PopSift::extractDownloadLoop( )
@@ -184,7 +181,7 @@ void PopSift::extractDownloadLoop( )
     Pipe& p = _pipe;
 
     SiftJob* job;
-    while( ( job = p._queue_stage2.pull() ) != 0 ) {
+    while( ( job = p._queue_stage2.pull() ) != nullptr ) {
         popsift::ImageBase* img = job->getImg();
 
         private_init( img->getWidth(), img->getHeight() );
@@ -217,7 +214,7 @@ void PopSift::matchPrepareLoop( )
     Pipe& p = _pipe;
 
     SiftJob* job;
-    while( ( job = p._queue_stage2.pull() ) != 0 ) {
+    while( ( job = p._queue_stage2.pull() ) != nullptr ) {
         popsift::ImageBase* img = job->getImg();
 
         private_init( img->getWidth(), img->getHeight() );
@@ -238,12 +235,12 @@ void PopSift::matchPrepareLoop( )
 SiftJob::SiftJob( int w, int h, const unsigned char* imageData )
     : _w(w)
     , _h(h)
-    , _img(0)
+    , _img(nullptr)
 {
     _f = _p.get_future();
 
     _imageData = (unsigned char*)malloc( w*h );
-    if( _imageData != 0 ) {
+    if( _imageData != nullptr ) {
         memcpy( _imageData, imageData, w*h );
     } else {
         cerr << __FILE__ << ":" << __LINE__ << " Memory limitation" << endl
@@ -255,12 +252,12 @@ SiftJob::SiftJob( int w, int h, const unsigned char* imageData )
 SiftJob::SiftJob( int w, int h, const float* imageData )
     : _w(w)
     , _h(h)
-    , _img(0)
+    , _img(nullptr)
 {
     _f = _p.get_future();
 
     _imageData = (unsigned char*)malloc( w*h*sizeof(float) );
-    if( _imageData != 0 ) {
+    if( _imageData != nullptr ) {
         memcpy( _imageData, imageData, w*h*sizeof(float) );
     } else {
         cerr << __FILE__ << ":" << __LINE__ << " Memory limitation" << endl
@@ -317,3 +314,27 @@ popsift::FeaturesDev* SiftJob::getDev()
     return dynamic_cast<popsift::FeaturesDev*>( _f.get() );
 }
 
+void PopSift::Pipe::uninit()
+{
+    _queue_stage1.push( nullptr );
+    if(_thread_stage2 != nullptr)
+    {
+        _thread_stage2->join();
+        _thread_stage2.reset(nullptr);
+    }
+    if(_thread_stage1 != nullptr)
+    {
+        _thread_stage1->join();
+        _thread_stage1.reset(nullptr);
+    }
+
+    while( !_unused.empty() )
+    {
+        popsift::ImageBase* img = _unused.pull();
+        delete img;
+    }
+
+    delete _pyramid;
+    _pyramid    = nullptr;
+
+}

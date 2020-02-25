@@ -74,14 +74,18 @@ class PopSift
 {
     struct Pipe
     {
-        boost::thread*                         _thread_stage1;
-        boost::thread*                         _thread_stage2;
+        std::unique_ptr<boost::thread>         _thread_stage1;
+        std::unique_ptr<boost::thread>         _thread_stage2;
         boost::sync_queue<SiftJob*>            _queue_stage1;
         boost::sync_queue<SiftJob*>            _queue_stage2;
         boost::sync_queue<popsift::ImageBase*> _unused;
-        popsift::ImageBase*                    _current;
 
-        popsift::Pyramid*                      _pyramid;
+        popsift::Pyramid*                      _pyramid{nullptr};
+
+        /**
+         * @brief Release the allocated resources, if any.
+         */
+        void uninit();
     };
 
 public:
@@ -92,11 +96,15 @@ public:
     };
 
 public:
+
+    PopSift() = delete;
+    PopSift(const PopSift&) = delete;
+
     /* We support more than 1 streams, but we support only one sigma and one
      * level parameters.
      */
-    PopSift( ImageMode imode = ByteImages );
-    PopSift( const popsift::Config&          config,
+    explicit PopSift( ImageMode imode = ByteImages );
+    explicit PopSift( const popsift::Config&          config,
              popsift::Config::ProcessingMode mode  = popsift::Config::ExtractingMode,
              ImageMode                       imode = ByteImages );
     ~PopSift();
@@ -118,10 +126,14 @@ public:
                        int          h,
                        const float* imageData );
 
-    /** deprecated */
+    /**
+     * @deprecated
+     * */
     inline void uninit( int /*pipe*/ ) { uninit(); }
 
-    /** deprecated */
+    /**
+     * @deprecated
+     **/
     inline bool init( int /*pipe*/, int w, int h ) {
         _last_init_w = w;
         _last_init_h = h;
@@ -161,8 +173,11 @@ private:
      */
     popsift::Config _shadow_config;
 
-    int             _last_init_w; /* to support depreacted interface */
-    int             _last_init_h; /* to support depreacted interface */
+    int             _last_init_w{}; /* to support deprecated interface */
+    int             _last_init_h{}; /* to support deprecated interface */
     ImageMode       _image_mode;
+
+    /// whether the object is initialized
+    bool            _isInit{true};
 };
 

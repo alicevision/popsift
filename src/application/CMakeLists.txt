@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(PopsiftDemo)
+project(PopsiftDemo LANGUAGES CXX)
 
 if(TARGET popsift)
   # when compiled in the repository the target is already defined
