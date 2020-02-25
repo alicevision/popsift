@@ -3,14 +3,15 @@
 #    set(RESULT_NAME ${RESULT_NAME} CACHE STRING "CUDA CC versions to compile")
 # replacing your own variable for RESULT_NAME
 #
+# We assume that MINCC default to 20
 # We assume that MINCUDAVERSION defaults to 7.0
 #
 function(ChooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
-  if(NOT DEFINED ${MINCC})
-    message(FATAL_ERROR "CMake function ChooseCudaCC must be called with a minimal CC")
+  if(NOT DEFINED MINCC)
+    set(MINCC 20)
   endif()
-  if(NOT DEFINED ${MINCUDAVERSION})
-    set(MINCUDAVERSION 70)
+  if(NOT DEFINED MINCUDAVERSION)
+    set(MINCUDAVERSION 7.0)
   endif()
 
   find_package(CUDA ${MINCUDAVERSION} REQUIRED)
@@ -32,6 +33,7 @@ function(ChooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
   else()
     message(FATAL_ERROR "Unknown how to build for ${CMAKE_SYSTEM_PROCESSOR}")
   endif()
+
   #
   # Default setting of the CUDA CC versions to compile.
   # Shortening the lists saves a lot of compile time.
@@ -63,9 +65,10 @@ function(ChooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
   #
   # Add all requested CUDA CCs to the command line for offline compilation
   #
+  set(GENCODE_FLAGS "${CUDA_NVCC_FLAGS}")
   list(SORT CC_LIST)
   foreach(CC_VERSION ${CC_LIST})
-    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-gencode;arch=compute_${CC_VERSION},code=sm_${CC_VERSION}")
+    set(GENCODE_FLAGS "${GENCODE_FLAGS};-gencode;arch=compute_${CC_VERSION},code=sm_${CC_VERSION}")
   endforeach()
 
   #
@@ -74,8 +77,13 @@ function(ChooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
   list(LENGTH CC_LIST CC_LIST_LEN)
   MATH(EXPR CC_LIST_LEN "${CC_LIST_LEN}-1")
   list(GET CC_LIST ${CC_LIST_LEN} CC_LIST_LAST)
-  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-gencode;arch=compute_${CC_LIST_LAST},code=compute_${CC_LIST_LAST}")
+  set(GENCODE_FLAGS "${GENCODE_FLAGS};-gencode;arch=compute_${CC_LIST_LAST},code=compute_${CC_LIST_LAST}")
 
+  #
+  # Two variables are exported to the parent scope. One is passed through the
+  # environment (CUDA_NVCC_FLAGS), the other is passed by name (RESULT_NAME)
+  #
+  set(CUDA_NVCC_FLAGS ${GENCODE_FLAGS} PARENT_SCOPE)
   set(${RESULT_NAME} ${CC_LIST} PARENT_SCOPE)
 endfunction()
 
