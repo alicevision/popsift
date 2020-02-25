@@ -91,9 +91,9 @@ endif()
 # Shortening the lists saves a lot of compile time.
 #
 if(CUDA_VERSION_MAJOR GREATER 7)
-  set(PopSift_CUDA_CC_LIST_BASIC 30 50 52 60 61)
+  set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 60 61)
 else()
-  set(PopSift_CUDA_CC_LIST_BASIC 30 50 52 )
+  set(PopSift_CUDA_CC_LIST_BASIC 30 35 50 52 )
 endif()
 set(PopSift_CUDA_CC_LIST ${PopSift_CUDA_CC_LIST_BASIC} CACHE STRING "CUDA CC versions to compile")
 
