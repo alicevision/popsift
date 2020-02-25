@@ -6,7 +6,7 @@
 # We assume that MINCC default to 20
 # We assume that MINCUDAVERSION defaults to 7.0
 #
-function(ChooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
+function(chooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
   if(NOT DEFINED MINCC)
     set(MINCC 20)
   endif()
