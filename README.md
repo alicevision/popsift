@@ -1,7 +1,7 @@
 
 # PopSift  
 
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3728/badge)](https://bestpractices.coreinfrastructure.org/projects/3728)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3728/badge)](https://bestpractices.coreinfrastructure.org/projects/3728)  [![Codacy Badge](https://api.codacy.com/project/badge/Grade/8b0f7a68bc0d4df2ac89c6e732917caa)](https://app.codacy.com/manual/alicevision/popsift?utm_source=github.com&utm_medium=referral&utm_content=alicevision/popsift&utm_campaign=Badge_Grade_Settings)
 
 PopSift is an open-source implementation of the SIFT algorithm in CUDA.
 PopSift tries to stick as closely as possible to David Lowe's famous paper [1], while extracting features from an image in real-time at least on an NVidia GTX 980 Ti GPU.
