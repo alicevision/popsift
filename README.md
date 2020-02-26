@@ -32,6 +32,7 @@ make install
 ```
 
 Continuous integration: 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/8b0f7a68bc0d4df2ac89c6e732917caa)](https://app.codacy.com/manual/alicevision/popsift?utm_source=github.com&utm_medium=referral&utm_content=alicevision/popsift&utm_campaign=Badge_Grade_Settings)
 - [![Build Status](https://travis-ci.org/alicevision/popsift.svg?branch=master)](https://travis-ci.org/alicevision/popsift) master branch.
 - [![Build Status](https://travis-ci.org/alicevision/popsift.svg?branch=develop)](https://travis-ci.org/alicevision/popsift) develop branch.
 - [![Build status](https://ci.appveyor.com/api/projects/status/rsm5269hs288c2ji/branch/develop?svg=true)](https://ci.appveyor.com/project/AliceVision/popsift/branch/develop)
