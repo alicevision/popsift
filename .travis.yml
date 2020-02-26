@@ -62,7 +62,7 @@ install:
   - sudo dpkg -i $CUDA_REPO_PKG
   - rm ${CUDA_REPO_PKG}
   - travis_retry sudo apt-get -y update
-  - travis_retry sudo apt-get install -y --no-install-recommends  cuda-core-$CUDA_PKG_VERSION  cuda-cudart-dev-$CUDA_PKG_VERSION  cuda-cublas-dev-$CUDA_PKG_VERSION cuda-curand-dev-$CUDA_PKG_VERSION
+  - travis_retry sudo apt-get install -y --no-install-recommends --allow-unauthenticated cuda-core-$CUDA_PKG_VERSION  cuda-cudart-dev-$CUDA_PKG_VERSION  cuda-cublas-dev-$CUDA_PKG_VERSION cuda-curand-dev-$CUDA_PKG_VERSION
   - sudo ln -s /usr/local/cuda-${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR} /usr/local/cuda
 
 before_script:
