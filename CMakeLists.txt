@@ -88,14 +88,18 @@ endif()
 
 message(STATUS "CUDA Version is ${CUDA_VERSION}")
 
+include(ChooseCudaCC)
 if(NOT DEFINED PopSift_CUDA_CC_LIST)
-  include(ChooseCudaCC)
-  set(PopSift_MIN_CC 30)
-  set(PopSift_MIN_CUDA_VERSION 7.0)
-  chooseCudaCC(PopSift_CUDA_CC_LIST_BASIC ${PopSift_MIN_CC} ${PopSift_MIN_CUDA_VERSION})
+  chooseCudaCC(PopSift_CUDA_CC_LIST_BASIC
+               PopSift_CUDA_GENCODE_FLAGS
+	       MIN_CC 30
+	       MIN_CUDA_VERSION 7.0)
   set(PopSift_CUDA_CC_LIST ${PopSift_CUDA_CC_LIST_BASIC} CACHE STRING "CUDA CC versions to compile")
+else()
+  getFlagsForCudaCCList(PopSift_CUDA_CC_LIST
+                        PopSift_CUDA_GENCODE_FLAGS)
 endif()
-message(STATUS "Compiling for CUDA CCs ${PopSift_CUDA_CC_LIST}")
+list(APPEND CUDA_NVCC_FLAGS "${PopSift_CUDA_GENCODE_FLAGS}")
 
 if(PopSift_USE_NVTX_PROFILING)
   message(STATUS "PROFILING CPU CODE: NVTX is in use")
@@ -103,17 +107,17 @@ endif()
 
 if(PopSift_ERRCHK_AFTER_KERNEL)
   message(STATUS "Synchronizing and checking errors after every kernel call")
-  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-DERRCHK_AFTER_KERNEL")
+  list(APPEND CUDA_NVCC_FLAGS "-DERRCHK_AFTER_KERNEL")
 endif()
 
 set(CUDA_SEPARABLE_COMPILATION ON)
 
 if(UNIX AND NOT APPLE)
-  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xcompiler;-rdynamic")
-  # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;-v")
-  # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xptxas;-warn-double-usage")
-  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--keep")
-  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--source-in-ptx")
+  list(APPEND CUDA_NVCC_FLAGS         "-Xcompiler;-rdynamic")
+  # set(CUDA_NVCC_FLAGS       "${CUDA_NVCC_FLAGS};-Xptxas;-v")
+  # set(CUDA_NVCC_FLAGS       "${CUDA_NVCC_FLAGS};-Xptxas;-warn-double-usage")
+  list(APPEND CUDA_NVCC_FLAGS_DEBUG   "--keep")
+  list(APPEND CUDA_NVCC_FLAGS_DEBUG   "--source-in-ptx")
 endif()
 
 # The following if should not be necessary, but apparently there is a bug in FindCUDA.cmake that
@@ -121,35 +125,35 @@ endif()
 # see https://gitlab.kitware.com/cmake/cmake/issues/16411
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   message(STATUS "Building in debug mode")
-  set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG};-G")
+  list(APPEND CUDA_NVCC_FLAGS_DEBUG   "-G")
 endif()
-set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-O3")
+list(APPEND CUDA_NVCC_FLAGS_RELEASE "-O3")
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE)
-  set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};-Xcompiler;-fPIC")
+  list(APPEND CUDA_NVCC_FLAGS "-Xcompiler;-fPIC")
 endif()
 
 # default stream per-thread implies that each host thread has one non-synchronizing 0-stream
 # currently, the code requires legacy mode
-set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;legacy")
+list(APPEND CUDA_NVCC_FLAGS "--default-stream;legacy")
 # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;per-thread")
 
-if( ( CUDA_VERSION VERSION_EQUAL "7.5" ) OR ( CUDA_VERSION VERSION_GREATER "7.5") )
+if(CUDA_VERSION VERSION_GREATER_EQUAL "7.5")
   if(PopSift_NVCC_WARNINGS)
-    set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;-warn-lmem-usage")
-    set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;-warn-spills")
-    set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;--warn-on-local-memory-usage")
-    set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-Xptxas;--warn-on-spills")
+    list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;-warn-lmem-usage")
+    list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;-warn-spills")
+    list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;--warn-on-local-memory-usage")
+    list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;--warn-on-spills")
   endif()
 endif()
 
-if(PopSift_USE_NORMF AND CUDA_VERSION VERSION_GREATER "7.4")
+if(PopSift_USE_NORMF AND CUDA_VERSION VERSION_GREATER_EQUAL "7.5")
   set(PopSift_HAVE_NORMF   1)
 else()
   set(PopSift_HAVE_NORMF   0)
 endif()
 
-if( ( CUDA_VERSION VERSION_EQUAL "9.0" ) OR ( CUDA_VERSION VERSION_GREATER "9.0") )
+if(CUDA_VERSION VERSION_GREATER_EQUAL "9.0")
   set(HAVE_SHFL_DOWN_SYNC   1)
 else()
   set(HAVE_SHFL_DOWN_SYNC   0)

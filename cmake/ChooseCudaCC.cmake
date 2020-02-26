@@ -1,23 +1,46 @@
 #
-# after returning from this function, do not forget to call the following:
-#    set(RESULT_NAME ${RESULT_NAME} CACHE STRING "CUDA CC versions to compile")
-# replacing your own variable for RESULT_NAME
+# CUDA hardware and SDKs are developing over time, different SDK support different
+# hardware, and supported hardware differs depending on platform even for the same
+# SDK version.
+# This file attempts to provide a function that returns a valid selection of hardware
+# for the current SDK and platform.
 #
-# We assume that MINCC default to 20
-# We assume that MINCUDAVERSION defaults to 7.0
+# It will require updates as CUDA develops, and it is currently not complete in terms
+# of existing platforms that support CUDA.
 #
-function(chooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
-  if(NOT DEFINED MINCC)
-    set(MINCC 20)
+# This function does not edit cache entries or variables in the parent scope
+# except for the variables whose names are supplied for SUPPORTED_CC and
+# SUPPORTED_GENCODE_FLAGS
+#
+# You may want to cache SUPPORTED_CC and append SUPPORTED_GENCODE_FLAGS to
+# CUDA_NVCC_FLAGS.
+# Like this:
+#    set(MYCC ${MYCC} CACHE STRING "CUDA CC versions to compile")
+# end
+#    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};${MY_GENCODE_FLAGS}")
+#    
+# We assume that ${SUPPORTED_CC} can be overwritten.
+# We assume that ${SUPPORTED_GENCODE_FLAGS} can be overwritten.
+# We assume that MIN_CC default to 20
+# We assume that MIN_CUDA_VERSION defaults to 7.0
+#
+function(chooseCudaCC SUPPORTED_CC SUPPORTED_GENCODE_FLAGS)
+  set(options "")
+  set(oneValueArgs MIN_CUDA_VERSION MIN_CC)
+  set(multipleValueArgs "")
+  cmake_parse_arguments(CHOOSE_CUDA "${options}" "${oneValueArgs}" "${multipleValueArgs}" ${ARGN})
+
+  if(NOT DEFINED CHOOSE_CUDA_MIN_CC)
+    set(CHOOSE_CUDA_MIN_CC 20)
   endif()
-  if(NOT DEFINED MINCUDAVERSION)
-    set(MINCUDAVERSION 7.0)
+  if(NOT DEFINED CHOOSE_CUDA_MIN_CUDA_VERSION)
+    set(CHOOSE_CUDA_MIN_CUDA_VERSION 7.0)
   endif()
 
-  find_package(CUDA ${MINCUDAVERSION} REQUIRED)
+  find_package(CUDA ${CHOOSE_CUDA_MIN_CUDA_VERSION} REQUIRED)
 
   if(NOT CUDA_FOUND)
-    message(FATAL_ERROR "Could not find CUDA >= ${MINCUDAVERSION}")
+    message(FATAL_ERROR "Could not find CUDA >= ${CHOOSE_CUDA_MIN_CUDA_VERSION}")
   endif()
 
   #
@@ -26,11 +49,17 @@ function(chooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
   # it is possible that non-Tegra ARM systems exist as well.
   # For now, this is my best guess.
   #
-  if((CMAKE_SYSTEM_PROCESSOR STREQUAL "i686") OR (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64"))
-    set(CC_LIST_BY_SYSTEM_PROCESSOR 20 21 30 35 50 52 60 61 70 75)
-  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
-    set(CC_LIST_BY_SYSTEM_PROCESSOR 32 53 62 72)
-  else()
+  set(TEGRA_SUPPORTED_PROCESSORS "armv71;arm;aarch64")
+  set(OTHER_SUPPORTED_PROCESSORS "i686;x86_64;AMD64")
+
+  set(CC_LIST_BY_SYSTEM_PROCESSOR "")
+  if(CMAKE_SYSTEM_PROCESSOR IN_LIST OTHER_SUPPORTED_PROCESSORS)
+    list(APPEND CC_LIST_BY_SYSTEM_PROCESSOR "20;21;30;35;50;52;60;61;70;75")
+  endif()
+  if(CMAKE_SYSTEM_PROCESSOR IN_LIST TEGRA_SUPPORTED_PROCESSORS)
+    list(APPEND CC_LIST_BY_SYSTEM_PROCESSOR "32;53;62;72")
+  endif()
+  if(NOT CC_LIST_BY_SYSTEM_PROCESSOR)
     message(FATAL_ERROR "Unknown how to build for ${CMAKE_SYSTEM_PROCESSOR}")
   endif()
 
@@ -52,11 +81,13 @@ function(chooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
   else()
     message(FATAL_ERROR "We do not support a CUDA SDK below version 7.0")
   endif()
+  if(${CHOOSE_CUDA_MIN_CC} GREATER ${CUDA_MIN_CC})
+    set(CUDA_MIN_CC ${CHOOSE_CUDA_MIN_CC})
+  endif()
 
   set(CC_LIST "")
   foreach(CC ${CC_LIST_BY_SYSTEM_PROCESSOR})
-    if( (${CC} GREATER ${MINCC}) AND
-        (${CC} GREATER_EQUAL ${CUDA_MIN_CC}) AND
+    if( (${CC} GREATER_EQUAL ${CUDA_MIN_CC}) AND
 	(${CC} LESS_EQUAL ${CUDA_MAX_CC}) )
       list(APPEND CC_LIST ${CC})
     endif()
@@ -65,10 +96,10 @@ function(chooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
   #
   # Add all requested CUDA CCs to the command line for offline compilation
   #
-  set(GENCODE_FLAGS "${CUDA_NVCC_FLAGS}")
+  set(GENCODE_FLAGS "")
   list(SORT CC_LIST)
   foreach(CC_VERSION ${CC_LIST})
-    set(GENCODE_FLAGS "${GENCODE_FLAGS};-gencode;arch=compute_${CC_VERSION},code=sm_${CC_VERSION}")
+    list(APPEND GENCODE_FLAGS "-gencode;arch=compute_${CC_VERSION},code=sm_${CC_VERSION}")
   endforeach()
 
   #
@@ -77,13 +108,50 @@ function(chooseCudaCC RESULT_NAME MINCC MINCUDAVERSION)
   list(LENGTH CC_LIST CC_LIST_LEN)
   MATH(EXPR CC_LIST_LEN "${CC_LIST_LEN}-1")
   list(GET CC_LIST ${CC_LIST_LEN} CC_LIST_LAST)
-  set(GENCODE_FLAGS "${GENCODE_FLAGS};-gencode;arch=compute_${CC_LIST_LAST},code=compute_${CC_LIST_LAST}")
+  list(APPEND GENCODE_FLAGS "-gencode;arch=compute_${CC_LIST_LAST},code=compute_${CC_LIST_LAST}")
 
   #
   # Two variables are exported to the parent scope. One is passed through the
-  # environment (CUDA_NVCC_FLAGS), the other is passed by name (RESULT_NAME)
+  # environment (CUDA_NVCC_FLAGS), the other is passed by name (SUPPORTED_CC)
   #
-  set(CUDA_NVCC_FLAGS ${GENCODE_FLAGS} PARENT_SCOPE)
-  set(${RESULT_NAME} ${CC_LIST} PARENT_SCOPE)
+  set(${SUPPORTED_GENCODE_FLAGS} "${GENCODE_FLAGS}" PARENT_SCOPE)
+  set(${SUPPORTED_CC} "${CC_LIST}" PARENT_SCOPE)
+endfunction()
+
+#
+# This function is used to create a list of gencode instructions for a given list
+# of CCs.
+# It takes as arguments is list of CCs and a list variable that can be filled with
+# gencode strings.
+#
+# We assume that ${SUPPORTED_GENCODE_FLAGS} can be overwritten.
+#
+function(getFlagsForCudaCCList INPUT_CC_LIST SUPPORTED_GENCODE_FLAGS)
+  set(CC_LIST "${${INPUT_CC_LIST}}")
+
+  #
+  # Add all requested CUDA CCs to the command line for offline compilation
+  #
+  set(GENCODE_FLAGS "")
+  list(SORT CC_LIST)
+  foreach(CC_VERSION ${CC_LIST})
+    list(APPEND GENCODE_FLAGS "-gencode;arch=compute_${CC_VERSION},code=sm_${CC_VERSION}")
+  endforeach()
+
+  #
+  # Use the highest request CUDA CC for CUDA JIT compilation
+  #
+  list(LENGTH CC_LIST CC_LIST_LEN)
+  MATH(EXPR CC_LIST_LEN "${CC_LIST_LEN}-1")
+  list(GET CC_LIST ${CC_LIST_LEN} CC_LIST_LAST)
+  list(APPEND GENCODE_FLAGS "-gencode;arch=compute_${CC_LIST_LAST},code=compute_${CC_LIST_LAST}")
+
+  message(STATUS "Setting gencode flags: ${GENCODE_FLAGS}")
+
+  #
+  # Two variables are exported to the parent scope. One is passed through the
+  # environment (CUDA_NVCC_FLAGS), the other is passed by name (SUPPORTED_CC)
+  #
+  set(${SUPPORTED_GENCODE_FLAGS} "${GENCODE_FLAGS}" PARENT_SCOPE)
 endfunction()
 
