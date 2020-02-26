@@ -4,9 +4,6 @@ sudo: required
 language: cpp
 compiler: gcc
 
-cache:
-  apt: true
-
 addons:
   apt:
     packages:
@@ -110,5 +107,6 @@ script:
   - make install -j 2 VERBOSE=1
 
 cache:
+  apt: true
   directories:
     - ${CMAKE_INSTALL}
