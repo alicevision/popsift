@@ -66,8 +66,8 @@ private:
                                          : ( my_val < other_val );
         const bool must_swap   = not ( my_more ^ reverse ^ increasing );
 
-        return ( must_swap ? popsift::shuffle_xor( my_index, 1 << shift )
-                           : my_index );
+        int lane = must_swap ? ( 1 << shift ) : 0;
+        return popsift::shuffle_xor( my_index, lane );
     }
 
     __device__ inline

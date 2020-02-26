@@ -172,8 +172,6 @@ static void collectFilenames( list<string>& inputFiles, const boost::filesystem:
 
 SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 {
-    int w;
-    int h;
     SiftJob* job;
     unsigned char* image_data;
 
@@ -197,8 +195,8 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
             cerr << "Failed converting image " << inputFile << " to unsigned greyscale image" << endl;
             exit( -1 );
         }
-        w = img.Width();
-        h = img.Height();
+        const auto w = img.Width();
+        const auto h = img.Height();
         cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
 
         image_data = img.GetData();
@@ -213,10 +211,11 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 #endif
     {
         nvtxRangePushA( "load and convert image - pgmread" );
-
+        int w{};
+        int h{};
         image_data = readPGMfile( inputFile, w, h );
-        if( image_data == 0 ) {
-            exit( -1 );
+        if( image_data == nullptr ) {
+            exit( EXIT_FAILURE );
         }
 
         nvtxRangePop( ); // "load and convert image - pgmread"
@@ -230,7 +229,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
         }
         else
         {
-            float* f_image_data = new float [w * h];
+            auto f_image_data = new float [w * h];
             for( int i=0; i<w*h; i++ )
             {
                 f_image_data[i] = float( image_data[i] ) / 256.0f;
@@ -271,8 +270,7 @@ int main(int argc, char **argv)
 
     popsift::Config config;
     list<string>   inputFiles;
-    string         inputFile = "";
-    const char*    appName   = argv[0];
+    string         inputFile{};
 
     std::cout << "PopSift version: " << POPSIFT_VERSION_STRING << std::endl;
 
@@ -282,7 +280,7 @@ int main(int argc, char **argv)
     }
     catch (std::exception& e) {
         std::cout << e.what() << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
 
     if( boost::filesystem::exists( inputFile ) ) {
@@ -291,13 +289,13 @@ int main(int argc, char **argv)
             collectFilenames( inputFiles, inputFile );
             if( inputFiles.empty() ) {
                 cerr << "No files in directory, nothing to do" << endl;
-                exit( 0 );
+                return EXIT_SUCCESS;
             }
         } else if( boost::filesystem::is_regular_file( inputFile ) ) {
             inputFiles.push_back( inputFile );
         } else {
             cout << "Input file is neither regular file nor directory, nothing to do" << endl;
-            exit( -1 );
+            return EXIT_FAILURE;
         }
     }
 
@@ -310,10 +308,9 @@ int main(int argc, char **argv)
                      float_mode ? PopSift::FloatImages : PopSift::ByteImages );
 
     std::queue<SiftJob*> jobs;
-    for( auto it = inputFiles.begin(); it!=inputFiles.end(); it++ ) {
-        inputFile = it->c_str();
-
-        SiftJob* job = process_image( inputFile, PopSift );
+    for(const auto& currFile : inputFiles)
+    {
+        SiftJob* job = process_image( currFile, PopSift );
         jobs.push( job );
     }
 
@@ -328,5 +325,7 @@ int main(int argc, char **argv)
     }
 
     PopSift.uninit( );
+
+    return EXIT_SUCCESS;
 }
 
