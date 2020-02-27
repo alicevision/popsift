@@ -1,12 +1,28 @@
 #
+# This file contains two functions:
+# chooseCudaCC
+# getFlagsForCudaCCList
+#
+# Motivation:
 # CUDA hardware and SDKs are developing over time, different SDK support different
 # hardware, and supported hardware differs depending on platform even for the same
-# SDK version.
-# This file attempts to provide a function that returns a valid selection of hardware
-# for the current SDK and platform.
+# SDK version. This file attempts to provide a function that returns a valid selection
+# of hardware for the current SDK and platform. It will require updates as CUDA develops,
+# and it is currently not complete in terms of existing platforms that support CUDA.
 #
-# It will require updates as CUDA develops, and it is currently not complete in terms
-# of existing platforms that support CUDA.
+
+#
+# Return the minimal set of supported Cuda CC 
+#
+# Usage:
+#   chooseCudaCC(SUPPORTED_CC SUPPORTED_GENCODE_FLAGS
+#                [MIN_CUDA_VERSION X.Y]
+#                [MIN_CC XX ])
+#
+# SUPPORTED_CC out variable. Stores the list of supported CC.
+# SUPPORTED_GENCODE_FLAGS out variable. List of gencode flags to append to, e.g., CUDA_NVCC_FLAGS
+# MIN_CUDA_VERSION the minimal supported version of cuda (e.g. 7.5, default 7.0).
+# MIN_CC minimal supported Cuda CC by the project (e.g. 35, default 20)
 #
 # This function does not edit cache entries or variables in the parent scope
 # except for the variables whose names are supplied for SUPPORTED_CC and
@@ -19,11 +35,6 @@
 # end
 #    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};${MY_GENCODE_FLAGS}")
 #    
-# We assume that ${SUPPORTED_CC} can be overwritten.
-# We assume that ${SUPPORTED_GENCODE_FLAGS} can be overwritten.
-# We assume that MIN_CC default to 20
-# We assume that MIN_CUDA_VERSION defaults to 7.0
-#
 function(chooseCudaCC SUPPORTED_CC SUPPORTED_GENCODE_FLAGS)
   set(options "")
   set(oneValueArgs MIN_CUDA_VERSION MIN_CC)
@@ -88,7 +99,7 @@ function(chooseCudaCC SUPPORTED_CC SUPPORTED_GENCODE_FLAGS)
   set(CC_LIST "")
   foreach(CC ${CC_LIST_BY_SYSTEM_PROCESSOR})
     if( (${CC} GREATER_EQUAL ${CUDA_MIN_CC}) AND
-	(${CC} LESS_EQUAL ${CUDA_MAX_CC}) )
+        (${CC} LESS_EQUAL ${CUDA_MAX_CC}) )
       list(APPEND CC_LIST ${CC})
     endif()
   endforeach()
@@ -119,12 +130,13 @@ function(chooseCudaCC SUPPORTED_CC SUPPORTED_GENCODE_FLAGS)
 endfunction()
 
 #
-# This function is used to create a list of gencode instructions for a given list
-# of CCs.
-# It takes as arguments is list of CCs and a list variable that can be filled with
-# gencode strings.
+# Return the gencode parameters for a given list of CCs.
 #
-# We assume that ${SUPPORTED_GENCODE_FLAGS} can be overwritten.
+# Usage:
+#   getFlagsForCudaCCList(INPUT_CC_LIST SUPPORTED_GENCODE_FLAGS)
+#
+# INPUT_CC_LIST in variable. Contains a list of supported CCs.
+# SUPPORTED_GENCODE_FLAGS out variable. List of gencode flags to append to, e.g., CUDA_NVCC_FLAGS
 #
 function(getFlagsForCudaCCList INPUT_CC_LIST SUPPORTED_GENCODE_FLAGS)
   set(CC_LIST "${${INPUT_CC_LIST}}")
