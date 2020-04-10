@@ -17,7 +17,12 @@ find_package(DevIL COMPONENTS IL ILU) # yields IL_FOUND, IL_LIBRARIES, IL_INCLUD
 if(PopSift_BOOST_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS ON)
 endif()
-find_package(Boost 1.53.0 REQUIRED COMPONENTS filesystem program_options)
+find_package(Boost 1.53.0 REQUIRED COMPONENTS filesystem program_options system)
+if(WIN32)
+  add_definitions("-DBOOST_ALL_NO_LIB")
+  link_directories(Boost_LIBRARRY_DIR_DEBUG)
+  link_directories(Boost_LIBRARRY_DIR_RELEASE)
+endif(WIN32)
 
 set(PD_INCLUDE_DIRS    ${Boost_INCLUDE_DIRS})
 set(PD_LINK_LIBS       ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
