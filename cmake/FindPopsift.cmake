@@ -24,7 +24,7 @@ FIND_PATH(POPSIFT_INCLUDE_DIR popsift/popsift.h
 )
 
 find_package(CUDA 7.0 REQUIRED)
-find_package(Boost 1.53.0 REQUIRED COMPONENTS system filesystem)
+find_package(Threads REQUIRED)
 
 IF(POPSIFT_INCLUDE_DIR)
   MESSAGE(STATUS "popsift headers found in ${POPSIFT_INCLUDE_DIR}")
