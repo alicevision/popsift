@@ -10,16 +10,16 @@ Dependencies
 
 Most of the dependencies can be installed from the common repositories (apt, yum etc):
 
-Boost >= 1.55 ([atomic, chrono, date-time, system, thread]-dev)
+Boost >= 1.55 ([atomic, chrono, date-time, system, thread]-dev) (only required for the application)
 CUDA >= 7.0
 DevIL (libdevil-dev) (only required for the application)
 
 Build
 -----
 
-PopSift has been developed and tested on Linux machines, mostly a variant of Ubuntu, but compiles on MacOSX as well. It comes as a CMake project and requires at least CUDA 7.0 and Boost >= 1.55. It is known to compile and work with NVidia cards of compute capability 3.0 (including the GT 650M), but the code is developed with the compute capability 5.2 card GTX 980 Ti in mind.
+PopSift has been developed and tested on Linux machines, mostly a variant of Ubuntu, but compiles on MacOSX as well. It comes as a CMake project and requires at least CUDA 7.0. The example application carries an additional dependency on Boost >= 1.55. It is known to compile and work with NVidia cards of compute capability 3.0 (including the GT 650M), but the code is developed with the compute capability 5.2 card GTX 980 Ti in mind.
 
-If you want to avoid building the application you can run cmake with the option `-DPopSift_BUILD_EXAMPLES:BOOL=OFF`.
+If you want to avoid building the example application you can run cmake with the option `-DPopSift_BUILD_EXAMPLES:BOOL=OFF`.
 If you want to build PopSift as a shared library: `-DBUILD_SHARED_LIBS=ON`.
 
 In order to build the library you can run:
