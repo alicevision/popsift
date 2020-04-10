@@ -51,6 +51,9 @@ else()
   set(CUDA_USE_STATIC_CUDA_RUNTIME ON)
 endif()
 
+# Require threads because of std::thread.
+find_package(Threads REQUIRED)
+
 find_package(CUDA 7.0 REQUIRED)
 
 if(NOT CUDA_FOUND)
