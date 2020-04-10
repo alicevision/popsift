@@ -60,6 +60,10 @@ set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 # https://gitlab.kitware.com/cmake/cmake/issues/16097
 target_link_libraries(popsift ${CUDA_CUDADEVRT_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
 
+# Link to threads because we're using C++11 std::thread.
+find_package(Threads REQUIRED)
+target_link_libraries(popsift ${CMAKE_THREAD_LIBS_INIT})
+
 
 # EXPORTING THE LIBRARY
 #
