@@ -6,18 +6,19 @@
 
 namespace popsift {
 
-/*************************************************************
- * SyncQueue
- * This is a basic alternative to the Boost sync_queue class.
- * It lets threads push and pull items off a queue in a thread
- * safe manner.
- *************************************************************/
+/**
+ * @brief A thread safe wrapper around std::queue (replaces boost::sync_queue).
+ * @tparam T the value type that's stored in the queue.
+ */
 template<typename T>
 class SyncQueue {
- public:
+public:
   SyncQueue() = default;
 
-  /* Push an item onto the queue and signal it's available. */
+  /**
+   * @brief Push an item onto the queue and signal it's available.
+   * @param[in] value the item to add to the queue.
+   */
   void push(const T& value) {
     std::unique_lock<std::mutex> lock(mtx_);
     items_.push(value);
@@ -25,13 +26,19 @@ class SyncQueue {
     signal_.notify_one();
   }
 
-  /* Check if the queue is empty - thread safety via mutex. */
+  /**
+   * @brief Check if the queue is empty - thread safety via mutex.
+   * @return True if the queue is empty.
+   */
   bool empty() {
     std::unique_lock<std::mutex> lock(mtx_);
     return items_.empty();
   }
 
-  /* BLOCKING. Pull an item off the queue, or, wait until one arrives. */
+  /**
+   * @brief Pull an item off the queue, or, wait until one arrives. Blocking.
+   * @return The front item that was popped off the queue.
+   */
   T pull() {
     std::unique_lock<std::mutex> lock(mtx_);
     signal_.wait(lock, [this] { return !items_.empty(); });
@@ -40,7 +47,7 @@ class SyncQueue {
     return ans;
   }
 
- private:
+private:
   std::mutex mtx_;
   std::queue<T> items_;
   std::condition_variable signal_;
