@@ -10,7 +10,6 @@ OPTION(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code
 OPTION(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 OPTION(PopSift_USE_NORMF "The __normf function computes Euclidian distance on large arrays. Fast but stability is uncertain." OFF)
 OPTION(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
-OPTION(PopSift_BOOST_USE_STATIC_LIBS "Link examples with static Boost libraries" OFF)
 OPTION(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE)

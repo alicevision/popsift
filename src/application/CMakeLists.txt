@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
 project(PopsiftDemo LANGUAGES CXX)
 
+OPTION(PopSift_BOOST_USE_STATIC_LIBS "Link examples with static Boost libraries" OFF)
+
 if(TARGET popsift)
   # when compiled in the repository the target is already defined
   add_library(PopSift::popsift ALIAS popsift)
