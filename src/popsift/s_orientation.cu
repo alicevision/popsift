@@ -75,6 +75,7 @@ void ori_par( const int           octave,
     __shared__ float sm_hist[ORI_NBINS];
 
     for( int i = threadIdx.x; i < ORI_NBINS; i += blockDim.x )  hist[i] = 0.0f;
+    __syncthreads();
 
     /* keypoint fractional geometry */
     const float x     = iext->xpos;
@@ -206,6 +207,7 @@ void ori_par( const int           octave,
 
     int2 best_index = make_int2( threadIdx.x, threadIdx.x + 32 );
 
+    __syncthreads();
     BitonicSort::Warp32<float> sorter( yval );
     sorter.sort64( best_index );
     __syncthreads();
