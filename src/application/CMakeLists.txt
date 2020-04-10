@@ -14,8 +14,9 @@ endif()
 
 find_package(DevIL COMPONENTS IL ILU) # yields IL_FOUND, IL_LIBRARIES, IL_INCLUDE_DIR
 
-set(Boost_INCLUDE_DIRS "")
-set(Boost_LIBRARIES "")
+if(PopSift_BOOST_USE_STATIC_LIBS)
+  set(Boost_USE_STATIC_LIBS ON)
+endif()
 find_package(Boost 1.53.0 REQUIRED COMPONENTS filesystem program_options)
 
 set(PD_INCLUDE_DIRS    ${Boost_INCLUDE_DIRS})

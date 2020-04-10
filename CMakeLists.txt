@@ -10,12 +10,8 @@ OPTION(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code
 OPTION(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 OPTION(PopSift_USE_NORMF "The __normf function computes Euclidian distance on large arrays. Fast but stability is uncertain." OFF)
 OPTION(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
-OPTION(PopSift_BOOST_USE_STATIC_LIBS "Link with static Boost libraries" OFF)
+OPTION(PopSift_BOOST_USE_STATIC_LIBS "Link examples with static Boost libraries" OFF)
 OPTION(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
-
-if(PopSift_BOOST_USE_STATIC_LIBS)
-  set(Boost_USE_STATIC_LIBS ON)
-endif()
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -39,13 +35,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -G")
 # set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -G")
-
-find_package(Boost 1.53.0 REQUIRED COMPONENTS system thread)
-if(WIN32)
-  add_definitions("-DBOOST_ALL_NO_LIB")
-  link_directories(Boost_LIBRARRY_DIR_DEBUG)
-  link_directories(Boost_LIBRARRY_DIR_RELEASE)
-endif(WIN32)
 
 if(BUILD_SHARED_LIBS)
   message(STATUS "BUILD_SHARED_LIBS ON")
