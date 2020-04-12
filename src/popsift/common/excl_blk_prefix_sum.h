@@ -73,7 +73,6 @@ private:
         if( threadIdx.x == 0 && threadIdx.y == 0 ) {
             loop_total = 0;
         }
-        __syncthreads();
 
         const int start = threadIdx.y * blockDim.x + threadIdx.x;
         const int wrap  = blockDim.x * blockDim.y;
