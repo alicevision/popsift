@@ -45,7 +45,7 @@ do
       echo "Directory output-$img exists. Skipping."
       continue
     fi
-    @CMAKE_BINARY_DIR@/popsift-demo --log --gauss-mode vlfeat --desc-mode loop --popsift-mode --root-sift --downsampling -1 -i $imgfile
+    @EXECUTABLE_OUTPUT_PATH@/popsift-demo --log --gauss-mode vlfeat --desc-mode loop --popsift-mode --root-sift --downsampling -1 -i $imgfile
     if [ $? != 0 ]
     then
       echo "Running popsift on $imgfile failed."

@@ -9,7 +9,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <stdio.h>
+#include <cstdio>
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
@@ -21,8 +21,9 @@
 #include "sift_extremum.h"
 #include "common/debug_macros.h"
 #include "common/assist.h"
+#include "sift_config.h"
 
-#ifdef USE_NVTX
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
 #else
 #define nvtxRangePushA(a)

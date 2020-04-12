@@ -17,9 +17,10 @@
 
 #include "sift_conf.h"
 #include "sift_extremum.h"
+#include "sift_config.h"
 
 
-#ifdef USE_NVTX
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
 #else
 #define nvtxRangeStartA(a)
@@ -45,7 +46,7 @@ class SiftJob
     int                 _h;
     unsigned char*      _imageData;
     popsift::ImageBase* _img;
-#ifdef USE_NVTX
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangeId_t       _nvtx_id;
 #endif
 

@@ -6,8 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include <iostream>
-#include <stdio.h>
-#include <iso646.h>
+#include <cstdio>
 
 #include "sift_pyramid.h"
 #include "sift_constants.h"
@@ -20,8 +19,9 @@
 #include "s_desc_notile.h"
 #include "common/assist.h"
 #include "common/debug_macros.h"
+#include "sift_config.h"
 
-#ifdef USE_NVTX
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
 #else
 #define nvtxRangePushA(a)

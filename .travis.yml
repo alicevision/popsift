@@ -34,7 +34,7 @@ env:
     - POPSIFT_APP_INSTALL=${POPSIFT_APP_BUILD}/install
     # CMAKE
     # - CMAKE_URL="https://cmake.org/files/v3.6/cmake-3.6.1-Linux-x86_64.tar.gz"
-    - CMAKE_URL="https://cmake.org/files/v3.4/cmake-3.4.1-Linux-x86_64.tar.gz"
+    - CMAKE_URL="https://cmake.org/files/v3.13/cmake-3.13.5-Linux-x86_64.tar.gz"
     - CMAKE_ROOT=${TRAVIS_BUILD_DIR}/cmake
     - CMAKE_SOURCE=${CMAKE_ROOT}/source
     - CMAKE_INSTALL=${CMAKE_ROOT}/install

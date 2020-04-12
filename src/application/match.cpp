@@ -19,17 +19,19 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
-#include <popsift/popsift.h>
-#include <popsift/features.h>
-#include <popsift/sift_conf.h>
 #include <popsift/common/device_prop.h>
+#include <popsift/features.h>
+#include <popsift/popsift.h>
+#include <popsift/sift_conf.h>
+#include <popsift/sift_config.h>
+#include <popsift/version.hpp>
 
 #ifdef USE_DEVIL
 #include <devil_cpp_wrapper.hpp>
 #endif
 #include "pgmread.h"
 
-#ifdef USE_NVTX
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
 #else
 #define nvtxRangePushA(a)
@@ -223,6 +225,8 @@ int main(int argc, char **argv)
     popsift::Config config;
     string         lFile{};
     string         rFile{};
+
+    std::cout << "PopSift version: " << POPSIFT_VERSION_STRING << std::endl;
 
     try {
         parseargs( argc, argv, config, lFile, rFile ); // Parse command line

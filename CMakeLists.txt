@@ -1,17 +1,23 @@
 # CMake below 3.4 does not work with CUDA separable compilation at all
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.12)
 
-project(PopSift VERSION 1.0.0)
+project(PopSift VERSION 1.0.0 LANGUAGES CXX)
 
-OPTION(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
-OPTION(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
-OPTION(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after every kernel." OFF)
-OPTION(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
-OPTION(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
-OPTION(PopSift_USE_NORMF "The __normf function computes Euclidian distance on large arrays. Fast but stability is uncertain." OFF)
-OPTION(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
-OPTION(PopSift_BOOST_USE_STATIC_LIBS "Link with static Boost libraries" OFF)
-OPTION(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
+# Set build path as a folder named as the platform (linux, windows, darwin...) plus the processor type
+set(EXECUTABLE_OUTPUT_PATH "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+set(LIBRARY_OUTPUT_PATH "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+
+option(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
+option(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
+option(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after every kernel." OFF)
+option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
+option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
+option(PopSift_USE_NORMF "The __normf function computes Euclidian distance on large arrays. Fast but stability is uncertain." OFF)
+option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
+option(PopSift_BOOST_USE_STATIC_LIBS "Link with static Boost libraries" OFF)
+option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
 
 if(PopSift_BOOST_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS ON)
@@ -31,15 +37,24 @@ else()
   message(STATUS "Building in ${CMAKE_BUILD_TYPE} configuration")
 endif()
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
-set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_RELEASE}   -O3")
+# for some reason this line is necessary to propagate the standard to nvcc
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD 11)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -G")
-# set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -G")
+# ==============================================================================
+# GNUInstallDirs CMake module
+# - Define GNU standard installation directories
+# - Provides install directory variables as defined by the GNU Coding Standards.
+# ==============================================================================
+include(GNUInstallDirs)
 
+
+#################
+# BOOST
+#################
 find_package(Boost 1.53.0 REQUIRED COMPONENTS system thread)
 if(WIN32)
   add_definitions("-DBOOST_ALL_NO_LIB")
@@ -62,6 +77,9 @@ else()
   set(CUDA_USE_STATIC_CUDA_RUNTIME ON)
 endif()
 
+###################
+#  CUDA
+###################
 find_package(CUDA 7.0 REQUIRED)
 
 if(NOT CUDA_FOUND)
@@ -145,9 +163,9 @@ if( ( CUDA_VERSION VERSION_EQUAL "7.5" ) OR ( CUDA_VERSION VERSION_GREATER "7.5"
 endif()
 
 if(PopSift_USE_NORMF AND CUDA_VERSION VERSION_GREATER "7.4")
-  set(HAVE_NORMF   1)
+  set(PopSift_HAVE_NORMF   1)
 else()
-  set(HAVE_NORMF   0)
+  set(PopSift_HAVE_NORMF   0)
 endif()
 
 if( ( CUDA_VERSION VERSION_EQUAL "9.0" ) OR ( CUDA_VERSION VERSION_GREATER "9.0") )
@@ -169,7 +187,9 @@ cuda_find_library_local_first(CUDA_CUDADEVRT_LIBRARY cudadevrt "\"cudadevrt\" li
 if(PopSift_USE_NVTX_PROFILING)
   # library required for NVTX profiling of the CPU
   cuda_find_library_local_first(CUDA_NVTX_LIBRARY nvToolsExt "NVTX library")
-  add_definitions(-DUSE_NVTX)
+  set(PopSift_USE_NVTX 1)
+else()
+  set(PopSift_USE_NVTX 0)
 endif()
 
 add_subdirectory(src)
@@ -184,5 +204,27 @@ CONFIGURE_FILE(
   "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake"
   IMMEDIATE @ONLY)
 ADD_CUSTOM_TARGET(uninstall
-  "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake") 
+  "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake")
 
+
+######################################
+# SUMMARY
+######################################
+message("\n")
+message("******************************************")
+message("Building configuration:\n")
+message(STATUS "PopSift version: " ${PROJECT_VERSION})
+message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
+message(STATUS "Build Shared libs: " ${BUILD_SHARED_LIBS})
+message(STATUS "Build examples: " ${PopSift_BUILD_EXAMPLES})
+message(STATUS "Generate position independent code: " ${PopSift_USE_POSITION_INDEPENDENT_CODE})
+message(STATUS "Use CUDA NVTX for profiling: " ${PopSift_USE_NVTX_PROFILING})
+message(STATUS "Synchronize and check CUDA error after every kernel: " ${PopSift_ERRCHK_AFTER_KERNEL})
+message(STATUS "Grid filtering: " ${PopSift_USE_GRID_FILTER})
+message(STATUS "Testing step: " ${PopSift_USE_TEST_CMD})
+message(STATUS "Link with static Boost libraries: " ${PopSift_BOOST_USE_STATIC_LIBS})
+message(STATUS "Additional warning for CUDA nvcc: " ${PopSift_NVCC_WARNINGS})
+message(STATUS "Compiling for CUDA CCs: ${PopSift_CUDA_CC_LIST}")
+message(STATUS "Install path: " ${CMAKE_INSTALL_PREFIX})
+message("\n******************************************")
+message("\n")
