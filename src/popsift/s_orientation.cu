@@ -5,9 +5,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <math.h>
-#include <stdio.h>
-#include <inttypes.h>
+#include <cmath>
+#include <cstdio>
+#include <cinttypes>
 
 #include "common/assist.h"
 #include "sift_pyramid.h"
@@ -17,8 +17,9 @@
 #include "common/warp_bitonic_sort.h"
 #include "common/debug_macros.h"
 #include "common/assist.h"
+#include "sift_config.h"
 
-#ifdef USE_NVTX
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
 #else
 #define nvtxRangePushA(a)
