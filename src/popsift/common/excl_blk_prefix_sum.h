@@ -73,6 +73,7 @@ private:
         if( threadIdx.x == 0 && threadIdx.y == 0 ) {
             loop_total = 0;
         }
+        __syncthreads();
 
         const int start = threadIdx.y * blockDim.x + threadIdx.x;
         const int wrap  = blockDim.x * blockDim.y;
@@ -131,9 +132,8 @@ private:
                  */
                 _mapping_writer.set( ebs, self, cell );
             }
-
-            // Wait to update loop_total until everyone is done.
             __syncthreads();
+
             if( threadIdx.y == 0 && threadIdx.x == 31 ) {
                 loop_total += ibs;
             }
