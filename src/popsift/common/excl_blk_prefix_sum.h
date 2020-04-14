@@ -137,12 +137,10 @@ private:
             if( threadIdx.y == 0 && threadIdx.x == 31 ) {
                 loop_total += ibs;
             }
+            __syncthreads();
         }
 
-        if( threadIdx.y == 0 && threadIdx.x == 31 )
-        {
-            _total_writer.set( loop_total );
-        }
+        _total_writer.set( loop_total );
     }
 };
 
