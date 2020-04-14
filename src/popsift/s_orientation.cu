@@ -204,10 +204,10 @@ void ori_par( const int           octave,
         refined_angle[bin] = predicate ? prev + newbin : -1;
         yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
     }
+    __syncthreads();
 
     int2 best_index = make_int2( threadIdx.x, threadIdx.x + 32 );
 
-    __syncthreads();
     BitonicSort::Warp32<float> sorter( yval );
     sorter.sort64( best_index );
     __syncthreads();
