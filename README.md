@@ -110,7 +110,7 @@ We acknowledge that there is at least one SIFT implementation that is vastly fas
 
 PopSift is licensed under [MPL v2 license](COPYING.md).
 SIFT was patented in the United States from 1999-03-08 to 2020-03-28. See the [patent link](https://patents.google.com/patent/US6711293B1/en) for more information.
-This license does not release users of this code from any requirements that may arise from such patents.
+PopSift license only concerns the PopSift source code and does not release users of this code from any requirements that may arise from patents.
 
 
 ## Cite Us
