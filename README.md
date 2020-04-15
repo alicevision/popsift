@@ -135,7 +135,7 @@ If you use PopSift for your publication, please cite us as:
 
 ## Acknowledgements
 
-PopSift was developed within the project [POPART](https://cordis.europa.eu/project/id/644874), which has been funded by the European Commission in the Horizon 2020 framework.
+PopSift was developed within the project [POPART](https://alicevision.org/popart), which has been funded by the European Commission in the Horizon 2020 framework.
 
 ___
 
