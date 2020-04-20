@@ -38,13 +38,13 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
 {
     boost::filesystem::path input_file( filename );
 
-    if( not boost::filesystem::exists( input_file ) ) {
+    if( ! boost::filesystem::exists( input_file ) ) {
         cerr << "File " << input_file << " does not exist" << endl;
         return nullptr;
     }
 
     ifstream pgmfile( filename.c_str(), ios::binary );
-    if( not pgmfile.is_open() ) {
+    if( ! pgmfile.is_open() ) {
         cerr << "File " << input_file << " could not be opened for reading" << endl;
         return nullptr;
     }
