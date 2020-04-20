@@ -76,6 +76,7 @@ void ori_par( const int           octave,
     __shared__ float sm_hist[ORI_NBINS];
 
     for( int i = threadIdx.x; i < ORI_NBINS; i += blockDim.x )  hist[i] = 0.0f;
+    __syncthreads();
 
     /* keypoint fractional geometry */
     const float x     = iext->xpos;
@@ -204,6 +205,7 @@ void ori_par( const int           octave,
         refined_angle[bin] = predicate ? prev + newbin : -1;
         yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
     }
+    __syncthreads();
 
     int2 best_index = make_int2( threadIdx.x, threadIdx.x + 32 );
 

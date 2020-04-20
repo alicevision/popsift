@@ -132,6 +132,7 @@ private:
                  */
                 _mapping_writer.set( ebs, self, cell );
             }
+            __syncthreads();
 
             if( threadIdx.y == 0 && threadIdx.x == 31 ) {
                 loop_total += ibs;
@@ -139,12 +140,7 @@ private:
             __syncthreads();
         }
 
-        // if( threadIdx.y == 0 && threadIdx.x == 31 )
-        if( threadIdx.y == 0 )
-        {
-            loop_total = popsift::shuffle( loop_total, 31 );
-            _total_writer.set( loop_total );
-        }
+        _total_writer.set( loop_total );
     }
 };
 
