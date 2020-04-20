@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
 project(PopsiftDemo LANGUAGES CXX)
 
+OPTION(PopSift_BOOST_USE_STATIC_LIBS "Link examples with static Boost libraries" OFF)
+
 if(TARGET popsift)
   # when compiled in the repository the target is already defined
   add_library(PopSift::popsift ALIAS popsift)
@@ -15,9 +17,13 @@ endif()
 
 find_package(DevIL COMPONENTS IL ILU) # yields IL_FOUND, IL_LIBRARIES, IL_INCLUDE_DIR
 
-set(Boost_INCLUDE_DIRS "")
-set(Boost_LIBRARIES "")
-find_package(Boost 1.53.0 REQUIRED COMPONENTS filesystem program_options)
+if(PopSift_BOOST_USE_STATIC_LIBS)
+  set(Boost_USE_STATIC_LIBS ON)
+endif()
+find_package(Boost 1.53.0 REQUIRED COMPONENTS filesystem program_options system)
+if(WIN32)
+  add_definitions("-DBOOST_ALL_NO_LIB")
+endif(WIN32)
 
 set(PD_INCLUDE_DIRS    ${Boost_INCLUDE_DIRS})
 set(PD_LINK_LIBS       ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})

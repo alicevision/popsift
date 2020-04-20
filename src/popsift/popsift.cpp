@@ -5,6 +5,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+#include <cmath>
+#include <cstring>
 #include <fstream>
 
 #include "popsift.h"
@@ -30,11 +32,11 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
 
     configure( config, true );
 
-    _pipe._thread_stage1.reset( new boost::thread( &PopSift::uploadImages, this ));
+    _pipe._thread_stage1.reset( new std::thread( &PopSift::uploadImages, this ));
     if( mode == popsift::Config::ExtractingMode )
-        _pipe._thread_stage2.reset( new boost::thread( &PopSift::extractDownloadLoop, this ));
+        _pipe._thread_stage2.reset( new std::thread( &PopSift::extractDownloadLoop, this ));
     else
-        _pipe._thread_stage2.reset( new boost::thread( &PopSift::matchPrepareLoop, this ));
+        _pipe._thread_stage2.reset( new std::thread( &PopSift::matchPrepareLoop, this ));
 }
 
 PopSift::PopSift( ImageMode imode )
@@ -51,8 +53,8 @@ PopSift::PopSift( ImageMode imode )
         _pipe._unused.push( new popsift::ImageFloat );
     }
 
-    _pipe._thread_stage1.reset( new boost::thread( &PopSift::uploadImages, this ));
-    _pipe._thread_stage2.reset( new boost::thread( &PopSift::extractDownloadLoop, this ));
+    _pipe._thread_stage1.reset( new std::thread( &PopSift::uploadImages, this ));
+    _pipe._thread_stage2.reset( new std::thread( &PopSift::extractDownloadLoop, this ));
 }
 
 PopSift::~PopSift()

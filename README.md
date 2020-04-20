@@ -1,5 +1,5 @@
 
-# PopSift  
+# PopSift
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3728/badge)](https://bestpractices.coreinfrastructure.org/projects/3728)  [![Codacy Badge](https://api.codacy.com/project/badge/Grade/8b0f7a68bc0d4df2ac89c6e732917caa)](https://app.codacy.com/manual/alicevision/popsift?utm_source=github.com&utm_medium=referral&utm_content=alicevision/popsift&utm_campaign=Badge_Grade_Settings)
 
@@ -15,11 +15,11 @@ PopSift compiles and works with NVidia cards of compute capability >= 3.0 (inclu
 
 PopSift depends on:
 
-* Boost >= 1.55 (required components {atomic, chrono, date-time, system, thread}-dev)
-
 * CUDA >= 7.0
 
 Optionally, for the provided applications:
+
+* Boost >= 1.55 (required components {atomic, chrono, date-time, system, thread}-dev)
 
 * DevIL (libdevil-dev) can be used to load a broader range of image formats, otherwise only pgm is supported.
 
@@ -41,7 +41,7 @@ Some build options are available:
 * `BUILD_SHARED_LIBS` (default: `ON`) controls the type of library to build (`ON` for shared libraries, `OFF` for static)
 
 
-### Continuous integration: 
+### Continuous integration:
 - [![Build Status](https://travis-ci.org/alicevision/popsift.svg?branch=master)](https://travis-ci.org/alicevision/popsift) master branch.
 - [![Build Status](https://travis-ci.org/alicevision/popsift.svg?branch=develop)](https://travis-ci.org/alicevision/popsift) develop branch.
 - [![Build status](https://ci.appveyor.com/api/projects/status/rsm5269hs288c2ji/branch/develop?svg=true)](https://ci.appveyor.com/project/AliceVision/popsift/branch/develop)
@@ -57,12 +57,12 @@ Calling `popsift-demo` without parameters shows the options.
 
 ### Using PopSift as third party
 
-To integrate PopSift into other software, link with `libpopsift`. 
-If your are using CMake for building your project you can easily add PopSift to your project. 
+To integrate PopSift into other software, link with `libpopsift`.
+If your are using CMake for building your project you can easily add PopSift to your project.
 Once you have built and installed PopSift in a directory (say, `<prefix>`), in your `CMakeLists.txt` file just add the dependency
 
 ```cmake
-# Find the package from the PopSiftConfig.cmake 
+# Find the package from the PopSiftConfig.cmake
 # in <prefix>/lib/cmake/PopSift/. Under the namespace PopSift::
 # it exposes the target popsift that allows you to compile
 # and link with the library
@@ -86,23 +86,23 @@ cmake .. -DPopSift_DIR=<prefix>/lib/cmake/PopSift/
 
 The caller must create a `popart::Config` struct (documented in `src/sift/sift_conf.h`) to control the behaviour of the PopSift, and instantiate an object of class `PopSift` (found in `src/sift/popsift.h`).
 
-After this, images can be enqueued for SIFT extraction using (`enqueue()`).  
+After this, images can be enqueued for SIFT extraction using (`enqueue()`).
 A valid input is a single plane of grayscale values located in host memory.
 They can passed as a pointer to unsigned char, with a value range from 0 to 255, or as a pointer to float, with a value range from 0.0f to 1.0f.
 
-Only host memory limits the number of images that can be enqueued. 
+Only host memory limits the number of images that can be enqueued.
 The `enqueue` function returns a pointer to a `SiftJob` immediately and performs the feature extraction asynchronously.
 The memory of the image passed to enqueue remains the caller's responsibility. Calling `SiftJob::get` on the returned job blocks until features are extracted, and returns them.
 
-Features offer iterators that iterate over objects of type `Feature`. 
-Both classes are documented in `sift_extremum.h`. 
+Features offer iterators that iterate over objects of type `Feature`.
+Both classes are documented in `sift_extremum.h`.
 Each feature represents a feature point in the coordinate system of the input image, providing X and Y coordinates and scale (sigma), as well as several alternative descriptors for the feature point (according to Lowe, 15% of the feature points should be expected to have 2 or more descriptors).
 
 In an alternate, deprecated, blocking API, `init()` must be called to pass image width and height to PopSift, followed by a call to `executed()` that takes image data and returns the extracted features. `execute()` is synchronous and blocking.
 
-As far as we know, no implementation that is faster than PopSift at the time of PopSift's release comes under a license that allows commercial use and sticks close to the original paper at the same time as well. 
-PopSift can be configured at runtime to use constants that affect it behaviours. 
-In particular, users can choose to generate results very similar to VLFeat or results that are closer (but not as close) to the SIFT implementation of the OpenCV extras. 
+As far as we know, no implementation that is faster than PopSift at the time of PopSift's release comes under a license that allows commercial use and sticks close to the original paper at the same time as well.
+PopSift can be configured at runtime to use constants that affect it behaviours.
+In particular, users can choose to generate results very similar to VLFeat or results that are closer (but not as close) to the SIFT implementation of the OpenCV extras.
 We acknowledge that there is at least one SIFT implementation that is vastly faster, but it makes considerable sacrifices in terms of accuracy and compatibility.
 
 
@@ -131,7 +131,7 @@ If you use PopSift for your publication, please cite us as:
 	 acmid = {3208136},
 	 publisher = {ACM},
 	 address = {New York, NY, USA},
-} 
+}
 ```
 
 

@@ -12,9 +12,9 @@
 #include <stack>
 #include <queue>
 #include <future>
-#include <boost/thread/thread.hpp>
-#include <boost/thread/sync_queue.hpp>
+#include <thread>
 
+#include "common/sync_queue.h"
 #include "sift_conf.h"
 #include "sift_extremum.h"
 #include "sift_config.h"
@@ -75,11 +75,11 @@ class PopSift
 {
     struct Pipe
     {
-        std::unique_ptr<boost::thread>         _thread_stage1;
-        std::unique_ptr<boost::thread>         _thread_stage2;
-        boost::sync_queue<SiftJob*>            _queue_stage1;
-        boost::sync_queue<SiftJob*>            _queue_stage2;
-        boost::sync_queue<popsift::ImageBase*> _unused;
+        std::unique_ptr<std::thread>            _thread_stage1;
+        std::unique_ptr<std::thread>            _thread_stage2;
+        popsift::SyncQueue<SiftJob*>            _queue_stage1;
+        popsift::SyncQueue<SiftJob*>            _queue_stage2;
+        popsift::SyncQueue<popsift::ImageBase*> _unused;
 
         popsift::Pyramid*                      _pyramid{nullptr};
 

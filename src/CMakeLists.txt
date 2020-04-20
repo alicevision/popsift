@@ -45,13 +45,12 @@ set(popsift_generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 # BUILD_INTERFACE allows to include the directory with source only when target is
 # built in the building tree (ie, not from an install location)
-target_include_directories(popsift 
+target_include_directories(popsift
             PUBLIC
             $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
             $<BUILD_INTERFACE:${popsift_generated_dir}>
             $<BUILD_INTERFACE:${popsift_generated_dir}/popsift>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>
-            ${Boost_INCLUDE_DIRS}
             ${CUDA_INCLUDE_DIRS})
 
 
@@ -60,7 +59,8 @@ set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 
 # cannot use PRIVATE here as there is a bug in FindCUDA and CUDA_ADD_LIBRARY
 # https://gitlab.kitware.com/cmake/cmake/issues/16097
-target_link_libraries(popsift ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
+target_link_libraries(popsift ${CUDA_CUDADEVRT_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} Threads::Threads)
+
 
 
 # EXPORTING THE LIBRARY

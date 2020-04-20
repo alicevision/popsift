@@ -14,14 +14,9 @@ option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code
 option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 option(PopSift_USE_NORMF "The __normf function computes Euclidian distance on large arrays. Fast but stability is uncertain." OFF)
 option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
-option(PopSift_BOOST_USE_STATIC_LIBS "Link with static Boost libraries" OFF)
 option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
-
-if(PopSift_BOOST_USE_STATIC_LIBS)
-  set(Boost_USE_STATIC_LIBS ON)
-endif()
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -52,16 +47,6 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 include(GNUInstallDirs)
 
 
-#################
-# BOOST
-#################
-find_package(Boost 1.53.0 REQUIRED COMPONENTS system thread)
-if(WIN32)
-  add_definitions("-DBOOST_ALL_NO_LIB")
-  link_directories(Boost_LIBRARRY_DIR_DEBUG)
-  link_directories(Boost_LIBRARRY_DIR_RELEASE)
-endif(WIN32)
-
 if(BUILD_SHARED_LIBS)
   message(STATUS "BUILD_SHARED_LIBS ON")
   # Need to declare CUDA_USE_STATIC_CUDA_RUNTIME as an option to ensure that it is not overwritten in FindCUDA.
@@ -76,6 +61,9 @@ else()
   option(CUDA_USE_STATIC_CUDA_RUNTIME "Use the static version of the CUDA runtime library if available" ON)
   set(CUDA_USE_STATIC_CUDA_RUNTIME ON)
 endif()
+
+# Require threads because of std::thread.
+find_package(Threads REQUIRED)
 
 ###################
 #  CUDA
