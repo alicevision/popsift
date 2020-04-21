@@ -35,12 +35,12 @@ RUN apt-get clean && apt-get update && apt-get install -y --no-install-recommend
  # Manually install cmake
 WORKDIR /tmp/cmake
 RUN wget https://cmake.org/files/v3.17/cmake-3.17.1.tar.gz && \
-    tar zxvf cmake-3.17.1.tar.gz && \
-    cd cmake-3.17.1 && \
-    ./bootstrap --prefix=/usr/local  -- -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_USE_OPENSSL:BOOL=ON && \
-    make -j2 install && \
-    cd /tmp && \
-    rm -rf cmake
+    tar zxvf cmake-3.17.1.tar.gz
+WORKDIR /tmp/cmake/cmake-3.17.1
+RUN ./bootstrap --prefix=/usr/local  -- -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_USE_OPENSSL:BOOL=ON && \
+    make -j2 install
+WORKDIR /tmp
+RUN rm -rf cmake
 
 COPY . /opt/popsift
 WORKDIR /opt/popsift/build
