@@ -138,6 +138,14 @@ public:
         std::cerr << __FILE__ << ":" << __LINE__ << std::endl << "    " << s << std::endl; \
     }
 
+#define POP_WARN(s) { \
+        std::cerr << __FILE__ << ":" << __LINE__ << std::endl; \
+        std::cerr << "    WARNING: " << s << std::endl; \
+    }
+#define POP_CUDA_WARN(err,s) { \
+        std::cerr << __FILE__ << ":" << __LINE__ << std::endl; \
+        std::cerr << "    WARNING: " << s << cudaGetErrorString(err) << std::endl; \
+    }
 #define POP_CUDA_FATAL(err,s) { \
         std::cerr << __FILE__ << ":" << __LINE__ << std::endl; \
         std::cerr << "    " << s << cudaGetErrorString(err) << std::endl; \

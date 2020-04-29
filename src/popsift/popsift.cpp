@@ -91,10 +91,8 @@ bool PopSift::configure( const popsift::Config& config, bool force )
     return true;
 }
 
-bool PopSift::private_init( int w, int h )
+void PopSift::private_apply_scale_factor( int& w, int& h )
 {
-    Pipe& p = _pipe;
-
     /* up=-1 -> scale factor=2
      * up= 0 -> scale factor=1
      * up= 1 -> scale factor=0.5
@@ -102,22 +100,28 @@ bool PopSift::private_init( int w, int h )
     float upscaleFactor = _config.getUpscaleFactor();
     float scaleFactor = 1.0f / powf( 2.0f, -upscaleFactor );
 
-    if( p._pyramid != nullptr ) {
-        p._pyramid->resetDimensions( _config,
-                                     ceilf( w * scaleFactor ),
-                                     ceilf( h * scaleFactor ) );
-        return true;
-    }
-
     if( _config.octaves < 0 ) {
         int oct = max(int (floor( logf( (float)min( w, h ) )
                             / logf( 2.0f ) ) - 3.0f + scaleFactor ), 1);
         _config.octaves = oct;
     }
 
-    p._pyramid = new popsift::Pyramid( _config,
-                                       ceilf( w * scaleFactor ),
-                                       ceilf( h * scaleFactor ) );
+    w = ceilf( w * scaleFactor );
+    h = ceilf( h * scaleFactor );
+}
+
+bool PopSift::private_init( int w, int h )
+{
+    Pipe& p = _pipe;
+
+    private_apply_scale_factor( w, h );
+
+    if( p._pyramid != nullptr ) {
+        p._pyramid->resetDimensions( _config, w, h );
+        return true;
+    }
+
+    p._pyramid = new popsift::Pyramid( _config, w, h );
 
     cudaDeviceSynchronize();
 
@@ -136,6 +140,93 @@ void PopSift::uninit( )
     _isInit = false;
 }
 
+PopSift::AllocTest PopSift::testTextureFit( int width, int height )
+{
+    const bool warn = popsift::cuda::device_prop_t::dont_warn;
+    bool retval;
+    retval = _device_properties.checkLimit_2DtexLinear( width,
+                                                        height,
+                                                        warn );
+    if( !retval )
+    {
+        return AllocTest::ImageExceedsLinearTextureLimit;
+    }
+
+
+    /* Scale the width and height - we need that size for the largest
+     * octave. */
+    private_apply_scale_factor( width, height );
+
+    /* _config.level does not contain the 3 blur levels beyond the first
+     * that is required for downscaling to the following octave.
+     * We need all layers to check if we can support enough layers.
+     */
+    int depth = _config.levels + 3;
+
+    /* Surfaces have a limited width in bytes, not in elements.
+     * Our DOG pyramid stores 4/byte floats, so me must check for
+     * that width.
+     */
+    int byteWidth = width * sizeof(float);
+    retval = _device_properties.checkLimit_2DsurfLayered( byteWidth,
+                                                          height,
+                                                          depth,
+                                                          warn );
+    if( !retval )
+    {
+        return AllocTest::ImageExceedsLayeredSurfaceLimit;
+    }
+    else
+    {
+        return AllocTest::Ok;
+    }
+}
+
+std::string PopSift::testTextureFitErrorString( AllocTest err, int width, int height )
+{
+    ostringstream ostr;
+
+    switch( err )
+    {
+        case AllocTest::Ok :
+            ostr << "?    No error." << endl;
+            break;
+        case AllocTest::ImageExceedsLinearTextureLimit :
+            _device_properties.checkLimit_2DtexLinear( width, height, false );
+            ostr << "E    Cannot load unscaled image. " << endl
+                 << "E    It exceeds the max CUDA linear texture size. " << endl
+                 << "E    Max is (" << width << "," << height << ")" << endl;
+            break;
+        case AllocTest::ImageExceedsLayeredSurfaceLimit :
+            {
+                const float upscaleFactor = _config.getUpscaleFactor();
+                const float scaleFactor = 1.0f / powf( 2.0f, -upscaleFactor );
+                int w = ceilf( width * scaleFactor ) * sizeof(float);
+                int h = ceilf( height * scaleFactor );
+                int d = _config.levels + 3;
+
+                _device_properties.checkLimit_2DsurfLayered( w, h, d, false );
+
+                w = w / scaleFactor / sizeof(float);
+                h = h / scaleFactor;
+                ostr << "E    Cannot use"
+                     << (upscaleFactor==1 ? " default " : " ")
+                     << "downscaling factor " << -upscaleFactor
+                     << " (i.e. upscaling by " << pow(2,upscaleFactor) << "). "
+                     << endl
+                     << "E    It exceeds the max CUDA layered surface size. " << endl
+                     << "E    Change downscaling to fit into (" << w << "," << h
+                     << ") with " << (d-3) << " levels per octave." << endl;
+            }
+            break;
+        default:
+            ostr << "E    Programming error, please report." << endl;
+            break;
+    }
+    return ostr.str();
+}
+
+
 SiftJob* PopSift::enqueue( int                  w,
                            int                  h,
                            const unsigned char* imageData )
@@ -145,6 +236,14 @@ SiftJob* PopSift::enqueue( int                  w,
         cerr << __FILE__ << ":" << __LINE__ << " Image mode error" << endl
              << "E    Cannot load byte images into a PopSift pipeline configured for float images" << endl;
         exit( -1 );
+    }
+
+    AllocTest a = testTextureFit( w, h );
+    if( a != AllocTest::Ok )
+    {
+        cerr << __FILE__ << ":" << __LINE__ << " Image too large" << endl
+             << testTextureFitErrorString( a,w,h );
+        return NULL;
     }
 
     SiftJob* job = new SiftJob( w, h, imageData );
@@ -161,6 +260,14 @@ SiftJob* PopSift::enqueue( int          w,
         cerr << __FILE__ << ":" << __LINE__ << " Image mode error" << endl
              << "E    Cannot load float images into a PopSift pipeline configured for byte images" << endl;
         exit( -1 );
+    }
+
+    AllocTest a = testTextureFit( w, h );
+    if( a != AllocTest::Ok )
+    {
+        cerr << __FILE__ << ":" << __LINE__ << " Image too large" << endl
+             << testTextureFitErrorString( a,w,h );
+        return NULL;
     }
 
     SiftJob* job = new SiftJob( w, h, imageData );
