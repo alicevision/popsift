@@ -32,6 +32,15 @@ else()
   message(STATUS "Building in ${CMAKE_BUILD_TYPE} configuration")
 endif()
 
+message(STATUS "CMAKE_CONFIGURATION_TYPES: ${CMAKE_CONFIGURATION_TYPES}")
+if(MSVC AND NOT BUILD_SHARED_LIBS)
+  foreach(config ${CMAKE_CONFIGURATION_TYPES})
+    string(TOUPPER ${config} config)
+    string(REPLACE /MD /MT CMAKE_C_FLAGS_${config} "${CMAKE_C_FLAGS_${config}}")
+    string(REPLACE /MD /MT CMAKE_CXX_FLAGS_${config} "${CMAKE_CXX_FLAGS_${config}}")
+  endforeach()
+endif()
+
 # for some reason this line is necessary to propagate the standard to nvcc
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(CMAKE_CXX_STANDARD 11)
