@@ -111,7 +111,6 @@ struct Config
     void setMaxExtreme( int m );
     void setPrintGaussTables( );
     void setDPOrientation( bool on );
-    void setMaxExtrema( int extrema );
     void setFilterMaxExtrema( int extrema );
     void setFilterGridSize( int sz );
     void setFilterSorting( const std::string& direction );
