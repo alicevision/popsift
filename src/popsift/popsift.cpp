@@ -171,14 +171,8 @@ PopSift::AllocTest PopSift::testTextureFit( int width, int height )
                                                           height,
                                                           depth,
                                                           warn );
-    if( !retval )
-    {
-        return AllocTest::ImageExceedsLayeredSurfaceLimit;
-    }
-    else
-    {
-        return AllocTest::Ok;
-    }
+
+    return (retval ? AllocTest::Ok : AllocTest::ImageExceedsLayeredSurfaceLimit);
 }
 
 std::string PopSift::testTextureFitErrorString( AllocTest err, int width, int height )
