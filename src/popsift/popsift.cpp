@@ -236,7 +236,7 @@ SiftJob* PopSift::enqueue( int                  w,
     {
         cerr << __FILE__ << ":" << __LINE__ << " Image too large" << endl
              << testTextureFitErrorString( a,w,h );
-        return NULL;
+        return nullptr;
     }
 
     SiftJob* job = new SiftJob( w, h, imageData );
@@ -260,7 +260,7 @@ SiftJob* PopSift::enqueue( int          w,
     {
         cerr << __FILE__ << ":" << __LINE__ << " Image too large" << endl
              << testTextureFitErrorString( a,w,h );
-        return NULL;
+        return nullptr;
     }
 
     SiftJob* job = new SiftJob( w, h, imageData );
