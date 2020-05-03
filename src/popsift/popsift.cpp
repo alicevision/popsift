@@ -343,9 +343,12 @@ SiftJob::SiftJob( int w, int h, const unsigned char* imageData )
     _f = _p.get_future();
 
     _imageData = (unsigned char*)malloc( w*h );
-    if( _imageData != nullptr ) {
+    if( _imageData != nullptr )
+    {
         memcpy( _imageData, imageData, w*h );
-    } else {
+    }
+    else
+    {
         cerr << __FILE__ << ":" << __LINE__ << " Memory limitation" << endl
              << "E    Failed to allocate memory for SiftJob" << endl;
         exit( -1 );
@@ -360,9 +363,12 @@ SiftJob::SiftJob( int w, int h, const float* imageData )
     _f = _p.get_future();
 
     _imageData = (unsigned char*)malloc( w*h*sizeof(float) );
-    if( _imageData != nullptr ) {
+    if( _imageData != nullptr )
+    {
         memcpy( _imageData, imageData, w*h*sizeof(float) );
-    } else {
+    }
+    else
+    {
         cerr << __FILE__ << ":" << __LINE__ << " Memory limitation" << endl
              << "E    Failed to allocate memory for SiftJob" << endl;
         exit( -1 );
