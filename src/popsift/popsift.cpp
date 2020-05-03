@@ -143,8 +143,7 @@ void PopSift::uninit( )
 PopSift::AllocTest PopSift::testTextureFit( int width, int height )
 {
     const bool warn = popsift::cuda::device_prop_t::dont_warn;
-    bool retval;
-    retval = _device_properties.checkLimit_2DtexLinear( width,
+    bool retval = _device_properties.checkLimit_2DtexLinear( width,
                                                         height,
                                                         warn );
     if( !retval )
