@@ -28,7 +28,7 @@ device_prop_t::device_prop_t( )
 
     _properties.resize(_num_devices);
 
-    for( int n=0; n<_num_devices; n++ ) {
+    for( int n=0; n<_num_devices; ++n ) {
         _properties[n] = new cudaDeviceProp;
         err = cudaGetDeviceProperties( _properties[n], n );
         POP_CUDA_FATAL_TEST( err, "Cannot get properties for a device" );
