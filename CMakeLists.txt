@@ -139,6 +139,23 @@ if(PopSift_USE_POSITION_INDEPENDENT_CODE AND NOT MSVC)
   list(APPEND CUDA_NVCC_FLAGS "-Xcompiler;-fPIC")
 endif()
 
+if(MSVC)
+  if(BUILD_SHARED_LIBS)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+      set(PopSift_MVSC_LINKER "/MDd")
+    else()
+      set(PopSift_MVSC_LINKER "/MD")
+    endif()
+  else()
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+      set(PopSift_MVSC_LINKER "/MTd")
+    else()
+      set(PopSift_MVSC_LINKER "/MT")
+    endif()
+  endif()
+  list(APPEND CUDA_NVCC_FLAGS   -Xcompiler ${PopSift_MVSC_LINKER})
+endif()
+
 # default stream per-thread implies that each host thread has one non-synchronizing 0-stream
 # currently, the code requires legacy mode
 list(APPEND CUDA_NVCC_FLAGS "--default-stream;legacy")
