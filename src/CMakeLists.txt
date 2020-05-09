@@ -62,6 +62,14 @@ set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 target_link_libraries(popsift ${CUDA_CUDADEVRT_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} Threads::Threads)
 
 
+if(MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "MSVC AND CMAKE_BUILD_TYPE STREQUAL debug ")
+    if(NOT BUILD_SHARED_LIBS)
+        set_target_properties(popsift PROPERTIES STATIC_LIBRARY_FLAGS "/NODEFAULTLIB:libcmt.lib;/VERBOSE:LIB")
+        list(APPEND STATIC_LIBRARY_FLAGS "/NODEFAULTLIB:libcmt.lib" "/VERBOSE:LIB")
+        message(STATUS "adding properties")
+    endif()
+endif()
 
 # EXPORTING THE LIBRARY
 #
