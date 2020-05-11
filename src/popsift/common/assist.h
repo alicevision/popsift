@@ -148,4 +148,4 @@ static void memalign_free( void* ptr )
 #endif
 }
 
-}; // namespace popsift
+} // namespace popsift
