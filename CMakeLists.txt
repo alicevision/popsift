@@ -18,7 +18,7 @@ option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 
-if(PopSift_USE_POSITION_INDEPENDENT_CODE)
+if(PopSift_USE_POSITION_INDEPENDENT_CODE AND NOT MSVC)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
