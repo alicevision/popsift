@@ -45,6 +45,7 @@ if(MSVC AND NOT BUILD_SHARED_LIBS)
 endif()
 
 # for some reason this line is necessary to propagate the standard to nvcc
+# On MSVC this is not necessary / nvcc does not recognize the flag for MSVC
 if(NOT MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
