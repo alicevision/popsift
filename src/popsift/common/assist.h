@@ -133,7 +133,7 @@ static void* memalign(size_t alignment, size_t size)
     int err = posix_memalign( &ret, alignment, size );
     if( err != 0 ) {
         errno = err;
-        ret = 0;
+        ret = nullptr;
     }
     return ret;
 #endif
