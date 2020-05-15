@@ -499,10 +499,8 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
         } else if( conf.getScalingMode() == Config::ScaleDirect ) {
             GaussTableChoice useGauss = ( conf.getGaussMode() == Config::VLFeat_Relative ) ? Interpolated_FromPrevious
                                                                                            : NotInterpolated_FromPrevious;
-            for( int level=0; level<_levels; level++ ) {
-                const int width  = oct_obj.getWidth();
-                const int height = oct_obj.getHeight();
-
+            for( int level=0; level<_levels; level++ )
+            {
                 if( level == 0 )
                 {
                     horiz_from_input_image( conf, base, octave, stream );
