@@ -77,7 +77,7 @@ void ext_desc_notile_sub( const float x, const float y, const int level,
         }
     }
 
-    for( int i=0; i<8; i++ )
+    for( int i=0; i<8; ++i)
     {
         dpt[i] += popsift::shuffle_down( dpt[i], 4, 8 ); // add n+4
         dpt[i] += popsift::shuffle_down( dpt[i], 2, 8 ); // add n+2

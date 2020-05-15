@@ -355,9 +355,11 @@ void Pyramid::orientation( const Config& conf )
 
     nvtxRangePushA( "filtering grid" );
     int ext_total = 0;
-    for( int o=0; o<MAX_OCTAVES; o++ ) {
-        if( hct.ext_ct[o] > 0 ) {
-            ext_total += hct.ext_ct[o];
+    for(int o : hct.ext_ct)
+    {
+        if( o > 0 )
+        {
+            ext_total += o;
         }
     }
 

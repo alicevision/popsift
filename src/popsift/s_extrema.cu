@@ -422,7 +422,7 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
         b.y = -D.y;
         b.z = -D.z;
 
-        if( solve( A, b ) == false ) {
+        if(!solve(A, b)) {
             d.x = 0;
             d.y = 0;
             d.z = 0;

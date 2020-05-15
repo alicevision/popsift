@@ -435,8 +435,9 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* 
                      << 1.0f / (sigma * sigma) << " ";
 
             if (really) {
-                for (int i = 0; i<128; i++) {
-                    ostr << desc.features[i] << " ";
+                for (float feature : desc.features)
+                {
+                    ostr << feature << " ";
                 }
             }
             ostr << endl;
