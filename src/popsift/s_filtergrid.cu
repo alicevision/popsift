@@ -70,7 +70,7 @@ struct FunctionExtractCell
 struct FunctionIsAbove
 {
     int _limit;
-    FunctionIsAbove( int limit ) : _limit(limit) { }
+    explicit FunctionIsAbove( int limit ) : _limit(limit) { }
 
     __host__ __device__
     inline bool operator()( int val ) const

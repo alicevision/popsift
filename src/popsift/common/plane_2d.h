@@ -92,7 +92,7 @@ template <typename T> struct PlaneT : public PlaneBase
     T* data;
 
     __host__ __device__ PlaneT( )      : data(0) { }
-    __host__ __device__ PlaneT( T* d ) : data(d) { }
+    __host__ __device__ explicit PlaneT( T* d ) : data(d) { }
 
     __host__ __device__ inline size_t elemSize() const { return elem_size; }
 };

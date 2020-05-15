@@ -250,7 +250,7 @@ class ExtremaRead
     const Extremum* const _oris;
 public:
     inline __device__
-    ExtremaRead( const Extremum* const d_oris ) : _oris( d_oris ) { }
+    explicit ExtremaRead( const Extremum* const d_oris ) : _oris( d_oris ) { }
 
     inline __device__
     int get( int n ) const { return _oris[n].num_ori; }
@@ -261,7 +261,7 @@ class ExtremaWrt
     Extremum* _oris;
 public:
     inline __device__
-    ExtremaWrt( Extremum* d_oris ) : _oris( d_oris ) { }
+    explicit ExtremaWrt( Extremum* d_oris ) : _oris( d_oris ) { }
 
     inline __device__
     void set( int n, int value ) { _oris[n].idx_ori = value; }
@@ -272,7 +272,7 @@ class ExtremaTot
     int& _extrema_counter;
 public:
     inline __device__
-    ExtremaTot( int& extrema_counter ) : _extrema_counter( extrema_counter ) { }
+    explicit ExtremaTot( int& extrema_counter ) : _extrema_counter( extrema_counter ) { }
 
     inline __device__
     void set( int value ) { _extrema_counter = value; }
