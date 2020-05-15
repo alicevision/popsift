@@ -187,7 +187,7 @@ public:
     }
 
     inline __device__
-    int verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         return true;
     }
@@ -232,7 +232,7 @@ public:
     }
 
     inline __device__
-    int verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         // reject if outside of image bounds or far outside DoG bounds
         return ( ( xn < 0.0f ||
@@ -284,7 +284,7 @@ public:
     }
 
     inline __device__
-    int verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         // reject if outside of image bounds or far outside DoG bounds
         return ( ( xn < 0.0f ||
