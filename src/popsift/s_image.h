@@ -25,7 +25,7 @@ struct ImageBase
     /** Create a device-sided buffer of the given dimensions */
     ImageBase( int w, int h );
 
-    virtual ~ImageBase( );
+    virtual ~ImageBase( ) = default;
 
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.

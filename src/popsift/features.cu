@@ -30,8 +30,7 @@ FeaturesBase::FeaturesBase( )
     , _num_ori( 0 )
 { }
 
-FeaturesBase::~FeaturesBase( )
-{ }
+FeaturesBase::~FeaturesBase( ) = default;
 
 /*************************************************************
  * FeaturesHost
