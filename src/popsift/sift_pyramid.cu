@@ -144,8 +144,8 @@ Pyramid::Pyramid( const Config& config,
         dobuf_shadow.i_ext_off[o] = dobuf_shadow.i_ext_off[0] + (o*h_consts.max_extrema);
     }
     for (int o = _num_octaves; o<MAX_OCTAVES; o++) {
-        dobuf_shadow.i_ext_dat[o] = 0;
-        dobuf_shadow.i_ext_off[o] = 0;
+        dobuf_shadow.i_ext_dat[o] = nullptr;
+        dobuf_shadow.i_ext_off[o] = nullptr;
     }
 
     sz = h_consts.max_extrema;
@@ -276,7 +276,7 @@ void prep_features( Descriptor* descriptor_base, int up_fac )
         fet.orientation[ori] = ext.orientation[ori];
     }
     for( ; ori<ORIENTATION_MAX_COUNT; ori++ ) {
-        fet.desc[ori]        = 0;
+        fet.desc[ori]        = nullptr;
         fet.orientation[ori] = 0;
     }
 }

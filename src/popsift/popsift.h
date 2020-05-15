@@ -145,7 +145,7 @@ public:
     inline popsift::FeaturesBase* execute( int /*pipe*/, const unsigned char* imageData )
     {
         SiftJob* j = enqueue( _last_init_w, _last_init_h, imageData );
-        if( !j ) return 0;
+        if( !j ) return nullptr;
         popsift::FeaturesBase* f = j->getBase();
         delete j;
         return f;

@@ -316,12 +316,12 @@ void Octave::alloc_interm_tex()
     tex_desc.readMode         = cudaReadModeElementType; // read as float
     tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
 
-    err = cudaCreateTextureObject( &_intm_tex_point, &res_desc, &tex_desc, 0 );
+    err = cudaCreateTextureObject( &_intm_tex_point, &res_desc, &tex_desc, nullptr );
     POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate point texture: ");
 
     tex_desc.filterMode       = cudaFilterModeLinear; // no interpolation
 
-    err = cudaCreateTextureObject( &_intm_tex_linear.tex, &res_desc, &tex_desc, 0 );
+    err = cudaCreateTextureObject( &_intm_tex_linear.tex, &res_desc, &tex_desc, nullptr );
     POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate point texture: ");
 }
 
