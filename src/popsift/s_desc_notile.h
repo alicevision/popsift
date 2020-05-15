@@ -14,6 +14,6 @@
 namespace popsift
 {
 
-bool start_ext_desc_notile( const int octave, Octave& oct_obj );
+bool start_ext_desc_notile( int octave, Octave& oct_obj );
 
 }; // namespace popsift

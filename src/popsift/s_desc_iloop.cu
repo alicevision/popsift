@@ -128,11 +128,7 @@ void ext_desc_iloop_sub( const float         ang,
     }
 }
 
-__global__
-void ext_desc_iloop( const int           octave,
-                     cudaTextureObject_t layer_tex,
-                     const int           w,
-                     const int           h )
+__global__ void ext_desc_iloop(int octave, cudaTextureObject_t layer_tex, int w, int h)
 {
     const int   o_offset =  dct.ori_ps[octave] + blockIdx.x;
     Descriptor* desc     = &dbuf.desc           [o_offset];

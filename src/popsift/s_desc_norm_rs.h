@@ -16,20 +16,17 @@ class NormalizeRootSift
 {
 public:
     __device__ static inline
-    void normalize( float* features, const bool ignoreme );
+    void normalize( float* features, bool ignoreme );
 
     __device__ static inline
     void normalize_restrict( const float* __restrict__ src_desc,
                              float* __restrict__       dest_desc );
 
-    __device__ static inline
-    void normalize( const float* src_desc,
-                    float*       dest_desc,
-                    const  bool  ignoreme );
+    __device__ static inline void normalize(const float* src_desc, float* dest_desc, bool ignoreme);
 };
 
 __device__ inline
-void NormalizeRootSift::normalize( float* features, const bool ignoreme )
+void NormalizeRootSift::normalize( float* features, bool ignoreme )
 {
     normalize( features, features, ignoreme );
 }
@@ -42,7 +39,7 @@ void NormalizeRootSift::normalize_restrict( const float* __restrict__ src_desc,
 }
 
 __device__ inline
-void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, const bool ignoreme )
+void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, bool ignoreme )
 {
     const float4* ptr4 = (const float4*)src_desc;
 

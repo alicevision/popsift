@@ -74,9 +74,7 @@ void ext_desc_igrid_sub( const float x, const float y, const int level,
     }
 }
 
-__global__
-void ext_desc_igrid( const int           octave,
-                     cudaTextureObject_t texLinear )
+__global__ void ext_desc_igrid(int octave, cudaTextureObject_t texLinear)
 {
     const int   num      = dct.ori_ct[octave];
 

@@ -124,7 +124,7 @@ class ModeFunctions
 {
 public:
     inline __device__
-    bool first_contrast_ok( const float val ) const;
+    bool first_contrast_ok( float val ) const;
 
     /* refine
      * returns -1 : break loop and fail
@@ -132,14 +132,14 @@ public:
      *          1 : break loop and succeed
      */
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it );
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it );
 
     /*
      * returns true  : values after refine make sense
      *         false : they do not
      */
     inline __device__
-    bool verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const;
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const;
 };
 
 template<>
@@ -147,13 +147,13 @@ class ModeFunctions<Config::OpenCV>
 {
 public:
     inline __device__
-    bool first_contrast_ok( const float val ) const
+    bool first_contrast_ok( float val ) const
     {
         return ( fabsf( val ) >= floorf( d_consts.threshold ) );
     }
 
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it ) const
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         // OpenCV mode is a special case because d remains unmodified.
         // Either we return 1, and n has not been modified.
@@ -187,7 +187,7 @@ public:
     }
 
     inline __device__
-    int verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const
+    int verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         return true;
     }
@@ -204,7 +204,7 @@ public:
     }
 
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it ) const
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         if( last_it ) return 0;
 
@@ -232,7 +232,7 @@ public:
     }
 
     inline __device__
-    int verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const
+    int verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         // reject if outside of image bounds or far outside DoG bounds
         return ( ( xn < 0.0f ||
@@ -256,7 +256,7 @@ public:
     }
 
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it ) const
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         if( last_it ) return 0;
 
@@ -284,7 +284,7 @@ public:
     }
 
     inline __device__
-    int verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const
+    int verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         // reject if outside of image bounds or far outside DoG bounds
         return ( ( xn < 0.0f ||
@@ -298,16 +298,15 @@ public:
 };
 
 template<int sift_mode>
-__device__ inline
-bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
-                              int                 debug_octave,
-                              int                 width,
-                              int                 height,
-                              const uint32_t      maxlevel,
-                              const float         w_grid_divider,
-                              const float         h_grid_divider,
-                              const int           grid_width,
-                              InitialExtremum&    ec )
+__device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
+                                               int debug_octave,
+                                               int width,
+                                               int height,
+                                               uint32_t maxlevel,
+                                               float w_grid_divider,
+                                               float h_grid_divider,
+                                               int grid_width,
+                                               InitialExtremum& ec)
 {
     ec.xpos    = 0.0f;
     ec.ypos    = 0.0f;

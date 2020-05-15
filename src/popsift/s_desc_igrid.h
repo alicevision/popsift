@@ -16,9 +16,7 @@
  * block = 16,4,4 or with 32,4,4, depending on macros
  * grid  = nunmber of orientations
  */
-__global__
-void ext_desc_igrid( const int           octave,
-                     cudaTextureObject_t texLinear );
+__global__ void ext_desc_igrid(int octave, cudaTextureObject_t texLinear);
 
 namespace popsift
 {

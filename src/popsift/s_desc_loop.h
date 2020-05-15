@@ -14,11 +14,7 @@
 
 #undef BLOCK_3_DIMS
 
-__global__
-void ext_desc_loop( const int           octave,
-                    cudaTextureObject_t layer_tex,
-                    const int           width,
-                    const int           height );
+__global__ void ext_desc_loop(int octave, cudaTextureObject_t layer_tex, int width, int height);
 
 namespace popsift
 {

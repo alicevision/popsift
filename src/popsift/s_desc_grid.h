@@ -17,9 +17,7 @@
  * block = 16,4,4
  * grid  = nunmber of orientations
  */
-__global__
-void ext_desc_grid( const int           octave,
-                    cudaTextureObject_t layer_tex );
+__global__ void ext_desc_grid(int octave, cudaTextureObject_t layer_tex);
 
 namespace popsift
 {

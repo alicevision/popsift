@@ -121,9 +121,7 @@ void ext_desc_grid_sub( const int           ix,
     }
 }
 
-__global__
-void ext_desc_grid( const int           octave,
-                    cudaTextureObject_t layer_tex )
+__global__ void ext_desc_grid(int octave, cudaTextureObject_t layer_tex)
 {
     const int   o_offset =  dct.ori_ps[octave] + blockIdx.x;
     const int   ix       = threadIdx.y;
