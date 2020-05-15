@@ -105,19 +105,19 @@ public:
     inline LinearTexture getIntermDataTexLinear( ) {
         return _intm_tex_linear;
     }
-    inline cudaTextureObject_t getIntermDataTexPoint( ) {
+    inline cudaTextureObject_t getIntermDataTexPoint( ) const {
         return _intm_tex_point;
     }
     inline LinearTexture getDataTexLinear( ) {
         return _data_tex_linear;
     }
-    inline cudaTextureObject_t getDataTexPoint( ) {
+    inline cudaTextureObject_t getDataTexPoint( ) const {
         return _data_tex_point;
     }
-    inline cudaSurfaceObject_t getDataSurface( ) {
+    inline cudaSurfaceObject_t getDataSurface( ) const {
         return _data_surf;
     }
-    inline cudaSurfaceObject_t getIntermediateSurface( ) {
+    inline cudaSurfaceObject_t getIntermediateSurface( ) const {
         return _intm_surf;
     }
         
