@@ -24,44 +24,44 @@ struct LinearTexture
 
 class Octave
 {
-    int   _w;
-    int   _h;
-    int   _max_w;
-    int   _max_h;
-    float _w_grid_divider;
-    float _h_grid_divider;
-    int   _debug_octave_id;
-    int   _levels;
-    int   _gauss_group;
+    int   _w{};
+    int   _h{};
+    int   _max_w{};
+    int   _max_h{};
+    float _w_grid_divider{};
+    float _h_grid_divider{};
+    int   _debug_octave_id{};
+    int   _levels{};
+    int   _gauss_group{};
 
-    cudaArray_t           _data;
-    cudaChannelFormatDesc _data_desc;
-    cudaExtent            _data_ext;
-    cudaSurfaceObject_t   _data_surf;
-    cudaTextureObject_t   _data_tex_point;
-    LinearTexture         _data_tex_linear;
+    cudaArray_t           _data{};
+    cudaChannelFormatDesc _data_desc{};
+    cudaExtent            _data_ext{};
+    cudaSurfaceObject_t   _data_surf{};
+    cudaTextureObject_t   _data_tex_point{};
+    LinearTexture         _data_tex_linear{};
 
-    cudaArray_t           _intm;
-    cudaChannelFormatDesc _intm_desc;
-    cudaExtent            _intm_ext;
-    cudaSurfaceObject_t   _intm_surf;
-    cudaTextureObject_t   _intm_tex_point;
-    LinearTexture         _intm_tex_linear;
+    cudaArray_t           _intm{};
+    cudaChannelFormatDesc _intm_desc{};
+    cudaExtent            _intm_ext{};
+    cudaSurfaceObject_t   _intm_surf{};
+    cudaTextureObject_t   _intm_tex_point{};
+    LinearTexture         _intm_tex_linear{};
 
-    cudaArray_t           _dog_3d;
-    cudaChannelFormatDesc _dog_3d_desc;
-    cudaExtent            _dog_3d_ext;
-    cudaSurfaceObject_t   _dog_3d_surf;
-    cudaTextureObject_t   _dog_3d_tex_point;
-    LinearTexture         _dog_3d_tex_linear;
+    cudaArray_t           _dog_3d{};
+    cudaChannelFormatDesc _dog_3d_desc{};
+    cudaExtent            _dog_3d_ext{};
+    cudaSurfaceObject_t   _dog_3d_surf{};
+    cudaTextureObject_t   _dog_3d_tex_point{};
+    LinearTexture         _dog_3d_tex_linear{};
 
     // one CUDA stream per level
     // consider whether some of them can be removed
-    cudaStream_t _stream;
-    cudaEvent_t  _scale_done;
-    cudaEvent_t  _extrema_done;
-    cudaEvent_t  _ori_done;
-    cudaEvent_t  _desc_done;
+    cudaStream_t _stream{};
+    cudaEvent_t  _scale_done{};
+    cudaEvent_t  _extrema_done{};
+    cudaEvent_t  _ori_done{};
+    cudaEvent_t  _desc_done{};
 
 public:
     Octave( );

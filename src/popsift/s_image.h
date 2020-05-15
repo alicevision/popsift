@@ -59,9 +59,9 @@ protected:
     int _max_h; // allocated height of image
 
     /* Texture information for input image on device */
-    cudaTextureObject_t _input_image_tex;
-    cudaTextureDesc     _input_image_texDesc;
-    cudaResourceDesc    _input_image_resDesc;
+    cudaTextureObject_t _input_image_tex{};
+    cudaTextureDesc     _input_image_texDesc{};
+    cudaResourceDesc    _input_image_resDesc{};
 };
 
 /*************************************************************
