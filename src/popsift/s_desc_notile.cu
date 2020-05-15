@@ -5,15 +5,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdio.h>
-#include <iso646.h>
-#include <iostream>
-
-#include "sift_constants.h"
-#include "s_gradiant.h"
-#include "s_desc_notile.h"
 #include "common/assist.h"
 #include "common/vec_macros.h"
+#include "s_desc_notile.h"
+#include "s_gradiant.h"
+#include "sift_constants.h"
+
+#include <cstdio>
+#include <iostream>
 
 //   1    -> 19.6 on 980 Ti
 //   2    -> 19.5 on 980 Ti

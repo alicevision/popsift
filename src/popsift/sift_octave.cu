@@ -5,22 +5,23 @@
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
-#include <sstream>
+
+#include "common/clamp.h"
+#include "common/debug_macros.h"
+#include "common/write_plane_2d.h"
+#include "sift_constants.h"
+#include "sift_octave.h"
+#include "sift_pyramid.h"
+
 #include <sys/stat.h>
+
+#include <new> // for placement new
+#include <sstream>
 #ifdef _WIN32
 #include <direct.h>
 #define stat _stat
 #define mkdir(name, mode) _mkdir(name)
 #endif
-
-#include <new> // for placement new
-
-#include "sift_pyramid.h"
-#include "sift_constants.h"
-#include "common/debug_macros.h"
-#include "common/clamp.h"
-#include "common/write_plane_2d.h"
-#include "sift_octave.h"
 
 using namespace std;
 

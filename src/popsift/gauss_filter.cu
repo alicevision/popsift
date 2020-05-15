@@ -5,11 +5,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdio.h>
-#include <algorithm>
-
-#include "gauss_filter.h"
 #include "common/debug_macros.h"
+#include "gauss_filter.h"
+
+#include <algorithm>
+#include <cstdio>
 
 using namespace std;
 
@@ -377,7 +377,7 @@ void GaussTable<LEVELS>::transformBlurTable( )
 {
     for( int level=0; level<LEVELS; level++ ) {
         i_span[level] = span[level];
-        if( not ( i_span[level] & 1 ) ) {
+        if( ! ( i_span[level] & 1 ) ) {
             i_span[level] += 1;
         }
     }

@@ -5,17 +5,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <iomanip>
-#include <iostream>
-
-#include <stdlib.h>
-#include <errno.h>
-#include <math_constants.h>
-
-#include "features.h"
-#include "sift_extremum.h"
 #include "common/assist.h"
 #include "common/debug_macros.h"
+#include "features.h"
+#include "sift_extremum.h"
+
+#include <math_constants.h>
+
+#include <cerrno>
+#include <cstdlib>
+#include <iomanip>
+#include <iostream>
 
 using namespace std;
 

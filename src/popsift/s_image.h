@@ -7,9 +7,10 @@
  */
 #pragma once
 
-#include <stdint.h>
 #include "common/plane_2d.h"
 #include "sift_conf.h"
+
+#include <cstdint>
 
 namespace popsift {
 

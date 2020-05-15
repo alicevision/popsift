@@ -5,19 +5,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <cmath>
-#include <cstdio>
-#include <cinttypes>
-
 #include "common/assist.h"
-#include "sift_pyramid.h"
-#include "sift_constants.h"
-#include "s_gradiant.h"
+#include "common/debug_macros.h"
 #include "common/excl_blk_prefix_sum.h"
 #include "common/warp_bitonic_sort.h"
-#include "common/debug_macros.h"
-#include "common/assist.h"
+#include "s_gradiant.h"
 #include "sift_config.h"
+#include "sift_constants.h"
+#include "sift_pyramid.h"
+
+#include <cinttypes>
+#include <cmath>
+#include <cstdio>
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>

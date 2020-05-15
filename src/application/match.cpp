@@ -5,26 +5,25 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <cmath>
-#include <iomanip>
-#include <cstdlib>
-#include <stdexcept>
-#include <list>
-#include <string>
-
-#include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
-
 #include <popsift/common/device_prop.h>
 #include <popsift/features.h>
 #include <popsift/popsift.h>
 #include <popsift/sift_conf.h>
 #include <popsift/sift_config.h>
 #include <popsift/version.hpp>
+
+#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
+
+#include <cmath>
+#include <cstdlib>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <list>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
 #ifdef USE_DEVIL
 #include <devil_cpp_wrapper.hpp>
@@ -174,7 +173,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 
     nvtxRangePushA( "load and convert image" );
 #ifdef USE_DEVIL
-    if( not pgmread_loading )
+    if( ! pgmread_loading )
     {
         ilImage img;
         if( img.Load( inputFile.c_str() ) == false ) {
@@ -238,14 +237,14 @@ int main(int argc, char **argv)
     }
 
     if( boost::filesystem::exists( lFile ) ) {
-        if( not boost::filesystem::is_regular_file( lFile ) ) {
+        if( ! boost::filesystem::is_regular_file( lFile ) ) {
             cout << "Input file " << lFile << " is not a regular file, nothing to do" << endl;
             return EXIT_FAILURE;
         }
     }
 
     if( boost::filesystem::exists( rFile ) ) {
-        if( not boost::filesystem::is_regular_file( rFile ) ) {
+        if( ! boost::filesystem::is_regular_file( rFile ) ) {
             cout << "Input file " << rFile << " is not a regular file, nothing to do" << endl;
             return EXIT_FAILURE;
         }

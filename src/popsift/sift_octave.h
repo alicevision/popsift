@@ -7,13 +7,13 @@
  */
 #pragma once
 
-#include <iostream>
-#include <vector>
-
 #include "s_image.h"
 #include "sift_conf.h"
-#include "sift_extremum.h"
 #include "sift_constants.h"
+#include "sift_extremum.h"
+
+#include <iostream>
+#include <vector>
 
 namespace popsift {
 

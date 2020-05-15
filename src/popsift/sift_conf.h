@@ -8,7 +8,6 @@
 #pragma once
 
 #include <string>
-#include <iso646.h>
 
 #define MAX_OCTAVES   20
 #define MAX_LEVELS    10
@@ -316,7 +315,7 @@ inline bool operator==( const Config& l, const Config& r )
 
 inline bool operator!=( const Config& l, const Config& r )
 {
-    return not l.equal( r );
+    return ! l.equal( r );
 }
 
 }; // namespace popsift

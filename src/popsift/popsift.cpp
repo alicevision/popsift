@@ -7,12 +7,15 @@
  */
 #include <cmath>
 #include <cstring>
-#include <fstream>
-
 #include "popsift.h"
+
 #include "gauss_filter.h"
-#include "sift_pyramid.h"
 #include "sift_config.h"
+#include "sift_pyramid.h"
+
+#include <cmath>
+#include <cstring>
+#include <fstream>
 
 using namespace std;
 

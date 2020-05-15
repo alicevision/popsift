@@ -5,10 +5,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+#include "common/assist.h"
+#include "gauss_filter.h"
 #include "s_pyramid_build_ra.h"
 #include "sift_constants.h"
-#include "gauss_filter.h"
-#include "common/assist.h"
 
 namespace popsift {
 namespace gauss {

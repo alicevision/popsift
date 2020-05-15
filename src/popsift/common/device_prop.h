@@ -7,8 +7,8 @@
  */
 #pragma once
 
-#include <vector>
 #include <cuda_runtime.h>
+#include <vector>
 
 namespace popsift { namespace cuda {
 

@@ -5,23 +5,25 @@
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
-#include <iostream>
+
+#include "common/assist.h"
+#include "common/debug_macros.h"
+#include "sift_config.h"
+#include "sift_extremum.h"
+#include "sift_pyramid.h"
+
+#include <sys/stat.h>
+
+#include <cstdio>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <vector>
-#include <cstdio>
-#include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
 #define stat _stat
 #define mkdir(path, perm) _mkdir(path)
 #endif
-
-#include "sift_pyramid.h"
-#include "sift_extremum.h"
-#include "common/debug_macros.h"
-#include "common/assist.h"
-#include "sift_config.h"
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>

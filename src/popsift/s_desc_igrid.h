@@ -6,10 +6,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #pragma once
-#include "sift_pyramid.h"
-#include "sift_octave.h"
-#include "sift_extremum.h"
 #include "common/debug_macros.h"
+#include "sift_extremum.h"
+#include "sift_octave.h"
+#include "sift_pyramid.h"
 
 /*
  * We assume that this is started with

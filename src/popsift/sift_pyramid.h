@@ -7,15 +7,14 @@
  */
 #pragma once
 
-#include <iostream>
-#include <vector>
-
+#include "features.h"
+#include "s_image.h"
 #include "sift_conf.h"
 #include "sift_constants.h"
-#include "features.h"
-
-#include "s_image.h"
 #include "sift_octave.h"
+
+#include <iostream>
+#include <vector>
 
 namespace popsift {
 

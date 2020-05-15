@@ -6,12 +6,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #pragma once
-
-#include <assert.h>
-#include <inttypes.h>
-#include <errno.h>
-#include <stdlib.h>
 #include <cuda_runtime.h>
+
+#include <cassert>
+#include <cerrno>
+#include <cinttypes>
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>

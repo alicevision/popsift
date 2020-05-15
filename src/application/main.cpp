@@ -5,26 +5,25 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <cmath>
-#include <iomanip>
-#include <cstdlib>
-#include <stdexcept>
-#include <list>
-#include <string>
-
-#include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
-
-#include <popsift/popsift.h>
+#include <popsift/common/device_prop.h>
 #include <popsift/features.h>
+#include <popsift/popsift.h>
 #include <popsift/sift_conf.h>
 #include <popsift/sift_config.h>
 #include <popsift/version.hpp>
-#include <popsift/common/device_prop.h>
+
+#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
+
+#include <cmath>
+#include <cstdlib>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <list>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
 #ifdef USE_DEVIL
 #include <devil_cpp_wrapper.hpp>
@@ -176,7 +175,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     unsigned char* image_data;
 
 #ifdef USE_DEVIL
-    if( not pgmread_loading )
+    if( ! pgmread_loading )
     {
         if( float_mode )
         {
@@ -220,7 +219,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 
         nvtxRangePop( ); // "load and convert image - pgmread"
 
-        if( not float_mode )
+        if( ! float_mode )
         {
             // PopSift.init( w, h );
             job = PopSift.enqueue( w, h, image_data );
@@ -319,7 +318,7 @@ int main(int argc, char **argv)
         SiftJob* job = jobs.front();
         jobs.pop();
         if( job ) {
-            read_job( job, not dont_write );
+            read_job( job, ! dont_write );
             delete job;
         }
     }

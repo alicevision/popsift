@@ -7,18 +7,18 @@
  */
 #pragma once
 
-#include <cuda_runtime.h>
-#include <vector>
-#include <stack>
-#include <queue>
-#include <future>
-#include <thread>
-
 #include "common/sync_queue.h"
 #include "sift_conf.h"
-#include "sift_extremum.h"
 #include "sift_config.h"
+#include "sift_extremum.h"
 
+#include <cuda_runtime.h>
+
+#include <future>
+#include <queue>
+#include <stack>
+#include <thread>
+#include <vector>
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>

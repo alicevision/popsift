@@ -5,18 +5,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include "sift_pyramid.h"
-#include "sift_constants.h"
-#include "gauss_filter.h"
-#include "common/debug_macros.h"
 #include "common/assist.h"
 #include "common/clamp.h"
+#include "common/debug_macros.h"
+#include "gauss_filter.h"
 #include "s_pyramid_build_aa.h"
 #include "s_pyramid_build_ai.h"
 #include "s_pyramid_build_ra.h"
+#include "sift_constants.h"
+#include "sift_pyramid.h"
 
+#include <cstdio>
 #include <iostream>
-#include <stdio.h>
 
 /* It makes no sense whatsoever to change this value */
 #define PREV_LEVEL 3

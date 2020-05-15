@@ -7,10 +7,10 @@
  */
 #pragma once
 
+#include "sift_constants.h"
+
 #include <iostream>
 #include <vector>
-
-#include "sift_constants.h"
 
 namespace popsift {
 

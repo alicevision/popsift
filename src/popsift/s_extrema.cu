@@ -5,17 +5,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <cuda_runtime.h>
-#include <texture_fetch_functions.h>
-#include <stdio.h>
-#include <iso646.h>
-
-#include "sift_pyramid.h"
-#include "sift_constants.h"
-#include "s_solve.h"
-#include "common/debug_macros.h"
 #include "common/assist.h"
 #include "common/clamp.h"
+#include "common/debug_macros.h"
+#include "s_solve.h"
+#include "sift_constants.h"
+#include "sift_pyramid.h"
+
+#include <cuda_runtime.h>
+#include <texture_fetch_functions.h>
+
+#include <cstdio>
 
 namespace popsift{
 
@@ -342,9 +342,9 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
     const float val = readTex( dog, x, y, level );
 
     ModeFunctions<sift_mode> f;
-    if( not f.first_contrast_ok( val ) ) return false;
+    if( ! f.first_contrast_ok( val ) ) return false;
 
-    if( not is_extremum( dog, x-1, y-1, level-1 ) ) {
+    if( ! is_extremum( dog, x-1, y-1, level-1 ) ) {
         // if( debug_octave==0 && level==2 && x==14 && y==73 ) printf("But I fail\n");
         return false;
     }
@@ -463,7 +463,7 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
     const float yn      = n.y + d.y;
     const float sn      = n.z + d.z;
 
-    if( not f.verify( xn, yn, sn, width, height, maxlevel ) ) {
+    if( ! f.verify( xn, yn, sn, width, height, maxlevel ) ) {
         return false;
     }
 
