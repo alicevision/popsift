@@ -75,12 +75,12 @@ struct Image : public ImageBase
     /** Create a device-sided buffer of the given dimensions */
     Image( int w, int h );
 
-    virtual ~Image( );
+    ~Image( ) override;
 
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
-    virtual void resetDimensions( int w, int h );
+    void resetDimensions( int w, int h ) override;
 
     /* This loading function copies all image data to a local
      * buffer that is pinned in memory. We should offer two
@@ -88,12 +88,12 @@ struct Image : public ImageBase
      * if the image is already uploaded, and one that takes
      * an image in pinned memory.
      */
-    virtual void load( void* input );
+    void load( void* input ) override;
 
 private:
-    void allocate( int w, int h );
-    void createTexture( );
-    void destroyTexture( );
+    void allocate( int w, int h ) override;
+    void createTexture( ) override;
+    void destroyTexture( ) override;
 
 private:
     /* 2D plane holding input image on host for uploading
@@ -115,12 +115,12 @@ struct ImageFloat : public ImageBase
     /** Create a device-sided buffer of the given dimensions */
     ImageFloat( int w, int h );
 
-    virtual ~ImageFloat( );
+    ~ImageFloat( ) override;
 
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
-    virtual void resetDimensions( int w, int h );
+    void resetDimensions( int w, int h ) override;
 
     /* This loading function copies all image data to a local
      * buffer that is pinned in memory. We should offer two
@@ -128,12 +128,12 @@ struct ImageFloat : public ImageBase
      * if the image is already uploaded, and one that takes
      * an image in pinned memory.
      */
-    virtual void load( void* input );
+    void load( void* input ) override;
 
 private:
-    void allocate( int w, int h );
-    void createTexture( );
-    void destroyTexture( );
+    void allocate( int w, int h ) override;
+    void createTexture( ) override;
+    void destroyTexture( ) override;
 
 private:
     /* 2D plane holding input image on host for uploading
