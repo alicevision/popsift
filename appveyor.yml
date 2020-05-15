@@ -9,10 +9,10 @@ configuration:
   - Release
   - Debug
 
-environment:
-  matrix:
-    - DBUILD_SHARED_LIBS: 0
-    - DBUILD_SHARED_LIBS: 1
+#environment:
+#  matrix:
+#    - DBUILD_SHARED_LIBS: 0
+#    - DBUILD_SHARED_LIBS: 1
 
 install:
     - cmd: >-
