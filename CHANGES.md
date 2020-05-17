@@ -20,3 +20,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for cuda 9 and 10
 - Support for RTX architecture
 - Optional grid filtering
+- Dockerfile
