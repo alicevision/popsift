@@ -137,7 +137,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
 
        if (vm.count("help")) {
            std::cout << all << '\n';
-           exit(1);
+           exit(EXIT_SUCCESS);
        }
 
         notify(vm); // Notify does processing (e.g., raise exceptions if required args are missing)

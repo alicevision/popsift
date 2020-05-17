@@ -62,7 +62,6 @@ set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 target_link_libraries(popsift ${CUDA_CUDADEVRT_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} Threads::Threads)
 
 
-
 # EXPORTING THE LIBRARY
 #
 # place to put the cmake-related files

@@ -1,7 +1,24 @@
 cmake_minimum_required(VERSION 3.12)
 project(PopsiftDemo LANGUAGES CXX)
 
-OPTION(PopSift_BOOST_USE_STATIC_LIBS "Link examples with static Boost libraries" OFF)
+option(PopSift_BOOST_USE_STATIC_LIBS "Link examples with static Boost libraries" OFF)
+
+# if this is used as a stand-alone project we need to tell whether to use PIC
+if(NOT DEFINED BUILD_SHARED_LIBS)
+  option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+endif()
+
+# enable -fPIE for executables when -fpic
+# https://cmake.org/cmake/help/v3.17/policy/CMP0083.html
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.14)
+  cmake_policy(SET CMP0083 NEW)
+  include(CheckPIESupported)
+  check_pie_supported()
+elseif(CMAKE_POSITION_INDEPENDENT_CODE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  # manually add the link flag for gcc
+  list(APPEND CMAKE_EXE_LINKER_FLAGS "-pie")
+endif()
 
 if(TARGET popsift)
   # when compiled in the repository the target is already defined
@@ -52,7 +69,7 @@ set_property(TARGET popsift-demo PROPERTY CXX_STANDARD 11)
 
 target_compile_options(popsift-demo PRIVATE ${PD_COMPILE_OPTIONS} )
 target_include_directories(popsift-demo PUBLIC ${PD_INCLUDE_DIRS})
-target_compile_definitions(popsift-demo PRIVATE ${Boost_DEFINITIONS} BOOST_ALL_DYN_LINK BOOST_ALL_NO_LIB)
+target_compile_definitions(popsift-demo PRIVATE ${Boost_DEFINITIONS})
 target_link_libraries(popsift-demo PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 
 set_target_properties(popsift-demo  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
@@ -67,7 +84,7 @@ set_property(TARGET popsift-match PROPERTY CXX_STANDARD 11)
 
 target_compile_options(popsift-match PRIVATE ${PD_COMPILE_OPTIONS} )
 target_include_directories(popsift-match PUBLIC ${PD_INCLUDE_DIRS})
-target_compile_definitions(popsift-match PRIVATE ${Boost_DEFINITIONS} BOOST_ALL_DYN_LINK BOOST_ALL_NO_LIB)
+target_compile_definitions(popsift-match PRIVATE ${Boost_DEFINITIONS})
 target_link_libraries(popsift-match PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 
 set_target_properties(popsift-match  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
