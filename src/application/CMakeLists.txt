@@ -5,6 +5,9 @@ if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
 
   option(PopSift_BOOST_USE_STATIC_LIBS "Link examples with static Boost libraries" OFF)
   option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
+  include(GNUInstallDirs)
+
   set(CMAKE_POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
@@ -92,4 +95,4 @@ target_link_libraries(popsift-match PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 # installation
 #############################################################
 
-install(TARGETS popsift-demo DESTINATION bin)
+install(TARGETS popsift-demo DESTINATION ${CMAKE_INSTALL_BINDIR})
