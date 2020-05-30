@@ -160,11 +160,6 @@ private:
 
     void clone_device_descriptors_sub( const Config& conf, FeaturesDev* features );
 
-private:
-    // debug
-//    void print_tables_host( );
-
-public:
 };
 
 } // namespace popsift
