@@ -1,12 +1,12 @@
-cmake_minimum_required(VERSION 3.12)
-project(PopsiftDemo LANGUAGES CXX)
+if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+  # I am top-level project, i.e. I am not being include by another project
+  cmake_minimum_required(VERSION 3.12)
+  project(PopsiftDemo LANGUAGES CXX)
 
-option(PopSift_BOOST_USE_STATIC_LIBS "Link examples with static Boost libraries" OFF)
-
-# if this is used as a stand-alone project we need to tell whether to use PIC
-if(NOT DEFINED BUILD_SHARED_LIBS)
+  option(PopSift_BOOST_USE_STATIC_LIBS "Link examples with static Boost libraries" OFF)
   option(BUILD_SHARED_LIBS "Build shared libraries" ON)
   set(CMAKE_POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+
 endif()
 
 # enable -fPIE for executables when -fpic
@@ -88,7 +88,6 @@ target_compile_definitions(popsift-match PRIVATE ${Boost_DEFINITIONS})
 target_link_libraries(popsift-match PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 
 set_target_properties(popsift-match  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
-
 #############################################################
 # installation
 #############################################################
