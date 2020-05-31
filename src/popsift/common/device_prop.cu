@@ -5,11 +5,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+#include "debug_macros.h"
+#include "device_prop.h"
 #include <iostream>
 #include <sstream>
-
-#include "device_prop.h"
-#include "debug_macros.h"
 
 namespace popsift { namespace cuda {
 

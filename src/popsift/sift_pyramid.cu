@@ -5,23 +5,25 @@
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
-#include <iostream>
+
+#include "common/assist.h"
+#include "common/debug_macros.h"
+#include "sift_config.h"
+#include "sift_extremum.h"
+#include "sift_pyramid.h"
+
+#include <sys/stat.h>
+
+#include <cstdio>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <vector>
-#include <cstdio>
-#include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
 #define stat _stat
 #define mkdir(path, perm) _mkdir(path)
 #endif
-
-#include "sift_pyramid.h"
-#include "sift_extremum.h"
-#include "common/debug_macros.h"
-#include "common/assist.h"
-#include "sift_config.h"
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
@@ -142,8 +144,8 @@ Pyramid::Pyramid( const Config& config,
         dobuf_shadow.i_ext_off[o] = dobuf_shadow.i_ext_off[0] + (o*h_consts.max_extrema);
     }
     for (int o = _num_octaves; o<MAX_OCTAVES; o++) {
-        dobuf_shadow.i_ext_dat[o] = 0;
-        dobuf_shadow.i_ext_off[o] = 0;
+        dobuf_shadow.i_ext_dat[o] = nullptr;
+        dobuf_shadow.i_ext_off[o] = nullptr;
     }
 
     sz = h_consts.max_extrema;
@@ -274,7 +276,7 @@ void prep_features( Descriptor* descriptor_base, int up_fac )
         fet.orientation[ori] = ext.orientation[ori];
     }
     for( ; ori<ORIENTATION_MAX_COUNT; ori++ ) {
-        fet.desc[ori]        = 0;
+        fet.desc[ori]        = nullptr;
         fet.orientation[ori] = 0;
     }
 }
@@ -433,8 +435,9 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* 
                      << 1.0f / (sigma * sigma) << " ";
 
             if (really) {
-                for (int i = 0; i<128; i++) {
-                    ostr << desc.features[i] << " ";
+                for (float feature : desc.features)
+                {
+                    ostr << feature << " ";
                 }
             }
             ostr << endl;

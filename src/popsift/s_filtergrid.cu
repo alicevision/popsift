@@ -5,9 +5,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include "sift_pyramid.h"
-#include "sift_extremum.h"
 #include "sift_config.h"
+#include "sift_extremum.h"
+#include "sift_pyramid.h"
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
@@ -16,16 +16,16 @@
 #define nvtxRangePop()
 #endif
 
-#if not POPSIFT_IS_DEFINED(POPSIFT_DISABLE_GRID_FILTER)
+#if ! POPSIFT_IS_DEFINED(POPSIFT_DISABLE_GRID_FILTER)
 
-#include <thrust/device_vector.h>
-#include <thrust/sequence.h>
 #include <thrust/copy.h>
-#include <thrust/transform.h>
-#include <thrust/transform_scan.h>
-#include <thrust/sort.h>
+#include <thrust/device_vector.h>
 #include <thrust/execution_policy.h>
 #include <thrust/iterator/discard_iterator.h>
+#include <thrust/sequence.h>
+#include <thrust/sort.h>
+#include <thrust/transform.h>
+#include <thrust/transform_scan.h>
 
 namespace popsift
 {
@@ -70,7 +70,7 @@ struct FunctionExtractCell
 struct FunctionIsAbove
 {
     int _limit;
-    FunctionIsAbove( int limit ) : _limit(limit) { }
+    explicit FunctionIsAbove( int limit ) : _limit(limit) { }
 
     __host__ __device__
     inline bool operator()( int val ) const

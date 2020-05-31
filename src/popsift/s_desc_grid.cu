@@ -5,14 +5,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdio.h>
-#include <iso646.h>
-
-#include "sift_constants.h"
-#include "s_gradiant.h"
-#include "s_desc_grid.h"
 #include "common/assist.h"
 #include "common/vec_macros.h"
+#include "s_desc_grid.h"
+#include "s_gradiant.h"
+#include "sift_constants.h"
+
+#include <cstdio>
 
 using namespace popsift;
 
@@ -122,9 +121,7 @@ void ext_desc_grid_sub( const int           ix,
     }
 }
 
-__global__
-void ext_desc_grid( const int           octave,
-                    cudaTextureObject_t layer_tex )
+__global__ void ext_desc_grid(int octave, cudaTextureObject_t layer_tex)
 {
     const int   o_offset =  dct.ori_ps[octave] + blockIdx.x;
     const int   ix       = threadIdx.y;

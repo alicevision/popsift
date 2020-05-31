@@ -7,12 +7,12 @@
  */
 #pragma once
 
-#include <stdio.h>
-#include <inttypes.h>
-
-#include "common/plane_2d.h"
 #include "common/assist.h"
+#include "common/plane_2d.h"
 #include "sift_constants.h"
+
+#include <cinttypes>
+#include <cstdio>
 
 namespace popsift
 {

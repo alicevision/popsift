@@ -7,10 +7,10 @@
  */
 #pragma once
 
+#include "sift_constants.h"
+
 #include <iostream>
 #include <vector>
-
-#include "sift_constants.h"
 
 namespace popsift {
 
@@ -70,7 +70,7 @@ class FeaturesHost : public FeaturesBase
 public:
     FeaturesHost( );
     FeaturesHost( int num_ext, int num_ori );
-    virtual ~FeaturesHost( );
+    ~FeaturesHost( ) override;
 
     typedef Feature*       F_iterator;
     typedef const Feature* F_const_iterator;
@@ -106,7 +106,7 @@ class FeaturesDev : public FeaturesBase
 public:
     FeaturesDev( );
     FeaturesDev( int num_ext, int num_ori );
-    virtual ~FeaturesDev( );
+    ~FeaturesDev( ) override;
 
     void reset( int num_ext, int num_ori );
 

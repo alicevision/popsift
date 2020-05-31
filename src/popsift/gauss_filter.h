@@ -7,8 +7,8 @@
  */
 #pragma once
 
-#include "sift_constants.h"
 #include "sift_conf.h"
+#include "sift_constants.h"
 
 namespace popsift {
 

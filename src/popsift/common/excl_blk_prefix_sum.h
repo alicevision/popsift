@@ -7,10 +7,10 @@
  */
 #pragma once
 
+#include "assist.h"
+
 #include <cuda_runtime.h>
 #include <typeinfo>
-
-#include "assist.h"
 
 namespace ExclusivePrefixSum
 {

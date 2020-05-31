@@ -7,15 +7,14 @@
  */
 #pragma once
 
-#include <iostream>
-#include <vector>
-
+#include "features.h"
+#include "s_image.h"
 #include "sift_conf.h"
 #include "sift_constants.h"
-#include "features.h"
-
-#include "s_image.h"
 #include "sift_octave.h"
+
+#include <iostream>
+#include <vector>
 
 namespace popsift {
 
@@ -152,9 +151,6 @@ private:
 
     void descriptors( const Config& conf );
 
-    void debug_out_floats  ( float* data, uint32_t pitch, uint32_t height );
-    void debug_out_floats_t( float* data, uint32_t pitch, uint32_t height );
-
     void readDescCountersFromDevice( );
     void readDescCountersFromDevice( cudaStream_t s );
     void writeDescCountersToDevice( );
@@ -164,11 +160,6 @@ private:
 
     void clone_device_descriptors_sub( const Config& conf, FeaturesDev* features );
 
-private:
-    // debug
-    void print_tables_host( );
-
-public:
 };
 
 } // namespace popsift

@@ -7,19 +7,19 @@
  */
 #pragma once
 
-#include <cuda_runtime.h>
-#include <vector>
-#include <stack>
-#include <queue>
-#include <future>
-#include <thread>
-
 #include "common/sync_queue.h"
 #include "common/device_prop.h"
 #include "sift_conf.h"
-#include "sift_extremum.h"
 #include "sift_config.h"
+#include "sift_extremum.h"
 
+#include <cuda_runtime.h>
+
+#include <future>
+#include <queue>
+#include <stack>
+#include <thread>
+#include <vector>
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
@@ -190,7 +190,7 @@ public:
     inline popsift::FeaturesBase* execute( int /*pipe*/, const unsigned char* imageData )
     {
         SiftJob* j = enqueue( _last_init_w, _last_init_h, imageData );
-        if( !j ) return 0;
+        if( !j ) return nullptr;
         popsift::FeaturesBase* f = j->getBase();
         delete j;
         return f;

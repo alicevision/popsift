@@ -7,10 +7,9 @@
  */
 #pragma once
 
-#include <cuda_runtime.h>
-#include <iso646.h>
-
 #include "assist.h"
+
+#include <cuda_runtime.h>
 
 namespace popsift {
 namespace BitonicSort {
@@ -64,7 +63,7 @@ private:
         const bool id_less     = ( ( threadIdx.x & ( 1 << shift ) ) == 0 );
         const bool my_more     = id_less ? ( my_val > other_val )
                                          : ( my_val < other_val );
-        const bool must_swap   = not ( my_more ^ reverse ^ increasing );
+        const bool must_swap   = ! ( my_more ^ reverse ^ increasing );
 
         int lane = must_swap ? ( 1 << shift ) : 0;
         return popsift::shuffle_xor( my_index, lane );

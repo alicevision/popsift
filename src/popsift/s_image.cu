@@ -5,14 +5,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include "s_image.h"
-#include "common/debug_macros.h"
 #include "common/assist.h"
+#include "common/debug_macros.h"
+#include "s_image.h"
 #include "sift_config.h"
-#include <iostream>
-#include <fstream>
-#include <cstdio>
+
 #include <cassert>
+#include <cstdio>
+#include <fstream>
+#include <iostream>
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
@@ -38,10 +39,6 @@ ImageBase::ImageBase( )
 ImageBase::ImageBase( int w, int h )
     : _w(w), _h(h)
     , _max_w(w), _max_h(h)
-{
-}
-
-ImageBase::~ImageBase( )
 {
 }
 

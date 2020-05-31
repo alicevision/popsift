@@ -7,12 +7,13 @@
  */
 #pragma once
 
-#include <iostream>
-#include <iomanip>
-#include <string>
-#include <stdlib.h>
-#include <assert.h>
 #include <cuda_runtime.h>
+
+#include <cassert>
+#include <cstdlib>
+#include <iomanip>
+#include <iostream>
+#include <string>
 
 // synchronize device and check for an error
 void pop_sync_check_last_error( const char* file, size_t line );
@@ -134,7 +135,7 @@ public:
 // #define POP_INFO(s) cerr << __FILE__ << ":" << __LINE__ << std::endl << "    " << s << endl
 
 #define POP_INFO2(silent,s) \
-    if (not silent) { \
+    if (! silent) { \
         std::cerr << __FILE__ << ":" << __LINE__ << std::endl << "    " << s << std::endl; \
     }
 

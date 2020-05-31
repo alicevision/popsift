@@ -6,12 +6,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #pragma once
-
-#include <assert.h>
-#include <inttypes.h>
-#include <errno.h>
-#include <stdlib.h>
 #include <cuda_runtime.h>
+
+#include <cassert>
+#include <cerrno>
+#include <cinttypes>
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -92,7 +92,7 @@ template <typename T> struct PlaneT : public PlaneBase
     T* data;
 
     __host__ __device__ PlaneT( )      : data(0) { }
-    __host__ __device__ PlaneT( T* d ) : data(d) { }
+    __host__ __device__ explicit PlaneT( T* d ) : data(d) { }
 
     __host__ __device__ inline size_t elemSize() const { return elem_size; }
 };

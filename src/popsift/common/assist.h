@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <popsift/sift_config.h>
+
 #include <cuda_runtime.h>
 #include <iostream>
 #include <thread>
@@ -16,7 +18,7 @@
 #include <unistd.h>
 #endif
 
-#include "sift_config.h"
+
 
 namespace popsift
 {
