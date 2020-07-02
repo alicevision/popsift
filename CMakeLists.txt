@@ -8,7 +8,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-$
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 
 option(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
-option(PopSift_BUILD_DOCS "Build PopSift documentation."  ON)
+option(PopSift_BUILD_DOCS "Build PopSift documentation."  OFF)
 option(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
 option(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after every kernel." OFF)
 option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
