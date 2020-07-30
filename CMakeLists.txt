@@ -168,6 +168,7 @@ else()
   # CUDA SDK 11 has a version of CUB that requires C++14
   if(NOT MSVC)
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+      list(APPEND CUDA_NVCC_FLAGS "-std=c++14")
   endif()
   set(CMAKE_CXX_STANDARD 14)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
