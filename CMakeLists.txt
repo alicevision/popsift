@@ -44,16 +44,6 @@ if(MSVC AND NOT BUILD_SHARED_LIBS)
   endforeach()
 endif()
 
-# for some reason this line is necessary to propagate the standard to nvcc
-# On MSVC this is not necessary / nvcc does not recognize the flag for MSVC
-if(NOT MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-endif()
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_STANDARD 11)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-
 # ==============================================================================
 # GNUInstallDirs CMake module
 # - Define GNU standard installation directories
@@ -163,6 +153,28 @@ if(CUDA_VERSION VERSION_GREATER_EQUAL "7.5")
     list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;--warn-on-spills")
   endif()
 endif()
+
+if(CUDA_VERSION_MAJOR LESS 11)
+  # for some reason this line is necessary to propagate the standard to nvcc
+  # On MSVC this is not necessary / nvcc does not recognize the flag for MSVC
+  if(NOT MSVC)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+  endif()
+  set(CMAKE_CXX_STANDARD 11)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CUDA_STANDARD 11)
+  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+else()
+  # CUDA SDK 11 has a version of CUB that requires C++14
+  if(NOT MSVC)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+  endif()
+  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CUDA_STANDARD 14)
+  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+endif()
+
 
 if(PopSift_USE_NORMF AND CUDA_VERSION VERSION_GREATER_EQUAL "7.5")
   set(PopSift_HAVE_NORMF   1)
