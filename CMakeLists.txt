@@ -13,10 +13,9 @@ option(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after e
 option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
 option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 option(PopSift_USE_NORMF "The __normf function computes Euclidean distance on large arrays. Fast but stability is uncertain." OFF)
-option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
 option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
+option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE AND NOT MSVC)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -201,7 +200,13 @@ endif()
 
 add_subdirectory(src)
 
+set(PopSift_TESTFILE_PATH "../../GIT/popsift-samples/datasets/sample/big_set/" CACHE STRING "Base directory where your test files are stored")
 if(PopSift_USE_TEST_CMD)
+  if(NOT IS_ABSOLUTE("${PopSift_TESTFILE_PATH}"))
+    get_filename_component(PopSift_TESTFILES "${PopSift_TESTFILE_PATH}" ABSOLUTE)
+    set(PopSift_TESTFILE_PATH "${PopSift_TESTFILES}")
+  endif()
+
   add_subdirectory(testScripts)
 endif()
 
@@ -228,9 +233,12 @@ message(STATUS "Generate position independent code: " ${CMAKE_POSITION_INDEPENDE
 message(STATUS "Use CUDA NVTX for profiling: " ${PopSift_USE_NVTX_PROFILING})
 message(STATUS "Synchronize and check CUDA error after every kernel: " ${PopSift_ERRCHK_AFTER_KERNEL})
 message(STATUS "Grid filtering: " ${PopSift_USE_GRID_FILTER})
-message(STATUS "Testing step: " ${PopSift_USE_TEST_CMD})
 message(STATUS "Additional warning for CUDA nvcc: " ${PopSift_NVCC_WARNINGS})
 message(STATUS "Compiling for CUDA CCs: ${PopSift_CUDA_CC_LIST}")
 message(STATUS "Install path: " ${CMAKE_INSTALL_PREFIX})
+message(STATUS "Testing step: " ${PopSift_USE_TEST_CMD})
+if(PopSift_USE_TEST_CMD)
+  message(STATUS "Path for test input: " ${PopSift_TESTFILE_PATH})
+endif()
 message("\n******************************************")
 message("\n")
