@@ -15,6 +15,8 @@ PopSift compiles and works with NVidia cards of compute capability >= 3.0 (inclu
 
 PopSift depends on:
 
+* C++14
+
 * CUDA >= 7.0
 
 Optionally, for the provided applications:

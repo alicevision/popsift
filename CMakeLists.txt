@@ -155,9 +155,9 @@ if(CUDA_VERSION VERSION_GREATER_EQUAL "7.5")
 endif()
 
 set(PopSift_CXX_STANDARD 14) # Thrust/CUB requires C++14 starting with CUDA SDK 11
-if(CUDA_VERSION_MAJOR LESS 11)
-  set(PopSift_CXX_STANDARD 11)
-endif()
+# if(CUDA_VERSION_MAJOR LESS 11)
+#   set(PopSift_CXX_STANDARD 11)
+# endif()
 
 if(NOT MSVC)
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++${PopSift_CXX_STANDARD}")
