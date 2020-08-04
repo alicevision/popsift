@@ -15,9 +15,9 @@ PopSift compiles and works with NVidia cards of compute capability >= 3.0 (inclu
 
 PopSift depends on:
 
-* C++14
+* Host compiler that supports C++14 for CUDA SDK >= 9.0 and C++11 for CUDA SDK 8
 
-* CUDA >= 7.0
+* CUDA >= 8.0
 
 Optionally, for the provided applications:
 
