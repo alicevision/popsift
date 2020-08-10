@@ -44,16 +44,6 @@ if(MSVC AND NOT BUILD_SHARED_LIBS)
   endforeach()
 endif()
 
-# for some reason this line is necessary to propagate the standard to nvcc
-# On MSVC this is not necessary / nvcc does not recognize the flag for MSVC
-if(NOT MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-endif()
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_STANDARD 11)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-
 # ==============================================================================
 # GNUInstallDirs CMake module
 # - Define GNU standard installation directories
@@ -163,6 +153,21 @@ if(CUDA_VERSION VERSION_GREATER_EQUAL "7.5")
     list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;--warn-on-spills")
   endif()
 endif()
+
+set(PopSift_CXX_STANDARD 14) # Thrust/CUB requires C++14 starting with CUDA SDK 11
+if(CUDA_VERSION_MAJOR LESS_EQUAL 8)
+  set(PopSift_CXX_STANDARD 11)
+endif()
+
+if(NOT MSVC)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++${PopSift_CXX_STANDARD}")
+      list(APPEND CUDA_NVCC_FLAGS "-std=c++${PopSift_CXX_STANDARD}")
+endif()
+set(CMAKE_CXX_STANDARD ${PopSift_CXX_STANDARD})
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD ${PopSift_CXX_STANDARD})
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
 
 if(PopSift_USE_NORMF AND CUDA_VERSION VERSION_GREATER_EQUAL "7.5")
   set(PopSift_HAVE_NORMF   1)
