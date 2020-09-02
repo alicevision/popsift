@@ -117,6 +117,9 @@ struct ImageFloat : public ImageBase
 
     ~ImageFloat( ) override;
 
+    /** Apply Wallis filter to input image using NPPI API */
+    void wallisFilter( int filterWidth );
+
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
