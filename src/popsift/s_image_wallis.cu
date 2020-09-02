@@ -37,15 +37,15 @@ namespace popsift {
     // Amax and p constrain the change in individual pixels,
 void ImageFloat::wallisFilter( int filterWidth )
 {
-    const NppiSize COMPLETE = { .width = _w, .height = _h };
-    const NppiPoint NOOFFSET = { .x = 0, .y = 0 };
+    const NppiSize  COMPLETE{_w,_h}; // = { .width = _w, .height = _h };
+    const NppiPoint NOOFFSET{0, 0}; // = { .x = 0, .y = 0 };
     const float     Md   = 0.5f; // mean to match
     const float     Dd   = 0.1f; // contrast to match
     const float     Amax = 1.0f; // pixel constraint
     const float     p    = 1.0f; // pixel constraint
 
     if( filterWidth %2 == 0 ) filterWidth++;
-    const NppiSize FILTERSIZE = { .height = filterWidth, .width = filterWidth };
+    const NppiSize FILTERSIZE{filterWidth,filterWidth}; //  = { .height = filterWidth, .width = filterWidth };
 
     // int w = filterWidth >> 1; // floor(W/2)
 
