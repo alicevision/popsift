@@ -70,7 +70,8 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
             ("edge-threshold", value<float>()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
             ("edge-limit", value<float>()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
             ("downsampling", value<float>()->notifier([&](float f) { config.setDownsampling(f); }), "Downscale width and height of input by 2^N")
-            ("initial-blur", value<float>()->notifier([&](float f) {config.setInitialBlur(f); }), "Assume initial blur, subtract when blurring first time");
+            ("initial-blur", value<float>()->notifier([&](float f) {config.setInitialBlur(f); }), "Assume initial blur, subtract when blurring first time")
+            ("wallis-filter", bool_switch()->notifier([&](bool b) { config.setWallisFilter(b); }), "Wallis filtering of the input image before scaling (default false)");
     }
     options_description modes("Modes");
     {

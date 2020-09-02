@@ -37,6 +37,8 @@ struct ImageBase
      */
     void wallisFilter( Plane2D<float>& output, Plane2D<float>& input, int filterWidth, size_t pitch );
 
+    virtual void wallis( int filterWidth, size_t pitch ) = 0;
+
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
@@ -88,7 +90,7 @@ struct Image : public ImageBase
     ~Image( ) override;
 
     /** Apply Wallis filter to input image using NPPI API */
-    void wallis( int filterWidth, size_t pitch );
+    virtual void wallis( int filterWidth, size_t pitch );
 
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
@@ -131,7 +133,7 @@ struct ImageFloat : public ImageBase
     ~ImageFloat( ) override;
 
     /** Apply Wallis filter to input image using NPPI API */
-    void wallis( int filterWidth, size_t pitch );
+    virtual void wallis( int filterWidth, size_t pitch );
 
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.

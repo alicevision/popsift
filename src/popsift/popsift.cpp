@@ -325,6 +325,11 @@ void PopSift::matchPrepareLoop( )
 
         private_init( img->getWidth(), img->getHeight() );
 
+        if( _config.getWallisFilter() )
+        {
+            img->wallis( 3, _device_properties.getPitchInBytes() );
+        }
+
         p._pyramid->step1( _config, img );
         p._unused.push( img ); // uploaded input image no longer needed, release for reuse
 

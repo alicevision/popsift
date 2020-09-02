@@ -35,6 +35,7 @@ Config::Config( )
     , _filter_grid_size( 2 )
     , _assume_initial_blur( true )
     , _initial_blur( 0.5f )
+    , _wallis_filter( false )
     , _normalization_mode( getNormModeDefault() )
     , _normalization_multiplier( 0 )
     , _print_gauss_tables( false )
@@ -253,6 +254,11 @@ void Config::setInitialBlur( float blur )
     }
 }
 
+void Config::setWallisFilter( bool onoff )
+{
+    _wallis_filter = onoff;
+}
+
 Config::GaussMode Config::getGaussMode( ) const
 {
     return _gauss_mode;
@@ -271,6 +277,11 @@ bool Config::hasInitialBlur( ) const
 float Config::getInitialBlur( ) const
 {
     return _initial_blur;
+}
+
+bool Config::getWallisFilter( ) const
+{
+    return _wallis_filter;
 }
 
 float Config::getPeakThreshold() const
