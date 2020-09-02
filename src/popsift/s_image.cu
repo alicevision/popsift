@@ -105,7 +105,7 @@ void Image::resetDimensions( int w, int h )
         _input_image_h.freeHost( popsift::CudaAllocated );
         _input_image_d.freeDev( );
         _input_image_h.allocHost( _max_w, _max_h, popsift::CudaAllocated );
-        _input_image_d.allocDev(  _max_w, _max_h );
+        _input_image_d.allocDev(  _max_w, _max_h, popsift::OnDevice );
         _input_image_h.resetDimensionsHost( w, h );
         _input_image_d.resetDimensionsDev( w, h );
 
@@ -121,7 +121,7 @@ void Image::allocate( int w, int h )
     nvtxRangePushA( "allocating host-side image memory" );
 
     _input_image_h.allocHost( w, h, popsift::CudaAllocated );
-    _input_image_d.allocDev( w, h );
+    _input_image_d.allocDev(  w, h, popsift::OnDevice );
 
     createTexture( );
 
@@ -229,7 +229,7 @@ void ImageFloat::resetDimensions( int w, int h )
         _input_image_h.freeHost( popsift::CudaAllocated );
         _input_image_d.freeDev( );
         _input_image_h.allocHost( _max_w, _max_h, popsift::CudaAllocated );
-        _input_image_d.allocDev(  _max_w, _max_h );
+        _input_image_d.allocDev(  _max_w, _max_h, popsift::OnDevice );
         _input_image_h.resetDimensionsHost( w, h );
         _input_image_d.resetDimensionsDev( w, h );
 
@@ -245,7 +245,7 @@ void ImageFloat::allocate( int w, int h )
     nvtxRangePushA( "allocating host-side image memory" );
 
     _input_image_h.allocHost( w, h, popsift::CudaAllocated );
-    _input_image_d.allocDev( w, h );
+    _input_image_d.allocDev(  w, h, popsift::OnDevice );
 
     createTexture( );
 

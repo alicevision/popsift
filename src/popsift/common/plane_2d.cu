@@ -31,14 +31,34 @@ using namespace std;
 namespace popsift {
 
 __host__
-void* PlaneBase::allocDev2D( size_t& pitch, int w, int h, int elemSize )
+void* PlaneBase::allocDev2D( size_t& pitch, int w, int h, int elemSize, PlaneMapMode m )
 {
     // cerr << "Alloc " << w*h*elemSize << " B" << endl;
     void*       ptr;
     cudaError_t err;
-    err = cudaMallocPitch( &ptr, &pitch, w * elemSize, h );
-    POP_CUDA_FATAL_TEST( err, "Cannot allocate pitched CUDA memory: " );
-    return ptr;
+
+    if( m == OnDevice )
+    {
+        err = cudaMallocPitch( &ptr, &pitch, w * elemSize, h );
+        POP_CUDA_FATAL_TEST( err, "Cannot allocate pitched CUDA memory: " );
+        return ptr;
+    }
+    else if( m == ManagedMem )
+    {
+        size_t sz = w * elemSize;
+        size_t rest = sz % pitch;
+        if( rest != 0 ) sz += ( pitch - rest );
+        sz *= h;
+        err = cudaMallocManaged( &ptr, sz );
+        POP_CUDA_FATAL_TEST( err, "Cannot allocate managed CUDA memory: " );
+        return ptr;
+    }
+    else
+    {
+        cerr << __FILE__ << ":" << __LINE__ << endl
+             << "    Allocation mode not correct in device plane allocation" << endl;
+        exit( -1 );
+    }
 }
 
 __host__
@@ -54,7 +74,8 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
 {
     int sz = w * h * elemSize;
 
-    if( m == Unaligned ) {
+    if( m == Unaligned )
+    {
         void* ptr = malloc( sz );
 
         if( ptr != 0 ) return ptr;
@@ -69,7 +90,9 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
              << "    Failed to allocate " << sz << " bytes of unaligned host memory." << endl
              << "    Cause: " << buf << endl;
         exit( -1 );
-    } else if( m == PageAligned ) {
+    }
+    else if( m == PageAligned )
+    {
         void* ptr = memalign(getPageSize(), sz);
         if(ptr)
             return ptr;
@@ -86,15 +109,19 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
              << "    Trying to allocate unaligned instead." << endl;
 
         return allocHost2D( w, h, elemSize, Unaligned );
-    } else if( m == CudaAllocated ) {
+    }
+    else if( m == CudaAllocated )
+    {
         void* ptr;
         cudaError_t err;
         err = cudaMallocHost( &ptr, sz );
         POP_CUDA_FATAL_TEST( err, "Failed to allocate aligned and pinned host memory: " );
         return ptr;
-    } else {
+    }
+    else
+    {
         cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Alignment not correctly specified in host plane allocation" << endl;
+             << "    Allocation mode not correct in host plane allocation" << endl;
         exit( -1 );
     }
 }

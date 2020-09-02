@@ -33,7 +33,8 @@ enum PlaneMapMode
     OnDevice           = 1,
     Unaligned          = 2,
     PageAligned        = 3,
-    CudaAllocated      = 4
+    CudaAllocated      = 4,
+    ManagedMem         = 5
 };
 
 /*************************************************************
@@ -44,8 +45,13 @@ enum PlaneMapMode
 
 struct PlaneBase
 {
+    /** Allocate memory for a 2D plane on the device. There are two options for
+     *  the PlaneMapMode:
+     *  OnDevice: use cudaMallocPitch, pitch is an output parameter in this case
+     *  ManagedMem: use cudaMallocManaged, pitch in an input parameter in this case
+     */
     __host__
-    void* allocDev2D( size_t& pitch, int w, int h, int elemSize );
+    void* allocDev2D( size_t& pitch, int w, int h, int elemSize, PlaneMapMode m );
 
     __host__
     void freeDev2D( void* data );
@@ -147,9 +153,8 @@ template <typename T> struct PitchPlane2D : public PlaneT<T>
         return (T*)( (char*)this->data + y * _pitchInBytes );
     }
 
-    __host__ inline void allocDev( int w, int h ) {
-        size_t pitch;
-        this->data = (T*)PlaneBase::allocDev2D( pitch, w, h, this->elemSize() );
+    __host__ inline void allocDev( int w, int h, PlaneMapMode m, size_t pitch ) {
+        this->data = (T*)PlaneBase::allocDev2D( pitch, w, h, this->elemSize(), m );
         this->_pitchInBytes = pitch;
     }
 
@@ -340,10 +345,10 @@ public:
     __host__ __device__
     inline short getByteSize( ) const { return this->_pitchInBytes*_rows; }
 
-    __host__ inline void allocDev( int w, int h ) {
+    __host__ inline void allocDev( int w, int h, PlaneMapMode mode, size_t pitch=1 ) {
         _cols = w;
         _rows = h;
-        PitchPlane2D<T>::allocDev( w, h );
+        PitchPlane2D<T>::allocDev( w, h, mode, pitch );
     }
 
     __host__ inline void allocHost( int w, int h, PlaneMapMode mode ) {

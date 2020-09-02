@@ -65,6 +65,7 @@ void device_prop_t::print( )
                   << "    Concurrent kernels:    " << (ptr->concurrentKernels?"yes":"no") << endl
                   << "    Mapping host memory:   " << (ptr->canMapHostMemory?"yes":"no") << endl
                   << "    Unified addressing:    " << (ptr->unifiedAddressing?"yes":"no") << endl
+                  << "    Pitch for textures:    " << ptr->texturePitchAlignment << " bytes" << endl
                   << endl;
     }
 }
@@ -305,6 +306,29 @@ bool device_prop_t::checkLimit_2DsurfLayered( int& width, int& height, int& laye
     }
 
     return returnSuccess;
+}
+
+size_t device_prop_t::getPitchInBytes( ) const
+{
+    int         currentDevice;
+    cudaError_t err;
+
+    err = cudaGetDevice( &currentDevice );
+    if( err != cudaSuccess )
+    {
+        POP_CUDA_WARN( err, "Cannot get current CUDA device" );
+        return 1;
+    }
+
+    if( currentDevice >= _properties.size() )
+    {
+        POP_WARN( "CUDA device was not registered at program start" );
+        return 1;
+    }
+
+    const cudaDeviceProp* ptr = _properties[currentDevice];
+
+    return ptr->texturePitchAlignment;
 }
 
 }}

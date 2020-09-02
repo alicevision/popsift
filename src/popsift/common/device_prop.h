@@ -88,6 +88,12 @@ public:
      */
     bool checkLimit_2DsurfLayered( int& width, int& height, int& layers,
                                    bool printWarn ) const;
+
+    /** Textures can be bound to managed memory, but the pitched allocation API
+     *  doesn't exist for managed memory. Use this function to create the alignment
+     *  yourself.
+     */
+    size_t getPitchInBytes( ) const;
 };
 
 }}
