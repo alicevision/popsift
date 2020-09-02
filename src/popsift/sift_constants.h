@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <cuda_runtime.h>
+
 #ifndef INF
 #define INF               (1<<29)
 #endif

@@ -5,15 +5,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdio.h>
-#include <iso646.h>
-#include <iostream>
-
-#include "sift_constants.h"
-#include "s_gradiant.h"
-#include "s_desc_notile.h"
 #include "common/assist.h"
 #include "common/vec_macros.h"
+#include "s_desc_notile.h"
+#include "s_gradiant.h"
+#include "sift_constants.h"
+
+#include <cstdio>
+#include <iostream>
 
 //   1    -> 19.6 on 980 Ti
 //   2    -> 19.5 on 980 Ti
@@ -78,7 +77,7 @@ void ext_desc_notile_sub( const float x, const float y, const int level,
         }
     }
 
-    for( int i=0; i<8; i++ )
+    for( int i=0; i<8; ++i)
     {
         dpt[i] += popsift::shuffle_down( dpt[i], 4, 8 ); // add n+4
         dpt[i] += popsift::shuffle_down( dpt[i], 2, 8 ); // add n+2
@@ -131,7 +130,7 @@ void ext_desc_notile( const int           octave,
 namespace popsift
 {
 
-bool start_ext_desc_notile( const int octave, Octave& oct_obj )
+bool start_ext_desc_notile( int octave, Octave& oct_obj )
 {
     dim3 block;
     dim3 grid;

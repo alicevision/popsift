@@ -8,7 +8,6 @@
 #pragma once
 
 #include <string>
-#include <iso646.h>
 
 #define MAX_OCTAVES   20
 #define MAX_LEVELS    10
@@ -111,7 +110,6 @@ struct Config
     void setMaxExtreme( int m );
     void setPrintGaussTables( );
     void setDPOrientation( bool on );
-    void setMaxExtrema( int extrema );
     void setFilterMaxExtrema( int extrema );
     void setFilterGridSize( int sz );
     void setFilterSorting( const std::string& direction );
@@ -316,7 +314,7 @@ inline bool operator==( const Config& l, const Config& r )
 
 inline bool operator!=( const Config& l, const Config& r )
 {
-    return not l.equal( r );
+    return ! l.equal( r );
 }
 
 }; // namespace popsift

@@ -5,14 +5,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdio.h>
-#include <iso646.h>
-
-#include "sift_constants.h"
-#include "s_gradiant.h"
-#include "s_desc_igrid.h"
 #include "common/assist.h"
 #include "common/vec_macros.h"
+#include "s_desc_igrid.h"
+#include "s_gradiant.h"
+#include "sift_constants.h"
+
+#include <cstdio>
 
 using namespace popsift;
 
@@ -75,9 +74,7 @@ void ext_desc_igrid_sub( const float x, const float y, const int level,
     }
 }
 
-__global__
-void ext_desc_igrid( const int           octave,
-                     cudaTextureObject_t texLinear )
+__global__ void ext_desc_igrid(int octave, cudaTextureObject_t texLinear)
 {
     const int   num      = dct.ori_ct[octave];
 

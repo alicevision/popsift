@@ -5,23 +5,23 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <iostream>
-#include <stdio.h>
-#include <iso646.h>
-
-#include "sift_pyramid.h"
-#include "sift_constants.h"
-#include "s_gradiant.h"
-#include "s_desc_normalize.h"
-#include "s_desc_loop.h"
-#include "s_desc_iloop.h"
-#include "s_desc_grid.h"
-#include "s_desc_igrid.h"
-#include "s_desc_notile.h"
 #include "common/assist.h"
 #include "common/debug_macros.h"
+#include "s_desc_grid.h"
+#include "s_desc_igrid.h"
+#include "s_desc_iloop.h"
+#include "s_desc_loop.h"
+#include "s_desc_normalize.h"
+#include "s_desc_notile.h"
+#include "s_gradiant.h"
+#include "sift_config.h"
+#include "sift_constants.h"
+#include "sift_pyramid.h"
 
-#ifdef USE_NVTX
+#include <cstdio>
+#include <iostream>
+
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
 #else
 #define nvtxRangePushA(a)

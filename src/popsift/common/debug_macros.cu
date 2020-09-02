@@ -7,7 +7,7 @@
  */
 #include "debug_macros.h"
 
-#include <assert.h>
+#include <cassert>
 
 using namespace std;
 

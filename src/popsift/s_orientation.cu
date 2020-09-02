@@ -5,20 +5,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <math.h>
-#include <stdio.h>
-#include <inttypes.h>
-
 #include "common/assist.h"
-#include "sift_pyramid.h"
-#include "sift_constants.h"
-#include "s_gradiant.h"
+#include "common/debug_macros.h"
 #include "common/excl_blk_prefix_sum.h"
 #include "common/warp_bitonic_sort.h"
-#include "common/debug_macros.h"
-#include "common/assist.h"
+#include "s_gradiant.h"
+#include "sift_config.h"
+#include "sift_constants.h"
+#include "sift_pyramid.h"
 
-#ifdef USE_NVTX
+#include <cinttypes>
+#include <cmath>
+#include <cstdio>
+
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
 #else
 #define nvtxRangePushA(a)
@@ -75,6 +75,7 @@ void ori_par( const int           octave,
     __shared__ float sm_hist[ORI_NBINS];
 
     for( int i = threadIdx.x; i < ORI_NBINS; i += blockDim.x )  hist[i] = 0.0f;
+    __syncthreads();
 
     /* keypoint fractional geometry */
     const float x     = iext->xpos;
@@ -203,6 +204,7 @@ void ori_par( const int           octave,
         refined_angle[bin] = predicate ? prev + newbin : -1;
         yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
     }
+    __syncthreads();
 
     int2 best_index = make_int2( threadIdx.x, threadIdx.x + 32 );
 
@@ -248,7 +250,7 @@ class ExtremaRead
     const Extremum* const _oris;
 public:
     inline __device__
-    ExtremaRead( const Extremum* const d_oris ) : _oris( d_oris ) { }
+    explicit ExtremaRead( const Extremum* const d_oris ) : _oris( d_oris ) { }
 
     inline __device__
     int get( int n ) const { return _oris[n].num_ori; }
@@ -259,7 +261,7 @@ class ExtremaWrt
     Extremum* _oris;
 public:
     inline __device__
-    ExtremaWrt( Extremum* d_oris ) : _oris( d_oris ) { }
+    explicit ExtremaWrt( Extremum* d_oris ) : _oris( d_oris ) { }
 
     inline __device__
     void set( int n, int value ) { _oris[n].idx_ori = value; }
@@ -270,7 +272,7 @@ class ExtremaTot
     int& _extrema_counter;
 public:
     inline __device__
-    ExtremaTot( int& extrema_counter ) : _extrema_counter( extrema_counter ) { }
+    explicit ExtremaTot( int& extrema_counter ) : _extrema_counter( extrema_counter ) { }
 
     inline __device__
     void set( int value ) { _extrema_counter = value; }
@@ -353,9 +355,11 @@ void Pyramid::orientation( const Config& conf )
 
     nvtxRangePushA( "filtering grid" );
     int ext_total = 0;
-    for( int o=0; o<MAX_OCTAVES; o++ ) {
-        if( hct.ext_ct[o] > 0 ) {
-            ext_total += hct.ext_ct[o];
+    for(int o : hct.ext_ct)
+    {
+        if( o > 0 )
+        {
+            ext_total += o;
         }
     }
 

@@ -5,11 +5,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+#include "debug_macros.h"
+#include "device_prop.h"
 #include <iostream>
 #include <sstream>
-
-#include "device_prop.h"
-#include "debug_macros.h"
 
 namespace popsift { namespace cuda {
 
@@ -17,18 +16,24 @@ using namespace std;
 
 device_prop_t::device_prop_t( )
 {
+    int         currentDevice;
     cudaError_t err;
+
+    err = cudaGetDevice( &currentDevice );
+    POP_CUDA_FATAL_TEST( err, "Cannot get the current CUDA device" );
 
     err = cudaGetDeviceCount( &_num_devices );
     POP_CUDA_FATAL_TEST( err, "Cannot count devices" );
 
-    for( int n=0; n<_num_devices; n++ ) {
-        cudaDeviceProp* p;
-        _properties.push_back( p = new cudaDeviceProp );
-        err = cudaGetDeviceProperties( p, n );
+    _properties.resize(_num_devices);
+
+    for( int n=0; n<_num_devices; ++n ) {
+        _properties[n] = new cudaDeviceProp;
+        err = cudaGetDeviceProperties( _properties[n], n );
         POP_CUDA_FATAL_TEST( err, "Cannot get properties for a device" );
     }
-    err = cudaSetDevice( 0 );
+
+    err = cudaSetDevice( currentDevice );
     POP_CUDA_FATAL_TEST( err, "Cannot set device 0" );
 }
 
@@ -84,6 +89,222 @@ device_prop_t::~device_prop_t( )
         cudaDeviceProp* ptr = *p;
         delete ptr;
     }
+}
+
+bool device_prop_t::checkLimit_2DtexLinear( int& width, int& height, bool printWarn ) const
+{
+    bool        returnSuccess = true;
+    int         currentDevice;
+    cudaError_t err;
+
+    err = cudaGetDevice( &currentDevice );
+    if( err != cudaSuccess )
+    {
+        POP_CUDA_WARN( err, "Cannot get current CUDA device" );
+        return true;
+    }
+
+    if( currentDevice >= _properties.size() )
+    {
+        POP_WARN( "CUDA device was not registered at program start" );
+        return true;
+    }
+
+    const cudaDeviceProp* ptr = _properties[currentDevice];
+    if( width > ptr->maxTexture2DLayered[0] )
+    {
+        if( printWarn )
+        {
+            std::cerr << __FILE__ << ":" << __LINE__
+                      << ": CUDA device " << currentDevice << std::endl
+                      << "    does not support 2D linear textures " << width
+                      << " pixels wide." << endl;
+        }
+        width = ptr->maxTexture2DLayered[0];
+        returnSuccess = false;
+    }
+    if( height > ptr->maxTexture2DLayered[1] )
+    {
+        if( returnSuccess && printWarn )
+        {
+            std::cerr << __FILE__ << ":" << __LINE__
+                      << ": CUDA device " << currentDevice << std::endl
+                      << "    does not support 2D linear textures " << height
+                      << " pixels high." << endl;
+        }
+        height = ptr->maxTexture2DLayered[1];
+        returnSuccess = false;
+    }
+
+    return returnSuccess;
+}
+
+bool device_prop_t::checkLimit_2DtexArray( int& width, int& height, bool printWarn ) const
+{
+    bool        returnSuccess = true;
+    int         currentDevice;
+    cudaError_t err;
+
+    err = cudaGetDevice( &currentDevice );
+    if( err != cudaSuccess )
+    {
+        POP_CUDA_WARN( err, "Cannot get current CUDA device" );
+        return true;
+    }
+
+    if( currentDevice >= _properties.size() )
+    {
+        POP_WARN( "CUDA device was not registered at program start" );
+        return true;
+    }
+
+    const cudaDeviceProp* ptr = _properties[currentDevice];
+    if( width > ptr->maxTexture2D[0] )
+    {
+        if( printWarn )
+        {
+            std::cerr << __FILE__ << ":" << __LINE__
+                      << ": CUDA device " << currentDevice << std::endl
+                      << "    does not support 2D array textures " << width
+                      << " pixels wide." << endl;
+        }
+        width = ptr->maxTexture2D[0];
+        returnSuccess = false;
+    }
+    if( height > ptr->maxTexture2D[1] )
+    {
+        if( returnSuccess && printWarn )
+        {
+            std::cerr << __FILE__ << ":" << __LINE__
+                      << ": CUDA device " << currentDevice << std::endl
+                      << "    does not support 2D array textures " << height
+                      << " pixels high." << endl;
+        }
+        height = ptr->maxTexture2D[1];
+        returnSuccess = false;
+    }
+
+    return returnSuccess;
+}
+
+bool device_prop_t::checkLimit_2DtexLayered( int& width, int& height, int& layers, bool printWarn ) const
+{
+    bool        returnSuccess = true;
+    int         currentDevice;
+    cudaError_t err;
+
+    err = cudaGetDevice( &currentDevice );
+    if( err != cudaSuccess )
+    {
+        POP_CUDA_WARN( err, "Cannot get current CUDA device" );
+        return true;
+    }
+
+    if( currentDevice >= _properties.size() )
+    {
+        POP_WARN( "CUDA device was not registered at program start" );
+        return true;
+    }
+
+    const cudaDeviceProp* ptr = _properties[currentDevice];
+    if( width > ptr->maxTexture2DLayered[0] )
+    {
+        if( printWarn )
+        {
+            std::cerr << __FILE__ << ":" << __LINE__
+                      << ": CUDA device " << currentDevice << std::endl
+                      << "    does not support 2D array textures " << width
+                      << " pixels wide." << endl;
+        }
+        width = ptr->maxTexture2DLayered[0];
+        returnSuccess = false;
+    }
+    if( height > ptr->maxTexture2DLayered[1] )
+    {
+        if( returnSuccess && printWarn )
+        {
+            std::cerr << __FILE__ << ":" << __LINE__
+                      << ": CUDA device " << currentDevice << std::endl
+                      << "    does not support 2D array textures " << height
+                      << " pixels high." << endl;
+        }
+        height = ptr->maxTexture2DLayered[1];
+        returnSuccess = false;
+    }
+    if( layers > ptr->maxTexture2DLayered[2] )
+    {
+        if( returnSuccess && printWarn )
+        {
+            std::cerr << __FILE__ << ":" << __LINE__
+                      << ": CUDA device " << currentDevice << std::endl
+                      << "    does not support 2D array textures " << layers
+                      << " pixels deep." << endl;
+        }
+        layers = ptr->maxTexture2DLayered[2];
+        returnSuccess = false;
+    }
+
+    return returnSuccess;
+}
+
+bool device_prop_t::checkLimit_2DsurfLayered( int& width, int& height, int& layers, bool printWarn ) const
+{
+    bool        returnSuccess = true;
+    int         currentDevice;
+    cudaError_t err;
+
+    err = cudaGetDevice( &currentDevice );
+    if( err != cudaSuccess )
+    {
+        POP_CUDA_WARN( err, "Cannot get current CUDA device" );
+        return true;
+    }
+
+    if( currentDevice >= _properties.size() )
+    {
+        POP_WARN( "CUDA device was not registered at program start" );
+        return true;
+    }
+
+    const cudaDeviceProp* ptr = _properties[currentDevice];
+    if( width > ptr->maxSurface2DLayered[0] )
+    {
+        if( printWarn )
+        {
+            std::cerr << __FILE__ << ":" << __LINE__
+                      << ": CUDA device " << currentDevice << std::endl
+                      << "    does not support layered 2D surfaces " << width
+                      << " bytes wide." << endl;
+        }
+        width = ptr->maxSurface2DLayered[0];
+        returnSuccess = false;
+    }
+    if( height > ptr->maxSurface2DLayered[1] )
+    {
+        if( returnSuccess && printWarn )
+        {
+            std::cerr << __FILE__ << ":" << __LINE__
+                      << ": CUDA device " << currentDevice << std::endl
+                      << "    does not support layered 2D surfaces " << height
+                      << " pixels high." << endl;
+        }
+        height = ptr->maxSurface2DLayered[1];
+        returnSuccess = false;
+    }
+    if( layers > ptr->maxSurface2DLayered[2] )
+    {
+        if( returnSuccess && printWarn )
+        {
+            std::cerr << __FILE__ << ":" << __LINE__
+                      << ": CUDA device " << currentDevice << std::endl
+                      << "    does not support layered 2D surfaces " << layers
+                      << " pixels deep." << endl;
+        }
+        layers = ptr->maxSurface2DLayered[2];
+        returnSuccess = false;
+    }
+
+    return returnSuccess;
 }
 
 }}

@@ -6,8 +6,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #pragma once
-#include "s_desc_normalize.h"
 #include "common/assist.h"
+#include "s_desc_normalize.h"
 #include "sift_config.h"
 
 using namespace popsift;
@@ -128,7 +128,7 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
     descr.z = descr.z * norm;
     descr.w = descr.w * norm;
 
-    if( not ignoreme ) {
+    if( ! ignoreme ) {
         float4* out4 = (float4*)dst_desc;
         out4[threadIdx.x] = descr;
     }

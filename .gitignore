@@ -45,3 +45,5 @@ oxford
 # Temporary files
 .DS_Store
 
+# Downloaded archives for tests.
+*.tgz

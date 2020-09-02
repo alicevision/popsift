@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <popsift/sift_config.h>
+
 #include <cuda_runtime.h>
 #include <iostream>
 #include <thread>
@@ -16,7 +18,7 @@
 #include <unistd.h>
 #endif
 
-#include "sift_config.h"
+
 
 namespace popsift
 {
@@ -133,7 +135,7 @@ static void* memalign(size_t alignment, size_t size)
     int err = posix_memalign( &ret, alignment, size );
     if( err != 0 ) {
         errno = err;
-        ret = 0;
+        ret = nullptr;
     }
     return ret;
 #endif
@@ -148,4 +150,4 @@ static void memalign_free( void* ptr )
 #endif
 }
 
-}; // namespace popsift
+} // namespace popsift

@@ -5,9 +5,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
+#include "assist.h"
+#include "debug_macros.h"
+#include "plane_2d.h"
+
+#include <cuda_runtime.h>
+
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
-#include <string.h>
-#include <stdlib.h>
 #ifndef _WIN32
 #include <unistd.h>
 #else
@@ -17,11 +24,7 @@
 #include <malloc.h>
 #endif
 
-#include <cuda_runtime.h>
 
-#include "plane_2d.h"
-#include "assist.h"
-#include "debug_macros.h"
 
 using namespace std;
 
