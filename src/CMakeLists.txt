@@ -9,6 +9,7 @@ CUDA_ADD_LIBRARY(popsift
 	popsift/sift_conf.cu popsift/sift_conf.h
 	popsift/gauss_filter.cu popsift/gauss_filter.h
 	popsift/s_image.cu popsift/s_image.h
+	popsift/s_image_wallis.cu
 	popsift/sift_pyramid.cu popsift/sift_pyramid.h
 	popsift/sift_octave.cu popsift/sift_octave.h
 	popsift/s_pyramid_build.cu
