@@ -107,7 +107,12 @@ struct Config
     void setEdgeLimit( float v );
     void setThreshold( float v );
     void setInitialBlur( float blur );
-    void setWallisFilter( bool onoff = true );
+    void setUseWallisFilter( bool onoff = true );
+    void setWallisFilterWidth( int sz );
+    void setWallisFilterMd   ( float v );
+    void setWallisFilterDd   ( float v );
+    void setWallisFilterAmax ( float v );
+    void setWallisFilterp    ( float v );
     void setMaxExtreme( int m );
     void setPrintGaussTables( );
     void setDPOrientation( bool on );
@@ -119,7 +124,12 @@ struct Config
     bool  hasInitialBlur( ) const;
     float getInitialBlur( ) const;
 
-    bool  getWallisFilter( ) const;
+    bool  useWallisFilter( ) const;
+    int   getWallisFilterWidth( ) const;
+    float getWallisFilterMd( ) const;
+    float getWallisFilterDd( ) const;
+    float getWallisFilterAmax( ) const;
+    float getWallisFilterp( ) const;
 
     // computes the actual peak threshold depending on the threshold
     // parameter and the non-augmented number of levels
@@ -293,7 +303,12 @@ private:
     float _initial_blur;
 
     /** If true, apply Wallis filter to input image before scaling */
-    bool  _wallis_filter;
+    bool  _use_wallis_filter;
+    int   _wallis_filter_width;
+    float _wallis_filter_Md;
+    float _wallis_filter_Dd;
+    float _wallis_filter_Amax;
+    float _wallis_filter_p;
 
     /* OpenMVG requires a normalization named rootSift, the
      * classical L2-inspired mode is also supported.

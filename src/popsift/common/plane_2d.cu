@@ -33,27 +33,40 @@ namespace popsift {
 __host__
 void* PlaneBase::allocDev2D( size_t& pitch, int w, int h, int elemSize, PlaneMapMode m )
 {
+    _mode = m;
+
     // cerr << "Alloc " << w*h*elemSize << " B" << endl;
     void*       ptr;
     cudaError_t err;
 
+    std::cerr << "Allocating 2D plane, elem size " << elemSize
+              << " size " << w << "x" << h
+              << " type " << (m==OnDevice?"OnDevice":"ManagedMen")
+              << " pitch " << pitch
+              << std::endl;
+
     if( m == OnDevice )
     {
+        std::cerr << "    Trying to allocate " << w * elemSize << "x" << h << " bytes" << std::endl;
         err = cudaMallocPitch( &ptr, &pitch, w * elemSize, h );
         POP_CUDA_FATAL_TEST( err, "Cannot allocate pitched CUDA memory: " );
+        std::cerr << "    Allocated " << pitch << "x" << h << "=" << pitch*h << " bytes" << std::endl;
         return ptr;
     }
     else if( m == ManagedMem )
     {
         size_t sz = w * elemSize;
+        std::cerr << "    Trying to allocate " << w * elemSize << "x" << h << " bytes with alignment " << pitch << std::endl;
         size_t rest = sz % pitch;
         if( rest == 0 )
             pitch = sz;
         else
             pitch = sz + pitch - rest;
+        std::cerr << "    Trying to allocate " << pitch << "x" << h << "=" << pitch*h << " bytes" << std::endl;
         sz  = pitch * h;
         err = cudaMallocManaged( &ptr, sz );
         POP_CUDA_FATAL_TEST( err, "Cannot allocate managed CUDA memory: " );
+        std::cerr << "    Allocated " << pitch << "x" << h << "=" << pitch*h << " bytes" << std::endl;
         return ptr;
     }
     else
@@ -65,16 +78,10 @@ void* PlaneBase::allocDev2D( size_t& pitch, int w, int h, int elemSize, PlaneMap
 }
 
 __host__
-void PlaneBase::freeDev2D( void* data )
-{
-    cudaError_t err;
-    err = cudaFree( data );
-    POP_CUDA_FATAL_TEST( err, "Failed to free CUDA memory: " );
-}
-
-__host__
 void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
 {
+    _mode = m;
+
     int sz = w * h * elemSize;
 
     if( m == Unaligned )
@@ -130,23 +137,29 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
 }
 
 __host__
-void PlaneBase::freeHost2D( void* data, PlaneMapMode m )
+void PlaneBase::free2D( void* data )
 {
     if (!data)
         return;
-    else if (m == CudaAllocated) {
+
+    switch( _mode )
+    {
+    case OnDevice :
+    case ManagedMem :
+        cudaFree(data);
+        return;
+    case CudaAllocated :
         cudaFreeHost(data);
         return;
-    }
-    else if (m == Unaligned) {
+    case Unaligned :
         free(data);
         return;
-    }
-    else if (m == PageAligned) {
+    case PageAligned :
         memalign_free( data );
         return;
+    default :
+        assert(!"Invalid PlaneMapMode");
     }
-    assert(!"Invalid PlaneMapMode");
 }
 
 __host__

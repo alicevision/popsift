@@ -292,12 +292,19 @@ void PopSift::extractDownloadLoop( )
 
         private_init( img->getWidth(), img->getHeight() );
 
-        if( _config.getWallisFilter() )
+        if( _config.useWallisFilter() )
         {
-            img->wallis( 9, _device_properties.getPitchInBytes() );
+            std::cerr << "Calling the Wallis filter" << std::endl;
+            img->wallis( _config.getWallisFilterWidth(),
+                         _config.getWallisFilterMd(),
+                         _config.getWallisFilterDd(),
+                         _config.getWallisFilterAmax(),
+                         _config.getWallisFilterp(),
+                         _device_properties.getPitchInBytes() );
         }
         else
         {
+            std::cerr << "Bypassing the Wallis filter" << std::endl;
         }
 
         p._pyramid->step1( _config, img );

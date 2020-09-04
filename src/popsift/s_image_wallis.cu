@@ -49,120 +49,112 @@ static void chkSuccess( const char* file, int line, const char* ctx, NppStatus c
     }
 }
 
-/*************************************************************
- * ImageBase::wallisFilter
- *************************************************************/
-
-static void boxFilter( const float* in, size_t in_pitch, float* out, size_t out_pitch, const NppiSize& roi, const NppiSize& mask, const NppiPoint& anchor )
+static void boxFilter( Plane2D<float>& orig_input, Plane2D<float>& output, int filterWidth, size_t pitch )
 {
     NppStatus err;
 
-    std::cerr << __FILE__ << ":" <<  __LINE__ << ": input for nppiFilterBox_32f_C1R: " << std::endl
-              << "    input pitch: " << in_pitch << std::endl
-              << "    output pitch: " << out_pitch << std::endl
-              << "    ROI: " << roi.width << "x" << roi.height << std::endl
-              << "    mask: " << mask.width << "x" << mask.height << std::endl
-              << "    anchor: " << anchor.x << "x" << anchor.y << std::endl
-              << std::endl;
+    int width     = output.getWidth();
+    int height    = output.getHeight();
+
+    const NppiSize  roi           { width, height };
+    const NppiSize  mask          { filterWidth, filterWidth };
+    const NppiPoint NOOFFSET      { 0, 0 };
+    const NppiSize  edgeSize      { filterWidth/2, filterWidth/2 };
+    const NppiSize  protectedSize { width + filterWidth - 1, height + filterWidth - 1 };
+
+    Plane2D<float> I;
+    I.allocDev( protectedSize.width, protectedSize.height,  popsift::ManagedMem, pitch );
+
+    err = nppiCopyReplicateBorder_32f_C1R( orig_input.data,
+                                           orig_input.getPitchInBytes(),
+                                           roi,
+                                           I.data,
+                                           I.getPitchInBytes(),
+                                           protectedSize,
+                                           edgeSize.height,
+                                           edgeSize.width );
+    chkSuccess( __FILE__, __LINE__, "nppiCopyReplicateBorder_32f_C1R", err );
+
+    float*       out       = output.data;
+    const size_t out_pitch = output.getPitchInBytes();
+    const float* in        = I.data;
+    const size_t in_pitch  = I.getPitchInBytes();
+
     err = nppiFilterBox_32f_C1R( in, in_pitch,
                                  out, out_pitch,
                                  roi,
                                  mask,
-                                 anchor );
-    chkCudaState( __FILE__, __LINE__ );
+                                 NOOFFSET );
     chkSuccess( __FILE__, __LINE__, "nppiFilterBox_32f_C1R", err );
-    chkCudaState( __FILE__, __LINE__ );
+
+    I.free();
 }
+
+static void printMinMax( Plane2D<float>& in, float& minVal, float& maxVal )
+{
+    NppStatus   stat;
+    int width     = in.getWidth();
+    int height    = in.getHeight();
+
+    const NppiSize  roi { width, height };
+
+    int sz;
+    stat = nppiMinMaxGetBufferHostSize_32f_C1R( roi, &sz );
+    chkSuccess( __FILE__, __LINE__, "nppiSub_32f_C1R", stat );
+
+    unsigned char* ptr;
+    cudaMallocManaged( &ptr, sz );
+    chkCudaState( __FILE__, __LINE__ );
+
+    struct MinMax
+    {
+        float _min;
+        float _max;
+    };
+    struct MinMax* m;
+
+    cudaMallocManaged( &m, sizeof(MinMax) );
+    chkCudaState( __FILE__, __LINE__ );
+
+    stat = nppiMinMax_32f_C1R( in.data, in.getPitchInBytes(), roi, &m->_min, &m->_max, ptr );
+    chkCudaState( __FILE__, __LINE__ );
+    chkSuccess( __FILE__, __LINE__, "nppiSub_32f_C1R", stat );
+
+    minVal = m->_min;
+    maxVal = m->_max;
+
+    cudaFree( ptr );
+    cudaFree( m );
+}
+
+/*************************************************************
+ * ImageBase::wallisFilter
+ *************************************************************/
 
     // Taken from here: https://se.mathworks.com/matlabcentral/answers/287847-what-is-wallis-filter-i-have-an-essay-on-it-and-i-cannot-understand-of-find-info-on-it
 
     // function WallisFilter(obj, Md, Dd, Amax, p, W)
     // Md and Dd are mean and contrast to match,
     // Amax and p constrain the change in individual pixels,
-void ImageBase::wallisFilter( Plane2D<float>& D, Plane2D<float>& input, int filterWidth, size_t pitch )
+void ImageBase::wallisFilter( Plane2D<float>& input, int filterWidth, const float Md, const float Dd, const float Amax, const float p, Plane2D<float>& D, size_t pitch )
 {
     std::cerr << __FILE__ << ":" <<  __LINE__ << ": entering wallisFilter, pitch=" << pitch
               << " filterwidth=" << filterWidth << std::endl;
 
-    chkCudaState( __FILE__, __LINE__ );
-    write_plane2D( "wallis-step-input.pgm", input );
-    chkCudaState( __FILE__, __LINE__ );
-
     NppStatus err;
     const NppiSize  COMPLETE{_w,_h}; // = { .width = _w, .height = _h };
-    const NppiPoint NOOFFSET{0, 0}; // = { .x = 0, .y = 0 };
-    const float     Md   = 32767.0f; // desired average mean
-    const float     Dd   = Md/2.0f;  // desired average standard deviation
-    const float     Amax =     2.5f; // maximum gain factor to prevent extreme values
-    const float     p    =     0.8f; // mean proportionality filter controlling image flatness [0:1]
  
     // int w = filterWidth >> 1; // floor(W/2)
     if( filterWidth %2 == 0 ) filterWidth++;
 
-    const NppiSize FILTERSIZE{filterWidth,filterWidth}; //  = { .height = filterWidth, .width = filterWidth };
-
-    const NppiSize edgeSize{ filterWidth/2, filterWidth/2 };
-    const NppiSize protectedSize{ _w+filterWidth-1,_h+filterWidth-1 };
-
-    Plane2D<float> I;
-    I.allocDev( protectedSize.width, protectedSize.height,  popsift::ManagedMem, pitch );
-
-    std::cerr << __FILE__ << ":" <<  __LINE__ << ": I allocated"
-              << ", width=" << protectedSize.width
-              << ", elemsize=" << I.elemSize()
-              << ", align=" << pitch
-              << ", pitch=" << I.getPitchInBytes() << std::endl;
-
-    err = nppiCopyReplicateBorder_32f_C1R( input.data,
-                                           input.getPitchInBytes(),
-                                           COMPLETE,
-                                           I.data,
-                                           I.getPitchInBytes(),
-                                           protectedSize,
-                                           edgeSize.height,
-                                           edgeSize.width );
-    chkCudaState( __FILE__, __LINE__ );
-    chkSuccess( __FILE__, __LINE__, "nppiCopyReplicateBorder_32f_C1R", err );
-    chkCudaState( __FILE__, __LINE__ );
-    write_plane2D( "wallis-step-I.pgm", I );
-    chkCudaState( __FILE__, __LINE__ );
-
     Plane2D<float> M;
     M.allocDev( _w, _h, popsift::ManagedMem, pitch );
-    chkCudaState( __FILE__, __LINE__ );
 
-    std::cerr << __FILE__ << ":" <<  __LINE__ << ": M allocated"
-              << ", width=" << _w
-              << ", elemsize=" << M.elemSize()
-              << ", align=" << pitch
-              << ", pitch=" << M.getPitchInBytes() << std::endl;
-
-#if 1
-    boxFilter( I.data, // src ptr
-               I.getPitchInBytes(),  // src step
-               M.data,              // dst ptr
-               M.getPitchInBytes(), // dst step
-               COMPLETE,            // region
-               FILTERSIZE,          // filtersize
-               NOOFFSET );          // shift
-#else
-    std::cerr << __FILE__ << ":" <<  __LINE__ << ": input for nppiFilterBox_32f_C1R: "
-              << " input pitch: " << I.getPitchInBytes()
-              << " output pitch: " << M.getPitchInBytes()
-              << " ROI: " << COMPLETE.width << "x" << COMPLETE.height << std::endl;
-    err = nppiFilterBox_32f_C1R( I.data, // src ptr
-                                 I.getPitchInBytes(),  // src step
-                                 M.data,              // dst ptr
-                                 M.getPitchInBytes(), // dst step
-                                 COMPLETE,            // region
-                                 FILTERSIZE,          // filtersize
-                                 startPoint ); // NOOFFSET );          // shift
-    chkCudaState( __FILE__, __LINE__ );
-    chkSuccess( __FILE__, __LINE__, "nppiFilterBox_32f_C1R", err );
-    chkCudaState( __FILE__, __LINE__ );
-#endif
+    boxFilter( input,       // src
+               M,           // dst
+               filterWidth, // filtersize
+               pitch );     // pitch alignment for allocations
     write_plane2D( "wallis-step-M.pgm", M );
-    chkCudaState( __FILE__, __LINE__ );
 
     // Plane2D<float> ipsum( _w, _h );
     // compute the inclusive prefix sum on all horizontals
@@ -183,9 +175,7 @@ void ImageBase::wallisFilter( Plane2D<float>& D, Plane2D<float>& input, int filt
                            FminusM.getPitchInBytes(),
                            COMPLETE );
     chkSuccess( __FILE__, __LINE__, "nppiSub_32f_C1R", err );
-    chkCudaState( __FILE__, __LINE__ );
     write_plane2D( "wallis-step-FminusM.pgm", FminusM );
-    chkCudaState( __FILE__, __LINE__ );
 
     Plane2D<float> Dprep;
     Dprep.allocDev( _w, _h, popsift::ManagedMem, pitch );
@@ -200,47 +190,38 @@ void ImageBase::wallisFilter( Plane2D<float>& D, Plane2D<float>& input, int filt
                            Dprep.getPitchInBytes(),
                            COMPLETE );
     chkSuccess( __FILE__, __LINE__, "nppiSqr_32f_C1R", err );
-    chkCudaState( __FILE__, __LINE__ );
     write_plane2D( "wallis-step-Dprep.pgm", Dprep );
-    chkCudaState( __FILE__, __LINE__ );
 
     // ipsum = initBoxFilter( D );
     // D = runBoxFilter( ipsum, w );
     // D.divide( filterWidth^2 );
-    err = nppiFilterBox_32f_C1R( Dprep.data,
-                                 Dprep.getPitchInBytes(),
-                                 D.data,
-                                 D.getPitchInBytes(),
-                                 COMPLETE,
-                                 FILTERSIZE,
-                                 NOOFFSET );
+    boxFilter( Dprep,       // src
+               D,           // dst
+               filterWidth, // filtersize
+               pitch );     // pitch alignment for allocations
     chkSuccess( __FILE__, __LINE__, "nppiFilterBox_32f_C1R", err );
-    chkCudaState( __FILE__, __LINE__ );
     write_plane2D( "wallis-step-D-1.pgm", D );
-    chkCudaState( __FILE__, __LINE__ );
 
     // D.sqrt();
     err = nppiSqrt_32f_C1IR( D.data,
                              D.getPitchInBytes(),
                              COMPLETE );
     chkSuccess( __FILE__, __LINE__, "nppiSqrt_32f_C1IR", err );
-    chkCudaState( __FILE__, __LINE__ );
+
     // D.multiply( Amax );
     err = nppiMulC_32f_C1IR( Amax,
                              D.data,
                              D.getPitchInBytes(),
                              COMPLETE );
     chkSuccess( __FILE__, __LINE__, "nppiMulC_32f_C1IR", err );
-    chkCudaState( __FILE__, __LINE__ );
+
     // D.add( Dd );
     err = nppiAddC_32f_C1IR( Dd,
                              D.data,
                              D.getPitchInBytes(),
                              COMPLETE );
     chkSuccess( __FILE__, __LINE__, "nppiAddC_32f_C1IR", err );
-    chkCudaState( __FILE__, __LINE__ );
     write_plane2D( "wallis-step-D-2.pgm", D );
-    chkCudaState( __FILE__, __LINE__ );
 
     Plane2D<float> G;
     G.allocDev( _w, _h, popsift::ManagedMem, pitch );
@@ -253,9 +234,7 @@ void ImageBase::wallisFilter( Plane2D<float>& D, Plane2D<float>& input, int filt
                             G.getPitchInBytes(),
                             COMPLETE );
     chkSuccess( __FILE__, __LINE__, "nppiMulC_32f_C1R", err );
-    chkCudaState( __FILE__, __LINE__ );
     write_plane2D( "wallis-step-G.pgm", G );
-    chkCudaState( __FILE__, __LINE__ );
 
     // D = G / D; // element-wise division
     err = nppiDiv_32f_C1IR( G.data,
@@ -264,7 +243,6 @@ void ImageBase::wallisFilter( Plane2D<float>& D, Plane2D<float>& input, int filt
                             D.getPitchInBytes(),
                             COMPLETE );
     chkSuccess( __FILE__, __LINE__, "nppiDiv_32f_C1IR", err );
-    chkCudaState( __FILE__, __LINE__ );
 
     // D.add( p * Md );
     err = nppiAddC_32f_C1IR( p * Md,
@@ -272,7 +250,6 @@ void ImageBase::wallisFilter( Plane2D<float>& D, Plane2D<float>& input, int filt
                              D.getPitchInBytes(),
                              COMPLETE );
     chkSuccess( __FILE__, __LINE__, "nppiAddC_32f_C1IR", err );
-    chkCudaState( __FILE__, __LINE__ );
 
     // M.multiply( 1-p );
     err = nppiMulC_32f_C1IR( 1.0f-p,
@@ -280,7 +257,6 @@ void ImageBase::wallisFilter( Plane2D<float>& D, Plane2D<float>& input, int filt
                              M.getPitchInBytes(),
                              COMPLETE );
     chkSuccess( __FILE__, __LINE__, "nppiMulC_32f_C1IR", err );
-    chkCudaState( __FILE__, __LINE__ );
 
     // D = D + M; // element-wise addition
     err = nppiAdd_32f_C1IR( M.data,
@@ -289,25 +265,16 @@ void ImageBase::wallisFilter( Plane2D<float>& D, Plane2D<float>& input, int filt
                             D.getPitchInBytes(),
                             COMPLETE );
     chkSuccess( __FILE__, __LINE__, "nppiAdd_32f_C1IR", err );
-    chkCudaState( __FILE__, __LINE__ );
     write_plane2D( "wallis-step-D-3.pgm", D );
-    chkCudaState( __FILE__, __LINE__ );
+
     // D.max(0);
-#if 1
-    err = nppiThreshold_32f_C1IR( D.data,
-                                  D.getPitchInBytes(),
-                                  COMPLETE,
-                                  0.0f,
-                                  NPP_CMP_LESS );
-    chkSuccess( __FILE__, __LINE__, "nppiThreshold_32f_C1IR", err );
-#else
     err = nppiThreshold_LTVal_32f_C1IR( D.data,
                                         D.getPitchInBytes(),
                                         COMPLETE,
                                         0.0f,   // if less-than this
                                         0.0f ); // set to this value
     chkSuccess( __FILE__, __LINE__, "nppiThreshold_LTVal_32f_C1IR", err );
-#endif
+
     // D.min(65534)
     err = nppiThreshold_GTVal_32f_C1IR( D.data,
                                         D.getPitchInBytes(),
@@ -316,42 +283,45 @@ void ImageBase::wallisFilter( Plane2D<float>& D, Plane2D<float>& input, int filt
                                         65534.0f ); // set to this value
     chkSuccess( __FILE__, __LINE__, "nppiThreshold_GTVal_32f_C1IR", err );
     write_plane2D( "wallis-step-D-4.pgm", D );
+
+    M.free();
+    FminusM.free();
+    Dprep.free();
+    G.free();
 }
 
 /*************************************************************
  * Image
  *************************************************************/
 
-void Image::wallis( int filterWidth, size_t pitch )
+void Image::wallis( int filterWidth, const float Md, const float Dd, const float Amax, const float p, size_t pitch )
 {
+    float minVal, maxVal;
+
     NppStatus err;
     const NppiSize  COMPLETE{_w,_h}; // = { .width = _w, .height = _h };
     Plane2D<float> a;
     Plane2D<float> b;
     a.allocDev( _w, _h, popsift::ManagedMem, pitch );
     b.allocDev( _w, _h, popsift::ManagedMem, pitch );
-    chkCudaState( __FILE__, __LINE__ );
 
     std::cerr << __FILE__ << ":" << __LINE__ << " writing input image of size " << _w << "x" << _h << " for Wallis" << std::endl;
 
-    chkCudaState( __FILE__, __LINE__ );
     write_plane2D( "wallis-step-byte-0-input.pgm", true, _input_image_d );
     chkCudaState( __FILE__, __LINE__ );
 
     std::cerr << __FILE__ << ":" << __LINE__ << ": input  pitch in bytes: " << _input_image_d.getPitchInBytes() << std::endl
               << "    output pitch in bytes: " << a.getPitchInBytes() << std::endl;
 
-    chkCudaState( __FILE__, __LINE__ );
     err = nppiConvert_8u32f_C1R( _input_image_d.data,
                                  _input_image_d.getPitchInBytes(),
                                  a.data,
                                  a.getPitchInBytes(),
                                  COMPLETE );
-    chkCudaState( __FILE__, __LINE__ );
     chkSuccess( __FILE__, __LINE__, "nppiConvert_8u32f_C1R", err );
-    chkCudaState( __FILE__, __LINE__ );
     write_plane2D( "wallis-step-byte-1-a.pgm", a );
-    chkCudaState( __FILE__, __LINE__ );
+    printMinMax( a, minVal, maxVal );
+    std::cerr << "    " << __LINE__ << ": in a min=" << minVal << ", max=" << maxVal << std::endl;
 
     err = nppiMulC_32f_C1R( a.data,
                             a.getPitchInBytes(),
@@ -359,28 +329,37 @@ void Image::wallis( int filterWidth, size_t pitch )
                             b.data,
                             b.getPitchInBytes(),
                             COMPLETE );
-    chkCudaState( __FILE__, __LINE__ );
     chkSuccess( __FILE__, __LINE__, "nppiMulC_32f_C1R", err );
-    chkCudaState( __FILE__, __LINE__ );
     write_plane2D( "wallis-step-byte-2-b.pgm", a );
-    chkCudaState( __FILE__, __LINE__ );
+    printMinMax( b, minVal, maxVal );
+    std::cerr << "    " << __LINE__ << ": in b min=" << minVal << ", max=" << maxVal << std::endl;
 
-    wallisFilter( a, b, filterWidth, pitch );
-    chkCudaState( __FILE__, __LINE__ );
+    wallisFilter( b, filterWidth, Md, Dd, Amax, p, a, pitch );
     write_plane2D( "wallis-step-byte-3-a.pgm", a );
-    chkCudaState( __FILE__, __LINE__ );
+    printMinMax( a, minVal, maxVal );
+    std::cerr << "    " << __LINE__ << ": in a min=" << minVal << ", max=" << maxVal << std::endl;
 
-    err = nppiMulC_32f_C1R( a.data,
+    err = nppiDivC_32f_C1R( a.data,
                             a.getPitchInBytes(),
                             256.0f,
                             b.data,
                             b.getPitchInBytes(),
                             COMPLETE );
-    chkCudaState( __FILE__, __LINE__ );
     chkSuccess( __FILE__, __LINE__, "nppiMulC_32f_C1R", err );
-    chkCudaState( __FILE__, __LINE__ );
     write_plane2D( "wallis-step-byte-4-b.pgm", a );
-    chkCudaState( __FILE__, __LINE__ );
+    printMinMax( b, minVal, maxVal );
+    std::cerr << "    " << __LINE__ << ": in b min=" << minVal << ", max=" << maxVal << std::endl;
+
+    Plane2D<uint8_t> c;
+    c.allocDev( _w, _h, popsift::ManagedMem, pitch );
+    err = nppiConvert_32f8u_C1R( b.data,
+                                 b.getPitchInBytes(),
+                                 c.data,
+                                 c.getPitchInBytes(),
+                                 COMPLETE,
+                                 NPP_RND_NEAR );
+    chkSuccess( __FILE__, __LINE__, "nppiConvert_32f8u_C1R", err );
+    write_plane2D( "wallis-step-byte-5-b.pgm", c );
 
     err = nppiConvert_32f8u_C1R( b.data,
                                  b.getPitchInBytes(),
@@ -388,16 +367,14 @@ void Image::wallis( int filterWidth, size_t pitch )
                                  _input_image_d.getPitchInBytes(),
                                  COMPLETE,
                                  NPP_RND_NEAR );
-    chkCudaState( __FILE__, __LINE__ );
     chkSuccess( __FILE__, __LINE__, "nppiConvert_32f8u_C1R", err );
-    chkCudaState( __FILE__, __LINE__ );
 }
 
 /*************************************************************
  * ImageFloat
  *************************************************************/
 
-void ImageFloat::wallis( int filterWidth, size_t pitch )
+void ImageFloat::wallis( int filterWidth, const float Md, const float Dd, const float Amax, const float p, size_t pitch )
 {
     const NppiSize  COMPLETE{_w,_h}; // = { .width = _w, .height = _h };
     Plane2D<float> D;
@@ -410,7 +387,7 @@ void ImageFloat::wallis( int filterWidth, size_t pitch )
                       D.getPitchInBytes(),
                       COMPLETE );
 
-    wallisFilter( _input_image_d, D, filterWidth, pitch );
+    wallisFilter( D, filterWidth, Md, Dd, Amax, p, _input_image_d, pitch );
 
     nppiDivC_32f_C1IR( 65534.0f,
                        _input_image_d.data,

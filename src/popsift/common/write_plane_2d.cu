@@ -25,7 +25,7 @@ void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
         g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
         g.memcpyFromDevice( f );
         write_plane2D( filename, g );
-        g.freeHost( CudaAllocated );
+        g.free( );
     } else {
         write_plane2D( filename, f );
     }
@@ -40,7 +40,7 @@ void write_plane2D( const char* filename, bool onDevice, Plane2D_uint8& f )
         g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
         g.memcpyFromDevice( f );
         write_plane2D( filename, g );
-        g.freeHost( CudaAllocated );
+        g.free( );
     } else {
         write_plane2D( filename, f );
     }
@@ -55,7 +55,7 @@ void write_plane2Dunscaled( const char* filename, bool onDevice, Plane2D_float& 
         g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
         g.memcpyFromDevice( f );
         write_plane2Dunscaled( filename, g, offset );
-        g.freeHost( CudaAllocated );
+        g.free( );
     } else {
         write_plane2Dunscaled( filename, f, offset );
     }
@@ -124,9 +124,9 @@ void write_plane2D( const char* filename, Plane2D_float& f )
 __host__
 void write_plane2D( const char* filename, Plane2D_uint8& f )
 {
-    cerr << __FILE__ << ":" << __LINE__ << ": writing chars from Plane2D_uint8" << endl;
     int rows = f.getRows();
     int cols = f.getCols();
+    cerr << __FILE__ << ":" << __LINE__ << ": writing " << cols << "x" << rows << " chars from Plane2D_uint8" << endl;
 
     ofstream of( filename ); // , ios::binary );
     of << "P2" << endl
@@ -183,7 +183,7 @@ void dump_plane2Dfloat( const char* filename, bool onDevice, Plane2D_float& f )
         g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
         g.memcpyFromDevice( f );
         dump_plane2Dfloat( filename, g );
-        g.freeHost( CudaAllocated );
+        g.free( );
     } else {
         dump_plane2Dfloat( filename, f );
     }

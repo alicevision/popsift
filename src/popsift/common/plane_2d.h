@@ -54,13 +54,10 @@ struct PlaneBase
     void* allocDev2D( size_t& pitch, int w, int h, int elemSize, PlaneMapMode m );
 
     __host__
-    void freeDev2D( void* data );
-
-    __host__
     void* allocHost2D( int w, int h, int elemSize, PlaneMapMode m );
 
     __host__
-    void freeHost2D( void* data, PlaneMapMode m );
+    void free2D( void* data );
 
     __host__
     void memcpyToDevice( void* dst, int dst_pitch, void* src, int src_pitch, short cols, short rows, int elemSize );
@@ -81,6 +78,9 @@ struct PlaneBase
     __host__
     inline void waitAndCheck( cudaStream_t stream ) const { }
 #endif // not PLANE2D_CUDA_OP_DEBUG
+
+private:
+    PlaneMapMode _mode;
 };
 
 /*************************************************************
@@ -158,20 +158,17 @@ template <typename T> struct PitchPlane2D : public PlaneT<T>
         this->_pitchInBytes = pitch;
     }
 
-    __host__ inline void freeDev( ) {
-        assert( this->data );
-        PlaneBase::freeDev2D( this->data );
-        this->data = 0;
-    }
-
     __host__ inline void allocHost( int w, int h, PlaneMapMode mode ) {
         this->data = (T*)PlaneBase::allocHost2D( w, h, this->elemSize(), mode );
         this->_pitchInBytes = w * this->elemSize();
     }
 
-    __host__ inline void freeHost( PlaneMapMode mode ) {
-        PlaneBase::freeHost2D( this->data, mode );
+    __host__ inline void free( ) {
+        assert( this->data );
+        PlaneBase::free2D( this->data );
+        this->data = 0;
     }
+
     __host__ __device__
     inline short getPitchInBytes( ) const { return _pitchInBytes; }
 

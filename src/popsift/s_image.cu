@@ -63,12 +63,14 @@ Image::~Image( )
     if( _max_w == 0 ) return;
 
     destroyTexture( );
-    _input_image_d.freeDev( );
-    _input_image_h.freeHost( popsift::CudaAllocated );
+    _input_image_d.free( );
+    _input_image_h.free( );
 }
 
 void Image::load( void* input )
 {
+    std::cerr << __FILE__ << ":" << __LINE__ << " Loading image onto device" << std::endl;
+
     /* The host memcpy may seem like a really stupid idea, but _input_image_h
      * is in CUDA-allocated pinned host memory, which makes the H2D copy
      * much faster.
@@ -107,8 +109,8 @@ void Image::resetDimensions( int w, int h )
 
         _max_w = max( w, _max_w );
         _max_h = max( h, _max_h );
-        _input_image_h.freeHost( popsift::CudaAllocated );
-        _input_image_d.freeDev( );
+        _input_image_h.free( );
+        _input_image_d.free( );
         _input_image_h.allocHost( _max_w, _max_h, popsift::CudaAllocated );
         _input_image_d.allocDev(  _max_w, _max_h, popsift::OnDevice );
         _input_image_h.resetDimensionsHost( w, h );
@@ -191,8 +193,8 @@ ImageFloat::~ImageFloat( )
     if( _max_w == 0 ) return;
 
     destroyTexture( );
-    _input_image_d.freeDev( );
-    _input_image_h.freeHost( popsift::CudaAllocated );
+    _input_image_d.free( );
+    _input_image_h.free( );
 }
 
 void ImageFloat::load( void* input )
@@ -231,8 +233,8 @@ void ImageFloat::resetDimensions( int w, int h )
 
         _max_w = max( w, _max_w );
         _max_h = max( h, _max_h );
-        _input_image_h.freeHost( popsift::CudaAllocated );
-        _input_image_d.freeDev( );
+        _input_image_h.free( );
+        _input_image_d.free( );
         _input_image_h.allocHost( _max_w, _max_h, popsift::CudaAllocated );
         _input_image_d.allocDev(  _max_w, _max_h, popsift::OnDevice );
         _input_image_h.resetDimensionsHost( w, h );

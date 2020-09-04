@@ -34,10 +34,15 @@ struct ImageBase
      *
      *  It is expected that output is allocated and has the same
      *  dimensions as intput.
+     * Md  : desired average mean - e.g. 32767.0f
+     * Dd  : desired average standard deviation - e.g. 10000.0f
+     * Amax: maximum gain factor to prevent extreme values - e.g. 2.5
+     * p   : mean proportionality filter controlling image flatness [0:1] - e.g. 0.8f
      */
-    void wallisFilter( Plane2D<float>& output, Plane2D<float>& input, int filterWidth, size_t pitch );
+    // void wallisFilter( Plane2D<float>& input, int filterWidth, Plane2D<float>& output, size_t pitch );
+    void wallisFilter( Plane2D<float>& input, int filterWidth, const float Md, const float Dd, const float Amax, const float p, Plane2D<float>& D, size_t pitch );
 
-    virtual void wallis( int filterWidth, size_t pitch ) = 0;
+    virtual void wallis( int filterWidth, const float Md, const float Dd, const float Amax, const float p, size_t pitch ) = 0;
 
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
@@ -90,7 +95,7 @@ struct Image : public ImageBase
     ~Image( ) override;
 
     /** Apply Wallis filter to input image using NPPI API */
-    virtual void wallis( int filterWidth, size_t pitch );
+    virtual void wallis( int filterWidth, const float Md, const float Dd, const float Amax, const float p, size_t pitch );
 
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
@@ -133,7 +138,7 @@ struct ImageFloat : public ImageBase
     ~ImageFloat( ) override;
 
     /** Apply Wallis filter to input image using NPPI API */
-    virtual void wallis( int filterWidth, size_t pitch );
+    virtual void wallis( int filterWidth, const float Md, const float Dd, const float Amax, const float p, size_t pitch );
 
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.

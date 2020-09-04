@@ -35,7 +35,12 @@ Config::Config( )
     , _filter_grid_size( 2 )
     , _assume_initial_blur( true )
     , _initial_blur( 0.5f )
-    , _wallis_filter( false )
+    , _use_wallis_filter( false )
+    , _wallis_filter_width( 5 )
+    , _wallis_filter_Md( 32767.0f )
+    , _wallis_filter_Dd( 10000.0f )
+    , _wallis_filter_Amax( 2.5f )
+    , _wallis_filter_p( 0.8f )
     , _normalization_mode( getNormModeDefault() )
     , _normalization_multiplier( 0 )
     , _print_gauss_tables( false )
@@ -254,10 +259,16 @@ void Config::setInitialBlur( float blur )
     }
 }
 
-void Config::setWallisFilter( bool onoff )
+void Config::setUseWallisFilter( bool onoff )
 {
-    _wallis_filter = onoff;
+    _use_wallis_filter = onoff;
 }
+
+void Config::setWallisFilterWidth( int   v ) { _wallis_filter_width = v; }
+void Config::setWallisFilterMd   ( float v ) { _wallis_filter_Md    = v; }
+void Config::setWallisFilterDd   ( float v ) { _wallis_filter_Dd    = v; }
+void Config::setWallisFilterAmax ( float v ) { _wallis_filter_Amax  = v; }
+void Config::setWallisFilterp    ( float v ) { _wallis_filter_p     = v; }
 
 Config::GaussMode Config::getGaussMode( ) const
 {
@@ -279,10 +290,16 @@ float Config::getInitialBlur( ) const
     return _initial_blur;
 }
 
-bool Config::getWallisFilter( ) const
+bool Config::useWallisFilter( ) const
 {
-    return _wallis_filter;
+    return _use_wallis_filter;
 }
+
+int   Config::getWallisFilterWidth( ) const { return _wallis_filter_width; }
+float Config::getWallisFilterMd( )    const { return _wallis_filter_Md; }
+float Config::getWallisFilterDd( )    const { return _wallis_filter_Dd; }
+float Config::getWallisFilterAmax( )  const { return _wallis_filter_Amax; }
+float Config::getWallisFilterp( )     const { return _wallis_filter_p; }
 
 float Config::getPeakThreshold() const
 {

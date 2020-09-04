@@ -71,7 +71,12 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
             ("edge-limit", value<float>()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
             ("downsampling", value<float>()->notifier([&](float f) { config.setDownsampling(f); }), "Downscale width and height of input by 2^N")
             ("initial-blur", value<float>()->notifier([&](float f) {config.setInitialBlur(f); }), "Assume initial blur, subtract when blurring first time")
-            ("wallis-filter", bool_switch()->notifier([&](bool b) { config.setWallisFilter(b); }), "Wallis filtering of the input image before scaling (default false)");
+            ("use-wallis-filter", bool_switch()->notifier([&](bool b) { config.setUseWallisFilter(b); }), "Wallis filtering of the input image before scaling (default false)")
+            ("wf-width", value<int>()  ->notifier([&](int v) { config.setWallisFilterWidth(v); }), "Wallis filter width (default 5)")
+            ("wf-Md",    value<float>()->notifier([&](int v) { config.setWallisFilterMd(v); }), "Wallis desired average mean (default 32767)")
+            ("wf-Dd",    value<float>()->notifier([&](int v) { config.setWallisFilterDd(v); }), "Wallis desured average standard deviation (default 1000)")
+            ("wf-Amax",  value<float>()->notifier([&](int v) { config.setWallisFilterAmax(v); }), "Wallis maximum gain factor (default 2.5)")
+            ("wf-p",     value<float>()->notifier([&](int v) { config.setWallisFilterp(v); }), "Wallis mean proportionality filter controlling flatness (default 0.8)");
     }
     options_description modes("Modes");
     {

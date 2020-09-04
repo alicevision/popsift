@@ -69,6 +69,7 @@ target_link_libraries(popsift ${CUDA_CUDADEVRT_LIBRARY}
                               ${CUDA_nppicom_LIBRARY}
                               ${CUDA_nppidei_LIBRARY}
                               ${CUDA_nppif_LIBRARY}
+                              ${CUDA_nppist_LIBRARY}
                               ${CUDA_nppitc_LIBRARY}
                               Threads::Threads)
 
