@@ -35,6 +35,7 @@ CUDA_ADD_LIBRARY(popsift
         popsift/common/write_plane_2d.cu popsift/common/write_plane_2d.h
         popsift/common/debug_macros.cu popsift/common/debug_macros.h
         popsift/common/device_prop.cu popsift/common/device_prop.h
+	popsift/common/nppi_error_strings.cu popsift/common/nppi_error_strings.h
         popsift/common/warp_bitonic_sort.h
         popsift/common/excl_blk_prefix_sum.h
         popsift/common/vec_macros.h

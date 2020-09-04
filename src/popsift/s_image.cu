@@ -7,6 +7,7 @@
  */
 #include "common/assist.h"
 #include "common/debug_macros.h"
+#include "common/write_plane_2d.h"
 #include "s_image.h"
 #include "sift_config.h"
 
@@ -74,6 +75,10 @@ void Image::load( void* input )
      */
     memcpy( _input_image_h.data, input, _w*_h ); // assume that host Plane2D has no pitch
     _input_image_h.memcpyToDevice( _input_image_d );
+
+    write_plane2D( "wallis-input-hst.pgm", false, _input_image_h );
+    write_plane2D( "wallis-input-dev.pgm", true,  _input_image_d );
+
 }
 
 void Image::resetDimensions( int w, int h )

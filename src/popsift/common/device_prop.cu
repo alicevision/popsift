@@ -328,7 +328,8 @@ size_t device_prop_t::getPitchInBytes( ) const
 
     const cudaDeviceProp* ptr = _properties[currentDevice];
 
-    return ptr->texturePitchAlignment;
+    // return ptr->texturePitchAlignment;
+    return ptr->textureAlignment;
 }
 
 }}

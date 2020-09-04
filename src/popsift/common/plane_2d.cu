@@ -47,8 +47,11 @@ void* PlaneBase::allocDev2D( size_t& pitch, int w, int h, int elemSize, PlaneMap
     {
         size_t sz = w * elemSize;
         size_t rest = sz % pitch;
-        if( rest != 0 ) sz += ( pitch - rest );
-        sz *= h;
+        if( rest == 0 )
+            pitch = sz;
+        else
+            pitch = sz + pitch - rest;
+        sz  = pitch * h;
         err = cudaMallocManaged( &ptr, sz );
         POP_CUDA_FATAL_TEST( err, "Cannot allocate managed CUDA memory: " );
         return ptr;

@@ -14,6 +14,9 @@ namespace popsift {
 void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f );
 void write_plane2D( const char* filename, Plane2D_float& f );
 
+void write_plane2D( const char* filename, bool onDevice, Plane2D_uint8& f );
+void write_plane2D( const char* filename, Plane2D_uint8& f );
+
 void write_plane2Dunscaled( const char* filename, bool onDevice, Plane2D_float& f, int offset=0 );
 void write_plane2Dunscaled( const char* filename, Plane2D_float& f, int offset=0 );
 

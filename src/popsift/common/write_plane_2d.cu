@@ -32,6 +32,21 @@ void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
 }
 
 __host__
+void write_plane2D( const char* filename, bool onDevice, Plane2D_uint8& f )
+{
+    if( onDevice ) {
+        // cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
+        Plane2D_uint8 g;
+        g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
+        g.memcpyFromDevice( f );
+        write_plane2D( filename, g );
+        g.freeHost( CudaAllocated );
+    } else {
+        write_plane2D( filename, f );
+    }
+}
+
+__host__
 void write_plane2Dunscaled( const char* filename, bool onDevice, Plane2D_float& f, int offset )
 {
     if( onDevice ) {
@@ -104,6 +119,27 @@ void write_plane2D( const char* filename, Plane2D_float& f )
 #endif
 
     // cerr << "Leave " << __FUNCTION__ << endl;
+}
+
+__host__
+void write_plane2D( const char* filename, Plane2D_uint8& f )
+{
+    cerr << __FILE__ << ":" << __LINE__ << ": writing chars from Plane2D_uint8" << endl;
+    int rows = f.getRows();
+    int cols = f.getCols();
+
+    ofstream of( filename ); // , ios::binary );
+    of << "P2" << endl
+       << cols << " " << rows << endl
+       << "255" << endl;
+    for( int row=0; row<rows; row++ ) {
+        for( int col=0; col<cols; col++ ) {
+            const uint8_t v = f.ptr(row)[col];
+            const int     c = v;
+            of << c << " ";
+        }
+        of << endl;
+    }
 }
 
 __host__

@@ -107,7 +107,7 @@ struct Config
     void setEdgeLimit( float v );
     void setThreshold( float v );
     void setInitialBlur( float blur );
-    void setWallisFilter( bool on = true );
+    void setWallisFilter( bool onoff = true );
     void setMaxExtreme( int m );
     void setPrintGaussTables( );
     void setDPOrientation( bool on );

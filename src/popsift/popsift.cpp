@@ -292,6 +292,14 @@ void PopSift::extractDownloadLoop( )
 
         private_init( img->getWidth(), img->getHeight() );
 
+        if( _config.getWallisFilter() )
+        {
+            img->wallis( 9, _device_properties.getPitchInBytes() );
+        }
+        else
+        {
+        }
+
         p._pyramid->step1( _config, img );
         p._unused.push( img ); // uploaded input image no longer needed, release for reuse
 
@@ -324,11 +332,6 @@ void PopSift::matchPrepareLoop( )
         popsift::ImageBase* img = job->getImg();
 
         private_init( img->getWidth(), img->getHeight() );
-
-        if( _config.getWallisFilter() )
-        {
-            img->wallis( 3, _device_properties.getPitchInBytes() );
-        }
 
         p._pyramid->step1( _config, img );
         p._unused.push( img ); // uploaded input image no longer needed, release for reuse

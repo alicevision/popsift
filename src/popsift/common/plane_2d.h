@@ -48,7 +48,7 @@ struct PlaneBase
     /** Allocate memory for a 2D plane on the device. There are two options for
      *  the PlaneMapMode:
      *  OnDevice: use cudaMallocPitch, pitch is an output parameter in this case
-     *  ManagedMem: use cudaMallocManaged, pitch in an input parameter in this case
+     *  ManagedMem: use cudaMallocManaged, pitch takes texture alignment as input and pitch as output
      */
     __host__
     void* allocDev2D( size_t& pitch, int w, int h, int elemSize, PlaneMapMode m );
