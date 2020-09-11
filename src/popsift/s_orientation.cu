@@ -53,6 +53,21 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
 }
 
 /*
+ * Histogram smoothing helper
+ */
+template<int D>
+__device__
+inline static float smoothe( const float* const src, const int bin )
+{
+    const int prev = (bin == 0) ? ORI_NBINS-1 : bin-1;
+    const int next = (bin == ORI_NBINS-1) ? 0 : bin+1;
+
+    const float f  = ( src[prev] + src[bin] + src[next] ) / 3.0f;
+
+    return f;
+}
+
+/*
  * Compute the keypoint orientations for each extremum
  * using 16 threads for each of them.
  * direct curve fitting approach
@@ -71,13 +86,13 @@ void ori_par( const int           octave,
     const int              iext_off =  dobuf.i_ext_off[octave][extremum_index];
     const InitialExtremum* iext     = &dobuf.i_ext_dat[octave][iext_off];
 
-    __shared__ float hist   [ORI_NBINS];
-    __shared__ float sm_hist[ORI_NBINS];
+    __shared__ float hist         [64];
+    __shared__ float sm_hist      [64];
     __shared__ float refined_angle[64];
     __shared__ float yval         [64];
 
-    for( int i = threadIdx.x; i < ORI_NBINS; i += blockDim.x )  hist[i] = 0.0f;
-    __syncthreads();
+    hist[threadIdx.x+ 0] = 0.0f;
+    hist[threadIdx.x+32] = 0.0f;
 
     /* keypoint fractional geometry */
     const float x     = iext->xpos;
@@ -105,6 +120,7 @@ void ori_par( const int           octave,
     int hy = ymax - ymin + 1;
     int loops = wx * hy;
 
+    __syncthreads();
     for( int i = threadIdx.x; popsift::any(i < loops); i += blockDim.x )
     {
         if( i < loops ) {
@@ -124,7 +140,8 @@ void ori_par( const int           octave,
             float dy = yy - y;
 
             int sq_dist  = dx * dx + dy * dy;
-            if (sq_dist <= sq_thres) {
+            if (sq_dist <= sq_thres)
+            {
                 float weight = grad * expf(sq_dist * factor);
 
                 // int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
@@ -146,23 +163,18 @@ void ori_par( const int           octave,
     __syncthreads();
 
 #ifdef WITH_VLFEAT_SMOOTHING
-    for( int i=0; i<3; i++ ) {
-        for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
-            int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
-            int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            sm_hist[bin] = ( hist[prev] + hist[bin] + hist[next] ) / 3.0f;
-        }
+    for( int i=0; i<3 ; i++ )
+    {
+        sm_hist[threadIdx.x+ 0] = smoothe<0>( hist, threadIdx.x+ 0 );
+        sm_hist[threadIdx.x+32] = smoothe<1>( hist, threadIdx.x+32 );
         __syncthreads();
-        for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
-            int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
-            int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            hist[bin] = ( sm_hist[prev] + sm_hist[bin] + sm_hist[next] ) / 3.0f;
-        }
+        hist[threadIdx.x+ 0]    = smoothe<2>( sm_hist, threadIdx.x+ 0 );
+        hist[threadIdx.x+32]    = smoothe<3>( sm_hist, threadIdx.x+32 );
         __syncthreads();
     }
-    for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
-        sm_hist[bin] = hist[bin];
-    }
+
+    sm_hist[threadIdx.x+ 0] = hist[threadIdx.x+ 0];
+    sm_hist[threadIdx.x+32] = hist[threadIdx.x+32];
     __syncthreads();
 #else // not WITH_VLFEAT_SMOOTHING
     for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
