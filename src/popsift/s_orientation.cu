@@ -66,13 +66,15 @@ void ori_par( const int           octave,
 {
     const int extremum_index  = blockIdx.x * blockDim.y;
 
-    if( extremum_index >= dct.ext_ct[octave] ) return; // a few trailing warps
+    if( popsift::all( extremum_index >= dct.ext_ct[octave] ) ) return; // a few trailing warps
 
     const int              iext_off =  dobuf.i_ext_off[octave][extremum_index];
     const InitialExtremum* iext     = &dobuf.i_ext_dat[octave][iext_off];
 
     __shared__ float hist   [ORI_NBINS];
     __shared__ float sm_hist[ORI_NBINS];
+    __shared__ float refined_angle[64];
+    __shared__ float yval         [64];
 
     for( int i = threadIdx.x; i < ORI_NBINS; i += blockDim.x )  hist[i] = 0.0f;
     __syncthreads();
@@ -84,11 +86,11 @@ void ori_par( const int           octave,
     const float sig   = iext->sigma;
 
     /* orientation histogram radius */
-    float  sigw = ORI_WINFACTOR * sig;
-    int32_t rad  = (int)roundf((3.0f * sigw));
+    const float  sigw = ORI_WINFACTOR * sig;
+    const int32_t rad  = (int)roundf((3.0f * sigw));
 
-    float factor = __fdividef( -0.5f, (sigw * sigw) );
-    int sq_thres  = rad * rad;
+    const float factor = __fdividef( -0.5f, (sigw * sigw) );
+    const int sq_thres  = rad * rad;
 
     // int xmin = max(1,     (int)floor(x - rad));
     // int xmax = min(w - 2, (int)floor(x + rad));
@@ -131,14 +133,17 @@ void ori_par( const int           octave,
                 if( bidx > ORI_NBINS ) {
                     printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
                 }
+                if( bidx < 0 ) {
+                    printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
+                }
 
                 bidx = (bidx == ORI_NBINS) ? 0 : bidx;
 
                 atomicAdd( &hist[bidx], weight );
             }
         }
-        __syncthreads();
     }
+    __syncthreads();
 
 #ifdef WITH_VLFEAT_SMOOTHING
     for( int i=0; i<3; i++ ) {
@@ -178,8 +183,6 @@ void ori_par( const int           octave,
 
     // sub-cell refinement of the histogram cell index, yielding the angle
     // not necessary to initialize, every cell is computed
-    __shared__ float refined_angle[64];
-    __shared__ float yval         [64];
 
     for( int bin = threadIdx.x; popsift::any( bin < ORI_NBINS ); bin += blockDim.x ) {
         const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
@@ -349,11 +352,8 @@ void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
 __host__
 void Pyramid::orientation( const Config& conf )
 {
-    nvtxRangePushA( "reading extrema count" );
     readDescCountersFromDevice( );
-    nvtxRangePop( );
 
-    nvtxRangePushA( "filtering grid" );
     int ext_total = 0;
     for(int o : hct.ext_ct)
     {
@@ -369,11 +369,8 @@ void Pyramid::orientation( const Config& conf )
     {
         ext_total = extrema_filter_grid( conf, ext_total );
     }
-    nvtxRangePop( );
 
-    nvtxRangePushA( "reallocating extrema arrays" );
     reallocExtrema( ext_total );
-    nvtxRangePop( );
 
     int ext_ct_prefix_sum = 0;
     for( int octave=0; octave<_num_octaves; octave++ ) {
