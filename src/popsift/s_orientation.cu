@@ -411,7 +411,7 @@ void Pyramid::orientation( const Config& conf )
             grid.x  = num;
 
             ori_par
-                <<<grid,block,0,oct_str>>>
+                <<<grid,block,4*64*sizeof(float),oct_str>>>
                 ( octave,
                   hct.ext_ps[octave],
                   oct_obj.getDataTexPoint( ),
