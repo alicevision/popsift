@@ -2,7 +2,7 @@
 
 IMAGE=@PopSift_TESTFILE_PATH@/boat/img3.ppm
 
-POPSIFT_DEMO_BIN=@CMAKE_BINARY_DIR@/@CMAKE_SYSTEM_NAME@-@CMAKE_SYSTEM_PROCESSOR@/popsift-demo
+POPSIFT_DEMO_BIN=@CMAKE_RUNTIME_OUTPUT_DIRECTORY@/popsift-demo
 
 LOG=--log
 # LOG=
@@ -71,4 +71,3 @@ echo -n "grid vs notile:  "
 echo -n "igrid vs notile: "
 ~/GIT/github/popsift-samples/playground/build/compare-descfiles \
 	-q output-features-igrid.txt output-features-notile.txt
-
