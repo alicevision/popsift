@@ -290,7 +290,7 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
     nvtxRangePushA( "download descriptors" );
     FeaturesHost* features = new FeaturesHost( hct.ext_total, hct.ori_total );
 
-    if( hct.ext_total == 0 )
+    if( hct.ext_total == 0 || hct.ori_total == 0 )
     {
         nvtxRangePop();
         return features;
