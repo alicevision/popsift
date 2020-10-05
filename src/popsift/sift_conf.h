@@ -60,7 +60,8 @@ struct Config
         ILoop,       // scan horizontal, extract valid points, interpolate with tex engine
         Grid,        // scan in rotated mode, round pixel address
         IGrid,       // scan in rotated mode, interpolate with tex engine
-        NoTile       // variant of IGrid, no duplicate gradiant fetching
+        NoTile,      // variant of IGrid, no duplicate gradiant fetching
+        VLFeat_Desc  // extraction code according to VLFeat
     };
 
     enum NormMode {
