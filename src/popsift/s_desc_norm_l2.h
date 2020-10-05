@@ -96,7 +96,7 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
     norm += popsift::shuffle_down( norm,  2 );
     norm += popsift::shuffle_down( norm,  1 );
     if( threadIdx.x == 0 ) {
-        norm = __fsqrt_rn( norm );
+        norm = __frsqrt_rn( norm );
     }
     norm = popsift::shuffle( norm,  0 );
 
