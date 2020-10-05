@@ -200,7 +200,7 @@ endif()
 
 add_subdirectory(src)
 
-set(PopSift_TESTFILE_PATH "../../GIT/popsift-samples/datasets/sample/big_set/" CACHE STRING "Base directory where your test files are stored")
+set(PopSift_TESTFILE_PATH "popsift-samples/datasets/sample/big_set/" CACHE STRING "Base directory where your test files are stored")
 if(PopSift_USE_TEST_CMD)
   if(NOT IS_ABSOLUTE("${PopSift_TESTFILE_PATH}"))
     get_filename_component(PopSift_TESTFILES "${PopSift_TESTFILE_PATH}" ABSOLUTE)
