@@ -26,18 +26,6 @@ void ext_desc_vlfeat_sub( const float         ang,
                           const int           width,
                           const int           height )
 {
-// #ifndef BLOCK_3_DIMS
-//     const int tile_x      = threadIdx.y;
-//     const int tile_y      = threadIdx.z;
-//     const int tile_offset = ( ( ( tile_y << 2 ) + tile_x ) << 3 ); // base of the 8 floats written by this group of 16 threads
-// #else
-//     const int tile_x      = ( threadIdx.z &  0x3 );
-//     const int tile_y      = ( threadIdx.z >> 2 );
-//     const int tile_offset = ( threadIdx.z << 3 );
-// #endif
-
-    __shared__ float dpt[128];
-
     const float x     = ext->xpos;
     const float y     = ext->ypos;
     const int   level = ext->lpos; // old_level;
@@ -72,92 +60,100 @@ void ext_desc_vlfeat_sub( const float         ang,
     const int   xmax = min(width - 2,  (int)floorf(x + ptx + bsz));
     const int   ymax = min(height - 2, (int)floorf(y + pty + bsz));
 
+    __shared__ float dpt[4][128];
     for( int i=threadIdx.x; i<128; i+=blockDim.x )
     {
-        dpt[i] = 0.0f;
+        dpt[0][i] = 0.0f;
+        dpt[1][i] = 0.0f;
+        dpt[2][i] = 0.0f;
+        dpt[3][i] = 0.0f;
     }
-
     __syncthreads();
 
-    for( int pix_y = ymin; pix_y <= ymax; pix_y++ )
+    // we have 32 threads in a warp, how to use them?
+    const int tx = ( ( threadIdx.x >> 0 ) & 0x1 ); // 0 - 1
+    const int ty = ( ( threadIdx.x >> 1 ) & 0x1 ); // 0 - 1
+    const int tt = ( ( threadIdx.x >> 2 ) & 0x1 ); // 0 - 1
+    const int loop = threadIdx.x >> 3;             // 0 - 3
+
+    for( int pix_y = ymin+loop; popsift::any(pix_y <= ymax); pix_y += 4 )
     {
-      for( int pix_x = xmin; pix_x <= xmax; pix_x++ )
-      {
-        // d : distance from keypoint
-        const float2 d = make_float2( pix_x - x, pix_y - y );
-
-        // n : normalized distance from keypoint
-        const float2 n = make_float2( ::fmaf( crsbp, d.x,  srsbp * d.y ),
-                                      ::fmaf( crsbp, d.y, -srsbp * d.x ) ); 
-
-        // nn : abs value of normalized distance from keypoint
-        const float2 nn = abs(n);
-
-        if (nn.x < 2.0f && nn.y < 2.0f)
+        for( int pix_x = xmin; pix_x <= xmax; pix_x++ )
         {
-            float mod;
-            float th;
-
-            get_gradiant( mod, th, pix_x, pix_y, layer_tex, level );
-
-            mod /= 2; // Our mod is double that of vlfeat. Huh.
-
-            const float  ww = __expf( -scalbnf(n.x*n.x + n.y*n.y, -3));
-
-            th -= ang;
-            while( th > M_PI2 ) th -= M_PI2;
-            while( th < 0.0f  ) th += M_PI2;
-
-            const float nt = 8.0f * th / M_PI2;
-
-            // neighbouring tile on the lower side: -2, -1, 0 or 1
-            // (must use floorf because casting rounds towards zero
-            const int3 t0 = make_int3( (int)floorf(n.x - 0.5f),
-                                       (int)floorf(n.y - 0.5f),
-                                       (int)nt );
-            float wgt_x = - ( n.x - ( t0.x + 0.5f ) );
-            float wgt_y = - ( n.y - ( t0.y + 0.5f ) );
-            float wgt_t = - ( nt  - t0.z );
-
-            const int tx = ( ( threadIdx.x >> 0 ) & 0x1 );
-            const int ty = ( ( threadIdx.x >> 1 ) & 0x1 );
-            const int tt = ( ( threadIdx.x >> 2 ) & 0x1 );
-
-            if( ( t0.y + ty >= -2 ) &&
-                ( t0.y + ty <   2 ) &&
-                ( t0.x + tx >= -2 ) &&
-                ( t0.x + tx <   2 ) )
+            if( pix_y <= ymax )
             {
-                wgt_x = ( tx == 0 ) ? 1.0f + wgt_x : wgt_x;
-                wgt_y = ( ty == 0 ) ? 1.0f + wgt_y : wgt_y;
-                wgt_t = ( tt == 0 ) ? 1.0f + wgt_t : wgt_t;
+                // d : distance from keypoint
+                const float2 d = make_float2( pix_x - x, pix_y - y );
 
-                wgt_x = fabsf( wgt_x );
-                wgt_y = fabsf( wgt_y );
-                wgt_t = fabsf( wgt_t );
+                // n : normalized distance from keypoint
+                const float2 n = make_float2( ::fmaf( crsbp, d.x,  srsbp * d.y ),
+                                              ::fmaf( crsbp, d.y, -srsbp * d.x ) ); 
 
-                const float val = ww
-                                * mod
-                                * wgt_x
-                                * wgt_y
-                                * wgt_t;
+                // nn : abs value of normalized distance from keypoint
+                const float2 nn = abs(n);
 
-                const int offset =  80
-                                 + ( t0.y + ty ) * 32
-                                 + ( t0.x + tx ) * 8
-                                 + ( t0.z + tt ) % 8;
+                if (nn.x < 2.0f && nn.y < 2.0f)
+                {
+                    float mod;
+                    float th;
 
-                dpt[offset] += val;
+                    get_gradiant( mod, th, pix_x, pix_y, layer_tex, level );
+
+                    mod /= 2; // Our mod is double that of vlfeat. Huh.
+
+                    const float  ww = __expf( -scalbnf(n.x*n.x + n.y*n.y, -3));
+
+                    th -= ang;
+                    while( th > M_PI2 ) th -= M_PI2;
+                    while( th < 0.0f  ) th += M_PI2;
+
+                    const float nt = 8.0f * th / M_PI2;
+
+                    // neighbouring tile on the lower side: -2, -1, 0 or 1
+                    // (must use floorf because casting rounds towards zero
+                    const int3 t0 = make_int3( (int)floorf(n.x - 0.5f),
+                                               (int)floorf(n.y - 0.5f),
+                                               (int)nt );
+                    float wgt_x = - ( n.x - ( t0.x + 0.5f ) );
+                    float wgt_y = - ( n.y - ( t0.y + 0.5f ) );
+                    float wgt_t = - ( nt  - t0.z );
+
+                    if( ( t0.y + ty >= -2 ) &&
+                        ( t0.y + ty <   2 ) &&
+                        ( t0.x + tx >= -2 ) &&
+                        ( t0.x + tx <   2 ) )
+                    {
+                        wgt_x = ( tx == 0 ) ? 1.0f + wgt_x : wgt_x;
+                        wgt_y = ( ty == 0 ) ? 1.0f + wgt_y : wgt_y;
+                        wgt_t = ( tt == 0 ) ? 1.0f + wgt_t : wgt_t;
+
+                        wgt_x = fabsf( wgt_x );
+                        wgt_y = fabsf( wgt_y );
+                        wgt_t = fabsf( wgt_t );
+
+                        const float val = ww
+                                        * mod
+                                        * wgt_x
+                                        * wgt_y
+                                        * wgt_t;
+
+                        const int offset =  80
+                                        + ( t0.y + ty ) * 32
+                                        + ( t0.x + tx ) * 8
+                                        + ( t0.z + tt ) % 8;
+
+                        dpt[loop][offset] += val;
+                    }
+                }
             }
-
             __syncthreads();
         }
-      }
     }
 
     for( int i=threadIdx.x; i<128; i+=blockDim.x )
     {
-        features[i] = dpt[i];
+        float f = dpt[0][i] + dpt[1][i] + dpt[2][i] + dpt[3][i];
+        features[i] = f;
     }
 }
 
@@ -193,11 +189,11 @@ bool start_ext_desc_vlfeat( const int octave, Octave& oct_obj )
 
     if( grid.x == 0 ) return false;
 
-    block.x = 8;
+    block.x = 32;
     block.y = 1;
     block.z = 1;
 
-    size_t shared_size = 128 * sizeof(float);
+    size_t shared_size = 4 * 128 * sizeof(float);
 
     ext_desc_vlfeat
         <<<grid,block,shared_size,oct_obj.getStream()>>>
