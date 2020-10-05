@@ -28,6 +28,11 @@
 using namespace popsift;
 using namespace std;
 
+/* Bilinear histogram seems to be VLFeat's default now.
+ * We emulate it because we have different orientations without it.
+ */
+#define WITH_BILINEAR_ORI
+
 /* Smoothing like VLFeat is the default mode.
  * If you choose to undefine it, you get the smoothing approach taken by OpenCV
  */
@@ -55,6 +60,7 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
 /*
  * Histogram smoothing helper
  */
+#ifdef WITH_VLFEAT_SMOOTHING
 template<int D>
 __device__
 inline static float smoothe( const float* const src, const int bin )
@@ -66,6 +72,24 @@ inline static float smoothe( const float* const src, const int bin )
 
     return f;
 }
+#else // not WITH_VLFEAT_SMOOTHING
+__device__
+inline static float smoothe5( const float* const src, const int bin )
+{
+    int prev2 = bin-2;
+    int prev1 = bin-1;
+    if( prev2 < 0 ) prev2 += ORI_NBINS;
+    if( prev1 < 0 ) prev1 += ORI_NBINS;
+    const int next1 = (bin+1) % ORI_NBINS;
+    const int next2 = (bin+2) % ORI_NBINS;
+
+    const float f = ( src[prev2] + src[next2]
+                  + ( src[prev1] + src[next1] ) * 4.0f
+                  +   src[bin] * 6.0f ) / 16.0f;
+
+    return f;
+}
+#endif // not WITH_VLFEAT_SMOOTHING
 
 /*
  * Compute the keypoint orientations for each extremum
@@ -136,14 +160,26 @@ void ori_par( const int           octave,
                           layer,
                           level );
 
+            grad /= 2; // our grad is twice that of VLFeat - weird
+            if( theta < 0 ) theta += M_PI2;
+
             float dx = xx - x;
             float dy = yy - y;
 
-            int sq_dist  = dx * dx + dy * dy;
-            if (sq_dist <= sq_thres)
+            float sq_dist  = dx * dx + dy * dy;
+            if (sq_dist <= sq_thres + 0.6f)
             {
                 float weight = grad * expf(sq_dist * factor);
 
+#ifdef WITH_BILINEAR_ORI
+                const float fbin = float(ORI_NBINS) / M_PI2 * theta;
+                const int   bin  = (int)floorf(fbin - 0.5f);
+                const float rbin = fbin - bin - 0.5f;
+                int bin1 = ( bin + ORI_NBINS ) % ORI_NBINS;
+                atomicAdd( &hist[bin1], (1.0f - rbin) * weight );
+                int bin2 = ( bin + 1 ) % ORI_NBINS;
+                atomicAdd( &hist[bin2], rbin * weight );
+#else
                 // int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
                 int bidx = (int)roundf( __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) );
 
@@ -157,6 +193,7 @@ void ori_par( const int           octave,
                 bidx = (bidx == ORI_NBINS) ? 0 : bidx;
 
                 atomicAdd( &hist[bidx], weight );
+#endif
             }
         }
     }
@@ -177,46 +214,51 @@ void ori_par( const int           octave,
     sm_hist[threadIdx.x+32] = hist[threadIdx.x+32];
     __syncthreads();
 #else // not WITH_VLFEAT_SMOOTHING
-    for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
-        int prev2 = bin - 2;
-        int prev1 = bin - 1;
-        int next1 = bin + 1;
-        int next2 = bin + 2;
-        if( prev2 < 0 )          prev2 += ORI_NBINS;
-        if( prev1 < 0 )          prev1 += ORI_NBINS;
-        if( next1 >= ORI_NBINS ) next1 -= ORI_NBINS;
-        if( next2 >= ORI_NBINS ) next2 -= ORI_NBINS;
-        sm_hist[bin] = (   hist[prev2] + hist[next2]
-                         + ( hist[prev1] + hist[next1] ) * 4.0f
-                         +   hist[bin] * 6.0f ) / 16.0f;
-    }
+    sm_hist[threadIdx.x+ 0]    = smoothe5( hist, threadIdx.x+ 0 );
+    sm_hist[threadIdx.x+32]    = smoothe5( hist, threadIdx.x+32 );
     __syncthreads();
 #endif // not WITH_VLFEAT_SMOOTHING
+
+    if( threadIdx.x+32 >= ORI_NBINS ) sm_hist[threadIdx.x+32] = -INFINITY;
+    float maxval = fmaxf( sm_hist[threadIdx.x+ 0], sm_hist[threadIdx.x+32] );
+    float neigh;
+    neigh  = popsift::shuffle_down( maxval, 16 ); maxval = fmaxf( maxval, neigh );
+    neigh  = popsift::shuffle_down( maxval,  8 ); maxval = fmaxf( maxval, neigh );
+    neigh  = popsift::shuffle_down( maxval,  4 ); maxval = fmaxf( maxval, neigh );
+    neigh  = popsift::shuffle_down( maxval,  2 ); maxval = fmaxf( maxval, neigh );
+    neigh  = popsift::shuffle_down( maxval,  1 ); maxval = fmaxf( maxval, neigh );
+    maxval = popsift::shuffle( maxval,  0 );
 
     // sub-cell refinement of the histogram cell index, yielding the angle
     // not necessary to initialize, every cell is computed
 
-    for( int bin = threadIdx.x; popsift::any( bin < ORI_NBINS ); bin += blockDim.x ) {
-        const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
-        const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
+    for( int bin = threadIdx.x; popsift::any( bin < ORI_NBINS ); bin += blockDim.x )
+    {
+        const int prev = (bin == 0) ? ORI_NBINS-1 : bin-1;
+        const int next = (bin == ORI_NBINS-1) ? 0 : bin+1;
 
-        bool predicate = ( bin < ORI_NBINS ) && ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) );
+        bool predicate = ( bin < ORI_NBINS ) && ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) ) && (sm_hist[bin] > 0.8f * maxval);
 
+#define REFINE 2
+#if REFINE == 1
+        // Lilian's method
         const float num  = predicate ?   3.0f * sm_hist[prev]
                                        - 4.0f * sm_hist[bin]
                                        + 1.0f * sm_hist[next]
                                      : 0.0f;
-        // const float num  = predicate ?   2.0f * sm_hist[prev]
-        //                                - 4.0f * sm_hist[bin]
-        //                                + 2.0f * sm_hist[next]
-        //                              : 0.0f;
+#elif REFINE == 2
+        // VLFeat's method
+        const float  num    = predicate ? sm_hist[next] - sm_hist[prev]
+                                        : 0.0f;
+#else
+#error Must choose a refinement method
+#endif
         const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
 
         const float newbin = __fdividef( num, denB ); // verified: accuracy OK
 
-        predicate   = ( predicate && newbin >= 0.0f && newbin <= 2.0f );
 
-        refined_angle[bin] = predicate ? prev + newbin : -1;
+        refined_angle[bin] = predicate ? bin + newbin + 0.5f : -1;
         yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
     }
     __syncthreads();
@@ -229,9 +271,7 @@ void ori_par( const int           octave,
 
     // All threads retrieve the yval of thread 0, the largest
     // of all yvals.
-    const float best_val = yval[best_index.x];
-    const float yval_ref = 0.8f * popsift::shuffle( best_val, 0 );
-    const bool  valid    = ( best_val >= yval_ref );
+    const bool  valid    = true;
     bool        written  = false;
 
     Extremum* ext = &dobuf.extrema[ext_ct_prefix_sum + extremum_index];
@@ -240,8 +280,8 @@ void ori_par( const int           octave,
         if( valid ) {
             float chosen_bin = refined_angle[best_index.x];
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
-            // float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
-            float th = ::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
+            if( chosen_bin <  0         ) chosen_bin += ORI_NBINS;
+            float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS); // - M_PI;
             ext->orientation[threadIdx.x] = th;
             written = true;
         }
