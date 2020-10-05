@@ -42,6 +42,7 @@ using namespace std;
 static bool print_dev_info  = false;
 static bool print_time_info = false;
 static bool write_as_uchar  = false;
+static bool write_with_ori  = false;
 static bool dont_write      = false;
 static bool pgmread_loading = false;
 static bool float_mode      = false;
@@ -118,6 +119,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         ("print-time-info", bool_switch(&print_time_info)->default_value(false), "A debug output printing image processing time after load()")
         ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded to int.\n"
          "Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar")
+        ("write-with-ori", bool_switch(&write_with_ori)->default_value(false), "Output points are written with sigma and orientation.\n")
         ("dont-write", bool_switch(&dont_write)->default_value(false), "Suppress descriptor output")
         ("pgmread-loading", bool_switch(&pgmread_loading)->default_value(false), "Use the old image loader instead of LibDevIL")
         ("float-mode", bool_switch(&float_mode)->default_value(false), "Upload image to GPU as float instead of byte")
@@ -254,7 +256,7 @@ void read_job( SiftJob* job, bool really_write )
         nvtxRangePushA( "Writing features to disk" );
 
         std::ofstream of( "output-features.txt" );
-        feature_list->print( of, write_as_uchar );
+        feature_list->print( of, write_as_uchar, write_with_ori );
     }
     delete feature_list;
 
