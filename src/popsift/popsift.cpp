@@ -380,7 +380,7 @@ SiftJob::SiftJob( int w, int h, const float* imageData )
 
 SiftJob::~SiftJob( )
 {
-    delete [] _imageData;
+    free( _imageData );
 }
 
 void SiftJob::setImg( popsift::ImageBase* img )
