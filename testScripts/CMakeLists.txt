@@ -5,7 +5,7 @@ configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/testOxfordDataset.sh.in
                 ${CMAKE_CURRENT_BINARY_DIR}/testOxfordDataset.sh )
 
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/TEST.sh.in
-				${CMAKE_CURRENT_BINARY_DIR}/TEST.sh )
+                ${CMAKE_CURRENT_BINARY_DIR}/TEST.sh )
 
 add_custom_target(
 	prepare-test
