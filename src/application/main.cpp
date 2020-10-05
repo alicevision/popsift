@@ -65,13 +65,13 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         parameters.add_options()
             ("octaves", value<int>(&config.octaves), "Number of octaves")
             ("levels", value<int>(&config.levels), "Number of levels per octave")
-            ("sigma", value<float>()->notifier([&](float f) { config.setSigma(f); }), "Initial sigma value")
+            ("sigma", value<float>()->notifier([&](float f) { config.setSigma(f); }), "Initial sigma value (default 1.6)")
 
-            ("threshold", value<float>()->notifier([&](float f) { config.setThreshold(f); }), "Contrast threshold")
-            ("edge-threshold", value<float>()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
+            ("threshold", value<float>()->notifier([&](float f) { config.setThreshold(f); }), "Contrast threshold (default 0.04)")
+            ("edge-threshold", value<float>()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold (default 10.0)")
             ("edge-limit", value<float>()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
             ("downsampling", value<float>()->notifier([&](float f) { config.setDownsampling(f); }), "Downscale width and height of input by 2^N")
-            ("initial-blur", value<float>()->notifier([&](float f) {config.setInitialBlur(f); }), "Assume initial blur, subtract when blurring first time");
+            ("initial-blur", value<float>()->notifier([&](float f) {config.setInitialBlur(f); }), "Assume initial blur, subtract when blurring first time (default 0.5)");
     }
     options_description modes("Modes");
     {
