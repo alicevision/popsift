@@ -271,7 +271,7 @@ void ori_par( const int           octave,
 
     // All threads retrieve the yval of thread 0, the largest
     // of all yvals.
-    const bool  valid    = true;
+    const bool  valid    = ( yval[best_index.x] > 0 );
     bool        written  = false;
 
     Extremum* ext = &dobuf.extrema[ext_ct_prefix_sum + extremum_index];
