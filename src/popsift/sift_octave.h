@@ -131,10 +131,14 @@ public:
         return _dog_3d_tex_linear;
     }
 
-    /**
-     * alloc() - allocates all GPU memories for one octave
-     * @param width in floats, not bytes!!!
-     */
+     /**
+      * @brief Allocates all GPU memories for one octave.
+      * @param conf
+      * @param width in floats
+      * @param height
+      * @param levels
+      * @param gauss_group
+      */
     void alloc( const Config& conf,
                 int           width,
                 int           height,

@@ -8,6 +8,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-$
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 
 option(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
+option(PopSift_BUILD_DOCS "Build PopSift documentation."  OFF)
 option(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
 option(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after every kernel." OFF)
 option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
@@ -200,6 +201,10 @@ endif()
 
 add_subdirectory(src)
 
+if(PopSift_BUILD_DOCS)
+  add_subdirectory(doc)
+endif()
+
 set(PopSift_TESTFILE_PATH "popsift-samples/datasets/sample/big_set/" CACHE STRING "Base directory where your test files are stored")
 if(PopSift_USE_TEST_CMD)
   if(NOT IS_ABSOLUTE("${PopSift_TESTFILE_PATH}"))
@@ -229,6 +234,7 @@ message(STATUS "PopSift version: " ${PROJECT_VERSION})
 message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
 message(STATUS "Build Shared libs: " ${BUILD_SHARED_LIBS})
 message(STATUS "Build examples: " ${PopSift_BUILD_EXAMPLES})
+message(STATUS "Build documentation: " ${PopSift_BUILD_DOCS})
 message(STATUS "Generate position independent code: " ${CMAKE_POSITION_INDEPENDENT_CODE})
 message(STATUS "Use CUDA NVTX for profiling: " ${PopSift_USE_NVTX_PROFILING})
 message(STATUS "Synchronize and check CUDA error after every kernel: " ${PopSift_ERRCHK_AFTER_KERNEL})

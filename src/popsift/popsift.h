@@ -52,16 +52,38 @@ class SiftJob
 #endif
 
 public:
-    /** Constructor for byte images, value range 0..255 */
+
+    /**
+     * @brief Constructor for byte images, value range 0..255
+     * @param[in] w the width in pixel of the image
+     * @param[in] h the height in pixel of the image
+     * @param[in] imageData the image buffer
+     */
     SiftJob( int w, int h, const unsigned char* imageData );
 
-    /** Constructor for float images, value range [0..1[ */
+    /**
+     * @brief Constructor for float images, value range [0..1[
+     * @param[in] w the width in pixel of the image
+     * @param[in] h the height in pixel of the image
+     * @param[in] imageData the image buffer
+     */
     SiftJob( int w, int h, const float* imageData );
 
+    /**
+     * @brief Destructor releases all the resources.
+     */
     ~SiftJob( );
 
-    popsift::FeaturesHost* get();    // should be deprecated, same as getHost()
+    /**
+     * @deprecated
+     * @see getHost()
+     */
+    popsift::FeaturesHost* get();
     popsift::FeaturesBase* getBase();
+    /**
+     * @brief
+     * @return
+     */
     popsift::FeaturesHost* getHost();
     popsift::FeaturesDev*  getDev();
 
@@ -72,6 +94,9 @@ public:
     void setFeatures( popsift::FeaturesBase* f );
 };
 
+/**
+ * @brief
+ */
 class PopSift
 {
     struct Pipe
@@ -91,16 +116,28 @@ class PopSift
     };
 
 public:
+
+    /**
+    * @brief Image modes
+    */
     enum ImageMode
     {
+        ///  byte image, value range 0..255
         ByteImages,
+        /// float images, value range [0..1[
         FloatImages
     };
 
+    /**
+     * @brief Results for the allocation test.
+     */
     enum AllocTest
     {
+        /// the image dimensions are supported by this device's CUDA texture engine.
         Ok,
+        /// the input image size exceeds the dimensions of the CUDA Texture used for loading.
         ImageExceedsLinearTextureLimit,
+        /// the scaled input image exceeds the dimensions of the CUDA Surface used for the image pyramid.
         ImageExceedsLayeredSurfaceLimit
     };
 
@@ -109,27 +146,46 @@ public:
     PopSift() = delete;
     PopSift(const PopSift&) = delete;
 
-    /* We support more than 1 streams, but we support only one sigma and one
+    /**
+     * @brief We support more than 1 streams, but we support only one sigma and one
      * level parameters.
      */
     explicit PopSift( ImageMode imode = ByteImages );
-    explicit PopSift( const popsift::Config&          config,
-             popsift::Config::ProcessingMode mode  = popsift::Config::ExtractingMode,
-             ImageMode                       imode = ByteImages );
+
+    /**
+     * @brief
+     * @param config
+     * @param mode
+     * @param imode
+     */
+    explicit PopSift(const popsift::Config& config,
+                     popsift::Config::ProcessingMode mode = popsift::Config::ExtractingMode,
+                     ImageMode imode = ByteImages);
+
+    /**
+     * @brief Release all the resources.
+     */
     ~PopSift();
 
 public:
-    /** Provide the configuration if you used the PopSift default
-     *  constructor */
+    /**
+     * @brief Provide the configuration if you used the PopSift default
+     *  constructor
+     */
     bool configure( const popsift::Config& config, bool force = false );
 
+    /**
+     * @brief Release the resources.
+     */
     void uninit( );
 
-    /** Check whether the current CUDA device can support the image
+    /**
+     *  @brief Check whether the current CUDA device can support the image
      *  resolution (width,height) with the current configuration
      *  based on the card's texture engine.
      *  The function does not check if there is sufficient available
      *  memory.
+     *
      *  The first part of the test depends on the parameters width and
      *  height. It checks whether the image size is supported by CUDA
      *  2D linear textures on this card. This is used to load the image
@@ -142,8 +198,9 @@ public:
      *  "levels", because it determines the number of levels in each
      *  octave. The CUDA 2D layered texture must support enough depth
      *  for each level.
-     * @param width  The width of the input image
-     * @param height The height of the input image
+     *
+     * @param[in] width  The width of the input image
+     * @param[in] height The height of the input image
      * @return AllocTest::Ok if the image dimensions are supported by this device's
      *         CUDA texture engine,
      *         AllocTest::ImageExceedsLinearTextureLimit if the input image size
@@ -152,41 +209,60 @@ public:
      *         AllocTest::ImageExceedsLayeredSurfaceLimit if the scaled input
      *         image exceeds the dimensions of the CUDA Surface used for the
      *         image pyramid. The scaling factor must be changes to fit in.
-     * @remark { If you want to call configure() before extracting features,
-     *           you should call configure() before textTextureFit(). }
-     * @remark { The current CUDA device is determined by a call to
-     *           cudaGetDevice(), card properties are only read once. }
+     * @remark  * If you want to call configure() before extracting features,
+     *           you should call configure() before textTextureFit().
+     * @remark  * The current CUDA device is determined by a call to
+     *           cudaGetDevice(), card properties are only read once.
+     * @see AllocTest
      */
     AllocTest testTextureFit( int width, int height );
 
-    /** Create a warning string for an AllocTest error code. */
+    /**
+     * @brief Create a warning string for an AllocTest error code.
+     */
     std::string testTextureFitErrorString( AllocTest err, int w, int h );
 
-    /** Enqueue a byte image,  value range 0..255 */
+    /**
+     * @brief Enqueue a byte image,  value range [0,255].
+     * @param[in] w the width of the image.
+     * @param[in] h the height of the image.
+     * @param[in] imageData the image buffer.
+     * @return the associated job
+     * @see SiftJob
+     */
     SiftJob*  enqueue( int                  w,
                        int                  h,
                        const unsigned char* imageData );
 
-    /** Enqueue a float image,  value range 0..1 */
+    /**
+     * @brief Enqueue a float image,  value range [0,1].
+     * @param[in] w the width of the image.
+     * @param[in] h the height of the image.
+     * @param[in] imageData the image buffer.
+     * @return the associated job
+     * @see SiftJob
+     */
     SiftJob*  enqueue( int          w,
                        int          h,
                        const float* imageData );
 
     /**
      * @deprecated
-     * */
+     */
     inline void uninit( int /*pipe*/ ) { uninit(); }
 
     /**
      * @deprecated
-     **/
+     */
     inline bool init( int /*pipe*/, int w, int h ) {
         _last_init_w = w;
         _last_init_h = h;
         return true;
     }
 
-    /** deprecated */
+    /**
+     * @deprecated
+     */
     inline popsift::FeaturesBase* execute( int /*pipe*/, const unsigned char* imageData )
     {
         SiftJob* j = enqueue( _last_init_w, _last_init_h, imageData );
@@ -201,7 +277,7 @@ private:
     void private_apply_scale_factor( int& w, int& h );
     void uploadImages( );
 
-    /* The following method are alternative worker functions for Jobs submitted by
+    /* The following methods are alternative worker functions for Jobs submitted by
      * a calling application. The choice of method is made by the mode parameter
      * in the PopSift constructor. */
 
