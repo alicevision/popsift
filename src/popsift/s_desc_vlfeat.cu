@@ -36,6 +36,8 @@ void ext_desc_vlfeat_sub( const float         ang,
 //     const int tile_offset = ( threadIdx.z << 3 );
 // #endif
 
+    __shared__ float dpt[128];
+
     const float x     = ext->xpos;
     const float y     = ext->ypos;
     const int   level = ext->lpos; // old_level;
@@ -70,9 +72,12 @@ void ext_desc_vlfeat_sub( const float         ang,
     const int   xmax = min(width - 2,  (int)floorf(x + ptx + bsz));
     const int   ymax = min(height - 2, (int)floorf(y + pty + bsz));
 
-    float dpt[128];
+    for( int i=threadIdx.x; i<128; i+=blockDim.x )
+    {
+        dpt[i] = 0.0f;
+    }
 
-    for( int i=0; i<128; i++ ) dpt[i] = 0.0f;
+    __syncthreads();
 
     for( int pix_y = ymin; pix_y <= ymax; pix_y++ )
     {
@@ -110,45 +115,47 @@ void ext_desc_vlfeat_sub( const float         ang,
             const int3 t0 = make_int3( (int)floorf(n.x - 0.5f),
                                        (int)floorf(n.y - 0.5f),
                                        (int)nt );
-            float3 wgt[2];
+            float wgt_x = - ( n.x - ( t0.x + 0.5f ) );
+            float wgt_y = - ( n.y - ( t0.y + 0.5f ) );
+            float wgt_t = - ( nt  - t0.z );
 
-            wgt[1] = make_float3( fabsf( n.x - ( t0.x + 0.5f ) ),
-                                  fabsf( n.y - ( t0.y + 0.5f ) ),
-                                  fabsf( nt  - t0.z ) );
-            wgt[0] = make_float3( fabsf( 1.0f - wgt[1].x ),
-                                  fabsf( 1.0f - wgt[1].y ),
-                                  fabsf( 1.0f - wgt[1].z ) );
+            const int tx = ( ( threadIdx.x >> 0 ) & 0x1 );
+            const int ty = ( ( threadIdx.x >> 1 ) & 0x1 );
+            const int tt = ( ( threadIdx.x >> 2 ) & 0x1 );
 
-            for( int tx : { 0, 1 } )
+            if( ( t0.y + ty >= -2 ) &&
+                ( t0.y + ty <   2 ) &&
+                ( t0.x + tx >= -2 ) &&
+                ( t0.x + tx <   2 ) )
             {
-                for( int ty : { 0, 1 } )
-                {
-                    for( int tt : { 0, 1 } )
-                    {
-                        if( ( t0.y + ty >= -2 ) ||
-                            ( t0.x + tx >= -2 ) ||
-                            ( t0.y + ty < 2 ) ||
-                            ( t0.x + tx < 2 ) )
-                        {
-                            float val = ww
-                                      * mod
-                                      * wgt[tx].x
-                                      * wgt[ty].y
-                                      * wgt[tt].z;
+                wgt_x = ( tx == 0 ) ? 1.0f + wgt_x : wgt_x;
+                wgt_y = ( ty == 0 ) ? 1.0f + wgt_y : wgt_y;
+                wgt_t = ( tt == 0 ) ? 1.0f + wgt_t : wgt_t;
 
-                            dpt[ 80
+                wgt_x = fabsf( wgt_x );
+                wgt_y = fabsf( wgt_y );
+                wgt_t = fabsf( wgt_t );
+
+                const float val = ww
+                                * mod
+                                * wgt_x
+                                * wgt_y
+                                * wgt_t;
+
+                const int offset =  80
                                  + ( t0.y + ty ) * 32
                                  + ( t0.x + tx ) * 8
-                                 + ( t0.z + tt ) % 8 ] += val;
-                        }
-                    }
-                }
+                                 + ( t0.z + tt ) % 8;
+
+                dpt[offset] += val;
             }
+
+            __syncthreads();
         }
       }
     }
 
-    for (int i = 0; i < 128; i++)
+    for( int i=threadIdx.x; i<128; i+=blockDim.x )
     {
         features[i] = dpt[i];
     }
@@ -166,11 +173,11 @@ __global__ void ext_desc_vlfeat(int octave, cudaTextureObject_t layer_tex, int w
     const float ang      =  ext->orientation[ori_num];
 
     ext_desc_vlfeat_sub( ang,
-                       ext,
-                       desc->features,
-                       layer_tex,
-                       w,
-                       h );
+                         ext,
+                         desc->features,
+                         layer_tex,
+                         w,
+                         h );
 }
 
 namespace popsift
@@ -186,12 +193,14 @@ bool start_ext_desc_vlfeat( const int octave, Octave& oct_obj )
 
     if( grid.x == 0 ) return false;
 
-    block.x = 1;
+    block.x = 8;
     block.y = 1;
     block.z = 1;
 
+    size_t shared_size = 128 * sizeof(float);
+
     ext_desc_vlfeat
-        <<<grid,block,0,oct_obj.getStream()>>>
+        <<<grid,block,shared_size,oct_obj.getStream()>>>
         ( octave,
           oct_obj.getDataTexPoint( ),
           oct_obj.getWidth(),
