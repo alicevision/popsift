@@ -14,10 +14,9 @@ option(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after e
 option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
 option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 option(PopSift_USE_NORMF "The __normf function computes Euclidean distance on large arrays. Fast but stability is uncertain." OFF)
-option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
 option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
+option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE AND NOT MSVC)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -44,16 +43,6 @@ if(MSVC AND NOT BUILD_SHARED_LIBS)
     message(STATUS "CMAKE_CXX_FLAGS_${config} ${CMAKE_CXX_FLAGS_${config}}")
   endforeach()
 endif()
-
-# for some reason this line is necessary to propagate the standard to nvcc
-# On MSVC this is not necessary / nvcc does not recognize the flag for MSVC
-if(NOT MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-endif()
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_STANDARD 11)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 # ==============================================================================
 # GNUInstallDirs CMake module
@@ -165,6 +154,21 @@ if(CUDA_VERSION VERSION_GREATER_EQUAL "7.5")
   endif()
 endif()
 
+set(PopSift_CXX_STANDARD 14) # Thrust/CUB requires C++14 starting with CUDA SDK 11
+if(CUDA_VERSION_MAJOR LESS_EQUAL 8)
+  set(PopSift_CXX_STANDARD 11)
+endif()
+
+if(NOT MSVC)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++${PopSift_CXX_STANDARD}")
+      list(APPEND CUDA_NVCC_FLAGS "-std=c++${PopSift_CXX_STANDARD}")
+endif()
+set(CMAKE_CXX_STANDARD ${PopSift_CXX_STANDARD})
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD ${PopSift_CXX_STANDARD})
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
+
 if(PopSift_USE_NORMF AND CUDA_VERSION VERSION_GREATER_EQUAL "7.5")
   set(PopSift_HAVE_NORMF   1)
 else()
@@ -201,7 +205,13 @@ if(PopSift_BUILD_DOCS)
   add_subdirectory(doc)
 endif()
 
+set(PopSift_TESTFILE_PATH "popsift-samples/datasets/sample/big_set/" CACHE STRING "Base directory where your test files are stored")
 if(PopSift_USE_TEST_CMD)
+  if(NOT IS_ABSOLUTE("${PopSift_TESTFILE_PATH}"))
+    get_filename_component(PopSift_TESTFILES "${PopSift_TESTFILE_PATH}" ABSOLUTE)
+    set(PopSift_TESTFILE_PATH "${PopSift_TESTFILES}")
+  endif()
+
   add_subdirectory(testScripts)
 endif()
 
@@ -229,9 +239,12 @@ message(STATUS "Generate position independent code: " ${CMAKE_POSITION_INDEPENDE
 message(STATUS "Use CUDA NVTX for profiling: " ${PopSift_USE_NVTX_PROFILING})
 message(STATUS "Synchronize and check CUDA error after every kernel: " ${PopSift_ERRCHK_AFTER_KERNEL})
 message(STATUS "Grid filtering: " ${PopSift_USE_GRID_FILTER})
-message(STATUS "Testing step: " ${PopSift_USE_TEST_CMD})
 message(STATUS "Additional warning for CUDA nvcc: " ${PopSift_NVCC_WARNINGS})
 message(STATUS "Compiling for CUDA CCs: ${PopSift_CUDA_CC_LIST}")
 message(STATUS "Install path: " ${CMAKE_INSTALL_PREFIX})
+message(STATUS "Testing step: " ${PopSift_USE_TEST_CMD})
+if(PopSift_USE_TEST_CMD)
+  message(STATUS "Path for test input: " ${PopSift_TESTFILE_PATH})
+endif()
 message("\n******************************************")
 message("\n")
