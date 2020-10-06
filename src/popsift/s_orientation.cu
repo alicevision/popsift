@@ -183,14 +183,8 @@ void ori_par( const int           octave,
                 // int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
                 int bidx = (int)roundf( __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) );
 
-                if( bidx > ORI_NBINS ) {
-                    printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
-                }
-                if( bidx < 0 ) {
-                    printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
-                }
-
-                bidx = (bidx == ORI_NBINS) ? 0 : bidx;
+                while( bidx < 0 )          bidx += ORI_NBINS;
+                while( bidx >= ORI_NBINS ) bidx -= ORI_NBINS;
 
                 atomicAdd( &hist[bidx], weight );
 #endif
