@@ -33,11 +33,6 @@ using namespace std;
  */
 #define WITH_BILINEAR_ORI
 
-/* Smoothing like VLFeat is the default mode.
- * If you choose to undefine it, you get the smoothing approach taken by OpenCV
- */
-#define WITH_VLFEAT_SMOOTHING
-
 namespace popsift
 {
 
@@ -60,8 +55,6 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
 /*
  * Histogram smoothing helper
  */
-#ifdef WITH_VLFEAT_SMOOTHING
-template<int D>
 __device__
 inline static float smoothe( const float* const src, const int bin )
 {
@@ -72,24 +65,6 @@ inline static float smoothe( const float* const src, const int bin )
 
     return f;
 }
-#else // not WITH_VLFEAT_SMOOTHING
-__device__
-inline static float smoothe5( const float* const src, const int bin )
-{
-    int prev2 = bin-2;
-    int prev1 = bin-1;
-    if( prev2 < 0 ) prev2 += ORI_NBINS;
-    if( prev1 < 0 ) prev1 += ORI_NBINS;
-    const int next1 = (bin+1) % ORI_NBINS;
-    const int next2 = (bin+2) % ORI_NBINS;
-
-    const float f = ( src[prev2] + src[next2]
-                  + ( src[prev1] + src[next1] ) * 4.0f
-                  +   src[bin] * 6.0f ) / 16.0f;
-
-    return f;
-}
-#endif // not WITH_VLFEAT_SMOOTHING
 
 /*
  * Compute the keypoint orientations for each extremum
@@ -193,25 +168,19 @@ void ori_par( const int           octave,
     }
     __syncthreads();
 
-#ifdef WITH_VLFEAT_SMOOTHING
     for( int i=0; i<3 ; i++ )
     {
-        sm_hist[threadIdx.x+ 0] = smoothe<0>( hist, threadIdx.x+ 0 );
-        sm_hist[threadIdx.x+32] = smoothe<1>( hist, threadIdx.x+32 );
+        sm_hist[threadIdx.x+ 0] = smoothe( hist, threadIdx.x+ 0 );
+        sm_hist[threadIdx.x+32] = smoothe( hist, threadIdx.x+32 );
         __syncthreads();
-        hist[threadIdx.x+ 0]    = smoothe<2>( sm_hist, threadIdx.x+ 0 );
-        hist[threadIdx.x+32]    = smoothe<3>( sm_hist, threadIdx.x+32 );
+        hist[threadIdx.x+ 0]    = smoothe( sm_hist, threadIdx.x+ 0 );
+        hist[threadIdx.x+32]    = smoothe( sm_hist, threadIdx.x+32 );
         __syncthreads();
     }
 
     sm_hist[threadIdx.x+ 0] = hist[threadIdx.x+ 0];
     sm_hist[threadIdx.x+32] = hist[threadIdx.x+32];
     __syncthreads();
-#else // not WITH_VLFEAT_SMOOTHING
-    sm_hist[threadIdx.x+ 0]    = smoothe5( hist, threadIdx.x+ 0 );
-    sm_hist[threadIdx.x+32]    = smoothe5( hist, threadIdx.x+32 );
-    __syncthreads();
-#endif // not WITH_VLFEAT_SMOOTHING
 
     if( threadIdx.x+32 >= ORI_NBINS ) sm_hist[threadIdx.x+32] = -INFINITY;
     float maxval = fmaxf( sm_hist[threadIdx.x+ 0], sm_hist[threadIdx.x+32] );
