@@ -36,22 +36,6 @@ using namespace std;
 namespace popsift
 {
 
-__device__
-inline float compute_angle( int bin, float hc, float hn, float hp )
-{
-    /* interpolate */
-    float di = bin + 0.5f * (hn - hp) / (hc+hc-hn-hp);
-
-    /* clamp */
-    di = (di < 0) ? 
-            (di + ORI_NBINS) : 
-            ((di >= ORI_NBINS) ? (di - ORI_NBINS) : (di));
-
-    float th = __fdividef( M_PI2 * di, ORI_NBINS ) - M_PI;
-    // float th = ((M_PI2 * di) / ORI_NBINS);
-    return th;
-}
-
 /*
  * Histogram smoothing helper
  */
