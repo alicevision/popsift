@@ -16,7 +16,8 @@ namespace popsift {
 
 struct Descriptor; // float features[128];
 
-/* This is a data structure that is returned to a calling program.
+/**
+ * @brief This is a data structure that is returned to a calling program.
  * The xpos/ypos information in feature is scale-adapted.
  */
 struct Feature
@@ -24,9 +25,11 @@ struct Feature
     int         debug_octave;
     float       xpos;
     float       ypos;
-    float       sigma;   // scale;
-    int         num_ori; // number of this extremum's orientations
-                         // remaining entries in desc are 0
+    /// scale
+    float       sigma;
+    /// number of this extremum's orientations
+    /// remaining entries in desc are 0
+    int         num_ori;
     float       orientation[ORIENTATION_MAX_COUNT];
     Descriptor* desc[ORIENTATION_MAX_COUNT];
 
@@ -52,7 +55,8 @@ public:
     inline void    setDescriptorCount( int num_ori ) { _num_ori = num_ori; }
 };
 
-/* This is a data structure that is returned to a calling program.
+/**
+ * @brief This is a data structure that is returned to a calling program.
  * _ori is a transparent flat memory holding descriptors
  * that are referenced by the extrema.
  *
@@ -93,7 +97,7 @@ protected:
     friend class Pyramid;
 };
 
-typedef FeaturesHost Features;
+using Features = FeaturesHost;
 
 std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature );
 

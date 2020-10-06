@@ -30,12 +30,12 @@ do
   cd $dataset
   for img in img1 img2 img3 img4 img5 img6
   do
-    if [ -f @CMAKE_SOURCE_DIR@/oxford/$dataset/$img.pgm ]
+    if [ -f @PopSift_TESTFILE_PATH@/$dataset/$img.pgm ]
     then
-      imgfile=@CMAKE_SOURCE_DIR@/oxford/$dataset/$img.pgm
-    elif [ -f @CMAKE_SOURCE_DIR@/oxford/$dataset/$img.ppm ]
+      imgfile=@PopSift_TESTFILE_PATH@/$dataset/$img.pgm
+    elif [ -f @PopSift_TESTFILE_PATH@/$dataset/$img.ppm ]
     then
-      imgfile=@CMAKE_SOURCE_DIR@/oxford/$dataset/$img.ppm
+      imgfile=@PopSift_TESTFILE_PATH@/$dataset/$img.ppm
     else
       continue
     fi
@@ -45,7 +45,7 @@ do
       echo "Directory output-$img exists. Skipping."
       continue
     fi
-    @EXECUTABLE_OUTPUT_PATH@/popsift-demo --log --gauss-mode vlfeat --desc-mode loop --popsift-mode --root-sift --downsampling -1 -i $imgfile
+    @CMAKE_RUNTIME_OUTPUT_DIRECTORY@/popsift-demo --log --gauss-mode vlfeat --desc-mode loop --popsift-mode --root-sift --downsampling -1 -i $imgfile
     if [ $? != 0 ]
     then
       echo "Running popsift on $imgfile failed."
@@ -157,4 +157,3 @@ do
     fi
   done
 done
-

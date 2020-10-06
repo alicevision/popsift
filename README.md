@@ -11,6 +11,8 @@ PopSift tries to stick as closely as possible to David Lowe's famous paper [1], 
 
 PopSift compiles and works with NVidia cards of compute capability >= 3.0 (including the GT 650M), but the code is developed with the compute capability 5.2 card GTX 980 Ti in mind.
 
+CUDA SDK 11 does no longer support compute capability 3.0. 3.5 is still supported with deprecation warning.
+
 ## Dependencies
 
 PopSift depends on:
