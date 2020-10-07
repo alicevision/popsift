@@ -114,7 +114,8 @@ public:
 
         const float newbin = __fdividef( num, denB ); // verified: accuracy OK
 
-        angle = predicate ? prev + newbin : -1;
+        angle = predicate ? bin + newbin + 0.5f : -1;
+
         val   = predicate ?  -(num*num) / (4.0f * denB) + hist[prev] : -INFINITY;
     }
 };
