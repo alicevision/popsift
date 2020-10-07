@@ -74,9 +74,28 @@ struct Config
      */
     enum ScalingMode
     {
+        /// Experimental, non-working mode - scale direct from input
         ScaleDirect,
         /// Indirect - only working method
         ScaleDefault
+    };
+
+    /**
+     * @brief PopSift
+     */
+    enum OriMode
+    {
+        /** One bin per sample in histogram filling, quadratic angle refinement.
+         *  Original mode using by PopSift.
+         */
+        BestBin,
+        /** Two bins per sample in histogram filling, simple angle refinement.
+         *  Implements the approach taken by VLFeat.
+         */
+        InterpolatedBin,
+        /// default value
+        OriDefault = BestBin
+
     };
 
     /**
@@ -106,7 +125,9 @@ struct Config
         /// The L1-inspired norm, gives better matching results ("RootSift")
         RootSift,
         /// The L2-inspired norm, all descriptors on a hypersphere ("classic")
-        Classic
+        Classic,
+        /// The current default value
+        NormDefault = RootSift
     };
 
     /**
@@ -162,7 +183,27 @@ struct Config
      * @see LogMode
      */
     void setLogMode( LogMode mode = All );
+
+    /**
+     * @brief Set the scaling mode.
+     * @param mode The scaling mode
+     * @see ScalingMode
+     */
     void setScalingMode( ScalingMode mode = ScaleDefault );
+
+    /**
+     * @brief Set the orientation mode.
+     * @param mode The orientation mode
+     * @see OriMore
+     */
+    void setOrientationMode( OriMode mode = BestBin );
+
+    /**
+     * @brief Set the orientation mode.
+     * @param text string parsed as a legal orientation mode
+     * @see OriMore
+     */
+    void setOrientationMode( const std::string& text );
 
     /**
      * @brief Enable/desable verbose mode.
@@ -323,10 +364,22 @@ struct Config
 
     /**
      * @brief Get the scaling mode.
-     * @return the descriptor extraction mode.
+     * @return the extraction mode.
      * @see ScalingMode
      */
     inline ScalingMode getScalingMode() const { return _scaling_mode; }
+
+    /**
+     * @brief Get the orientation mode.
+     * @return the orientation mode.
+     * @see OriMode
+     */
+    inline OriMode getOrientationMode() const { return _ori_mode; }
+
+    /**
+     * @brief Helper functions for the main program's usage string.
+     */
+    static const char* getOrientationModeUsage( );
 
     /**
      * @brief Get the descriptor extraction mode
@@ -356,6 +409,9 @@ private:
 
     /// default: ScalingMode::DownscaledOctaves
     ScalingMode _scaling_mode;
+
+    /// default: OriMode::BestBin
+    OriMode _ori_mode;
 
     /// default: DescMode::Loop
     DescMode    _desc_mode;

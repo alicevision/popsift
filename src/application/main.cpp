@@ -101,11 +101,13 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         "Computed filter width are lower than VLFeat/PopSift")
         ("direct-scaling", bool_switch()->notifier([&](bool b) { if(b) config.setScalingMode(popsift::Config::ScaleDirect); }),
          "Direct each octave from upscaled orig instead of blurred level.")
+        ( "ori-mode", value<std::string>()->notifier([&](const std::string& s) {config.setOrientationMode(s); }),
+          popsift::Config::getOrientationModeUsage() )
         ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
         ( "norm-mode", value<std::string>()->notifier([&](const std::string& s) { config.setNormMode(s); }),
           popsift::Config::getNormModeUsage() )
         ( "root-sift", bool_switch()->notifier([&](bool b) { if(b) config.setNormMode(popsift::Config::RootSift); }),
-          popsift::Config::getNormModeUsage() )
+          "synonym to --norm-mode=RootSift" )
         ("filter-max-extrema", value<int>()->notifier([&](int f) {config.setFilterMaxExtrema(f); }), "Approximate max number of extrema.")
         ("filter-grid", value<int>()->notifier([&](int f) {config.setFilterGridSize(f); }), "Grid edge length for extrema filtering (ie. value 4 leads to a 4x4 grid)")
         ("filter-sort", value<std::string>()->notifier([&](const std::string& s) {config.setFilterSorting(s); }), "Sort extrema in each cell by scale, either random (default), up or down");

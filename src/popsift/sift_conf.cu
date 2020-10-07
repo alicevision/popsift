@@ -8,6 +8,8 @@
 #include "common/debug_macros.h"
 #include "sift_conf.h"
 
+#include <boost/algorithm/string.hpp>
+
 #include <iostream>
 
 using namespace std;
@@ -26,6 +28,7 @@ Config::Config( )
     , _sift_mode( Config::PopSift )
     , _log_mode( Config::None )
     , _scaling_mode( Config::ScaleDefault )
+    , _ori_mode( Config::OriDefault )
     , _desc_mode( Config::Loop )
     , _grid_filter_mode( Config::RandomScale )
     , verbose( false )
@@ -168,6 +171,42 @@ void Config::setScalingMode( ScalingMode mode )
     _scaling_mode = mode;
 }
 
+void Config::setOrientationMode( OriMode mode )
+{
+    _ori_mode = mode;
+}
+
+void Config::setOrientationMode( const std::string& text )
+{
+    if( boost::iequals( text, "BestBin" ) )
+    {
+        _ori_mode = BestBin;
+    }
+    else if( boost::iequals( text, "PopSift" ) )
+    {
+        _ori_mode = BestBin;
+    }
+    else if( boost::iequals( text, "InterpolatedBin" ) )
+    {
+        _ori_mode = InterpolatedBin;
+    }
+    else if( boost::iequals( text, "VLFeat" ) )
+    {
+        _ori_mode = InterpolatedBin;
+    }
+    else
+        POP_FATAL( string("Bad Orientation mode.\n") + getOrientationModeUsage() );
+}
+
+const char* Config::getOrientationModeUsage( )
+{
+    return
+        "Choice of orientation computation modes. "
+        "Options are: "
+        "BestBin (original PopSift behaviour, default), "
+        "InterpolatedBin (VLFeat-like behaviour)";
+}
+
 /**
  * Normalization mode
  * Should the descriptor normalization use L2-like classic normalization
@@ -198,15 +237,25 @@ void Config::setNormMode( Config::NormMode m )
 
 void Config::setNormMode( const std::string& m )
 {
-    if( m == "RootSift" ) setNormMode( Config::RootSift );
-    else if( m == "classic" ) setNormMode( Config::Classic );
+    if( boost::iequals( m, "RootSift" ) )
+    {
+        setNormMode( Config::RootSift );
+    }
+    else if( boost::iequals( m, "L2" ) )
+    {
+        setNormMode( Config::Classic );
+    }
+    else if( boost::iequals( m, "Classic" ) )
+    {
+        setNormMode( Config::Classic );
+    }
     else
         POP_FATAL( string("Bad Normalization mode.\n") + getGaussModeUsage() );
 }
 
 Config::NormMode Config::getNormModeDefault( )
 {
-    return Config::RootSift;
+    return Config::NormDefault;
 }
 
 const char* Config::getNormModeUsage( )

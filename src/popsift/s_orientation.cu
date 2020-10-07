@@ -28,19 +28,14 @@
 using namespace popsift;
 using namespace std;
 
-/* Bilinear histogram seems to be VLFeat's default now.
- * We emulate it because we have different orientations without it.
- */
-#define WITH_BILINEAR_ORI
-
 namespace popsift
 {
 
 /*
  * Histogram smoothing helper
  */
-__device__
-inline static float smoothe( const float* const src, const int bin )
+__device__ inline static
+float smoothe( const float* const src, const int bin )
 {
     const int prev = (bin == 0) ? ORI_NBINS-1 : bin-1;
     const int next = (bin == ORI_NBINS-1) ? 0 : bin+1;
@@ -50,11 +45,86 @@ inline static float smoothe( const float* const src, const int bin )
     return f;
 }
 
+class BestBin
+{
+public:
+    __device__ inline static
+    void fillHist( float* hist, const float weight, const float theta )
+    {
+        int bidx = (int)roundf( __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) );
+
+        while( bidx < 0 )          bidx += ORI_NBINS;
+        while( bidx >= ORI_NBINS ) bidx -= ORI_NBINS;
+
+        atomicAdd( &hist[bidx], weight );
+    }
+
+    __device__ inline static
+    void refine( int bin, float* hist, float maxval, float& angle, float& val )
+    {
+        const int prev = ( bin - 1 + ORI_NBINS ) % ORI_NBINS;
+        const int next = ( bin + 1 )             % ORI_NBINS;
+
+        bool predicate = ( bin < ORI_NBINS ) &&
+                        ( hist[bin] > max( hist[prev], hist[next] ) ) &&
+                        ( hist[bin] > 0.8f * maxval );
+
+        const float num  = predicate ?   3.0f * hist[prev]
+                                       - 4.0f * hist[bin]
+                                       + 1.0f * hist[next]
+                                     : 0.0f;
+        const float denB = predicate ? 2.0f * ( hist[prev] - 2.0f * hist[bin] + hist[next] ) : 1.0f;
+
+        const float newbin = __fdividef( num, denB ); // verified: accuracy OK
+
+        angle = predicate ? prev + newbin : -1;
+        val   = predicate ?  -(num*num) / (4.0f * denB) + hist[prev] : -INFINITY;
+    }
+};
+
+class InterpolatedBin
+{
+public:
+    __device__ inline static
+    void fillHist( float* hist, const float weight, const float theta )
+    {
+        const float fbin = float(ORI_NBINS) / M_PI2 * theta;
+        const int   bin  = (int)floorf(fbin - 0.5f);
+        const float rbin = fbin - bin - 0.5f;
+
+        int bin1 = ( bin + ORI_NBINS ) % ORI_NBINS;
+        atomicAdd( &hist[bin1], (1.0f - rbin) * weight );
+        int bin2 = ( bin + 1 ) % ORI_NBINS;
+        atomicAdd( &hist[bin2], rbin * weight );
+    }
+
+    __device__ inline static
+    void refine( int bin, float* hist, float maxval, float& angle, float& val )
+    {
+        const int prev = ( bin - 1 + ORI_NBINS ) % ORI_NBINS;
+        const int next = ( bin + 1 )             % ORI_NBINS;
+
+        bool predicate = ( bin < ORI_NBINS ) &&
+                        ( hist[bin] > max( hist[prev], hist[next] ) ) &&
+                        ( hist[bin] > 0.8f * maxval );
+
+        const float num  = predicate ? hist[next] - hist[prev]
+                                     : 0.0f;
+        const float denB = predicate ? 2.0f * ( hist[prev] - 2.0f * hist[bin] + hist[next] ) : 1.0f;
+
+        const float newbin = __fdividef( num, denB ); // verified: accuracy OK
+
+        angle = predicate ? prev + newbin : -1;
+        val   = predicate ?  -(num*num) / (4.0f * denB) + hist[prev] : -INFINITY;
+    }
+};
+
 /*
  * Compute the keypoint orientations for each extremum
  * using 16 threads for each of them.
  * direct curve fitting approach
  */
+template<class SB>
 __global__
 void ori_par( const int           octave,
               const int           ext_ct_prefix_sum,
@@ -130,23 +200,7 @@ void ori_par( const int           octave,
             {
                 float weight = grad * expf(sq_dist * factor);
 
-#ifdef WITH_BILINEAR_ORI
-                const float fbin = float(ORI_NBINS) / M_PI2 * theta;
-                const int   bin  = (int)floorf(fbin - 0.5f);
-                const float rbin = fbin - bin - 0.5f;
-                int bin1 = ( bin + ORI_NBINS ) % ORI_NBINS;
-                atomicAdd( &hist[bin1], (1.0f - rbin) * weight );
-                int bin2 = ( bin + 1 ) % ORI_NBINS;
-                atomicAdd( &hist[bin2], rbin * weight );
-#else
-                // int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
-                int bidx = (int)roundf( __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) );
-
-                while( bidx < 0 )          bidx += ORI_NBINS;
-                while( bidx >= ORI_NBINS ) bidx -= ORI_NBINS;
-
-                atomicAdd( &hist[bidx], weight );
-#endif
+                SB::fillHist( hist, weight, theta );
             }
         }
     }
@@ -181,32 +235,7 @@ void ori_par( const int           octave,
 
     for( int bin = threadIdx.x; popsift::any( bin < ORI_NBINS ); bin += blockDim.x )
     {
-        const int prev = (bin == 0) ? ORI_NBINS-1 : bin-1;
-        const int next = (bin == ORI_NBINS-1) ? 0 : bin+1;
-
-        bool predicate = ( bin < ORI_NBINS ) && ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) ) && (sm_hist[bin] > 0.8f * maxval);
-
-#define REFINE 2
-#if REFINE == 1
-        // Lilian's method
-        const float num  = predicate ?   3.0f * sm_hist[prev]
-                                       - 4.0f * sm_hist[bin]
-                                       + 1.0f * sm_hist[next]
-                                     : 0.0f;
-#elif REFINE == 2
-        // VLFeat's method
-        const float  num    = predicate ? sm_hist[next] - sm_hist[prev]
-                                        : 0.0f;
-#else
-#error Must choose a refinement method
-#endif
-        const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
-
-        const float newbin = __fdividef( num, denB ); // verified: accuracy OK
-
-
-        refined_angle[bin] = predicate ? bin + newbin + 0.5f : -1;
-        yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
+        SB::refine( bin, sm_hist, maxval, refined_angle[bin], yval[bin] );
     }
     __syncthreads();
 
@@ -397,13 +426,26 @@ void Pyramid::orientation( const Config& conf )
             block.y = 1;
             grid.x  = num;
 
-            ori_par
-                <<<grid,block,4*64*sizeof(float),oct_str>>>
-                ( octave,
-                  hct.ext_ps[octave],
-                  oct_obj.getDataTexPoint( ),
-                  oct_obj.getWidth( ),
-                  oct_obj.getHeight( ) );
+            if( conf.getOrientationMode() == Config::BestBin )
+            {
+                ori_par<BestBin>
+                    <<<grid,block,4*64*sizeof(float),oct_str>>>
+                    ( octave,
+                      hct.ext_ps[octave],
+                      oct_obj.getDataTexPoint( ),
+                      oct_obj.getWidth( ),
+                      oct_obj.getHeight( ) );
+            }
+            else
+            {
+                ori_par<InterpolatedBin>
+                    <<<grid,block,4*64*sizeof(float),oct_str>>>
+                    ( octave,
+                      hct.ext_ps[octave],
+                      oct_obj.getDataTexPoint( ),
+                      oct_obj.getWidth( ),
+                      oct_obj.getHeight( ) );
+            }
             POP_SYNC_CHK;
 
             if( octave != 0 ) {
