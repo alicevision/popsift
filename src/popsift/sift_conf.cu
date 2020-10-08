@@ -86,6 +86,25 @@ void Config::setDescMode( Config::DescMode m )
     _desc_mode = m;
 }
 
+const char* Config::getDescModeUsage( )
+{
+    return "Choice of descriptor extraction modes:\n"
+           "loop, iloop, grid, igrid, notile, vlfeat\n"
+	       "Default is loop\n"
+           "loop is OpenCV-like horizontal scanning, sampling every pixel in a radius around the "
+           "centers or the 16 tiles arond the keypoint. Each sampled point contributes to two "
+           "histogram bins."
+           "iloop is like loop but samples all constant 1-pixel distances from the keypoint, "
+           "using the CUDA texture engine for interpolation. "
+           "grid is like loop but works on rotated, normalized tiles, relying on CUDA 2D cache "
+           "to replace the manual data aligment idea of loop. "
+           "igrid iloop and grid. "
+           "notile is like igrid but handles all 16 tiles at once.\n"
+           "vlfeat is VLFeat-like horizontal scanning, sampling every pixel in a radius around "
+           "keypoint itself, using the 16 tile centers only for weighting. Every sampled point "
+           "contributes to up to eight historgram bins.";
+}
+
 void Config::setGaussMode( const std::string& m )
 {
     if( m == "vlfeat" )

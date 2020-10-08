@@ -227,6 +227,11 @@ struct Config
     */
     void setDescMode( DescMode mode = Loop );
 
+    /**
+     * @brief Helper functions for the main program's usage string.
+     */
+    static const char* getDescModeUsage( );
+
 //    void setGaussGroup( int groupsize );
 //    int  getGaussGroup( ) const;
 
