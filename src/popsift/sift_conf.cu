@@ -305,7 +305,10 @@ int Config::getNormalizationMultiplier( ) const
 void Config::setDownsampling( float v ) { _upscale_factor = -v; }
 void Config::setOctaves( int v ) { octaves = v; }
 void Config::setLevels( int v ) { levels = v; }
-void Config::setSigma( float v ) { sigma = v; }
+
+void  Config::setSigma( float v ) { sigma = v; }
+float Config::getSigma( ) const { return sigma; }
+
 void Config::setEdgeLimit( float v ) { _edge_limit = v; }
 void Config::setThreshold( float v ) { _threshold = v; }
 void Config::setPrintGaussTables() { _print_gauss_tables = true; }

@@ -238,7 +238,10 @@ struct Config
     void setDownsampling( float v );
     void setOctaves( int v );
     void setLevels( int v );
-    void setSigma( float v );
+
+    void  setSigma( float v );
+    float getSigma( ) const;
+
     void setEdgeLimit( float v );
     void setThreshold( float v );
     void setInitialBlur( float blur );
