@@ -156,7 +156,8 @@ void ori_par( const int           octave,
 
     /* orientation histogram radius */
     const float  sigw = ORI_WINFACTOR * sig;
-    const int32_t rad  = (int)roundf((3.0f * sigw));
+    // const int32_t rad  = (int)roundf((3.0f * sigw));
+    const int32_t rad  = max( (int)floorf((3.0f * sigw)), 1 );
 
     const float factor = __fdividef( -0.5f, (sigw * sigw) );
     const int sq_thres  = rad * rad;
@@ -165,10 +166,10 @@ void ori_par( const int           octave,
     // int xmax = min(w - 2, (int)floor(x + rad));
     // int ymin = max(1,     (int)floor(y - rad));
     // int ymax = min(h - 2, (int)floor(y + rad));
-    int xmin = max(1,     (int)roundf(x) - rad);
-    int xmax = min(w - 2, (int)roundf(x) + rad);
-    int ymin = max(1,     (int)roundf(y) - rad);
-    int ymax = min(h - 2, (int)roundf(y) + rad);
+    int xmin = max(0,     (int)roundf(x) - rad);
+    int xmax = min(w - 1, (int)roundf(x) + rad);
+    int ymin = max(0,     (int)roundf(y) - rad);
+    int ymax = min(h - 1, (int)roundf(y) + rad);
 
     int wx = xmax - xmin + 1;
     int hy = ymax - ymin + 1;
