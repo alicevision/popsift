@@ -80,6 +80,14 @@ public:
         angle = predicate ? prev + newbin : -1;
         val   = predicate ?  -(num*num) / (4.0f * denB) + hist[prev] : -INFINITY;
     }
+
+    __device__ inline static
+    float twist( float angle )
+    {
+        angle -= M_PI;
+        if( angle < 0 ) angle += M_PI2;
+        return angle;
+    }
 };
 
 class InterpolatedBin
@@ -117,6 +125,12 @@ public:
         angle = predicate ? bin + newbin + 0.5f : -1;
 
         val   = predicate ?  -(num*num) / (4.0f * denB) + hist[prev] : -INFINITY;
+    }
+
+    __device__ inline static
+    float twist( float angle )
+    {
+        return angle;
     }
 };
 
@@ -260,6 +274,7 @@ void ori_par( const int           octave,
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             if( chosen_bin <  0         ) chosen_bin += ORI_NBINS;
             float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS); // - M_PI;
+            th = SB::twist( th );
             ext->orientation[threadIdx.x] = th;
             written = true;
         }

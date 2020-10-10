@@ -137,7 +137,7 @@ __global__ void ext_desc_iloop(int octave, cudaTextureObject_t layer_tex, int w,
 
     const int   ext_base =  ext->idx_ori;
     const int   ori_num  =  o_offset - ext_base;
-    const float ang      =  ext->orientation[ori_num] - M_PI;
+    const float ang      =  ext->orientation[ori_num];
 
     ext_desc_iloop_sub( ang,
                         ext,

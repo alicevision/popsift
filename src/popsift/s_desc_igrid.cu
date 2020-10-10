@@ -91,7 +91,7 @@ __global__ void ext_desc_igrid(int octave, cudaTextureObject_t texLinear)
 
     const int   ext_base =  ext->idx_ori;
     const int   ori_num  =  o_offset - ext_base;
-    const float ang      =  ext->orientation[ori_num] - M_PI;
+    const float ang      =  ext->orientation[ori_num];
 
     float cos_t;
     float sin_t;
