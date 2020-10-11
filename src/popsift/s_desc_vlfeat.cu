@@ -89,61 +89,55 @@ void ext_desc_vlfeat_sub( const float         ang,
                 const float2 n = make_float2( ::fmaf( crsbp, d.x,  srsbp * d.y ),
                                               ::fmaf( crsbp, d.y, -srsbp * d.x ) ); 
 
-                // nn : abs value of normalized distance from keypoint
-                const float2 nn = abs(n);
+                float mod;
+                float th;
 
-                if (nn.x < 2.0f && nn.y < 2.0f)
+                get_gradiant( mod, th, pix_x, pix_y, layer_tex, level );
+
+                mod /= 2; // Our mod is double that of vlfeat. Huh.
+
+                const float  ww = __expf( -scalbnf(n.x*n.x + n.y*n.y, -3));
+
+                th -= ang;
+                while( th > M_PI2 ) th -= M_PI2;
+                while( th < 0.0f  ) th += M_PI2;
+
+                const float nt = 8.0f * th / M_PI2;
+
+                // neighbouring tile on the lower side: -2, -1, 0 or 1
+                // (must use floorf because casting rounds towards zero
+                const int3 t0 = make_int3( (int)floorf(n.x - 0.5f),
+                                        (int)floorf(n.y - 0.5f),
+                                        (int)nt );
+                float wgt_x = - ( n.x - ( t0.x + 0.5f ) );
+                float wgt_y = - ( n.y - ( t0.y + 0.5f ) );
+                float wgt_t = - ( nt  - t0.z );
+
+                if( ( t0.y + ty >= -2 ) &&
+                    ( t0.y + ty <   2 ) &&
+                    ( t0.x + tx >= -2 ) &&
+                    ( t0.x + tx <   2 ) )
                 {
-                    float mod;
-                    float th;
+                    wgt_x = ( tx == 0 ) ? 1.0f + wgt_x : wgt_x;
+                    wgt_y = ( ty == 0 ) ? 1.0f + wgt_y : wgt_y;
+                    wgt_t = ( tt == 0 ) ? 1.0f + wgt_t : wgt_t;
 
-                    get_gradiant( mod, th, pix_x, pix_y, layer_tex, level );
+                    wgt_x = fabsf( wgt_x );
+                    wgt_y = fabsf( wgt_y );
+                    wgt_t = fabsf( wgt_t );
 
-                    mod /= 2; // Our mod is double that of vlfeat. Huh.
+                    const float val = ww
+                                    * mod
+                                    * wgt_x
+                                    * wgt_y
+                                    * wgt_t;
 
-                    const float  ww = __expf( -scalbnf(n.x*n.x + n.y*n.y, -3));
+                    const int offset =  80
+                                    + ( t0.y + ty ) * 32
+                                    + ( t0.x + tx ) * 8
+                                    + ( t0.z + tt ) % 8;
 
-                    th -= ang;
-                    while( th > M_PI2 ) th -= M_PI2;
-                    while( th < 0.0f  ) th += M_PI2;
-
-                    const float nt = 8.0f * th / M_PI2;
-
-                    // neighbouring tile on the lower side: -2, -1, 0 or 1
-                    // (must use floorf because casting rounds towards zero
-                    const int3 t0 = make_int3( (int)floorf(n.x - 0.5f),
-                                               (int)floorf(n.y - 0.5f),
-                                               (int)nt );
-                    float wgt_x = - ( n.x - ( t0.x + 0.5f ) );
-                    float wgt_y = - ( n.y - ( t0.y + 0.5f ) );
-                    float wgt_t = - ( nt  - t0.z );
-
-                    if( ( t0.y + ty >= -2 ) &&
-                        ( t0.y + ty <   2 ) &&
-                        ( t0.x + tx >= -2 ) &&
-                        ( t0.x + tx <   2 ) )
-                    {
-                        wgt_x = ( tx == 0 ) ? 1.0f + wgt_x : wgt_x;
-                        wgt_y = ( ty == 0 ) ? 1.0f + wgt_y : wgt_y;
-                        wgt_t = ( tt == 0 ) ? 1.0f + wgt_t : wgt_t;
-
-                        wgt_x = fabsf( wgt_x );
-                        wgt_y = fabsf( wgt_y );
-                        wgt_t = fabsf( wgt_t );
-
-                        const float val = ww
-                                        * mod
-                                        * wgt_x
-                                        * wgt_y
-                                        * wgt_t;
-
-                        const int offset =  80
-                                        + ( t0.y + ty ) * 32
-                                        + ( t0.x + tx ) * 8
-                                        + ( t0.z + tt ) % 8;
-
-                        dpt[loop][offset] += val;
-                    }
+                    dpt[loop][offset] += val;
                 }
             }
             __syncthreads();
