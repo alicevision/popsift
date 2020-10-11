@@ -8,11 +8,24 @@
 #include "common/debug_macros.h"
 #include "sift_conf.h"
 
-#include <boost/algorithm/string.hpp>
-
 #include <iostream>
+#include <algorithm>
 
 using namespace std;
+
+static bool stringIsame( string l, string r )
+{
+    std::for_each( l.begin(), l.end(), [](char& c) { c = ::tolower(c); });
+    std::for_each( r.begin(), r.end(), [](char& c) { c = ::tolower(c); });
+    if( !strcmp( l.c_str(), r.c_str() ) )
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
 
 namespace popsift
 {
@@ -197,19 +210,19 @@ void Config::setOrientationMode( OriMode mode )
 
 void Config::setOrientationMode( const std::string& text )
 {
-    if( boost::iequals( text, "BestBin" ) )
+    if( stringIsame( text, "BestBin" ) )
     {
         _ori_mode = BestBin;
     }
-    else if( boost::iequals( text, "PopSift" ) )
+    else if( stringIsame( text, "PopSift" ) )
     {
         _ori_mode = BestBin;
     }
-    else if( boost::iequals( text, "InterpolatedBin" ) )
+    else if( stringIsame( text, "InterpolatedBin" ) )
     {
         _ori_mode = InterpolatedBin;
     }
-    else if( boost::iequals( text, "VLFeat" ) )
+    else if( stringIsame( text, "VLFeat" ) )
     {
         _ori_mode = InterpolatedBin;
     }
@@ -256,15 +269,15 @@ void Config::setNormMode( Config::NormMode m )
 
 void Config::setNormMode( const std::string& m )
 {
-    if( boost::iequals( m, "RootSift" ) )
+    if( stringIsame( m, "RootSift" ) )
     {
         setNormMode( Config::RootSift );
     }
-    else if( boost::iequals( m, "L2" ) )
+    else if( stringIsame( m, "L2" ) )
     {
         setNormMode( Config::Classic );
     }
-    else if( boost::iequals( m, "Classic" ) )
+    else if( stringIsame( m, "Classic" ) )
     {
         setNormMode( Config::Classic );
     }
