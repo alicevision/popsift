@@ -228,8 +228,8 @@ const char* Config::getOrientationModeUsage( )
     return
         "Choice of orientation computation modes. "
         "Options are: "
-        "BestBin (original PopSift behaviour, default), "
-        "InterpolatedBin (VLFeat-like behaviour)";
+        "BestBin (original PopSift bejaviour, default), "
+        "InterpolatedBin (VLFeat-like behaviour, experimental, do not use)";
 }
 
 /**
@@ -308,15 +308,24 @@ int Config::getNormalizationMultiplier( ) const
     return _normalization_multiplier;
 }
 
-void Config::setDownsampling( float v ) { _upscale_factor = -v; }
+void  Config::setDownsampling( float v ) { _upscale_factor = -v; }
+float Config::getDownsampling( ) const   { return -_upscale_factor; }
+
 void Config::setOctaves( int v ) { octaves = v; }
+int  Config::getOctaves( ) const { return octaves; }
+
 void Config::setLevels( int v ) { levels = v; }
+int  Config::getLevels( ) const { return levels; }
 
 void  Config::setSigma( float v ) { sigma = v; }
 float Config::getSigma( ) const { return sigma; }
 
-void Config::setEdgeLimit( float v ) { _edge_limit = v; }
-void Config::setThreshold( float v ) { _threshold = v; }
+void  Config::setEdgeLimit( float v ) { _edge_limit = v; }
+float Config::getEdgeLimit( ) const   { return _edge_limit; }
+
+void  Config::setThreshold( float v ) { _threshold = v; }
+float Config::getThreshold( ) const   { return _threshold; }
+
 void Config::setPrintGaussTables() { _print_gauss_tables = true; }
 void Config::setFilterMaxExtrema( int ext ) { _filter_max_extrema = ext; }
 void Config::setFilterGridSize( int sz ) { _filter_grid_size = sz; }
@@ -331,6 +340,15 @@ void Config::setInitialBlur( float blur )
         _initial_blur        = blur;
     }
 }
+bool Config::hasInitialBlur( ) const
+{
+    return _assume_initial_blur;
+}
+float Config::getInitialBlur( ) const
+{
+    return _initial_blur;
+}
+
 
 Config::GaussMode Config::getGaussMode( ) const
 {
@@ -340,16 +358,6 @@ Config::GaussMode Config::getGaussMode( ) const
 Config::SiftMode Config::getSiftMode() const
 {
     return _sift_mode;
-}
-
-bool Config::hasInitialBlur( ) const
-{
-    return _assume_initial_blur;
-}
-
-float Config::getInitialBlur( ) const
-{
-    return _initial_blur;
 }
 
 float Config::getPeakThreshold() const

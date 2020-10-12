@@ -90,7 +90,7 @@ struct Config
          */
         BestBin,
         /** Two bins per sample in histogram filling, simple angle refinement.
-         *  Implements the approach taken by VLFeat.
+         *  Tries to implement the approach taken by VLFeat. Experimental.
          */
         InterpolatedBin,
         /// default value
@@ -196,14 +196,14 @@ struct Config
     /**
      * @brief Set the orientation mode.
      * @param mode The orientation mode
-     * @see OriMore
+     * @see OriMode
      */
     void setOrientationMode( OriMode mode = BestBin );
 
     /**
      * @brief Set the orientation mode.
      * @param text string parsed as a legal orientation mode
-     * @see OriMore
+     * @see OriMode
      */
     void setOrientationMode( const std::string& text );
 
@@ -235,16 +235,28 @@ struct Config
 //    void setGaussGroup( int groupsize );
 //    int  getGaussGroup( ) const;
 
-    void setDownsampling( float v );
+    void  setDownsampling( float v );
+    float getDownsampling( ) const;
+
     void setOctaves( int v );
+    int  getOctaves( ) const;
+
     void setLevels( int v );
+    int  getLevels( ) const;
 
     void  setSigma( float v );
     float getSigma( ) const;
 
-    void setEdgeLimit( float v );
-    void setThreshold( float v );
-    void setInitialBlur( float blur );
+    void  setEdgeLimit( float v );
+    float getEdgeLimit( ) const;
+
+    void  setThreshold( float v );
+    float getThreshold( ) const;
+
+    void  setInitialBlur( float blur );
+    bool  hasInitialBlur( ) const;
+    float getInitialBlur( ) const;
+
 //    void setMaxExtreme( int m );
     void setPrintGaussTables( );
 //    void setDPOrientation( bool on );
@@ -252,9 +264,6 @@ struct Config
     void setFilterGridSize( int sz );
     void setFilterSorting( const std::string& direction );
     void setFilterSorting( GridFilterMode m );
-
-    bool  hasInitialBlur( ) const;
-    float getInitialBlur( ) const;
 
     /// computes the actual peak threshold depending on the threshold
     /// parameter and the non-augmented number of levels
