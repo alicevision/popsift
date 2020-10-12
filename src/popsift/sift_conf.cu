@@ -17,14 +17,7 @@ static bool stringIsame( string l, string r )
 {
     std::for_each( l.begin(), l.end(), [](char& c) { c = ::tolower(c); });
     std::for_each( r.begin(), r.end(), [](char& c) { c = ::tolower(c); });
-    if( !strcmp( l.c_str(), r.c_str() ) )
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
+    return l == r;
 }
 
 namespace popsift
@@ -390,4 +383,3 @@ bool Config::equal( const Config& other ) const
 }
 
 }; // namespace popsift
-
