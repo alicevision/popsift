@@ -45,101 +45,11 @@ float smoothe( const float* const src, const int bin )
     return f;
 }
 
-class BestBin
-{
-public:
-    __device__ inline static
-    void fillHist( float* hist, const float weight, const float theta )
-    {
-        int bidx = (int)roundf( __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) );
-
-        while( bidx < 0 )          bidx += ORI_NBINS;
-        while( bidx >= ORI_NBINS ) bidx -= ORI_NBINS;
-
-        atomicAdd( &hist[bidx], weight );
-    }
-
-    __device__ inline static
-    void refine( int bin, float* hist, float maxval, float& angle, float& val )
-    {
-        const int prev = ( bin - 1 + ORI_NBINS ) % ORI_NBINS;
-        const int next = ( bin + 1 )             % ORI_NBINS;
-
-        bool predicate = ( bin < ORI_NBINS ) &&
-                        ( hist[bin] > max( hist[prev], hist[next] ) ) &&
-                        ( hist[bin] > 0.8f * maxval );
-
-        const float num  = predicate ?   3.0f * hist[prev]
-                                       - 4.0f * hist[bin]
-                                       + 1.0f * hist[next]
-                                     : 0.0f;
-        const float denB = predicate ? 2.0f * ( hist[prev] - 2.0f * hist[bin] + hist[next] ) : 1.0f;
-
-        const float newbin = __fdividef( num, denB ); // verified: accuracy OK
-
-        angle = predicate ? prev + newbin : -1;
-        val   = predicate ?  -(num*num) / (4.0f * denB) + hist[prev] : -INFINITY;
-    }
-
-    __device__ inline static
-    float twist( float angle )
-    {
-        angle -= M_PI;
-        if( angle < 0 ) angle += M_PI2;
-        return angle;
-    }
-};
-
-class InterpolatedBin
-{
-public:
-    __device__ inline static
-    void fillHist( float* hist, const float weight, const float theta )
-    {
-        const float fbin = float(ORI_NBINS) / M_PI2 * theta;
-        const int   bin  = (int)floorf(fbin - 0.5f);
-        const float rbin = fbin - bin - 0.5f;
-
-        int bin1 = ( bin + ORI_NBINS ) % ORI_NBINS;
-        atomicAdd( &hist[bin1], (1.0f - rbin) * weight );
-        int bin2 = ( bin + 1 ) % ORI_NBINS;
-        atomicAdd( &hist[bin2], rbin * weight );
-    }
-
-    __device__ inline static
-    void refine( int bin, float* hist, float maxval, float& angle, float& val )
-    {
-        const int prev = ( bin - 1 + ORI_NBINS ) % ORI_NBINS;
-        const int next = ( bin + 1 )             % ORI_NBINS;
-
-        bool predicate = ( bin < ORI_NBINS ) &&
-                        ( hist[bin] > max( hist[prev], hist[next] ) ) &&
-                        ( hist[bin] > 0.8f * maxval );
-
-        const float num  = predicate ? hist[next] - hist[prev]
-                                     : 0.0f;
-        const float denB = predicate ? 2.0f * ( hist[prev] - 2.0f * hist[bin] + hist[next] ) : 1.0f;
-
-        const float newbin = __fdividef( num, denB ); // verified: accuracy OK
-
-        angle = predicate ? bin + newbin + 0.5f : -1;
-
-        val   = predicate ?  -(num*num) / (4.0f * denB) + hist[prev] : -INFINITY;
-    }
-
-    __device__ inline static
-    float twist( float angle )
-    {
-        return angle;
-    }
-};
-
 /*
  * Compute the keypoint orientations for each extremum
  * using 16 threads for each of them.
  * direct curve fitting approach
  */
-template<class SB>
 __global__
 void ori_par( const int           octave,
               const int           ext_ct_prefix_sum,
@@ -170,7 +80,6 @@ void ori_par( const int           octave,
 
     /* orientation histogram radius */
     const float  sigw = ORI_WINFACTOR * sig;
-    // const int32_t rad  = (int)roundf((3.0f * sigw));
     const int32_t rad  = max( (int)floorf((3.0f * sigw)), 1 );
 
     const float factor = __fdividef( -0.5f, (sigw * sigw) );
@@ -216,7 +125,12 @@ void ori_par( const int           octave,
             {
                 float weight = grad * expf(sq_dist * factor);
 
-                SB::fillHist( hist, weight, theta );
+                int bidx = (int)roundf( __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) );
+
+                while( bidx < 0 )          bidx += ORI_NBINS;
+                while( bidx >= ORI_NBINS ) bidx -= ORI_NBINS;
+
+                atomicAdd( &hist[bidx], weight );
             }
         }
     }
@@ -251,7 +165,23 @@ void ori_par( const int           octave,
 
     for( int bin = threadIdx.x; popsift::any( bin < ORI_NBINS ); bin += blockDim.x )
     {
-        SB::refine( bin, sm_hist, maxval, refined_angle[bin], yval[bin] );
+        const int prev = ( bin - 1 + ORI_NBINS ) % ORI_NBINS;
+        const int next = ( bin + 1 )             % ORI_NBINS;
+
+        bool predicate = ( bin < ORI_NBINS ) &&
+                         ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) ) &&
+                         ( sm_hist[bin] > 0.8f * maxval );
+
+        const float num  = predicate ?   3.0f * sm_hist[prev]
+                                       - 4.0f * sm_hist[bin]
+                                       + 1.0f * sm_hist[next]
+                                     : 0.0f;
+        const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
+
+        const float newbin = __fdividef( num, denB ); // verified: accuracy OK
+
+        refined_angle[bin] = predicate ? prev + newbin : -1;
+        yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + hist[prev] : -INFINITY;
     }
     __syncthreads();
 
@@ -274,7 +204,8 @@ void ori_par( const int           octave,
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             if( chosen_bin <  0         ) chosen_bin += ORI_NBINS;
             float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS); // - M_PI;
-            th = SB::twist( th );
+            th -= M_PI;
+            if( th < 0.0f ) th += M_PI2;
             ext->orientation[threadIdx.x] = th;
             written = true;
         }
@@ -443,26 +374,13 @@ void Pyramid::orientation( const Config& conf )
             block.y = 1;
             grid.x  = num;
 
-            if( conf.getOrientationMode() == Config::BestBin )
-            {
-                ori_par<BestBin>
-                    <<<grid,block,4*64*sizeof(float),oct_str>>>
-                    ( octave,
-                      hct.ext_ps[octave],
-                      oct_obj.getDataTexPoint( ),
-                      oct_obj.getWidth( ),
-                      oct_obj.getHeight( ) );
-            }
-            else
-            {
-                ori_par<InterpolatedBin>
-                    <<<grid,block,4*64*sizeof(float),oct_str>>>
-                    ( octave,
-                      hct.ext_ps[octave],
-                      oct_obj.getDataTexPoint( ),
-                      oct_obj.getWidth( ),
-                      oct_obj.getHeight( ) );
-            }
+            ori_par
+                <<<grid,block,4*64*sizeof(float),oct_str>>>
+                ( octave,
+                  hct.ext_ps[octave],
+                  oct_obj.getDataTexPoint( ),
+                  oct_obj.getWidth( ),
+                  oct_obj.getHeight( ) );
             POP_SYNC_CHK;
 
             if( octave != 0 ) {

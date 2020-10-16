@@ -34,7 +34,6 @@ Config::Config( )
     , _sift_mode( Config::PopSift )
     , _log_mode( Config::None )
     , _scaling_mode( Config::ScaleDefault )
-    , _ori_mode( Config::OriDefault )
     , _desc_mode( Config::Loop )
     , _grid_filter_mode( Config::RandomScale )
     , verbose( false )
@@ -194,42 +193,6 @@ Config::LogMode Config::getLogMode( ) const
 void Config::setScalingMode( ScalingMode mode )
 {
     _scaling_mode = mode;
-}
-
-void Config::setOrientationMode( OriMode mode )
-{
-    _ori_mode = mode;
-}
-
-void Config::setOrientationMode( const std::string& text )
-{
-    if( stringIsame( text, "BestBin" ) )
-    {
-        _ori_mode = BestBin;
-    }
-    else if( stringIsame( text, "PopSift" ) )
-    {
-        _ori_mode = BestBin;
-    }
-    else if( stringIsame( text, "InterpolatedBin" ) )
-    {
-        _ori_mode = InterpolatedBin;
-    }
-    else if( stringIsame( text, "VLFeat" ) )
-    {
-        _ori_mode = InterpolatedBin;
-    }
-    else
-        POP_FATAL( string("Bad Orientation mode.\n") + getOrientationModeUsage() );
-}
-
-const char* Config::getOrientationModeUsage( )
-{
-    return
-        "Choice of orientation computation modes. "
-        "Options are: "
-        "BestBin (original PopSift bejaviour, default), "
-        "InterpolatedBin (VLFeat-like behaviour, experimental, do not use)";
 }
 
 /**
