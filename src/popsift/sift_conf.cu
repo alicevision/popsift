@@ -9,8 +9,16 @@
 #include "sift_conf.h"
 
 #include <iostream>
+#include <algorithm>
 
 using namespace std;
+
+static bool stringIsame( string l, string r )
+{
+    std::for_each( l.begin(), l.end(), [](char& c) { c = ::tolower(c); });
+    std::for_each( r.begin(), r.end(), [](char& c) { c = ::tolower(c); });
+    return l == r;
+}
 
 namespace popsift
 {
@@ -79,6 +87,25 @@ void Config::setDescMode( const std::string& text )
 void Config::setDescMode( Config::DescMode m )
 {
     _desc_mode = m;
+}
+
+const char* Config::getDescModeUsage( )
+{
+    return "Choice of descriptor extraction modes:\n"
+           "loop, iloop, grid, igrid, notile, vlfeat\n"
+	       "Default is loop\n"
+           "loop is OpenCV-like horizontal scanning, sampling every pixel in a radius around the "
+           "centers or the 16 tiles arond the keypoint. Each sampled point contributes to two "
+           "histogram bins."
+           "iloop is like loop but samples all constant 1-pixel distances from the keypoint, "
+           "using the CUDA texture engine for interpolation. "
+           "grid is like loop but works on rotated, normalized tiles, relying on CUDA 2D cache "
+           "to replace the manual data aligment idea of loop. "
+           "igrid iloop and grid. "
+           "notile is like igrid but handles all 16 tiles at once.\n"
+           "vlfeat is VLFeat-like horizontal scanning, sampling every pixel in a radius around "
+           "keypoint itself, using the 16 tile centers only for weighting. Every sampled point "
+           "contributes to up to eight historgram bins.";
 }
 
 void Config::setGaussMode( const std::string& m )
@@ -196,15 +223,25 @@ void Config::setNormMode( Config::NormMode m )
 
 void Config::setNormMode( const std::string& m )
 {
-    if( m == "RootSift" ) setNormMode( Config::RootSift );
-    else if( m == "classic" ) setNormMode( Config::Classic );
+    if( stringIsame( m, "RootSift" ) )
+    {
+        setNormMode( Config::RootSift );
+    }
+    else if( stringIsame( m, "L2" ) )
+    {
+        setNormMode( Config::Classic );
+    }
+    else if( stringIsame( m, "Classic" ) )
+    {
+        setNormMode( Config::Classic );
+    }
     else
         POP_FATAL( string("Bad Normalization mode.\n") + getGaussModeUsage() );
 }
 
 Config::NormMode Config::getNormModeDefault( )
 {
-    return Config::RootSift;
+    return Config::NormDefault;
 }
 
 const char* Config::getNormModeUsage( )
@@ -232,12 +269,24 @@ int Config::getNormalizationMultiplier( ) const
     return _normalization_multiplier;
 }
 
-void Config::setDownsampling( float v ) { _upscale_factor = -v; }
+void  Config::setDownsampling( float v ) { _upscale_factor = -v; }
+float Config::getDownsampling( ) const   { return -_upscale_factor; }
+
 void Config::setOctaves( int v ) { octaves = v; }
+int  Config::getOctaves( ) const { return octaves; }
+
 void Config::setLevels( int v ) { levels = v; }
-void Config::setSigma( float v ) { sigma = v; }
-void Config::setEdgeLimit( float v ) { _edge_limit = v; }
-void Config::setThreshold( float v ) { _threshold = v; }
+int  Config::getLevels( ) const { return levels; }
+
+void  Config::setSigma( float v ) { sigma = v; }
+float Config::getSigma( ) const { return sigma; }
+
+void  Config::setEdgeLimit( float v ) { _edge_limit = v; }
+float Config::getEdgeLimit( ) const   { return _edge_limit; }
+
+void  Config::setThreshold( float v ) { _threshold = v; }
+float Config::getThreshold( ) const   { return _threshold; }
+
 void Config::setPrintGaussTables() { _print_gauss_tables = true; }
 void Config::setFilterMaxExtrema( int ext ) { _filter_max_extrema = ext; }
 void Config::setFilterGridSize( int sz ) { _filter_grid_size = sz; }
@@ -252,6 +301,15 @@ void Config::setInitialBlur( float blur )
         _initial_blur        = blur;
     }
 }
+bool Config::hasInitialBlur( ) const
+{
+    return _assume_initial_blur;
+}
+float Config::getInitialBlur( ) const
+{
+    return _initial_blur;
+}
+
 
 Config::GaussMode Config::getGaussMode( ) const
 {
@@ -261,16 +319,6 @@ Config::GaussMode Config::getGaussMode( ) const
 Config::SiftMode Config::getSiftMode() const
 {
     return _sift_mode;
-}
-
-bool Config::hasInitialBlur( ) const
-{
-    return _assume_initial_blur;
-}
-
-float Config::getInitialBlur( ) const
-{
-    return _initial_blur;
 }
 
 float Config::getPeakThreshold() const
@@ -304,4 +352,3 @@ bool Config::equal( const Config& other ) const
 }
 
 }; // namespace popsift
-

@@ -88,15 +88,16 @@ void Pyramid::descriptors( const Config& conf )
     if( hct.ori_total == 0 )
     {
         cerr << "Warning: no descriptors extracted" << endl;
-	return;
+        return;
     }
 
     dim3 block;
-    dim3 grid;
-    grid.x  = grid_divide( hct.ori_total, 32 );
     block.x = 32;
     block.y = 32;
     block.z = 1;
+
+    dim3 grid;
+    grid.x  = grid_divide( hct.ori_total, block.y );
 
     if( conf.getUseRootSift() ) {
         normalize_histogram<NormalizeRootSift> <<<grid,block,0,_download_stream>>> ( );
