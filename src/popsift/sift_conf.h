@@ -95,6 +95,10 @@ struct Config
         IGrid,
         /// loop-compatible; variant of IGrid, no duplicate gradient fetching
         NoTile,
+        /** extraction code according to VLFeat, similar to loop, weight goes into
+         *  up to 8 histogram bins
+         */
+        VLFeat_Desc
     };
 
     /**

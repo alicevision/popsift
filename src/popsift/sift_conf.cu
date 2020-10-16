@@ -80,6 +80,8 @@ void Config::setDescMode( const std::string& text )
         setDescMode( Config::IGrid );
     else if( text == "notile" )
         setDescMode( Config::NoTile );
+    else if( text == "vlfeat" )
+        setDescMode( Config::VLFeat_Desc );
     else
         POP_FATAL( "specified descriptor extraction mode must be one of loop, grid or igrid" );
 }

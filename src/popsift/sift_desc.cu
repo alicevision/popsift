@@ -13,6 +13,7 @@
 #include "s_desc_loop.h"
 #include "s_desc_normalize.h"
 #include "s_desc_notile.h"
+#include "s_desc_vlfeat.h"
 #include "s_gradiant.h"
 #include "sift_config.h"
 #include "sift_constants.h"
@@ -77,6 +78,8 @@ void Pyramid::descriptors( const Config& conf )
                 start_ext_desc_igrid( octave, oct_obj );
             } else if( conf.getDescMode() == Config::NoTile ) {
                 start_ext_desc_notile( octave, oct_obj );
+            } else if( conf.getDescMode() == Config::VLFeat_Desc ) {
+                start_ext_desc_vlfeat( octave, oct_obj );
             } else {
                 POP_FATAL( "not yet" );
             }
