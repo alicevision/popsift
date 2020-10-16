@@ -33,7 +33,7 @@ struct Feature
     float       orientation[ORIENTATION_MAX_COUNT];
     Descriptor* desc[ORIENTATION_MAX_COUNT];
 
-    void print( std::ostream& ostr, bool write_as_uchar ) const;
+    void print( std::ostream& ostr, bool write_as_uchar, bool with_orientation ) const;
 };
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
@@ -91,7 +91,7 @@ public:
     inline Feature*    getFeatures()    { return _ext; }
     inline Descriptor* getDescriptors() { return _ori; }
 
-    void print( std::ostream& ostr, bool write_as_uchar ) const;
+    void print( std::ostream& ostr, bool write_as_uchar, bool with_orientation ) const;
 
 protected:
     friend class Pyramid;
