@@ -58,15 +58,15 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
     float norm;
 
     if( threadIdx.x == 0 ) {
-        norm = normf( 128, src_desc );
+        norm = rnormf( 128, src_desc ); // 1/sqrt(sum of squares)
     }
     __syncthreads();
     norm = popsift::shuffle( norm, 0 );
 
-    descr.x = min( descr.x, 0.2f*norm );
-    descr.y = min( descr.y, 0.2f*norm );
-    descr.z = min( descr.z, 0.2f*norm );
-    descr.w = min( descr.w, 0.2f*norm );
+    descr.x = min( descr.x*norm, 0.2f );
+    descr.y = min( descr.y*norm, 0.2f );
+    descr.z = min( descr.z*norm, 0.2f );
+    descr.w = min( descr.w*norm, 0.2f );
 
     norm = descr.x * descr.x
          + descr.y * descr.y
@@ -96,14 +96,14 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
     norm += popsift::shuffle_down( norm,  2 );
     norm += popsift::shuffle_down( norm,  1 );
     if( threadIdx.x == 0 ) {
-        norm = __fsqrt_rn( norm );
+        norm = __frsqrt_rn( norm );
     }
     norm = popsift::shuffle( norm,  0 );
 
-    descr.x = min( descr.x, 0.2f*norm );
-    descr.y = min( descr.y, 0.2f*norm );
-    descr.z = min( descr.z, 0.2f*norm );
-    descr.w = min( descr.w, 0.2f*norm );
+    descr.x = min( descr.x*norm, 0.2f );
+    descr.y = min( descr.y*norm, 0.2f );
+    descr.z = min( descr.z*norm, 0.2f );
+    descr.w = min( descr.w*norm, 0.2f );
 
     norm = descr.x * descr.x
          + descr.y * descr.y
