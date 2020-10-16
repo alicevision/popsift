@@ -18,17 +18,17 @@ void normalize_histogram( )
     Descriptor* descs            = dbuf.desc;
     const int   num_orientations = dct.ori_total;
 
-    int offset = blockIdx.x * 32 + threadIdx.y;
+    int offset = blockIdx.x * blockDim.y + threadIdx.y;
 
     // all of these threads are useless
-    if( blockIdx.x * 32 >= num_orientations ) return;
+    if( blockIdx.x * blockDim.y >= num_orientations ) return;
 
-    offset = ( offset < num_orientations ) ? offset
-                                           : num_orientations-1;
-    Descriptor* desc = &descs[offset];
+    offset = min( offset, num_orientations-1 );
+
+    float* features = descs[offset].features;
 
     bool ignoreme = ( offset >= num_orientations );
 
-    T::normalize( desc->features, ignoreme );
+    T::normalize( features, ignoreme );
 }
 
