@@ -34,6 +34,9 @@ else()
   message(STATUS "Building in ${CMAKE_BUILD_TYPE} configuration")
 endif()
 
+include(FindOpenACC)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenACC_CXX_FLAGS}")
+
 # ensure the proper linker flags when building the static version on MSVC
 if(MSVC AND NOT BUILD_SHARED_LIBS)
   foreach(config "DEBUG" "RELEASE" "MINSIZEREL" "RELWITHDEBINFO")

@@ -1,0 +1,14 @@
+all: test
+
+test: @CMAKE_RUNTIME_OUTPUT_DIRECTORY@/popsift-compareSiftFiles
+	sh ./compareWithVLFeat.sh
+
+clean:
+	rm -f sort*.txt
+	rm -f sort*.png
+	rm -f *.sift
+	rm -f descdist*.txt
+	rm -f descdist*.png
+	rm -f tmp/*.sift tmp/UML*.txt tmp/sort*.txt tmp/coord*.txt tmp/sum*.txt
+	rm -f tmp/descdist*.txt
+

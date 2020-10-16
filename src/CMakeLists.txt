@@ -150,3 +150,7 @@ if(PopSift_BUILD_EXAMPLES)
   add_subdirectory(application)
 endif()
 
+if(PopSift_USE_TEST_CMD)
+  add_subdirectory(compareSiftFiles)
+endif()
+
