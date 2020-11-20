@@ -18,7 +18,7 @@ namespace popsift {
 __device__ __constant__
 GaussInfo d_gauss;
 
-__align__(128) GaussInfo h_gauss;
+__align__(128) thread_local GaussInfo h_gauss;
 
 
 __global__
