@@ -140,7 +140,7 @@ bool PopSift::private_init( int w, int h )
     return true;
 }
 
-bool PopSift::private_unit()
+bool PopSift::private_uninit()
 {
     Pipe& p = _pipe;
 
@@ -340,7 +340,7 @@ void PopSift::extractDownloadLoop( )
         job->setFeatures( features );
     }
 
-    private_unit();
+    private_uninit();
 }
 
 void PopSift::matchPrepareLoop( )
@@ -369,6 +369,8 @@ void PopSift::matchPrepareLoop( )
 
         job->setFeatures( features );
     }
+
+    private_uninit();
 }
 
 SiftJob::SiftJob( int w, int h, const unsigned char* imageData )
