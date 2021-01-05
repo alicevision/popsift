@@ -16,7 +16,7 @@ using namespace std;
 
 namespace popsift {
 
-ConstInfo                         h_consts;
+thread_local            ConstInfo h_consts;
 __device__ __constant__ ConstInfo d_consts;
 
 void init_constants( float sigma0, int levels, float threshold, float edge_limit, int max_extrema, int normalization_multiplier )

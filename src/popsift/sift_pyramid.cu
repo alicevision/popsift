@@ -38,18 +38,15 @@ using namespace std;
 
 namespace popsift {
 
-__device__
-ExtremaCounters dct;
-ExtremaCounters hct;
+__device__ ExtremaCounters   dct;
+thread_local ExtremaCounters hct;
 
-__device__
-ExtremaBuffers  dbuf;
-ExtremaBuffers  dbuf_shadow; // just for managing memories
-ExtremaBuffers  hbuf;
+__device__ ExtremaBuffers   dbuf;
+thread_local ExtremaBuffers dbuf_shadow; // just for managing memories
+thread_local ExtremaBuffers hbuf;
 
-__device__
-DevBuffers      dobuf;
-DevBuffers      dobuf_shadow; // just for managing memories
+__device__ DevBuffers       dobuf;
+thread_local DevBuffers     dobuf_shadow; // just for managing memories
 
 __global__
     void py_print_corner_float(float* img, uint32_t pitch, uint32_t height, uint32_t level)
@@ -215,6 +212,7 @@ Pyramid::~Pyramid()
 {
     cudaStreamDestroy( _download_stream );
 
+    cudaFree(     _d_extrema_num_blocks );
     cudaFree(     dobuf_shadow.i_ext_dat[0] );
     cudaFree(     dobuf_shadow.i_ext_off[0] );
     cudaFree(     dobuf_shadow.features );

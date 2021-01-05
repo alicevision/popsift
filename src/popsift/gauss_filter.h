@@ -105,7 +105,7 @@ private:
 };
 
 extern __device__ __constant__ GaussInfo d_gauss;
-extern                         GaussInfo h_gauss;
+extern thread_local            GaussInfo h_gauss;
 
 /* init_filter must be called early to initialize the Gauss tables.
  */
