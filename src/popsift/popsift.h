@@ -150,7 +150,7 @@ public:
      * @brief We support more than 1 streams, but we support only one sigma and one
      * level parameters.
      */
-    explicit PopSift( ImageMode imode = ByteImages );
+    explicit PopSift( ImageMode imode = ByteImages, int device = 0 );
 
     /**
      * @brief
@@ -160,7 +160,7 @@ public:
      */
     explicit PopSift(const popsift::Config& config,
                      popsift::Config::ProcessingMode mode = popsift::Config::ExtractingMode,
-                     ImageMode imode = ByteImages);
+                     ImageMode imode = ByteImages, int device = 0);
 
     /**
      * @brief Release all the resources.
@@ -273,7 +273,10 @@ public:
     }
 
 private:
+    bool applyConfiguration( bool force = false );
+
     bool private_init( int w, int h );
+    bool private_uninit( );
     void private_apply_scale_factor( int& w, int& h );
     void uploadImages( );
 
@@ -299,6 +302,7 @@ private:
     int             _last_init_w{}; /* to support deprecated interface */
     int             _last_init_h{}; /* to support deprecated interface */
     ImageMode       _image_mode;
+    int             _device;
 
     /// whether the object is initialized
     bool            _isInit{true};

@@ -50,13 +50,13 @@ struct DevBuffers
     Feature*         features;
 };
 
-extern            ExtremaCounters hct;
-extern __device__ ExtremaCounters dct;
-extern            ExtremaBuffers  hbuf;
-extern __device__ ExtremaBuffers  dbuf;
-extern            ExtremaBuffers  dbuf_shadow; // just for managing memories
-extern __device__ DevBuffers      dobuf;
-extern            DevBuffers      dobuf_shadow; // just for managing memories
+extern thread_local ExtremaCounters hct;
+extern __device__   ExtremaCounters dct;
+extern thread_local ExtremaBuffers  hbuf;
+extern __device__   ExtremaBuffers  dbuf;
+extern thread_local ExtremaBuffers  dbuf_shadow; // just for managing memories
+extern __device__   DevBuffers      dobuf;
+extern thread_local DevBuffers      dobuf_shadow; // just for managing memories
 
 class Pyramid
 {

@@ -19,9 +19,13 @@
 
 using namespace std;
 
-PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode, ImageMode imode )
+PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode, ImageMode imode, int device )
     : _image_mode( imode )
+    , _device(device)
 {
+    cudaSetDevice(_device);
+    configure(config);
+
     if( imode == ByteImages )
     {
         _pipe._unused.push( new popsift::Image);
@@ -33,8 +37,6 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
         _pipe._unused.push( new popsift::ImageFloat );
     }
 
-    configure( config, true );
-
     _pipe._thread_stage1.reset( new std::thread( &PopSift::uploadImages, this ));
     if( mode == popsift::Config::ExtractingMode )
         _pipe._thread_stage2.reset( new std::thread( &PopSift::extractDownloadLoop, this ));
@@ -42,9 +44,12 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
         _pipe._thread_stage2.reset( new std::thread( &PopSift::matchPrepareLoop, this ));
 }
 
-PopSift::PopSift( ImageMode imode )
+PopSift::PopSift( ImageMode imode, int device )
     : _image_mode( imode )
+    , _device(device)
 {
+    cudaSetDevice(_device);
+
     if( imode == ByteImages )
     {
         _pipe._unused.push( new popsift::Image);
@@ -68,16 +73,20 @@ PopSift::~PopSift()
     }
 }
 
-bool PopSift::configure( const popsift::Config& config, bool force )
+bool PopSift::configure( const popsift::Config& config, bool /*force*/ )
 {
     if( _pipe._pyramid != nullptr ) {
         return false;
     }
 
     _config = config;
-
     _config.levels = max( 2, config.levels );
 
+    return true;
+}
+
+bool PopSift::applyConfiguration(bool force)
+{
     if( force || ( _config  != _shadow_config ) )
     {
         popsift::init_filter( _config,
@@ -127,6 +136,16 @@ bool PopSift::private_init( int w, int h )
     p._pyramid = new popsift::Pyramid( _config, w, h );
 
     cudaDeviceSynchronize();
+
+    return true;
+}
+
+bool PopSift::private_uninit()
+{
+    Pipe& p = _pipe;
+
+    delete p._pyramid;
+    p._pyramid = nullptr;
 
     return true;
 }
@@ -273,6 +292,8 @@ SiftJob* PopSift::enqueue( int          w,
 
 void PopSift::uploadImages( )
 {
+    cudaSetDevice(_device);
+
     SiftJob* job;
     while( ( job = _pipe._queue_stage1.pull() ) != nullptr ) {
         popsift::ImageBase* img = _pipe._unused.pull();
@@ -284,10 +305,15 @@ void PopSift::uploadImages( )
 
 void PopSift::extractDownloadLoop( )
 {
+    cudaSetDevice(_device);
+    applyConfiguration(true);
+
     Pipe& p = _pipe;
 
     SiftJob* job;
     while( ( job = p._queue_stage2.pull() ) != nullptr ) {
+        applyConfiguration();
+
         popsift::ImageBase* img = job->getImg();
 
         private_init( img->getWidth(), img->getHeight() );
@@ -313,14 +339,21 @@ void PopSift::extractDownloadLoop( )
 
         job->setFeatures( features );
     }
+
+    private_uninit();
 }
 
 void PopSift::matchPrepareLoop( )
 {
+    cudaSetDevice(_device);
+    applyConfiguration(true);
+
     Pipe& p = _pipe;
 
     SiftJob* job;
     while( ( job = p._queue_stage2.pull() ) != nullptr ) {
+        applyConfiguration();
+
         popsift::ImageBase* img = job->getImg();
 
         private_init( img->getWidth(), img->getHeight() );
@@ -336,6 +369,8 @@ void PopSift::matchPrepareLoop( )
 
         job->setFeatures( features );
     }
+
+    private_uninit();
 }
 
 SiftJob::SiftJob( int w, int h, const unsigned char* imageData )
@@ -445,8 +480,4 @@ void PopSift::Pipe::uninit()
         popsift::ImageBase* img = _unused.pull();
         delete img;
     }
-
-    delete _pyramid;
-    _pyramid    = nullptr;
-
 }
