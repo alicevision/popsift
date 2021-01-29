@@ -13,6 +13,7 @@
 
 #include <cstdio>
 #include <iostream>
+#include <stdexcept>
 
 //   1    -> 19.6 on 980 Ti
 //   2    -> 19.5 on 980 Ti
@@ -151,11 +152,7 @@ bool start_ext_desc_notile( int octave, Octave& oct_obj )
           oct_obj.getDataTexLinear( ).tex );
     cudaDeviceSynchronize();
     cudaError_t err = cudaGetLastError( );
-    if( err != cudaSuccess ) {
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
-                  << "    cudaGetLastError failed: " << cudaGetErrorString(err) << std::endl;
-        exit( -__LINE__ );
-    }
+    POP_CUDA_FATAL_TEST(err, "cudaGetLastError failed: ");
 
     POP_SYNC_CHK;
 

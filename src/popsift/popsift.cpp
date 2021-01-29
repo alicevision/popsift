@@ -12,10 +12,13 @@
 #include "gauss_filter.h"
 #include "sift_config.h"
 #include "sift_pyramid.h"
+#include "common/debug_macros.h"
 
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <iostream>
+#include <stdexcept>
 
 using namespace std;
 
@@ -154,7 +157,7 @@ void PopSift::uninit( )
 {
     if(!_isInit)
     {
-        std::cout << "[warning] Attempt to release resources from an uninitialized instance" << std::endl;
+        std::cerr << "[warning] Attempt to release resources from an uninitialized instance" << std::endl;
         return;
     }
     _pipe.uninit();
@@ -248,9 +251,10 @@ SiftJob* PopSift::enqueue( int                  w,
 {
     if( _image_mode != ByteImages )
     {
-        cerr << __FILE__ << ":" << __LINE__ << " Image mode error" << endl
-             << "E    Cannot load byte images into a PopSift pipeline configured for float images" << endl;
-        exit( -1 );
+        stringstream ss;
+        ss << "Image mode error" << endl
+           << "E    Cannot load byte images into a PopSift pipeline configured for float images";
+        POP_FATAL(ss.str());
     }
 
     AllocTest a = testTextureFit( w, h );
@@ -272,9 +276,10 @@ SiftJob* PopSift::enqueue( int          w,
 {
     if( _image_mode != FloatImages )
     {
-        cerr << __FILE__ << ":" << __LINE__ << " Image mode error" << endl
-             << "E    Cannot load float images into a PopSift pipeline configured for byte images" << endl;
-        exit( -1 );
+        stringstream ss;
+        ss << "Image mode error" << endl
+           << "E    Cannot load float images into a PopSift pipeline configured for byte images";
+        POP_FATAL(ss.str());
     }
 
     AllocTest a = testTextureFit( w, h );
@@ -352,20 +357,29 @@ void PopSift::matchPrepareLoop( )
 
     SiftJob* job;
     while( ( job = p._queue_stage2.pull() ) != nullptr ) {
-        applyConfiguration();
+        popsift::FeaturesDev* features;
+        try
+        {
+            applyConfiguration();
 
-        popsift::ImageBase* img = job->getImg();
+            popsift::ImageBase* img = job->getImg();
 
-        private_init( img->getWidth(), img->getHeight() );
+            private_init(img->getWidth(), img->getHeight());
 
-        p._pyramid->step1( _config, img );
-        p._unused.push( img ); // uploaded input image no longer needed, release for reuse
+            p._pyramid->step1(_config, img);
+            p._unused.push(img); // uploaded input image no longer needed, release for reuse
 
-        p._pyramid->step2( _config );
+            p._pyramid->step2(_config);
 
-        popsift::FeaturesDev* features = p._pyramid->clone_device_descriptors( _config );
-
-        cudaDeviceSynchronize();
+            features = p._pyramid->clone_device_descriptors(_config);
+            cudaDeviceSynchronize();
+        }
+        catch(const std::exception& e)
+        {
+            job->setError(std::current_exception());
+            job->setFeatures(nullptr);
+            break;
+        }
 
         job->setFeatures( features );
     }
@@ -387,9 +401,10 @@ SiftJob::SiftJob( int w, int h, const unsigned char* imageData )
     }
     else
     {
-        cerr << __FILE__ << ":" << __LINE__ << " Memory limitation" << endl
-             << "E    Failed to allocate memory for SiftJob" << endl;
-        exit( -1 );
+        stringstream ss;
+        ss << "Memory limitation" << endl
+           << "E    Failed to allocate memory for SiftJob";
+        POP_FATAL(ss.str());
     }
 }
 
@@ -407,9 +422,10 @@ SiftJob::SiftJob( int w, int h, const float* imageData )
     }
     else
     {
-        cerr << __FILE__ << ":" << __LINE__ << " Memory limitation" << endl
-             << "E    Failed to allocate memory for SiftJob" << endl;
-        exit( -1 );
+        stringstream ss;
+        ss << "Memory limitation" << endl
+           << "E    Failed to allocate memory for SiftJob";
+        POP_FATAL(ss.str());
     }
 }
 
@@ -458,7 +474,16 @@ popsift::FeaturesHost* SiftJob::getHost()
 
 popsift::FeaturesDev* SiftJob::getDev()
 {
-    return dynamic_cast<popsift::FeaturesDev*>( _f.get() );
+    popsift::FeaturesBase* features = _f.get();
+    if(this->_err != nullptr) {
+        std::rethrow_exception(this->_err);
+    }
+    return dynamic_cast<popsift::FeaturesDev*>(features);
+}
+
+void SiftJob::setError(std::exception_ptr ptr)
+{
+    this->_err = ptr;
 }
 
 void PopSift::Pipe::uninit()

@@ -16,6 +16,8 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "debug_macros.h"
+
 #define PLANE2D_CUDA_OP_DEBUG
 
 #ifndef NDEBUG
@@ -407,14 +409,16 @@ __host__
 inline void Plane2D<T>::memcpyToDevice( Plane2D<T>& devPlane, cudaStream_t stream )
 {
     if( devPlane._cols != this->_cols ) {
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
-                  << "    Error: source columns (" << this->_cols << ") and dest columns (" << devPlane._cols << ") must be identical" << std::endl;
-        exit( -1 );
+        std::stringstream ss;
+        ss << "Error: source columns (" << this->_cols << ") and dest columns (" << devPlane._cols
+           << ") must be identical";
+        POP_FATAL(ss.str());
     }
     if( devPlane._rows != this->_rows ) {
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
-                  << "    Error: source rows (" << this->_rows << ") and dest rows (" << devPlane._rows << ") must be identical" << std::endl;
-        exit( -1 );
+        std::stringstream ss;
+        ss << "Error: source rows (" << this->_rows << ") and dest rows (" << devPlane._rows
+           << ") must be identical";
+        POP_FATAL(ss.str());
     }
     PitchPlane2D<T>::memcpyToDevice( devPlane, this->_cols, this->_rows, stream );
 }

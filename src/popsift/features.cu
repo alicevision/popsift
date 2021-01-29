@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 
 using namespace std;
 
@@ -61,19 +62,21 @@ void FeaturesHost::reset( int num_ext, int num_ori )
 
     _ext = (Feature*)memalign( getPageSize(), num_ext * sizeof(Feature) );
     if( _ext == nullptr ) {
-        cerr << __FILE__ << ":" << __LINE__ << " Runtime error:" << endl
-             << "    Failed to (re)allocate memory for downloading " << num_ext << " features" << endl;
-        if( errno == EINVAL ) cerr << "    Alignment is not a power of two." << endl;
-        if( errno == ENOMEM ) cerr << "    Not enough memory." << endl;
-        exit( -1 );
+        std::stringstream ss;
+        ss << "Runtime error:" << endl
+           << "    Failed to (re)allocate memory for downloading " << num_ext << " features" << endl;
+        if(errno == EINVAL) ss << "    Alignment is not a power of two.";
+        if(errno == ENOMEM) ss << "    Not enough memory.";
+        POP_FATAL(ss.str());
     }
     _ori = (Descriptor*)memalign( getPageSize(), num_ori * sizeof(Descriptor) );
-    if( _ori == nullptr ) {
-        cerr << __FILE__ << ":" << __LINE__ << " Runtime error:" << endl
-             << "    Failed to (re)allocate memory for downloading " << num_ori << " descriptors" << endl;
-        if( errno == EINVAL ) cerr << "    Alignment is not a power of two." << endl;
-        if( errno == ENOMEM ) cerr << "    Not enough memory." << endl;
-        exit( -1 );
+    if(_ori == nullptr) {
+        std::stringstream ss;
+        ss << "Runtime error:" << endl
+           << "    Failed to (re)allocate memory for downloading " << num_ori << " descriptors" << endl;
+        if(errno == EINVAL) ss << "    Alignment is not a power of two.";
+        if(errno == ENOMEM) ss << "    Not enough memory.";
+        POP_FATAL(ss.str());
     }
 
     setFeatureCount( num_ext );
