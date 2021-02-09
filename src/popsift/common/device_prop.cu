@@ -220,6 +220,9 @@ bool device_prop_t::checkLimit_2DtexLayered( int& width, int& height, int& layer
                       << "    does not support 2D array textures " << width
                       << " pixels wide." << endl;
         }
+        std::cerr << __FILE__ << ":" << __LINE__
+                  << "    width is too large :" << width
+                  << " px > " << ptr->maxTexture2DLayered[0] << endl;
         width = ptr->maxTexture2DLayered[0];
         returnSuccess = false;
     }
@@ -232,6 +235,9 @@ bool device_prop_t::checkLimit_2DtexLayered( int& width, int& height, int& layer
                       << "    does not support 2D array textures " << height
                       << " pixels high." << endl;
         }
+        std::cerr << __FILE__ << ":" << __LINE__
+                  << "    height is too large :" << height
+                  << " px > " << ptr->maxTexture2DLayered[1] << endl;
         height = ptr->maxTexture2DLayered[1];
         returnSuccess = false;
     }
@@ -244,6 +250,9 @@ bool device_prop_t::checkLimit_2DtexLayered( int& width, int& height, int& layer
                       << "    does not support 2D array textures " << layers
                       << " pixels deep." << endl;
         }
+        std::cerr << __FILE__ << ":" << __LINE__
+                  << "    layers is too large :" << layers
+                  << " > " << ptr->maxTexture2DLayered[2] << endl;
         layers = ptr->maxTexture2DLayered[2];
         returnSuccess = false;
     }
