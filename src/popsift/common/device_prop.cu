@@ -61,6 +61,10 @@ void device_prop_t::print( )
                   << "{" << ptr->maxGridSize[0]
                   << "," << ptr->maxGridSize[1]
                   << "," << ptr->maxGridSize[2] << "}" << endl
+                  << "    Max 2D surface layered sizes:        "
+                  << "{" << ptr->maxTexture2DLayered[0]
+                  << "," << ptr->maxTexture2DLayered[1]
+                  << "," << ptr->maxTexture2DLayered[2] << "}" << endl
                   << "    Number of SM(x)s:      " << ptr->multiProcessorCount << endl
                   << "    Concurrent kernels:    " << (ptr->concurrentKernels?"yes":"no") << endl
                   << "    Mapping host memory:   " << (ptr->canMapHostMemory?"yes":"no") << endl
