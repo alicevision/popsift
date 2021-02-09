@@ -1,4 +1,4 @@
-ARG CUDA_TAG=10.2
+ARG CUDA_TAG=11.2.0
 ARG OS_TAG=18.04
 FROM alicevision/popsift-deps:cuda${CUDA_TAG}-ubuntu${OS_TAG}
 LABEL maintainer="AliceVision Team alicevision@googlegroups.com"

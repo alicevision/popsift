@@ -31,7 +31,7 @@ RUN apt-get clean && apt-get update && apt-get install -y --no-install-recommend
         libboost-program-options-dev \
         libboost-thread-dev \
  && rm -rf /var/lib/apt/lists/*
- 
+
  # Manually install cmake
 WORKDIR /tmp/cmake
 ENV CMAKE_VERSION=3.17
