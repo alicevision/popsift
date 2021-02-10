@@ -16,6 +16,7 @@ option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce co
 option(PopSift_USE_NORMF "The __normf function computes Euclidean distance on large arrays. Fast but stability is uncertain." OFF)
 option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
 option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
+option(PopSift_NO_DEPRECATED_CUDA_SM_WARNINGS "Suppress warnings about soon to be deprecated cuda SM" ON)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE AND NOT MSVC)
@@ -104,6 +105,10 @@ if(PopSift_ERRCHK_AFTER_KERNEL)
 endif()
 
 set(CUDA_SEPARABLE_COMPILATION ON)
+
+if(PopSift_NO_DEPRECATED_CUDA_SM_WARNINGS)
+  list(APPEND CUDA_NVCC_FLAGS "-Wno-deprecated-gpu-targets")
+endif()
 
 if(UNIX AND NOT APPLE)
   list(APPEND CUDA_NVCC_FLAGS         "-Xcompiler;-rdynamic")
