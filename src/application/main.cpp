@@ -74,13 +74,13 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
              "Initial sigma value")
             ("threshold",
              value<float>()->notifier([&](float f) { config.setThreshold(f); })->default_value(config.getThreshold()),
-             "Contrast threshold")
+             popsift::Config::getPeakThreshUsage().c_str() )
             ("edge-threshold",
              value<float>()->notifier([&](float f) { config.setEdgeLimit(f); })->default_value(config.getEdgeLimit()),
-             "On-edge threshold")
+             popsift::Config::getEdgeThreshUsage().c_str() )
             ("edge-limit",
              value<float>()->notifier([&](float f) { config.setEdgeLimit(f); }),
-             "On-edge threshold")
+             "synonym to --edge-threshold" )
             ("downsampling",
              value<float>()->notifier([&](float f) { config.setDownsampling(f); })->default_value(config.getDownsampling()),
              "Downscale width and height of input by 2^N")

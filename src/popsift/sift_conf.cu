@@ -9,6 +9,7 @@
 #include "sift_conf.h"
 
 #include <iostream>
+#include <sstream>
 #include <algorithm>
 
 using namespace std;
@@ -28,8 +29,8 @@ Config::Config( )
     , octaves( -1 )
     , levels( 3 )
     , sigma( 1.6f )
-    , _edge_limit( 10.0f )
-    , _threshold( 0.04 ) // ( 10.0f / 256.0f )
+    , _edge_limit( getEdgeThreshDefault( ) )
+    , _threshold( getPeakThreshDefault() )
     , _gauss_mode( getGaussModeDefault() )
     , _sift_mode( Config::PopSift )
     , _log_mode( Config::None )
@@ -285,9 +286,38 @@ float Config::getSigma( ) const { return sigma; }
 
 void  Config::setEdgeLimit( float v ) { _edge_limit = v; }
 float Config::getEdgeLimit( ) const   { return _edge_limit; }
+float Config::getEdgeThreshDefault( )
+{
+    return 10.0f;
+}
+std::string Config::getEdgeThreshUsage( )
+{
+    std::ostringstream ostr;
+    ostr << "Edge Threshold: eliminates peaks of the DoG scale space whose curvature is too small." << endl
+         << "Default: " << getEdgeThreshDefault() << endl
+         << "Set to a value <= 0 to disable." << endl;
+    return ostr.str();
+}
 
 void  Config::setThreshold( float v ) { _threshold = v; }
 float Config::getThreshold( ) const   { return _threshold; }
+float Config::getPeakThreshold() const
+{
+    return ( _threshold * 0.5f * 255.0f / levels );
+}
+float Config::getPeakThreshDefault( )
+{
+    return 0.04f; // ( 10.0f / 256.0f )
+}
+std::string Config::getPeakThreshUsage( )
+{
+    std::ostringstream ostr;
+    ostr << "Peak Threshold: eliminates peaks of the DoG scale space that are too small" <<endl
+         << "(contrast too small in absolute value)." << endl
+         << "Default: " << getPeakThreshDefault() << endl
+         << "Set to a value <= 0 to disable." << endl;
+    return ostr.str();
+}
 
 void Config::setPrintGaussTables() { _print_gauss_tables = true; }
 void Config::setFilterMaxExtrema( int ext ) { _filter_max_extrema = ext; }
@@ -321,11 +351,6 @@ Config::GaussMode Config::getGaussMode( ) const
 Config::SiftMode Config::getSiftMode() const
 {
     return _sift_mode;
-}
-
-float Config::getPeakThreshold() const
-{
-    return ( _threshold * 0.5f * 255.0f / levels );
 }
 
 bool Config::ifPrintGaussTables() const

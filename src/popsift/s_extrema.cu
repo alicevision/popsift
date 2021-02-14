@@ -482,14 +482,21 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
 
     /* accept-reject extremum */
     // if( fabsf(contr) < (d_consts.threshold*2.0f) )
-    if( fabsf(contr) < scalbnf( d_consts.threshold, 1 ) )
+    if( d_consts.threshold > 0.0f )
     {
-        return false;
+        if( fabsf(contr) < scalbnf( d_consts.threshold, 1 ) )
+        {
+            return false;
+        }
     }
 
-    /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
-    if( edgeval >= (d_consts.edge_limit+1.0f)*(d_consts.edge_limit+1.0f)/d_consts.edge_limit ) {
-        return false;
+    if( d_consts.edge_limit > 0.0f )
+    {
+        /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
+        if( edgeval >= (d_consts.edge_limit+1.0f)*(d_consts.edge_limit+1.0f)/d_consts.edge_limit )
+        {
+            return false;
+        }
     }
 
     ec.xpos      = xn;

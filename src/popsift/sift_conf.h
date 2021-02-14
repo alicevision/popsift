@@ -215,11 +215,25 @@ struct Config
     void  setSigma( float v );
     float getSigma( ) const;
 
-    void  setEdgeLimit( float v );
-    float getEdgeLimit( ) const;
+    /** Set the Edge threshold, which requires a minimum curviness in the
+     *  the extremum. Set to a value <= 0 to ignore.
+     */
+    void               setEdgeLimit( float v );
+    float              getEdgeLimit( ) const;
+    static std::string getEdgeThreshUsage( );
+    static float       getEdgeThreshDefault( );
 
+    /** Set the Peak threshold, which requires a minimum difference between
+     *  a peak and its surrounding pixels. Set to a value <= 0 to ignore.
+     */
     void  setThreshold( float v );
     float getThreshold( ) const;
+    /** computes the actual peak threshold depending on the threshold
+     *  parameter and the non-augmented number of levels
+     */
+    float getPeakThreshold() const;
+    static std::string getPeakThreshUsage( );
+    static float       getPeakThreshDefault( );
 
     void  setInitialBlur( float blur );
     bool  hasInitialBlur( ) const;
@@ -232,10 +246,6 @@ struct Config
     void setFilterGridSize( int sz );
     void setFilterSorting( const std::string& direction );
     void setFilterSorting( GridFilterMode m );
-
-    /// computes the actual peak threshold depending on the threshold
-    /// parameter and the non-augmented number of levels
-    float getPeakThreshold() const;
 
     /// print Gauss spans and tables?
     bool ifPrintGaussTables() const;
