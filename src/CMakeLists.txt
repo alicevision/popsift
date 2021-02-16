@@ -10,7 +10,6 @@ CUDA_ADD_LIBRARY(popsift
         popsift/sift_octave.cu popsift/sift_octave.h
         popsift/s_pyramid_build.cu
         popsift/s_pyramid_build_aa.cu popsift/s_pyramid_build_aa.h
-        popsift/s_pyramid_build_ai.cu popsift/s_pyramid_build_ai.h
         popsift/s_pyramid_build_ra.cu popsift/s_pyramid_build_ra.h
         popsift/s_pyramid_fixed.cu
         popsift/sift_extremum.h

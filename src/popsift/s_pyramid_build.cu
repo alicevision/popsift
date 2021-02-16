@@ -10,7 +10,6 @@
 #include "common/debug_macros.h"
 #include "gauss_filter.h"
 #include "s_pyramid_build_aa.h"
-#include "s_pyramid_build_ai.h"
 #include "s_pyramid_build_ra.h"
 #include "sift_constants.h"
 #include "sift_pyramid.h"
@@ -258,32 +257,20 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t 
     {
     case Interpolated_FromPrevious :
         {
-            dim3 block( 128, 1 );
-            dim3 grid;
-            grid.x  = grid_divide( width,  128 );
-            grid.y  = height;
+            gauss::AbsoluteSourceInterpolatedFilter conv( width, height, stream );
 
-            gauss::absoluteSourceInterpolated::horiz
-                <<<grid,block,0,stream>>>
-                ( oct_obj.getDataTexLinear( ).tex,
-                  oct_obj.getIntermediateSurface( ),
-                  level );
+            conv.horiz( oct_obj.getDataTexLinear( ).tex,
+                        oct_obj.getIntermediateSurface( ),
+                        level );
         }
         break;
     case NotInterpolated_FromPrevious :
         {
-            dim3 block( 32,  8 ); // most stable good perf on GTX 980 TI
-            // similar speed: dim3 block( 32,  4 ); dim3 block( 32,  3 ); dim3 block( 32,  2 );
+            gauss::AbsoluteSource conv( width, height, stream );
 
-            dim3 grid;
-            grid.x  = grid_divide( width,  32 );
-            grid.y  = grid_divide( height, block.y );
-
-            gauss::absoluteSource::horiz
-                <<<grid,block,0,stream>>>
-                ( oct_obj.getDataTexPoint( ),
-                  oct_obj.getIntermediateSurface( ),
-                  level );
+            conv.horiz( oct_obj.getDataTexPoint( ),
+                        oct_obj.getIntermediateSurface( ),
+                        level );
         }
         break;
     case Interpolated_FromFirst :
@@ -312,58 +299,38 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
     {
     case Interpolated_FromPrevious :
         {
-            dim3 block( 4, 32 );
-            dim3 grid;
-            grid.x = (unsigned int)grid_divide( width,  block.y );
-            grid.y = (unsigned int)grid_divide( height, block.x );
+            gauss::AbsoluteSourceInterpolatedFilter conv( width, height, stream );
 
-            gauss::absoluteSourceInterpolated::vert
-                <<<grid,block,0,stream>>>
-                ( oct_obj.getIntermDataTexLinear( ).tex,
-                  oct_obj.getDataSurface( ),
-                  level );
+            conv.vert( oct_obj.getIntermDataTexLinear( ).tex,
+                       oct_obj.getDataSurface( ),
+                       level );
         }
         break;
     case Interpolated_FromFirst :
         {
-            dim3 block( 4, 32 );
-            dim3 grid;
-            grid.x = (unsigned int)grid_divide( width,  block.y );
-            grid.y = (unsigned int)grid_divide( height, block.x );
+            gauss::AbsoluteSourceInterpolatedFilterLevel0 conv( width, height, stream );
 
-            gauss::absoluteSourceInterpolated::vert_abs0
-                <<<grid,block,0,stream>>>
-                ( oct_obj.getIntermDataTexLinear( ).tex,
-                  oct_obj.getDataSurface( ),
-                  level );
+            conv.vert( oct_obj.getIntermDataTexLinear( ).tex,
+                       oct_obj.getDataSurface( ),
+                       level );
         }
         break;
     case NotInterpolated_FromPrevious :
         {
-            dim3 block( 64, 2 );
-            dim3 grid;
-            grid.x = (unsigned int)grid_divide( width,  block.x );
-            grid.y = (unsigned int)grid_divide( height, block.y );
+            gauss::AbsoluteSource conv( width, height, stream );
 
-            gauss::absoluteSource::vert
-                <<<grid,block,0,stream>>>
-                ( oct_obj.getIntermDataTexPoint( ),
-                  oct_obj.getDataSurface( ),
-                  level );
+            conv.vert( oct_obj.getIntermDataTexPoint( ),
+                       oct_obj.getDataSurface( ),
+                       level );
         }
         break;
     case NotInterpolated_FromFirst :
         {
-            dim3 block( 64, 2 );
-            dim3 grid;
-            grid.x = (unsigned int)grid_divide( width,  block.x );
-            grid.y = (unsigned int)grid_divide( height, block.y );
+            gauss::AbsoluteSourceLevel0 conv( width, height, stream );
 
-            gauss::absoluteSource::vert_abs0
-                <<<grid,block,0,stream>>>
-                ( oct_obj.getIntermDataTexPoint( ),
-                  oct_obj.getDataSurface( ),
-                  level );
+            conv.vert( oct_obj.getIntermDataTexPoint( ),
+                       oct_obj.getDataSurface( ),
+                       level );
         }
         break;
     default :
@@ -390,32 +357,22 @@ inline void Pyramid::vert_all_from_interm( int octave, int start_level, int max_
     {
     case Interpolated_FromFirst :
         {
-            dim3 block( 4, 32 );
-            dim3 grid;
-            grid.x = (unsigned int)grid_divide( width,  block.y );
-            grid.y = (unsigned int)grid_divide( height, block.x );
+            gauss::AbsoluteSourceInterpolatedFilterLevel0 conv( width, height, stream );
 
-            gauss::absoluteSourceInterpolated::vert_all_abs0
-                <<<grid,block,0,stream>>>
-                ( oct_obj.getIntermDataTexLinear( ).tex,
-                  oct_obj.getDataSurface( ),
-                  start_level,
-                  max_level );
+            conv.vert_all( oct_obj.getIntermDataTexLinear( ).tex,
+                           oct_obj.getDataSurface( ),
+                           start_level,
+                           max_level );
         }
         break;
     case NotInterpolated_FromFirst :
         {
-            dim3 block( 64, 2 );
-            dim3 grid;
-            grid.x = (unsigned int)grid_divide( width,  block.x );
-            grid.y = (unsigned int)grid_divide( height, block.y );
+            gauss::AbsoluteSourceLevel0 conv( width, height, stream );
 
-            gauss::absoluteSource::vert_all_abs0
-                <<<grid,block,0,stream>>>
-                ( oct_obj.getIntermDataTexPoint( ),
-                  oct_obj.getDataSurface( ),
-                  start_level,
-                  max_level );
+            conv.vert_all( oct_obj.getIntermDataTexPoint( ),
+                           oct_obj.getDataSurface( ),
+                           start_level,
+                           max_level );
         }
         break;
     case Interpolated_FromPrevious :
