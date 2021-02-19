@@ -12,39 +12,10 @@
 #include "sift_octave.h"
 #include "sift_pyramid.h"
 
-/*
- * We assume that this is started with
- * block = 16,4,4
- * grid  = nunmber of orientations
- */
-__global__ void ext_desc_grid(int octave, cudaTextureObject_t layer_tex);
-
 namespace popsift
 {
 
-inline static bool start_ext_desc_grid( const int octave, Octave& oct_obj )
-{
-    dim3 block;
-    dim3 grid;
-    grid.x = hct.ori_ct[octave];
-    grid.y = 1;
-    grid.z = 1;
-
-    if( grid.x == 0 ) return false;
-
-    block.x = 16;
-    block.y = 4;
-    block.z = 4;
-
-    ext_desc_grid
-        <<<grid,block,0,oct_obj.getStream()>>>
-        ( octave,
-          oct_obj.getDataTexPoint( ) );
-
-    POP_SYNC_CHK;
-
-    return true;
-}
+bool start_ext_desc_grid( const ExtremaCounters* ct, ExtremaBuffers* buf, const int octave, Octave& oct_obj );
 
 }; // namespace popsift
 

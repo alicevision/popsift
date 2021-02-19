@@ -52,17 +52,19 @@ float smoothe( const float* const src, const int bin )
  */
 __global__
 void ori_par( const int           octave,
-              const int           ext_ct_prefix_sum,
+              ExtremaCounters*    ct,
+              ExtremaBuffers*     buf,
               cudaTextureObject_t layer,
               const int           w,
               const int           h )
 {
-    const int extremum_index  = blockIdx.x * blockDim.y;
+    const int& ext_ct_prefix_sum = ct->ext_ps[octave];
+    const int  extremum_index  = blockIdx.x * blockDim.y;
 
-    if( popsift::all( extremum_index >= dct.ext_ct[octave] ) ) return; // a few trailing warps
+    if( popsift::all( extremum_index >= ct->ext_ct[octave] ) ) return; // a few trailing warps
 
-    const int              iext_off =  dobuf.i_ext_off[octave][extremum_index];
-    const InitialExtremum* iext     = &dobuf.i_ext_dat[octave][iext_off];
+    const int              iext_off =  buf->i_ext_off[octave][extremum_index];
+    const InitialExtremum* iext     = &buf->i_ext_dat[octave][iext_off];
 
     __shared__ float hist         [64];
     __shared__ float sm_hist      [64];
@@ -196,7 +198,7 @@ void ori_par( const int           octave,
     const bool  valid    = ( yval[best_index.x] > 0 );
     bool        written  = false;
 
-    Extremum* ext = &dobuf.extrema[ext_ct_prefix_sum + extremum_index];
+    Extremum* ext = &buf->extrema[ext_ct_prefix_sum + extremum_index];
 
     if( threadIdx.x < ORIENTATION_MAX_COUNT ) {
         if( valid ) {
@@ -282,46 +284,46 @@ public:
 };
 
 __global__
-void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
+void ori_prefix_sum( ExtremaCounters* ct, ExtremaBuffers* buf, const int total_ext_ct, const int num_octaves )
 {
     int       total_ori       = 0;
-    Extremum* extremum        = dobuf.extrema;
-    int*      feat_to_ext_map = dobuf.feat_to_ext_map;
+    Extremum* extremum        = buf->extrema;
+    int*      feat_to_ext_map = buf->feat_to_ext_map;
 
     ExtremaRead r( extremum );
     ExtremaWrt  w( extremum );
     ExtremaTot  t( total_ori );
-    ExtremaWrtMap wrtm( feat_to_ext_map, max( d_consts.max_orientations, dbuf.ori_allocated ) );
+    ExtremaWrtMap wrtm( feat_to_ext_map, max( d_consts.max_orientations, buf->ori_allocated ) );
     ExclusivePrefixSum::Block<ExtremaRead,ExtremaWrt,ExtremaTot,ExtremaWrtMap>( total_ext_ct, r, w, t, wrtm );
 
     __syncthreads();
 
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
-        dct.ext_ps[0] = 0;
+        ct->ext_ps[0] = 0;
         for( int o=1; o<MAX_OCTAVES; o++ ) {
-            dct.ext_ps[o] = dct.ext_ps[o-1] + dct.ext_ct[o-1];
+            ct->ext_ps[o] = ct->ext_ps[o-1] + ct->ext_ct[o-1];
         }
 
         for( int o=0; o<MAX_OCTAVES; o++ ) {
-            if( dct.ext_ct[o] == 0 ) {
-                dct.ori_ct[o] = 0;
+            if( ct->ext_ct[o] == 0 ) {
+                ct->ori_ct[o] = 0;
             } else {
-                int fe = dct.ext_ps[o  ];   /* first extremum for this octave */
-                int le = dct.ext_ps[o+1]-1; /* last  extremum for this octave */
-                int lo_ori_index = dobuf.extrema[fe].idx_ori;
-                int num_ori      = dobuf.extrema[le].num_ori;
-                int hi_ori_index = dobuf.extrema[le].idx_ori + num_ori;
-                dct.ori_ct[o] = hi_ori_index - lo_ori_index;
+                int fe = ct->ext_ps[o  ];   /* first extremum for this octave */
+                int le = ct->ext_ps[o+1]-1; /* last  extremum for this octave */
+                int lo_ori_index = buf->extrema[fe].idx_ori;
+                int num_ori      = buf->extrema[le].num_ori;
+                int hi_ori_index = buf->extrema[le].idx_ori + num_ori;
+                ct->ori_ct[o] = hi_ori_index - lo_ori_index;
             }
         }
 
-        dct.ori_ps[0] = 0;
+        ct->ori_ps[0] = 0;
         for( int o=1; o<MAX_OCTAVES; o++ ) {
-            dct.ori_ps[o] = dct.ori_ps[o-1] + dct.ori_ct[o-1];
+            ct->ori_ps[o] = ct->ori_ps[o-1] + ct->ori_ct[o-1];
         }
 
-        dct.ori_total = dct.ori_ps[MAX_OCTAVES-1] + dct.ori_ct[MAX_OCTAVES-1];
-        dct.ext_total = dct.ext_ps[MAX_OCTAVES-1] + dct.ext_ct[MAX_OCTAVES-1];
+        ct->ori_total = ct->ori_ps[MAX_OCTAVES-1] + ct->ori_ct[MAX_OCTAVES-1];
+        ct->ext_total = ct->ext_ps[MAX_OCTAVES-1] + ct->ext_ct[MAX_OCTAVES-1];
     }
 }
 
@@ -331,7 +333,7 @@ void Pyramid::orientation( const Config& conf )
     readDescCountersFromDevice( );
 
     int ext_total = 0;
-    for(int o : hct.ext_ct)
+    for(int o : _ct->ext_ct)
     {
         if( o > 0 )
         {
@@ -350,10 +352,10 @@ void Pyramid::orientation( const Config& conf )
 
     int ext_ct_prefix_sum = 0;
     for( int octave=0; octave<_num_octaves; octave++ ) {
-        hct.ext_ps[octave] = ext_ct_prefix_sum;
-        ext_ct_prefix_sum += hct.ext_ct[octave];
+        _ct->ext_ps[octave] = ext_ct_prefix_sum;
+        ext_ct_prefix_sum += _ct->ext_ct[octave];
     }
-    hct.ext_total = ext_ct_prefix_sum;
+    _ct->ext_total = ext_ct_prefix_sum;
 
     cudaStream_t oct_0_str = _octaves[0].getStream();
 
@@ -364,7 +366,7 @@ void Pyramid::orientation( const Config& conf )
 
         cudaStream_t oct_str = oct_obj.getStream();
 
-        int num = hct.ext_ct[octave];
+        int num = _ct->ext_ct[octave];
 
         if( num > 0 ) {
             dim3 block;
@@ -377,7 +379,8 @@ void Pyramid::orientation( const Config& conf )
             ori_par
                 <<<grid,block,4*64*sizeof(float),oct_str>>>
                 ( octave,
-                  hct.ext_ps[octave],
+                  _ct,
+                  _buf,
                   oct_obj.getDataTexPoint( ),
                   oct_obj.getWidth( ),
                   oct_obj.getHeight( ) );
@@ -398,7 +401,7 @@ void Pyramid::orientation( const Config& conf )
     grid.x  = 1;
     ori_prefix_sum
         <<<grid,block,0,oct_0_str>>>
-        ( ext_ct_prefix_sum, _num_octaves );
+        ( _ct, _buf, ext_ct_prefix_sum, _num_octaves );
     POP_SYNC_CHK;
 
     cudaDeviceSynchronize();

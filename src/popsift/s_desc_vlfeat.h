@@ -8,11 +8,12 @@
  */
 #pragma once
 #include "sift_octave.h"
+#include "sift_pyramid.h"
 
 namespace popsift
 {
 
-bool start_ext_desc_vlfeat( const int octave, Octave& oct_obj );
+bool start_ext_desc_vlfeat( const ExtremaCounters* ct, ExtremaBuffers* buf, const int octave, Octave& oct_obj );
 
 }; // namespace popsift
 

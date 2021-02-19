@@ -52,6 +52,13 @@ struct FunctionSort_IncCell_IncScale
 
 struct FunctionExtractCell
 {
+    ExtremaBuffers* _buf;
+
+    FunctionExtractCell( ExtremaBuffers* buf )
+    {
+        _buf = buf;
+    }
+    
     __device__
     inline thrust::tuple<int,float> operator()( const thrust::tuple<int,int>& val) const
     {
@@ -61,7 +68,7 @@ struct FunctionExtractCell
          */
         const int octave = thrust::get<0>(val);
         const int idx    = thrust::get<1>(val);
-        InitialExtremum& e = dobuf.i_ext_dat[octave][idx];
+        InitialExtremum& e = _buf->i_ext_dat[octave][idx];
 
         return  thrust::make_tuple( e.cell, e.sigma * powf( 2.0f, octave ) );
     }
@@ -81,22 +88,36 @@ struct FunctionIsAbove
 
 struct FunctionDisableExtremum
 {
+    ExtremaBuffers* _buf;
+
+    FunctionDisableExtremum( ExtremaBuffers* buf )
+    {
+        _buf = buf;
+    }
+
     __device__
     inline void operator()( const thrust::tuple<int,int>& val) const
     {
         const int octave = thrust::get<0>(val);
         const int idx    = thrust::get<1>(val);
-        InitialExtremum& e = dobuf.i_ext_dat[octave][idx];
+        InitialExtremum& e = _buf->i_ext_dat[octave][idx];
         e.ignore = true;
     }
 };
 
 struct FunctionExtractIgnored
 {
+    ExtremaBuffers* _buf;
+
+    FunctionExtractIgnored( ExtremaBuffers* buf )
+    {
+        _buf = buf;
+    }
+
     __device__
     inline int operator()( int idx, int octave ) const
     {
-        InitialExtremum& e = dobuf.i_ext_dat[octave][idx];
+        InitialExtremum& e = _buf->i_ext_dat[octave][idx];
         if( e.ignore )
             return 0;
         else
@@ -127,7 +148,7 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 
     int sum = 0;
     for( int o=0; o<MAX_OCTAVES; o++ ) {
-        const int ocount = hct.ext_ct[o];
+        const int ocount = _ct->ext_ct[o];
         if( ocount > 0 ) {
             cudaStream_t oct_str = _octaves[o].getStream();
 
@@ -147,7 +168,7 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     cudaDeviceSynchronize();
 
     // extract cell and scale value for all initial extrema
-    FunctionExtractCell          fun_extract_cell;
+    FunctionExtractCell          fun_extract_cell( _buf );
 
     thrust::transform( thrust::make_zip_iterator( thrust::make_tuple( octave_index.begin(),
                                                                       iext_index.begin() ) ),
@@ -267,7 +288,7 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 
     for( int i=0; i<h_cell_counts.size(); i++ )
     {
-        FunctionDisableExtremum fun_disable_extremum;
+        FunctionDisableExtremum fun_disable_extremum( _buf );
 
         int from = h_cell_offsets[i] + h_cell_counts[i];
         int to   = h_cell_limits [i];
@@ -285,10 +306,10 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     int ret_ext_total = 0;
 
     for( int o=0; o<MAX_OCTAVES; o++ ) {
-        const int ocount = hct.ext_ct[o];
+        const int ocount = _ct->ext_ct[o];
 
         if( ocount > 0 ) {
-            FunctionExtractIgnored fun_extract_ignore;
+            FunctionExtractIgnored fun_extract_ignore( _buf );
             thrust::identity<int>  fun_id;
 
             grid.resize( ocount );
@@ -300,7 +321,7 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
                 grid.begin(),
                 fun_extract_ignore );
 
-            thrust::device_ptr<int> off_ptr = thrust::device_pointer_cast( dobuf_shadow.i_ext_off[o] );
+            thrust::device_ptr<int> off_ptr = thrust::device_pointer_cast( _buf->i_ext_off[o] );
 
             thrust::copy_if( thrust::make_counting_iterator(0),
                              thrust::make_counting_iterator(ocount),
@@ -308,9 +329,9 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
                              off_ptr,
                              fun_id );
 
-            hct.ext_ct[o] = thrust::reduce( grid.begin(), grid.end() );
+            _ct->ext_ct[o] = thrust::reduce( grid.begin(), grid.end() );
 
-            ret_ext_total += hct.ext_ct[o];
+            ret_ext_total += _ct->ext_ct[o];
         }
     }
 

@@ -517,6 +517,8 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
                           int                 width,
                           int                 height,
                           const uint32_t      maxlevel,
+                          ExtremaCounters*    ct,
+                          ExtremaBuffers*     buf,
                           int*                d_number_of_blocks,
                           int                 number_of_blocks,
                           const float         w_grid_divider,
@@ -536,10 +538,10 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
                                                          grid_width,
                                                          ec );
 
-    uint32_t write_index = extrema_count<HEIGHT>( indicator, &dct.ext_ct[octave] );
+    uint32_t write_index = extrema_count<HEIGHT>( indicator, &ct->ext_ct[octave] );
 
-    InitialExtremum* d_extrema = dobuf.i_ext_dat[octave];
-    int*             d_ext_off = dobuf.i_ext_off[octave];
+    InitialExtremum* d_extrema = buf->i_ext_dat[octave];
+    int*             d_ext_off = buf->i_ext_off[octave];
 
     if( indicator && write_index < d_consts.max_extrema ) {
         ec.write_index = write_index;
@@ -556,10 +558,13 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
     __syncthreads();
 
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
-        int ct = atomicAdd( d_number_of_blocks, 1 );
-        if( ct >= number_of_blocks-1 ) {
-            int num_ext = atomicMin( &dct.ext_ct[octave], d_consts.max_extrema );
-            // printf( "Block %d,%d,%d num ext %d\n", blockIdx.x, blockIdx.y, blockIdx.z, dct.ext_ct[octave] );
+        // This works as a global barrier. Only thread 0 of the last thread block
+        // that finishes will call the atomicMin function.
+        // The atomicMin enforces an upper limit on the octave's number of extrema.
+        int count = atomicAdd( d_number_of_blocks, 1 );
+        if( count >= number_of_blocks-1 ) {
+            int num_ext = atomicMin( &ct->ext_ct[octave], d_consts.max_extrema );
+            // printf( "Block %d,%d,%d num ext %d\n", blockIdx.x, blockIdx.y, blockIdx.z, ct->ext_ct[octave] );
         }
     }
 }
@@ -602,6 +607,8 @@ void Pyramid::find_extrema( const Config& conf )
                       cols,
                       rows,
                       _levels-1,
+                      _ct,
+                      _buf,
                       num_blocks,
                       grid.x * grid.y,
                       oct_obj.getWGridDivider(),
@@ -617,6 +624,8 @@ void Pyramid::find_extrema( const Config& conf )
                       cols,
                       rows,
                       _levels-1,
+                      _ct,
+                      _buf,
                       num_blocks,
                       grid.x * grid.y,
                       oct_obj.getWGridDivider(),
@@ -632,6 +641,8 @@ void Pyramid::find_extrema( const Config& conf )
                       cols,
                       rows,
                       _levels-1,
+                      _ct,
+                      _buf,
                       num_blocks,
                       grid.x * grid.y,
                       oct_obj.getWGridDivider(),

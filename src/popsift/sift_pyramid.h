@@ -36,27 +36,22 @@ struct ExtremaCounters
 
 struct ExtremaBuffers
 {
+    /* This part of the struct deals with the descriptors that are
+     * finally detected by the algorithm.
+     */
     Descriptor*      desc;
     int              ext_allocated;
     int              ori_allocated;
-};
 
-struct DevBuffers
-{
+    /* This part of the struct deals with intermediate buffers to find
+     * extrema.
+     */
     InitialExtremum* i_ext_dat[MAX_OCTAVES];
     int*             i_ext_off[MAX_OCTAVES];
     int*             feat_to_ext_map;
     Extremum*        extrema;
     Feature*         features;
 };
-
-extern thread_local ExtremaCounters hct;
-extern __device__   ExtremaCounters dct;
-extern thread_local ExtremaBuffers  hbuf;
-extern __device__   ExtremaBuffers  dbuf;
-extern thread_local ExtremaBuffers  dbuf_shadow; // just for managing memories
-extern __device__   DevBuffers      dobuf;
-extern thread_local DevBuffers      dobuf_shadow; // just for managing memories
 
 class Pyramid
 {
@@ -75,6 +70,9 @@ class Pyramid
 
     /* the download of converted descriptors should be asynchronous */
     cudaStream_t _download_stream;
+
+    ExtremaCounters* _ct;
+    ExtremaBuffers*  _buf;
 
 public:
     enum GaussTableChoice {

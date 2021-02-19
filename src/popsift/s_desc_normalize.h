@@ -13,11 +13,8 @@
 
 template<class T>
 __global__
-void normalize_histogram( )
+void normalize_histogram( Descriptor* descs, const int num_orientations )
 {
-    Descriptor* descs            = dbuf.desc;
-    const int   num_orientations = dct.ori_total;
-
     int offset = blockIdx.x * blockDim.y + threadIdx.y;
 
     // all of these threads are useless
