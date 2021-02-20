@@ -102,20 +102,15 @@ Pyramid::Pyramid( const Config& config,
     , _levels( config.levels + 3 )
     , _assume_initial_blur( config.hasInitialBlur() )
     , _initial_blur( config.getInitialBlur() )
+    , _fg( config )
 {
     _octaves = new Octave[_num_octaves];
 
     int w = width;
     int h = height;
 
-    // memset( &hct,         0, sizeof(ExtremaCounters) );
-    // cudaMemcpyToSymbol( dct, &hct, sizeof(ExtremaCounters), 0, cudaMemcpyHostToDevice );
-
-    cudaMallocManaged( &_ct, sizeof(ExtremaCounters) );
+    _ct = popsift::cuda::malloc_mgdT<ExtremaCounters>( 1, __FILE__, __LINE__ );
     memset( _ct, 0, sizeof(ExtremaCounters) );
-
-    cudaMallocManaged( &_buf, sizeof(ExtremaBuffers) );
-    memset( _buf, 0, sizeof(ExtremaBuffers) );
 
     _d_extrema_num_blocks = popsift::cuda::malloc_devT<int>( _num_octaves, __FILE__, __LINE__ );
 
@@ -126,28 +121,8 @@ Pyramid::Pyramid( const Config& config,
         h = ceilf(h / 2.0f);
     }
 
-    int sz = _num_octaves * h_consts.max_extrema;
-    _buf->i_ext_dat[0] = popsift::cuda::malloc_mgdT<InitialExtremum>( sz, __FILE__, __LINE__);
-    _buf->i_ext_off[0] = popsift::cuda::malloc_mgdT<int>( sz, __FILE__, __LINE__);
-    for (int o = 1; o<_num_octaves; o++) {
-        _buf->i_ext_dat[o] = _buf->i_ext_dat[0] + (o*h_consts.max_extrema);
-        _buf->i_ext_off[o] = _buf->i_ext_off[0] + (o*h_consts.max_extrema);
-    }
-    for (int o = _num_octaves; o<MAX_OCTAVES; o++) {
-        _buf->i_ext_dat[o] = nullptr;
-        _buf->i_ext_off[o] = nullptr;
-    }
-
-    sz = h_consts.max_extrema;
-    _buf->extrema  = popsift::cuda::malloc_mgdT<Extremum>( sz, __FILE__, __LINE__);
-    _buf->features = popsift::cuda::malloc_mgdT<Feature>( sz, __FILE__, __LINE__);
-
-    _buf->ext_allocated = sz;
-
-    sz = max( 2 * h_consts.max_extrema, h_consts.max_orientations );
-    _buf->desc            = popsift::cuda::malloc_mgdT<Descriptor>( sz, __FILE__, __LINE__);
-    _buf->feat_to_ext_map = popsift::cuda::malloc_mgdT<int>( sz, __FILE__, __LINE__);
-    _buf->ori_allocated = sz;
+    _buf = popsift::cuda::malloc_mgdT<ExtremaBuffers>( 1, __FILE__, __LINE__ );
+    _buf->init( _num_octaves, h_consts.max_extrema, h_consts.max_orientations );
 
     cudaStreamCreate( &_download_stream );
 }
@@ -166,43 +141,19 @@ void Pyramid::resetDimensions( const Config& conf, int width, int height )
 
 void Pyramid::reallocExtrema( int numExtrema )
 {
-    if( numExtrema > _buf->ext_allocated ) {
-        numExtrema = ( ( numExtrema + 1024 ) & ( ~(1024-1) ) );
-        cudaFree( _buf->extrema );
-        cudaFree( _buf->features );
-
-        int sz = numExtrema;
-        _buf->extrema  = popsift::cuda::malloc_mgdT<Extremum>( sz, __FILE__, __LINE__);
-        _buf->features = popsift::cuda::malloc_mgdT<Feature>( sz, __FILE__, __LINE__);
-        _buf->ext_allocated = sz;
-
-        numExtrema *= 2;
-        if( numExtrema > _buf->ori_allocated ) {
-            cudaFree( _buf->desc );
-            cudaFree( _buf->feat_to_ext_map );
-
-            sz = numExtrema;
-            _buf->desc = popsift::cuda::malloc_mgdT<Descriptor>( sz, __FILE__, __LINE__);
-            _buf->feat_to_ext_map = popsift::cuda::malloc_mgdT<int>( sz, __FILE__, __LINE__);
-            _buf->ori_allocated = sz;
-        }
-    }
+    _buf->growBuffers( numExtrema );
 }
 
 Pyramid::~Pyramid()
 {
     cudaStreamDestroy( _download_stream );
 
-    cudaFree(     _d_extrema_num_blocks );
-    cudaFree(     _buf->i_ext_dat[0] );
-    cudaFree(     _buf->i_ext_off[0] );
-    cudaFree(     _buf->features );
-    cudaFree(     _buf->extrema );
-    cudaFree(     _buf->desc );
-    cudaFree(     _buf->feat_to_ext_map );
+    _buf->uninit( );
+    cudaFree( _buf );
+
+    cudaFree( _d_extrema_num_blocks );
 
     cudaFree( _ct );
-    cudaFree( _buf );
 
     delete[] _octaves;
 }
@@ -427,5 +378,60 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* 
     }
 }
 
+void ExtremaBuffers::init( int num_octaves, int max_extrema, int max_orientations )
+{
+    memset( this, 0, sizeof(ExtremaBuffers) );
+
+    const int sz = num_octaves * max_extrema;
+    i_ext_dat[0] = popsift::cuda::malloc_mgdT<InitialExtremum>( sz, __FILE__, __LINE__);
+    i_ext_off[0] = popsift::cuda::malloc_mgdT<int>( sz, __FILE__, __LINE__);
+    for (int o = 1; o < num_octaves; o++) {
+        i_ext_dat[o] = i_ext_dat[0] + (o*max_extrema);
+        i_ext_off[o] = i_ext_off[0] + (o*max_extrema);
+    }
+
+    extrema  = popsift::cuda::malloc_mgdT<Extremum>( max_extrema, __FILE__, __LINE__);
+    features = popsift::cuda::malloc_mgdT<Feature> ( max_extrema, __FILE__, __LINE__);
+    ext_allocated = max_extrema;
+
+    const int osz = max( 2 * max_extrema, max_orientations );
+    desc            = popsift::cuda::malloc_mgdT<Descriptor>( osz, __FILE__, __LINE__);
+    feat_to_ext_map = popsift::cuda::malloc_mgdT<int>       ( osz, __FILE__, __LINE__);
+    ori_allocated = osz;
+}
+
+void ExtremaBuffers::uninit( )
+{
+    cudaFree( feat_to_ext_map );
+    cudaFree( desc );
+    cudaFree( features );
+    cudaFree( extrema );
+    cudaFree( i_ext_off[0] );
+    cudaFree( i_ext_dat[0] );
+}
+
+void ExtremaBuffers::growBuffers( int numExtrema )
+{
+    numExtrema = ( ( numExtrema + 1024 ) & ( ~(1024-1) ) );
+
+    if( numExtrema <= ext_allocated ) return;
+
+    cudaFree( extrema );
+    cudaFree( features );
+
+    extrema  = popsift::cuda::malloc_mgdT<Extremum>( numExtrema, __FILE__, __LINE__);
+    features = popsift::cuda::malloc_mgdT<Feature> ( numExtrema, __FILE__, __LINE__);
+    ext_allocated = numExtrema;
+
+    numExtrema *= 2;
+    if( numExtrema > ori_allocated ) {
+        cudaFree( desc );
+        cudaFree( feat_to_ext_map );
+
+        desc = popsift::cuda::malloc_mgdT<Descriptor>    ( numExtrema, __FILE__, __LINE__);
+        feat_to_ext_map = popsift::cuda::malloc_mgdT<int>( numExtrema, __FILE__, __LINE__);
+        ori_allocated = numExtrema;
+    }
+}
 
 } // namespace popsift

@@ -299,10 +299,13 @@ void ori_prefix_sum( ExtremaCounters* ct, ExtremaBuffers* buf, const int total_e
     __syncthreads();
 
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
+        ct->make_extrema_prefix_sums( );
+        /* replaced by the __device__ method above:
         ct->ext_ps[0] = 0;
         for( int o=1; o<MAX_OCTAVES; o++ ) {
             ct->ext_ps[o] = ct->ext_ps[o-1] + ct->ext_ct[o-1];
         }
+        */
 
         for( int o=0; o<MAX_OCTAVES; o++ ) {
             if( ct->ext_ct[o] == 0 ) {
@@ -345,7 +348,7 @@ void Pyramid::orientation( const Config& conf )
     // therefore add 10% slack.
     if( conf.getFilterMaxExtrema() > 0 && int(conf.getFilterMaxExtrema()*1.1) < ext_total )
     {
-        ext_total = extrema_filter_grid( conf, ext_total );
+        ext_total = _fg.filter( conf, _ct, _buf, ext_total );
     }
 
     reallocExtrema( ext_total );

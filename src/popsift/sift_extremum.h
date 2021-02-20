@@ -28,10 +28,18 @@ struct InitialExtremum
     float ypos;
     /// extremum refined into this level
     int   lpos;
-    /// scale
+    /// scale - this is the accurate floating-point level within this octave
     float sigma;
+
     /// index into the grid for grid-based extrema filtering
     int   cell;
+    /// scale is sigma * powf( 2.0f, octave ) - sigma in the entire pyramid
+    float scale;
+
+    /** during histogram creation, assign a unique number to this
+     *  specific extremum in the cell (using the result of atomicAdd)
+     */
+    int   rank_in_cell;
     /// true if this extremum has been filtered
     bool  ignore;
     /// if any initial extrema are ignored, new index for Extremum

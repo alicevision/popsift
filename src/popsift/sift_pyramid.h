@@ -8,6 +8,7 @@
 #pragma once
 
 #include "features.h"
+#include "filtergrid.h"
 #include "s_image.h"
 #include "sift_conf.h"
 #include "sift_constants.h"
@@ -18,6 +19,9 @@
 
 namespace popsift {
 
+/** Datastructure in managed memory that holds counters for
+ *  initially collected extrema and orientations.
+ */
 struct ExtremaCounters
 {
     /* The number of extrema found per octave */
@@ -32,8 +36,31 @@ struct ExtremaCounters
 
     int ext_total;
     int ori_total;
+
+    /** host and device function helper function that updates the exclusive
+     *  prefix sum for extrema counts, updates ext_total and returns the total
+     *  number of extrema.
+     *  Note that exclusive prefix sum on the device could use several threads
+     *  but we are talking about a constant size of 20.
+     */
+    __device__ __host__ inline
+    int make_extrema_prefix_sums( )
+    {
+        ext_ps[0] = 0;
+        for( int o=1; o<MAX_OCTAVES; o++ ) {
+            ext_ps[o] = ext_ps[o-1] + ext_ct[o-1];
+        }
+        const int o = MAX_OCTAVES-1;
+
+        ext_total = ext_ps[o] + ext_ct[o];
+
+        return ext_total;
+    }
 };
 
+/** Datastructure in managed memory that allows CPU and GPU to access all
+ *  buffers.
+ */
 struct ExtremaBuffers
 {
     /* This part of the struct deals with the descriptors that are
@@ -51,6 +78,20 @@ struct ExtremaBuffers
     int*             feat_to_ext_map;
     Extremum*        extrema;
     Feature*         features;
+
+    /** Allocate buffers that hold intermediate and final information about
+     *  extrema and if applicable, orientations and descriptors.
+     *  Buffers are located in managed memory.
+     */
+    void init( int num_octave, int max_extrema, int max_orientations );
+
+    /** Release all buffers */
+    void uninit( );
+
+    /** Function that allows to resize buffers when all extrema have been
+     *  detected and the resulting total is too large.
+     */
+    void growBuffers( int numExtrema );
 };
 
 class Pyramid
@@ -73,6 +114,9 @@ class Pyramid
 
     ExtremaCounters* _ct;
     ExtremaBuffers*  _buf;
+
+    /** A structure that encapsulates everything we need for grid filtering */
+    FilterGrid _fg;
 
 public:
     enum GaussTableChoice {
@@ -144,7 +188,6 @@ private:
     void find_extrema( const Config& conf );
     void reallocExtrema( int numExtrema );
 
-    int  extrema_filter_grid( const Config& conf, int ext_total ); // called at head of orientation
     void orientation( const Config& conf );
 
     void descriptors( const Config& conf );

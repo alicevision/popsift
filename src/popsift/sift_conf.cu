@@ -36,12 +36,9 @@ Config::Config( )
     , _log_mode( Config::None )
     , _scaling_mode( Config::ScaleDefault )
     , _desc_mode( Config::Loop )
-    , _grid_filter_mode( Config::RandomScale )
     , verbose( false )
     // , _max_extrema( 20000 )
     , _max_extrema( 100000 )
-    , _filter_max_extrema( -1 )
-    , _filter_grid_size( 2 )
     , _assume_initial_blur( true )
     , _initial_blur( 0.5f )
     , _normalization_mode( getNormModeDefault() )
@@ -150,6 +147,16 @@ const char* Config::getGaussModeUsage( )
         "relative (synonym for vlfeat-hw-interpolated)";
 }
 
+void Config::setFilterMaxExtrema( int ext )
+{
+    _grid_filter._max_extrema = ext;
+}
+
+void Config::setFilterGridSize( int sz )
+{
+    _grid_filter._size = sz;
+}
+
 bool Config::getCanFilterExtrema() const
 {
 #if __CUDACC_VER_MAJOR__ >= 8
@@ -162,18 +169,18 @@ bool Config::getCanFilterExtrema() const
 void Config::setFilterSorting( const std::string& text )
 {
     if( text == "up" )
-        _grid_filter_mode = Config::SmallestScaleFirst;
+        _grid_filter._mode = GridFilterConfig::SmallestScaleFirst;
     else if( text == "down" )
-        _grid_filter_mode = Config::LargestScaleFirst;
+        _grid_filter._mode = GridFilterConfig::LargestScaleFirst;
     else if( text == "random" )
-        _grid_filter_mode = Config::RandomScale;
+        _grid_filter._mode = GridFilterConfig::RandomScale;
     else
         POP_FATAL( "filter sorting mode must be one of up, down or random" );
 }
 
-void Config::setFilterSorting( Config::GridFilterMode m )
+void Config::setFilterSorting( GridFilterConfig::Mode m )
 {
-    _grid_filter_mode = m;
+    _grid_filter._mode = m;
 }
 
 void Config::setVerbose( bool on )
@@ -320,8 +327,6 @@ std::string Config::getPeakThreshUsage( )
 }
 
 void Config::setPrintGaussTables() { _print_gauss_tables = true; }
-void Config::setFilterMaxExtrema( int ext ) { _filter_max_extrema = ext; }
-void Config::setFilterGridSize( int sz ) { _filter_grid_size = sz; }
 
 void Config::setInitialBlur( float blur )
 {
@@ -377,5 +382,11 @@ bool Config::equal( const Config& other ) const
         COMPARE( _normalization_multiplier ) ) return false;
     return true;
 }
+
+GridFilterConfig::GridFilterConfig( )
+    : _max_extrema( -1 )
+    , _size( 2 )
+    , _mode( RandomScale )
+{ }
 
 }; // namespace popsift

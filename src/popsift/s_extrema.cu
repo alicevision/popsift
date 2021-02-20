@@ -299,7 +299,7 @@ public:
 
 template<int sift_mode>
 __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
-                                               int debug_octave,
+                                               int octave,
                                                int width,
                                                int height,
                                                uint32_t maxlevel,
@@ -344,7 +344,7 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
     if( ! f.first_contrast_ok( val ) ) return false;
 
     if( ! is_extremum( dog, x-1, y-1, level-1 ) ) {
-        // if( debug_octave==0 && level==2 && x==14 && y==73 ) printf("But I fail\n");
+        // if( octave==0 && level==2 && x==14 && y==73 ) printf("But I fail\n");
         return false;
     }
 
@@ -503,6 +503,7 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
     ec.ypos      = yn;
     ec.lpos      = (int)roundf(sn);
     ec.sigma     = d_consts.sigma0 * pow(d_consts.sigma_k, sn); // * 2;
+    ec.scale     = ec.sigma * powf( 2.0f, octave );
     ec.cell      = floorf( yn / h_grid_divider ) * grid_width + floorf( xn / w_grid_divider );
         // const float sigma_k = powf(2.0f, 1.0f / levels );
 
