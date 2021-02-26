@@ -35,8 +35,6 @@ struct GridFilterConfig
      */
     enum Mode
     {
-        /// keep a random selection
-        RandomScale,
         /// keep those with the largest scale
         LargestScaleFirst,
         /// keep those with the smallest scale
@@ -263,6 +261,9 @@ struct Config
 //    void setDPOrientation( bool on );
     void setFilterMaxExtrema( int extrema );
     void setFilterGridSize( int sz );
+
+    static GridFilterConfig::Mode getFilterGridModeDefault( );
+    static const char* getFilterGridModeUsage( );
     void setFilterSorting( const std::string& direction );
     void setFilterSorting( GridFilterConfig::Mode m );
 

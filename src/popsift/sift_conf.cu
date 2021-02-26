@@ -166,16 +166,31 @@ bool Config::getCanFilterExtrema() const
 #endif
 }
 
+const char* Config::getFilterGridModeUsage( )
+{
+    return "l/largest (default) or s/smallest. "
+           "largest: keep the extrema with the largest scales from each grid-filtered cell. "
+           "smallest: keep the extrema with the smallest scales. "
+           "The first octave has the smallest scales.";
+}
+
+GridFilterConfig::Mode Config::getFilterGridModeDefault( )
+{
+    return GridFilterConfig::LargestScaleFirst;
+}
+
 void Config::setFilterSorting( const std::string& text )
 {
-    if( text == "up" )
+    if( stringIsame( text, "smallest" ) )
         _grid_filter._mode = GridFilterConfig::SmallestScaleFirst;
-    else if( text == "down" )
+    if( stringIsame( text, "s" ) )
+        _grid_filter._mode = GridFilterConfig::SmallestScaleFirst;
+    else if( stringIsame( text, "largest" ) )
         _grid_filter._mode = GridFilterConfig::LargestScaleFirst;
-    else if( text == "random" )
-        _grid_filter._mode = GridFilterConfig::RandomScale;
+    else if( stringIsame( text, "l" ) )
+        _grid_filter._mode = GridFilterConfig::LargestScaleFirst;
     else
-        POP_FATAL( "filter sorting mode must be one of up, down or random" );
+        POP_FATAL( string("bad grid filter mode, ") + getFilterGridModeUsage() );
 }
 
 void Config::setFilterSorting( GridFilterConfig::Mode m )
@@ -386,7 +401,7 @@ bool Config::equal( const Config& other ) const
 GridFilterConfig::GridFilterConfig( )
     : _max_extrema( -1 )
     , _size( 2 )
-    , _mode( RandomScale )
+    , _mode( LargestScaleFirst )
 { }
 
 }; // namespace popsift
