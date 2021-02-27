@@ -308,10 +308,7 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
                                                int grid_width,
                                                InitialExtremum& ec)
 {
-    ec.xpos    = 0.0f;
-    ec.ypos    = 0.0f;
-    ec.lpos    = 0;
-    ec.sigma   = 0.0f;
+    ec.set( octave, 0.0f, 0.0f, 0.0f, 0 );
 
     /*
      * First consideration: extrema cannot be found on any outermost edge,
@@ -499,13 +496,9 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
         }
     }
 
-    ec.xpos      = xn;
-    ec.ypos      = yn;
-    ec.lpos      = (int)roundf(sn);
-    ec.sigma     = d_consts.sigma0 * pow(d_consts.sigma_k, sn); // * 2;
-    ec.scale     = ec.sigma * powf( 2.0f, octave );
-    ec.cell      = floorf( yn / h_grid_divider ) * grid_width + floorf( xn / w_grid_divider );
-        // const float sigma_k = powf(2.0f, 1.0f / levels );
+    ec.set( octave,
+            xn, yn, sn,
+            floorf( yn / h_grid_divider ) * grid_width + floorf( xn / w_grid_divider ) );
 
     return true;
 }
@@ -527,7 +520,6 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
                           const int           grid_width )
 {
     InitialExtremum ec;
-    ec.ignore = false;
 
     bool indicator = find_extrema_in_dog_sub<sift_mode>( dog,
                                                          octave,
@@ -545,7 +537,6 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
     int*             d_ext_off = buf->i_ext_off[octave];
 
     if( indicator && write_index < d_consts.max_extrema ) {
-        ec.write_index = write_index;
         // store the initial extremum in an array
         d_extrema[write_index] = ec;
 

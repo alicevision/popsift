@@ -78,8 +78,8 @@ fg_init( const int         octave,
 
     InitialExtremum* ie = &buf->i_ext_dat[octave][my_idx_in_octave];
 
-    cells[my_idx]  = ie->cell;
-    scales[my_idx] = ie->scale;
+    cells[my_idx]  = ie->getCell();
+    scales[my_idx] = ie->getScale();
 
     /* Keep pointers in this pointer array. The indirection is not elegant for CUDA,
      * we can improve that later by making additional arrays for .cell and .scale
@@ -289,7 +289,7 @@ void FilterGrid::prune_extrema( GridFilterConfig::Mode mode )
             {
                 const int sorted_index = _sorting_index[base+d];
                 InitialExtremum* ie = _initial_extrema_pointers[sorted_index];
-                ie->ignore = true;
+                ie->setIgnore();
             }
         }
         else // mode == GridFilterConfig::SmallestScaleFirst
@@ -299,7 +299,7 @@ void FilterGrid::prune_extrema( GridFilterConfig::Mode mode )
             {
                 const int sorted_index = _sorting_index[base-d-1];
                 InitialExtremum* ie = _initial_extrema_pointers[sorted_index];
-                ie->ignore = true;
+                ie->setIgnore();
             }
         }
     }
@@ -335,7 +335,7 @@ int FilterGrid::filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers*
         for( int i=0; i<max_ct; i++ )
         {
             const InitialExtremum* iext= &buf->i_ext_dat[o][i];
-            if( iext->ignore == false )
+            if( iext->isIgnored() == false )
             {
                 buf->i_ext_off[o][counter] = i;
                 counter += 1;

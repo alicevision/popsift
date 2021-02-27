@@ -13,6 +13,7 @@
 #include "sift_conf.h"
 #include "sift_constants.h"
 #include "sift_octave.h"
+#include "initial_extremum.h"
 
 #include <iostream>
 #include <vector>

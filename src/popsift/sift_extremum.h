@@ -9,42 +9,10 @@
 
 #include "sift_constants.h"
 
-#include <iostream>
-#include <vector>
+// #include <iostream>
+// #include <vector>
 
 namespace popsift {
-
-/**
- * @brief This is an internal data structure.
- * Separated from the final Extremum data structure to implement
- * grid filtering in a space-efficient manner. In grid filtering,
- * extrema are first found, after that some may be discarded in
- * some spatial regions of the image. Avoid waste of space by
- * allocating Extremum structures only for the remaining ones.
- */
-struct InitialExtremum
-{
-    float xpos;
-    float ypos;
-    /// extremum refined into this level
-    int   lpos;
-    /// scale - this is the accurate floating-point level within this octave
-    float sigma;
-
-    /// index into the grid for grid-based extrema filtering
-    int   cell;
-    /// scale is sigma * powf( 2.0f, octave ) - sigma in the entire pyramid
-    float scale;
-
-    /** during histogram creation, assign a unique number to this
-     *  specific extremum in the cell (using the result of atomicAdd)
-     */
-    int   rank_in_cell;
-    /// true if this extremum has been filtered
-    bool  ignore;
-    /// if any initial extrema are ignored, new index for Extremum
-    int   write_index;
-};
 
 /**
  * @brief This is an internal data structure.

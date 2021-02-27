@@ -75,10 +75,10 @@ void ori_par( const int           octave,
     hist[threadIdx.x+32] = 0.0f;
 
     /* keypoint fractional geometry */
-    const float x     = iext->xpos;
-    const float y     = iext->ypos;
-    const int   level = iext->lpos; // old_level;
-    const float sig   = iext->sigma;
+    const float& x     = iext->getX();
+    const float& y     = iext->getY();
+    const int&   level = iext->getLevel();
+    const float& sig   = iext->getSigma();
 
     /* orientation histogram radius */
     const float  sigw = ORI_WINFACTOR * sig;
@@ -215,11 +215,11 @@ void ori_par( const int           octave,
 
     int angles = __popc( popsift::ballot( written ) );
     if( threadIdx.x == 0 ) {
-        ext->xpos    = iext->xpos;
-        ext->ypos    = iext->ypos;
-        ext->lpos    = iext->lpos;
-        ext->sigma   = iext->sigma;
-        ext->octave  = octave;
+        ext->xpos    = iext->getX();
+        ext->ypos    = iext->getY();
+        ext->lpos    = iext->getLevel();
+        ext->sigma   = iext->getSigma();
+        ext->octave  = iext->getOctave();
         ext->num_ori = angles;
     }
 }
