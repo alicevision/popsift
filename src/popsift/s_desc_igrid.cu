@@ -132,7 +132,7 @@ bool start_ext_desc_igrid( const ExtremaCounters* ct, ExtremaBuffers* buf, const
     ext_desc_igrid
         <<<grid,block,0,oct_obj.getStream()>>>
         ( buf,
-          ct->ori_ps[octave],
+          ct->getOrientationBase( octave ),
           oct_obj.getDataTexLinear( ).tex );
 
     POP_SYNC_CHK;

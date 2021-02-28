@@ -58,7 +58,7 @@ void ori_par( const int           octave,
               const int           w,
               const int           h )
 {
-    const int& ext_ct_prefix_sum = ct->ext_ps[octave];
+    const int& ext_ct_prefix_sum = ct->getExtremaBase( octave );
     const int  extremum_index  = blockIdx.x * blockDim.y;
 
     if( popsift::all( extremum_index >= ct->ext_ct[octave] ) ) return; // a few trailing warps
@@ -284,7 +284,7 @@ public:
 };
 
 __global__
-void ori_prefix_sum( ExtremaCounters* ct, ExtremaBuffers* buf, const int total_ext_ct, const int num_octaves )
+void ori_prefix_sum( ExtremaCounters* ct, ExtremaBuffers* buf )
 {
     int       total_ori       = 0;
     Extremum* extremum        = buf->extrema;
@@ -294,25 +294,20 @@ void ori_prefix_sum( ExtremaCounters* ct, ExtremaBuffers* buf, const int total_e
     ExtremaWrt  w( extremum );
     ExtremaTot  t( total_ori );
     ExtremaWrtMap wrtm( feat_to_ext_map, max( d_consts.max_orientations, buf->ori_allocated ) );
-    ExclusivePrefixSum::Block<ExtremaRead,ExtremaWrt,ExtremaTot,ExtremaWrtMap>( total_ext_ct, r, w, t, wrtm );
+    ExclusivePrefixSum::Block<ExtremaRead,ExtremaWrt,ExtremaTot,ExtremaWrtMap>( ct->getTotalExtrema(), r, w, t, wrtm );
 
     __syncthreads();
 
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
-        ct->make_extrema_prefix_sums( );
-        /* replaced by the __device__ method above:
-        ct->ext_ps[0] = 0;
-        for( int o=1; o<MAX_OCTAVES; o++ ) {
-            ct->ext_ps[o] = ct->ext_ps[o-1] + ct->ext_ct[o-1];
-        }
-        */
+        // this is actually an input to the function
+        // ct->make_extrema_prefix_sums( );
 
         for( int o=0; o<MAX_OCTAVES; o++ ) {
             if( ct->ext_ct[o] == 0 ) {
                 ct->ori_ct[o] = 0;
             } else {
-                int fe = ct->ext_ps[o  ];   /* first extremum for this octave */
-                int le = ct->ext_ps[o+1]-1; /* last  extremum for this octave */
+                int fe = ct->getExtremaBase(o  );   /* first extremum for this octave */
+                int le = ct->getExtremaBase(o+1)-1; /* last  extremum for this octave */
                 int lo_ori_index = buf->extrema[fe].idx_ori;
                 int num_ori      = buf->extrema[le].num_ori;
                 int hi_ori_index = buf->extrema[le].idx_ori + num_ori;
@@ -320,13 +315,7 @@ void ori_prefix_sum( ExtremaCounters* ct, ExtremaBuffers* buf, const int total_e
             }
         }
 
-        ct->ori_ps[0] = 0;
-        for( int o=1; o<MAX_OCTAVES; o++ ) {
-            ct->ori_ps[o] = ct->ori_ps[o-1] + ct->ori_ct[o-1];
-        }
-
-        ct->ori_total = ct->ori_ps[MAX_OCTAVES-1] + ct->ori_ct[MAX_OCTAVES-1];
-        ct->ext_total = ct->ext_ps[MAX_OCTAVES-1] + ct->ext_ct[MAX_OCTAVES-1];
+        ct->make_orientation_prefix_sums( );
     }
 }
 
@@ -335,30 +324,16 @@ void Pyramid::orientation( const Config& conf )
 {
     readDescCountersFromDevice( );
 
-    int ext_total = 0;
-    for(int o : _ct->ext_ct)
-    {
-        if( o > 0 )
-        {
-            ext_total += o;
-        }
-    }
+    _ct->make_extrema_prefix_sums();
 
     // Filter functions are only called if necessary. They are very expensive,
     // therefore add 10% slack.
-    if( conf.getFilterMaxExtrema() > 0 && int(conf.getFilterMaxExtrema()*1.1) < ext_total )
+    if( conf.getFilterMaxExtrema() > 0 && int(conf.getFilterMaxExtrema()*1.1) < _ct->getTotalExtrema() )
     {
-        ext_total = _fg.filter( conf, _ct, _buf, ext_total );
+        _fg.filter( conf, _ct, _buf, _ct->getTotalExtrema() );
     }
 
-    reallocExtrema( ext_total );
-
-    int ext_ct_prefix_sum = 0;
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        _ct->ext_ps[octave] = ext_ct_prefix_sum;
-        ext_ct_prefix_sum += _ct->ext_ct[octave];
-    }
-    _ct->ext_total = ext_ct_prefix_sum;
+    reallocExtrema( _ct->getTotalExtrema() );
 
     cudaStream_t oct_0_str = _octaves[0].getStream();
 
@@ -404,7 +379,7 @@ void Pyramid::orientation( const Config& conf )
     grid.x  = 1;
     ori_prefix_sum
         <<<grid,block,0,oct_0_str>>>
-        ( _ct, _buf, ext_ct_prefix_sum, _num_octaves );
+        ( _ct, _buf );
     POP_SYNC_CHK;
 
     cudaDeviceSynchronize();

@@ -149,7 +149,7 @@ bool start_ext_desc_notile( const ExtremaCounters* ct, ExtremaBuffers* buf, int 
         <<<grid,block,0,oct_obj.getStream()>>>
         ( buf,
           ct->ori_ct[octave],
-          ct->ori_ps[octave],
+          ct->getOrientationBase( octave ),
           oct_obj.getDataTexLinear( ).tex );
     cudaDeviceSynchronize();
     cudaError_t err = cudaGetLastError( );

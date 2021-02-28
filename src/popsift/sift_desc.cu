@@ -88,7 +88,7 @@ void Pyramid::descriptors( const Config& conf )
         }
     }
 
-    if( _ct->ori_total == 0 )
+    if( _ct->getTotalOrientations() == 0 )
     {
         cerr << "Warning: no descriptors extracted" << endl;
         return;
@@ -100,19 +100,19 @@ void Pyramid::descriptors( const Config& conf )
     block.z = 1;
 
     dim3 grid;
-    grid.x  = grid_divide( _ct->ori_total, block.y );
+    grid.x  = grid_divide( _ct->getTotalOrientations(), block.y );
 
     if( conf.getUseRootSift() ) {
         normalize_histogram<NormalizeRootSift>
             <<<grid,block,0,_download_stream>>>
             ( _buf->desc,
-              _ct->ori_total );
+              _ct->getTotalOrientations() );
         POP_SYNC_CHK;
     } else {
         normalize_histogram<NormalizeL2>
             <<<grid,block,0,_download_stream>>>
             ( _buf->desc,
-              _ct->ori_total );
+              _ct->getTotalOrientations() );
         POP_SYNC_CHK;
     }
 

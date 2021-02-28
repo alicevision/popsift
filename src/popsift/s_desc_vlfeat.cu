@@ -202,7 +202,7 @@ bool start_ext_desc_vlfeat( const ExtremaCounters* ct, ExtremaBuffers* buf, cons
     ext_desc_vlfeat
         <<<grid,block,shared_size,oct_obj.getStream()>>>
         ( buf,
-          ct->ori_ps[octave],
+          ct->getOrientationBase( octave ),
           oct_obj.getDataTexPoint( ),
           oct_obj.getWidth(),
           oct_obj.getHeight() );

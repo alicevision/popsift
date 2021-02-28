@@ -186,7 +186,7 @@ bool start_ext_desc_loop( const ExtremaCounters* ct, ExtremaBuffers* buf, const 
         <<<grid,block,0,oct_obj.getStream()>>>
         ( buf,
           octave,
-          ct->ori_ps[octave],
+          ct->getOrientationBase( octave ),
           oct_obj.getDataTexPoint( ),
           oct_obj.getWidth(),
           oct_obj.getHeight() );

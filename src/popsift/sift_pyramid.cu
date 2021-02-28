@@ -185,7 +185,7 @@ __global__
 void prep_features( Descriptor* descriptor_base, ExtremaCounters* ct, ExtremaBuffers* buf, int up_fac )
 {
     int offset = blockIdx.x * 32 + threadIdx.x;
-    if( offset >= ct->ext_total ) return;
+    if( offset >= ct->getTotalExtrema() ) return;
     const Extremum& ext = buf->extrema [offset];
     Feature&        fet = buf->features[offset];
 
@@ -220,15 +220,15 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
     readDescCountersFromDevice();
 
     nvtxRangePushA( "download descriptors" );
-    FeaturesHost* features = new FeaturesHost( _ct->ext_total, _ct->ori_total );
+    FeaturesHost* features = new FeaturesHost( _ct->getTotalExtrema(), _ct->getTotalOrientations() );
 
-    if( _ct->ext_total == 0 || _ct->ori_total == 0 )
+    if( _ct->getTotalExtrema() == 0 || _ct->getTotalOrientations() == 0 )
     {
         nvtxRangePop();
         return features;
     }
 
-    dim3 grid( grid_divide( _ct->ext_total, 32 ) );
+    dim3 grid( grid_divide( _ct->getTotalExtrema(), 32 ) );
     prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), _ct, _buf, up_fac );
     POP_SYNC_CHK;
 
@@ -237,13 +237,13 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
     nvtxRangePop();
     popcuda_memcpy_async( features->getFeatures(),
                           _buf->features,
-                          _ct->ext_total * sizeof(Feature),
+                          _ct->getTotalExtrema() * sizeof(Feature),
                           cudaMemcpyDeviceToHost,
                           _download_stream );
 
     popcuda_memcpy_async( features->getDescriptors(),
                           _buf->desc,
-                          _ct->ori_total * sizeof(Descriptor),
+                          _ct->getTotalOrientations() * sizeof(Descriptor),
                           cudaMemcpyDeviceToHost,
                           _download_stream );
     cudaStreamSynchronize( _download_stream );
@@ -259,25 +259,25 @@ void Pyramid::clone_device_descriptors_sub( const Config& conf, FeaturesDev* fea
 {
     const float up_fac = conf.getUpscaleFactor();
 
-    dim3 grid( grid_divide( _ct->ext_total, 32 ) );
+    dim3 grid( grid_divide( _ct->getTotalExtrema(), 32 ) );
     prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), _ct, _buf, up_fac );
     POP_SYNC_CHK;
 
     popcuda_memcpy_async( features->getFeatures(),
                           _buf->features,
-                          _ct->ext_total * sizeof(Feature),
+                          _ct->getTotalExtrema() * sizeof(Feature),
                           cudaMemcpyDeviceToDevice,
                           _download_stream );
 
     popcuda_memcpy_async( features->getDescriptors(),
                           _buf->desc,
-                          _ct->ori_total * sizeof(Descriptor),
+                          _ct->getTotalOrientations() * sizeof(Descriptor),
                           cudaMemcpyDeviceToDevice,
                           _download_stream );
 
     popcuda_memcpy_async( features->getReverseMap(),
                           _buf->feat_to_ext_map,
-                          _ct->ori_total * sizeof(int),
+                          _ct->getTotalOrientations() * sizeof(int),
                           cudaMemcpyDeviceToDevice,
                           _download_stream );
 }
@@ -286,7 +286,7 @@ FeaturesDev* Pyramid::clone_device_descriptors( const Config& conf )
 {
     readDescCountersFromDevice();
 
-    FeaturesDev* features = new FeaturesDev( _ct->ext_total, _ct->ori_total );
+    FeaturesDev* features = new FeaturesDev( _ct->getTotalExtrema(), _ct->getTotalOrientations() );
 
     clone_device_descriptors_sub( conf, features );
 
@@ -339,7 +339,7 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* 
 
     const float up_fac = conf.getUpscaleFactor();
 
-    for( int ext_idx = 0; ext_idx<_ct->ext_total; ext_idx++ ) {
+    for( int ext_idx = 0; ext_idx<_ct->getTotalExtrema(); ext_idx++ ) {
         const Feature& ext = features->getFeatures()[ext_idx];
         const int   octave  = ext.debug_octave;
         const float xpos    = ext.xpos  * pow(2.0f, octave - up_fac);

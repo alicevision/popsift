@@ -30,14 +30,13 @@ struct ExtremaCounters
     /* The number of orientation found per octave */
     int ori_ct[MAX_OCTAVES];
 
+private:
     /* Exclusive prefix sum of ext_ct */
-    int ext_ps[MAX_OCTAVES];
+    int ext_ps[MAX_OCTAVES+1];
     /* Exclusive prefix sum of ori_ct */
-    int ori_ps[MAX_OCTAVES];
+    int ori_ps[MAX_OCTAVES+1];
 
-    int ext_total;
-    int ori_total;
-
+public:
     /** host and device function helper function that updates the exclusive
      *  prefix sum for extrema counts, updates ext_total and returns the total
      *  number of extrema.
@@ -48,14 +47,53 @@ struct ExtremaCounters
     int make_extrema_prefix_sums( )
     {
         ext_ps[0] = 0;
-        for( int o=1; o<MAX_OCTAVES; o++ ) {
+        for( int o=1; o<=MAX_OCTAVES; o++ ) {
             ext_ps[o] = ext_ps[o-1] + ext_ct[o-1];
         }
-        const int o = MAX_OCTAVES-1;
 
-        ext_total = ext_ps[o] + ext_ct[o];
+        return ext_ps[MAX_OCTAVES];
+    }
 
-        return ext_total;
+    /** get total number of extrema */
+    __device__ __host__ inline
+    int getTotalExtrema( ) const
+    {
+        return ext_ps[MAX_OCTAVES];
+    }
+
+    /** in a sorted array of extrema, get the base index for the entries
+     *  of this octave's extrema */
+    __device__ __host__ inline
+    int getExtremaBase( const int& octave ) const
+    {
+        return ext_ps[octave];
+    }
+
+    /** compute the prefix sum and total sum of orientation count per octave */
+    __device__ __host__ inline
+    int make_orientation_prefix_sums( )
+    {
+        ori_ps[0] = 0;
+        for( int o=1; o<=MAX_OCTAVES; o++ ) {
+            ori_ps[o] = ori_ps[o-1] + ori_ct[o-1];
+        }
+
+        return ori_ps[MAX_OCTAVES];
+    }
+
+    /** get total number of orientations */
+    __device__ __host__ inline
+    int getTotalOrientations( ) const
+    {
+        return ori_ps[MAX_OCTAVES];
+    }
+
+    /** in a sorted array of orientations, get the base index for the entries
+     *  of this octave's orientations */
+    __device__ __host__ inline
+    int getOrientationBase( const int& octave ) const
+    {
+        return ori_ps[octave];
     }
 };
 

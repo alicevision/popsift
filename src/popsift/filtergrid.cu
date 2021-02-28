@@ -70,7 +70,7 @@ fg_init( const int         octave,
 
     if( my_idx_in_octave > extrema_in_octave ) return;
 
-    const int base_index = ct->ext_ps[octave];
+    const int base_index = ct->getExtremaBase( octave );
     const int my_idx     = base_index + my_idx_in_octave;
 
     /* This is the array we are going to use for sorting and filtering and so on. */
@@ -95,7 +95,7 @@ void FilterGrid::init( ExtremaBuffers* buf, ExtremaCounters* ct )
     _ct->make_extrema_prefix_sums();
 
 
-    if( _alloc_size < _ct->ext_total )
+    if( _alloc_size < _ct->getTotalExtrema() )
     {
         if( _alloc_size > 0 )
         {
@@ -104,7 +104,7 @@ void FilterGrid::init( ExtremaBuffers* buf, ExtremaCounters* ct )
             cudaFree( _scales );
             cudaFree( _initial_extrema_pointers );
         }
-        _alloc_size = _ct->ext_total;
+        _alloc_size = _ct->getTotalExtrema();
         _sorting_index = popsift::cuda::malloc_mgdT<int>( _alloc_size, __FILE__, __LINE__);
         _cells         = popsift::cuda::malloc_mgdT<int>( _alloc_size, __FILE__, __LINE__);
         _scales        = popsift::cuda::malloc_mgdT<float>( _alloc_size, __FILE__, __LINE__);
@@ -160,11 +160,11 @@ fg_countcells( const int  ext_total,
 void FilterGrid::count_cells( )
 {
     dim3 block( 32 );
-    dim3 grid( grid_divide( _ct->ext_total, block.x ) );
+    dim3 grid( grid_divide( _ct->getTotalExtrema(), block.x ) );
 
     fg_countcells
         <<<grid,block,sizeof(int)*_slots>>>
-        ( _ct->ext_total,
+        ( _ct->getTotalExtrema(),
           _cells,
           _slots,
           _histogram_full );
@@ -216,10 +216,10 @@ void FilterGrid::sort_by_cell_and_scale( )
 #if 0
     cudaDeviceSynchronize();
     int* ptr = _sorting_index;
-    std::sort( ptr, ptr + _ct->ext_total, tc );
+    std::sort( ptr, ptr + _ct->getTotalExtrema(), tc );
 #else
     thrust::device_ptr<int> ptr = thrust::device_pointer_cast( _sorting_index );
-    thrust::sort( ptr, ptr + _ct->ext_total, tc );
+    thrust::sort( ptr, ptr + _ct->getTotalExtrema(), tc );
 #endif
 }
 
@@ -327,7 +327,6 @@ int FilterGrid::filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers*
     level_histogram( max_extrema );
     prune_extrema( conf.getFilterSorting() );
 
-    int filtered_ext_total = 0;
     for( int o=0; o<MAX_OCTAVES; o++ )
     {
         const int max_ct = ct->ext_ct[o];
@@ -342,10 +341,11 @@ int FilterGrid::filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers*
             }
         }
         ct->ext_ct[o] = counter;
-        filtered_ext_total += counter;
     }
 
-    return filtered_ext_total;
+    ct->make_extrema_prefix_sums();
+
+    return ct->getTotalExtrema();
 }
 }; // namespace popsift
 
