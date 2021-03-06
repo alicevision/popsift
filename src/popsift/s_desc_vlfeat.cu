@@ -51,15 +51,17 @@ void ext_desc_vlfeat_sub( const float         ang,
     const float2 maxdist = make_float2( -2.0f, -2.0f );
 
     // We rotate the corner of the maximum range by the keypoint orientation.
-    const float ptx = fabsf( ::fmaf( csbp, maxdist.x, ::fmaf( -ssbp, maxdist.y, x )) );
-    const float pty = fabsf( ::fmaf( csbp, maxdist.y, ::fmaf(  ssbp, maxdist.x, y ) ) );
+    // const float ptx = csbp * maxdist - ssbp * maxdist;
+    // const float pty = csbp * maxdist + ssbp * maxdist;
+    const float ptx = fabsf( ::fmaf( csbp, maxdist.x, -ssbp * maxdist.y ) );
+    const float pty = fabsf( ::fmaf( csbp, maxdist.y,  ssbp * maxdist.x ) );
 
-    const float bsz = fabsf(csbp) + fabsf(ssbp);
+    const float bsz = 2.0f * ( fabsf(csbp) + fabsf(ssbp) );
+
     const int   xmin = max(1,          (int)floorf(x - ptx - bsz));
     const int   ymin = max(1,          (int)floorf(y - pty - bsz));
     const int   xmax = min(width - 2,  (int)floorf(x + ptx + bsz));
     const int   ymax = min(height - 2, (int)floorf(y + pty + bsz));
-
     __shared__ float dpt[4][128];
     for( int i=threadIdx.x; i<128; i+=blockDim.x )
     {
