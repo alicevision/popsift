@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for Cuda CC 7 cards (RTX 2080) [PR](https://github.com/alicevision/popsift/pull/67)
 - Support for Boost 1.70 [PR](https://github.com/alicevision/popsift/pull/65)
 - Support for device selection and multiple GPUs [PR](https://github.com/alicevision/popsift/pull/121)
+- Test: adding descriptor comparator [PR](https://github.com/alicevision/popsift/pull/115)
 
 ### Fixed
 - CMake: fixes to allow building on Windows using vcpkg [PR](https://github.com/alicevision/popsift/pull/92)

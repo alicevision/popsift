@@ -26,3 +26,6 @@ add_custom_target(
  	DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/testOxfordDataset.sh
 	DEPENDS popsift-demo
 )
+
+add_subdirectory(compareVersions)
+
