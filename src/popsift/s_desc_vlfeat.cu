@@ -73,16 +73,15 @@ void ext_desc_vlfeat_sub( const float         ang,
     __syncthreads();
 
     // we have 32 threads in a warp, how to use them?
-    const int tx = ( ( threadIdx.x >> 0 ) & 0x1 ); // 0 - 1
-    const int ty = ( ( threadIdx.x >> 1 ) & 0x1 ); // 0 - 1
-    const int tt = ( ( threadIdx.x >> 2 ) & 0x1 ); // 0 - 1
     const int loop = threadIdx.x >> 3;             // 0 - 3
+    const int xstart = ( threadIdx.x & 0x7 );
+    const int xstep  = 8;
 
     for( int pix_y = ymin+loop; popsift::any(pix_y <= ymax); pix_y += 4 )
     {
-        for( int pix_x = xmin; pix_x <= xmax; pix_x++ )
+        for( int pix_x = xmin+xstart; popsift::any(pix_x <= xmax); pix_x+=xstep )
         {
-            if( pix_y <= ymax )
+            if( ( pix_y <= ymax ) && ( pix_x <= xmax ) )
             {
                 // d : distance from keypoint
                 const float2 d = make_float2( pix_x - x, pix_y - y );
@@ -111,35 +110,44 @@ void ext_desc_vlfeat_sub( const float         ang,
                 const int3 t0 = make_int3( (int)floorf(n.x - 0.5f),
                                         (int)floorf(n.y - 0.5f),
                                         (int)nt );
-                float wgt_x = - ( n.x - ( t0.x + 0.5f ) );
-                float wgt_y = - ( n.y - ( t0.y + 0.5f ) );
-                float wgt_t = - ( nt  - t0.z );
+                const float wgt_x = - ( n.x - ( t0.x + 0.5f ) );
+                const float wgt_y = - ( n.y - ( t0.y + 0.5f ) );
+                const float wgt_t = - ( nt  - t0.z );
 
-                if( ( t0.y + ty >= -2 ) &&
-                    ( t0.y + ty <   2 ) &&
-                    ( t0.x + tx >= -2 ) &&
-                    ( t0.x + tx <   2 ) )
+                for( int tx=0; tx<2; tx++ )
                 {
-                    wgt_x = ( tx == 0 ) ? 1.0f + wgt_x : wgt_x;
-                    wgt_y = ( ty == 0 ) ? 1.0f + wgt_y : wgt_y;
-                    wgt_t = ( tt == 0 ) ? 1.0f + wgt_t : wgt_t;
+                    for( int ty=0; ty<2; ty++ )
+                    {
+                        for( int tt=0; tt<2; tt++ )
+                        {
+                            if( ( t0.y + ty >= -2 ) &&
+                                ( t0.y + ty <   2 ) &&
+                                ( t0.x + tx >= -2 ) &&
+                                ( t0.x + tx <   2 ) )
+                            {
+                                float i_wgt_x = ( tx == 0 ) ? 1.0f + wgt_x : wgt_x;
+                                float i_wgt_y = ( ty == 0 ) ? 1.0f + wgt_y : wgt_y;
+                                float i_wgt_t = ( tt == 0 ) ? 1.0f + wgt_t : wgt_t;
 
-                    wgt_x = fabsf( wgt_x );
-                    wgt_y = fabsf( wgt_y );
-                    wgt_t = fabsf( wgt_t );
+                                i_wgt_x = fabsf( i_wgt_x );
+                                i_wgt_y = fabsf( i_wgt_y );
+                                i_wgt_t = fabsf( i_wgt_t );
 
-                    const float val = ww
-                                    * mod
-                                    * wgt_x
-                                    * wgt_y
-                                    * wgt_t;
+                                const float val = ww
+                                                * mod
+                                                * i_wgt_x
+                                                * i_wgt_y
+                                                * i_wgt_t;
 
-                    const int offset =  80
-                                    + ( t0.y + ty ) * 32
-                                    + ( t0.x + tx ) * 8
-                                    + ( t0.z + tt ) % 8;
+                                const int offset =  80
+                                                + ( t0.y + ty ) * 32
+                                                + ( t0.x + tx ) * 8
+                                                + ( t0.z + tt ) % 8;
 
-                    dpt[loop][offset] += val;
+                                atomicAdd( &dpt[loop][offset], val );
+                            }
+                        }
+                    }
                 }
             }
             __syncthreads();
