@@ -6,6 +6,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+#include "popsift/sift_config.h"
+
 #include "common/assist.h"
 #include "common/debug_macros.h"
 #include "common/vec_macros.h"
@@ -62,27 +64,62 @@ void ext_desc_vlfeat_sub( const float         ang,
     const int   ymin = max(1,          (int)floorf(y - pty - bsz));
     const int   xmax = min(width - 2,  (int)floorf(x + ptx + bsz));
     const int   ymax = min(height - 2, (int)floorf(y + pty + bsz));
-    __shared__ float dpt[4][128];
+
+    __shared__ float dpt[128];
+
+#if POPSIFT_IS_DEFINED(POPSIFT_HAVE_COOPERATIVE_GROUPS)
+    cg::thread_block          block = cg::this_thread_block();
+    cg::thread_block_tile<32> tile  = cg::tiled_partition<32>( block );
+
+    for( int i=tile.thread_rank(); i<128; i+=tile.size() )
+    {
+        dpt[i] = 0.0f;
+    }
+
+    tile.sync();
+#else
     for( int i=threadIdx.x; i<128; i+=blockDim.x )
     {
-        dpt[0][i] = 0.0f;
-        dpt[1][i] = 0.0f;
-        dpt[2][i] = 0.0f;
-        dpt[3][i] = 0.0f;
+        dpt[i] = 0.0f;
     }
+
     __syncthreads();
+#endif
 
-    // we have 32 threads in a warp, how to use them?
-    const int loop = threadIdx.x >> 3;             // 0 - 3
-    const int xstart = ( threadIdx.x & 0x7 );
-    const int xstep  = 8;
-
-    for( int pix_y = ymin+loop; popsift::any(pix_y <= ymax); pix_y += 4 )
+    for( int pix_y = ymin; pix_y <= ymax; pix_y += 1 )
     {
-        for( int pix_x = xmin+xstart; popsift::any(pix_x <= xmax); pix_x+=xstep )
+        for( int base_x = xmin; base_x <= xmax; base_x += 32 )
         {
+            float mod;
+            float th;
+
+#if POPSIFT_IS_DEFINED(POPSIFT_HAVE_COOPERATIVE_GROUPS)
+            get_gradiant32( tile, mod, th, base_x, pix_y, layer_tex, level );
+#else
+            get_gradiant32( mod, th, base_x, pix_y, layer_tex, level );
+#endif
+
+            mod /= 2.0f; // Our mod is double that of vlfeat. Huh.
+
+            th -= ang;
+            while( th > M_PI2 ) th -= M_PI2;
+            while( th < 0.0f  ) th += M_PI2;
+#if POPSIFT_IS_DEFINED(POPSIFT_HAVE_COOPERATIVE_GROUPS)
+            tile.sync();
+
+            const int pix_x = base_x + tile.thread_rank();
+#else
+            __syncthreads();
+
+            const int pix_x = base_x + threadIdx.x;
+#endif
+
             if( ( pix_y <= ymax ) && ( pix_x <= xmax ) )
             {
+#if POPSIFT_IS_DEFINED(POPSIFT_HAVE_COOPERATIVE_GROUPS)
+                cg::coalesced_group co_tile = cg::coalesced_threads();
+#endif
+
                 // d : distance from keypoint
                 const float2 d = make_float2( pix_x - x, pix_y - y );
 
@@ -90,26 +127,15 @@ void ext_desc_vlfeat_sub( const float         ang,
                 const float2 n = make_float2( ::fmaf( crsbp, d.x,  srsbp * d.y ),
                                               ::fmaf( crsbp, d.y, -srsbp * d.x ) ); 
 
-                float mod;
-                float th;
-
-                get_gradiant( mod, th, pix_x, pix_y, layer_tex, level );
-
-                mod /= 2; // Our mod is double that of vlfeat. Huh.
-
                 const float  ww = __expf( -scalbnf(n.x*n.x + n.y*n.y, -3));
-
-                th -= ang;
-                while( th > M_PI2 ) th -= M_PI2;
-                while( th < 0.0f  ) th += M_PI2;
 
                 const float nt = 8.0f * th / M_PI2;
 
                 // neighbouring tile on the lower side: -2, -1, 0 or 1
                 // (must use floorf because casting rounds towards zero
                 const int3 t0 = make_int3( (int)floorf(n.x - 0.5f),
-                                        (int)floorf(n.y - 0.5f),
-                                        (int)nt );
+                                           (int)floorf(n.y - 0.5f),
+                                           (int)nt );
                 const float wgt_x = - ( n.x - ( t0.x + 0.5f ) );
                 const float wgt_y = - ( n.y - ( t0.y + 0.5f ) );
                 const float wgt_t = - ( nt  - t0.z );
@@ -144,21 +170,37 @@ void ext_desc_vlfeat_sub( const float         ang,
                                                 + ( t0.x + tx ) * 8
                                                 + ( t0.z + tt ) % 8;
 
-                                atomicAdd( &dpt[loop][offset], val );
+                                atomicAdd( &dpt[offset], val );
                             }
+
+#if POPSIFT_IS_DEFINED(POPSIFT_HAVE_COOPERATIVE_GROUPS)
+                            co_tile.sync();
+#else
+                            // cannot be done before CUDA 9
+#endif
                         }
                     }
                 }
             }
+#if POPSIFT_IS_DEFINED(POPSIFT_HAVE_COOPERATIVE_GROUPS)
+            tile.sync();
+#else
             __syncthreads();
+#endif
         }
     }
 
+#if POPSIFT_IS_DEFINED(POPSIFT_HAVE_COOPERATIVE_GROUPS)
+    for( int i=tile.thread_rank(); i<128; i+=tile.size() )
+    {
+        features[i] = dpt[i];
+    }
+#else
     for( int i=threadIdx.x; i<128; i+=blockDim.x )
     {
-        float f = dpt[0][i] + dpt[1][i] + dpt[2][i] + dpt[3][i];
-        features[i] = f;
+        features[i] = dpt[i];
     }
+#endif
 }
 
 __global__ void ext_desc_vlfeat(int octave, cudaTextureObject_t layer_tex, int w, int h)

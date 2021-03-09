@@ -181,9 +181,11 @@ else()
 endif()
 
 if(CUDA_VERSION VERSION_GREATER_EQUAL "9.0")
-  set(HAVE_SHFL_DOWN_SYNC   1)
+  set(PopSift_HAVE_SHFL_DOWN_SYNC   1)
+  set(PopSift_HAVE_COOPERATIVE_GROUPS   1)
 else()
-  set(HAVE_SHFL_DOWN_SYNC   0)
+  set(PopSift_HAVE_SHFL_DOWN_SYNC   0)
+  set(PopSift_HAVE_COOPERATIVE_GROUPS   0)
 endif()
 
 if(NOT PopSift_USE_GRID_FILTER)

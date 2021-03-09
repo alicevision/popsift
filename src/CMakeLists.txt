@@ -28,6 +28,7 @@ CUDA_ADD_LIBRARY(popsift
         popsift/s_desc_norm_l2.h
         popsift/s_desc_normalize.h
         popsift/s_gradiant.h
+	popsift/s_gradiant_cuda9plus.h
         popsift/s_solve.h
         popsift/common/assist.cu popsift/common/assist.h
         popsift/common/clamp.h
