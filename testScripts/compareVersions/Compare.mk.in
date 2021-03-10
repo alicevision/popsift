@@ -1,0 +1,24 @@
+all: double
+
+single: @CMAKE_RUNTIME_OUTPUT_DIRECTORY@/popsift-compareSiftFiles
+	bash ./compareWithVLFeat.sh -1 popsift vlfeat
+
+double: @CMAKE_RUNTIME_OUTPUT_DIRECTORY@/popsift-compareSiftFiles
+	bash ./compareWithVLFeat.sh -1 vlfeat default -2 popsift vlfeat
+
+triple: @CMAKE_RUNTIME_OUTPUT_DIRECTORY@/popsift-compareSiftFiles
+	bash ./compareWithVLFeat.sh -1 vlfeat default -2 popsift default -3 popsift vlfeat
+
+clean:
+	rm -rf popsift-*-popsift-*
+	rm -rf vlfeat-*-vlfeat-*
+	rm -rf vlfeat-*-popsift-*
+	rm -rf popsift-*-vlfeat-*
+	rm -f sort*.txt
+	rm -f sort*.png
+	rm -f *.sift
+	rm -f descdist*.txt
+	rm -f descdist*.png
+	rm -f tmp/*.sift tmp/UML*.txt tmp/sort*.txt tmp/coord*.txt tmp/sum*.txt
+	rm -f tmp/descdist*.txt
+
