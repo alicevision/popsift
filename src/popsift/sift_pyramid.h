@@ -8,16 +8,21 @@
 #pragma once
 
 #include "features.h"
+#include "filtergrid.h"
 #include "s_image.h"
 #include "sift_conf.h"
 #include "sift_constants.h"
 #include "sift_octave.h"
+#include "initial_extremum.h"
 
 #include <iostream>
 #include <vector>
 
 namespace popsift {
 
+/** Datastructure in managed memory that holds counters for
+ *  initially collected extrema and orientations.
+ */
 struct ExtremaCounters
 {
     /* The number of extrema found per octave */
@@ -25,38 +30,108 @@ struct ExtremaCounters
     /* The number of orientation found per octave */
     int ori_ct[MAX_OCTAVES];
 
+private:
     /* Exclusive prefix sum of ext_ct */
-    int ext_ps[MAX_OCTAVES];
+    int ext_ps[MAX_OCTAVES+1];
     /* Exclusive prefix sum of ori_ct */
-    int ori_ps[MAX_OCTAVES];
+    int ori_ps[MAX_OCTAVES+1];
 
-    int ext_total;
-    int ori_total;
+public:
+    /** host and device function helper function that updates the exclusive
+     *  prefix sum for extrema counts, updates ext_total and returns the total
+     *  number of extrema.
+     *  Note that exclusive prefix sum on the device could use several threads
+     *  but we are talking about a constant size of 20.
+     */
+    __device__ __host__ inline
+    int make_extrema_prefix_sums( )
+    {
+        ext_ps[0] = 0;
+        for( int o=1; o<=MAX_OCTAVES; o++ ) {
+            ext_ps[o] = ext_ps[o-1] + ext_ct[o-1];
+        }
+
+        return ext_ps[MAX_OCTAVES];
+    }
+
+    /** get total number of extrema */
+    __device__ __host__ inline
+    int getTotalExtrema( ) const
+    {
+        return ext_ps[MAX_OCTAVES];
+    }
+
+    /** in a sorted array of extrema, get the base index for the entries
+     *  of this octave's extrema */
+    __device__ __host__ inline
+    int getExtremaBase( const int& octave ) const
+    {
+        return ext_ps[octave];
+    }
+
+    /** compute the prefix sum and total sum of orientation count per octave */
+    __device__ __host__ inline
+    int make_orientation_prefix_sums( )
+    {
+        ori_ps[0] = 0;
+        for( int o=1; o<=MAX_OCTAVES; o++ ) {
+            ori_ps[o] = ori_ps[o-1] + ori_ct[o-1];
+        }
+
+        return ori_ps[MAX_OCTAVES];
+    }
+
+    /** get total number of orientations */
+    __device__ __host__ inline
+    int getTotalOrientations( ) const
+    {
+        return ori_ps[MAX_OCTAVES];
+    }
+
+    /** in a sorted array of orientations, get the base index for the entries
+     *  of this octave's orientations */
+    __device__ __host__ inline
+    int getOrientationBase( const int& octave ) const
+    {
+        return ori_ps[octave];
+    }
 };
 
+/** Datastructure in managed memory that allows CPU and GPU to access all
+ *  buffers.
+ */
 struct ExtremaBuffers
 {
+    /* This part of the struct deals with the descriptors that are
+     * finally detected by the algorithm.
+     */
     Descriptor*      desc;
     int              ext_allocated;
     int              ori_allocated;
-};
 
-struct DevBuffers
-{
+    /* This part of the struct deals with intermediate buffers to find
+     * extrema.
+     */
     InitialExtremum* i_ext_dat[MAX_OCTAVES];
     int*             i_ext_off[MAX_OCTAVES];
     int*             feat_to_ext_map;
     Extremum*        extrema;
     Feature*         features;
-};
 
-extern thread_local ExtremaCounters hct;
-extern __device__   ExtremaCounters dct;
-extern thread_local ExtremaBuffers  hbuf;
-extern __device__   ExtremaBuffers  dbuf;
-extern thread_local ExtremaBuffers  dbuf_shadow; // just for managing memories
-extern __device__   DevBuffers      dobuf;
-extern thread_local DevBuffers      dobuf_shadow; // just for managing memories
+    /** Allocate buffers that hold intermediate and final information about
+     *  extrema and if applicable, orientations and descriptors.
+     *  Buffers are located in managed memory.
+     */
+    void init( int num_octave, int max_extrema, int max_orientations );
+
+    /** Release all buffers */
+    void uninit( );
+
+    /** Function that allows to resize buffers when all extrema have been
+     *  detected and the resulting total is too large.
+     */
+    void growBuffers( int numExtrema );
+};
 
 class Pyramid
 {
@@ -75,6 +150,12 @@ class Pyramid
 
     /* the download of converted descriptors should be asynchronous */
     cudaStream_t _download_stream;
+
+    ExtremaCounters* _ct;
+    ExtremaBuffers*  _buf;
+
+    /** A structure that encapsulates everything we need for grid filtering */
+    FilterGrid _fg;
 
 public:
     enum GaussTableChoice {
@@ -146,7 +227,6 @@ private:
     void find_extrema( const Config& conf );
     void reallocExtrema( int numExtrema );
 
-    int  extrema_filter_grid( const Config& conf, int ext_total ); // called at head of orientation
     void orientation( const Config& conf );
 
     void descriptors( const Config& conf );

@@ -5,6 +5,8 @@ CUDA_ADD_LIBRARY(popsift
         popsift/sift_constants.cu popsift/sift_constants.h
         popsift/sift_conf.cu popsift/sift_conf.h
         popsift/gauss_filter.cu popsift/gauss_filter.h
+        popsift/filtergrid.cu popsift/filtergrid.h
+        popsift/initial_extremum.h
         popsift/s_image.cu popsift/s_image.h
         popsift/sift_pyramid.cu popsift/sift_pyramid.h
         popsift/sift_octave.cu popsift/sift_octave.h
@@ -16,7 +18,6 @@ CUDA_ADD_LIBRARY(popsift
         popsift/sift_extremum.h
         popsift/sift_extremum.cu popsift/s_extrema.cu
         popsift/s_orientation.cu
-        popsift/s_filtergrid.cu
         popsift/sift_desc.cu
         popsift/s_desc_loop.cu popsift/s_desc_loop.h
         popsift/s_desc_iloop.cu popsift/s_desc_iloop.h

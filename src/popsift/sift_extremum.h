@@ -9,34 +9,10 @@
 
 #include "sift_constants.h"
 
-#include <iostream>
-#include <vector>
+// #include <iostream>
+// #include <vector>
 
 namespace popsift {
-
-/**
- * @brief This is an internal data structure.
- * Separated from the final Extremum data structure to implement
- * grid filtering in a space-efficient manner. In grid filtering,
- * extrema are first found, after that some may be discarded in
- * some spatial regions of the image. Avoid waste of space by
- * allocating Extremum structures only for the remaining ones.
- */
-struct InitialExtremum
-{
-    float xpos;
-    float ypos;
-    /// extremum refined into this level
-    int   lpos;
-    /// scale
-    float sigma;
-    /// index into the grid for grid-based extrema filtering
-    int   cell;
-    /// true if this extremum has been filtered
-    bool  ignore;
-    /// if any initial extrema are ignored, new index for Extremum
-    int   write_index;
-};
 
 /**
  * @brief This is an internal data structure.

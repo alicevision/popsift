@@ -9,6 +9,7 @@
 #include "sift_conf.h"
 
 #include <iostream>
+#include <sstream>
 #include <algorithm>
 
 using namespace std;
@@ -28,19 +29,16 @@ Config::Config( )
     , octaves( -1 )
     , levels( 3 )
     , sigma( 1.6f )
-    , _edge_limit( 10.0f )
-    , _threshold( 0.04 ) // ( 10.0f / 256.0f )
+    , _edge_limit( getEdgeThreshDefault( ) )
+    , _threshold( getPeakThreshDefault() )
     , _gauss_mode( getGaussModeDefault() )
     , _sift_mode( Config::PopSift )
     , _log_mode( Config::None )
     , _scaling_mode( Config::ScaleDefault )
     , _desc_mode( Config::Loop )
-    , _grid_filter_mode( Config::RandomScale )
     , verbose( false )
     // , _max_extrema( 20000 )
     , _max_extrema( 100000 )
-    , _filter_max_extrema( -1 )
-    , _filter_grid_size( 2 )
     , _assume_initial_blur( true )
     , _initial_blur( 0.5f )
     , _normalization_mode( getNormModeDefault() )
@@ -149,6 +147,16 @@ const char* Config::getGaussModeUsage( )
         "relative (synonym for vlfeat-hw-interpolated)";
 }
 
+void Config::setFilterMaxExtrema( int ext )
+{
+    _grid_filter._max_extrema = ext;
+}
+
+void Config::setFilterGridSize( int sz )
+{
+    _grid_filter._size = sz;
+}
+
 bool Config::getCanFilterExtrema() const
 {
 #if __CUDACC_VER_MAJOR__ >= 8
@@ -158,21 +166,36 @@ bool Config::getCanFilterExtrema() const
 #endif
 }
 
-void Config::setFilterSorting( const std::string& text )
+const char* Config::getFilterGridModeUsage( )
 {
-    if( text == "up" )
-        _grid_filter_mode = Config::SmallestScaleFirst;
-    else if( text == "down" )
-        _grid_filter_mode = Config::LargestScaleFirst;
-    else if( text == "random" )
-        _grid_filter_mode = Config::RandomScale;
-    else
-        POP_FATAL( "filter sorting mode must be one of up, down or random" );
+    return "l/largest (default) or s/smallest. "
+           "largest: keep the extrema with the largest scales from each grid-filtered cell. "
+           "smallest: keep the extrema with the smallest scales. "
+           "The first octave has the smallest scales.";
 }
 
-void Config::setFilterSorting( Config::GridFilterMode m )
+GridFilterConfig::Mode Config::getFilterGridModeDefault( )
 {
-    _grid_filter_mode = m;
+    return GridFilterConfig::LargestScaleFirst;
+}
+
+void Config::setFilterSorting( const std::string& text )
+{
+    if( stringIsame( text, "smallest" ) )
+        _grid_filter._mode = GridFilterConfig::SmallestScaleFirst;
+    if( stringIsame( text, "s" ) )
+        _grid_filter._mode = GridFilterConfig::SmallestScaleFirst;
+    else if( stringIsame( text, "largest" ) )
+        _grid_filter._mode = GridFilterConfig::LargestScaleFirst;
+    else if( stringIsame( text, "l" ) )
+        _grid_filter._mode = GridFilterConfig::LargestScaleFirst;
+    else
+        POP_FATAL( string("bad grid filter mode, ") + getFilterGridModeUsage() );
+}
+
+void Config::setFilterSorting( GridFilterConfig::Mode m )
+{
+    _grid_filter._mode = m;
 }
 
 void Config::setVerbose( bool on )
@@ -285,13 +308,40 @@ float Config::getSigma( ) const { return sigma; }
 
 void  Config::setEdgeLimit( float v ) { _edge_limit = v; }
 float Config::getEdgeLimit( ) const   { return _edge_limit; }
+float Config::getEdgeThreshDefault( )
+{
+    return 10.0f;
+}
+std::string Config::getEdgeThreshUsage( )
+{
+    std::ostringstream ostr;
+    ostr << "Edge Threshold: eliminates peaks of the DoG scale space whose curvature is too small." << endl
+         << "Default: " << getEdgeThreshDefault() << endl
+         << "Set to a value <= 0 to disable." << endl;
+    return ostr.str();
+}
 
 void  Config::setThreshold( float v ) { _threshold = v; }
 float Config::getThreshold( ) const   { return _threshold; }
+float Config::getPeakThreshold() const
+{
+    return ( _threshold * 0.5f * 255.0f / levels );
+}
+float Config::getPeakThreshDefault( )
+{
+    return 0.04f; // ( 10.0f / 256.0f )
+}
+std::string Config::getPeakThreshUsage( )
+{
+    std::ostringstream ostr;
+    ostr << "Peak Threshold: eliminates peaks of the DoG scale space that are too small" <<endl
+         << "(contrast too small in absolute value)." << endl
+         << "Default: " << getPeakThreshDefault() << endl
+         << "Set to a value <= 0 to disable." << endl;
+    return ostr.str();
+}
 
 void Config::setPrintGaussTables() { _print_gauss_tables = true; }
-void Config::setFilterMaxExtrema( int ext ) { _filter_max_extrema = ext; }
-void Config::setFilterGridSize( int sz ) { _filter_grid_size = sz; }
 
 void Config::setInitialBlur( float blur )
 {
@@ -323,11 +373,6 @@ Config::SiftMode Config::getSiftMode() const
     return _sift_mode;
 }
 
-float Config::getPeakThreshold() const
-{
-    return ( _threshold * 0.5f * 255.0f / levels );
-}
-
 bool Config::ifPrintGaussTables() const
 {
     return _print_gauss_tables;
@@ -352,5 +397,11 @@ bool Config::equal( const Config& other ) const
         COMPARE( _normalization_multiplier ) ) return false;
     return true;
 }
+
+GridFilterConfig::GridFilterConfig( )
+    : _max_extrema( -1 )
+    , _size( 2 )
+    , _mode( LargestScaleFirst )
+{ }
 
 }; // namespace popsift

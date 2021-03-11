@@ -63,6 +63,23 @@ void malloc_hst( void** ptr, int sz,
 } }
 
 namespace popsift { namespace cuda {
+void malloc_mgd( void** ptr, int sz,
+                 const char* file, int line )
+{
+    cudaError_t err;
+    err = cudaMallocManaged( ptr, sz );
+    if( err != cudaSuccess ) {
+        std::cerr << file << ":" << line << std::endl
+                  << "    cudaMallocManaged failed: " << cudaGetErrorString(err) << std::endl;
+        exit( -__LINE__ );
+    }
+#ifdef DEBUG_INIT_DEVICE_ALLOCATIONS
+    memset( *ptr, 0, sz );
+#endif // NDEBUG
+}
+} }
+
+namespace popsift { namespace cuda {
 void memcpy_async( void* dst, const void* src, size_t sz,
                    cudaMemcpyKind type, cudaStream_t stream,
                    const char* file, size_t line )

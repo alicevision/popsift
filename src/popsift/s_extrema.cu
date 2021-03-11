@@ -299,7 +299,7 @@ public:
 
 template<int sift_mode>
 __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
-                                               int debug_octave,
+                                               int octave,
                                                int width,
                                                int height,
                                                uint32_t maxlevel,
@@ -308,10 +308,7 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
                                                int grid_width,
                                                InitialExtremum& ec)
 {
-    ec.xpos    = 0.0f;
-    ec.ypos    = 0.0f;
-    ec.lpos    = 0;
-    ec.sigma   = 0.0f;
+    ec.set( octave, 0.0f, 0.0f, 0.0f, 0 );
 
     /*
      * First consideration: extrema cannot be found on any outermost edge,
@@ -344,7 +341,7 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
     if( ! f.first_contrast_ok( val ) ) return false;
 
     if( ! is_extremum( dog, x-1, y-1, level-1 ) ) {
-        // if( debug_octave==0 && level==2 && x==14 && y==73 ) printf("But I fail\n");
+        // if( octave==0 && level==2 && x==14 && y==73 ) printf("But I fail\n");
         return false;
     }
 
@@ -482,22 +479,26 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
 
     /* accept-reject extremum */
     // if( fabsf(contr) < (d_consts.threshold*2.0f) )
-    if( fabsf(contr) < scalbnf( d_consts.threshold, 1 ) )
+    if( d_consts.threshold > 0.0f )
     {
-        return false;
+        if( fabsf(contr) < scalbnf( d_consts.threshold, 1 ) )
+        {
+            return false;
+        }
     }
 
-    /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
-    if( edgeval >= (d_consts.edge_limit+1.0f)*(d_consts.edge_limit+1.0f)/d_consts.edge_limit ) {
-        return false;
+    if( d_consts.edge_limit > 0.0f )
+    {
+        /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
+        if( edgeval >= (d_consts.edge_limit+1.0f)*(d_consts.edge_limit+1.0f)/d_consts.edge_limit )
+        {
+            return false;
+        }
     }
 
-    ec.xpos      = xn;
-    ec.ypos      = yn;
-    ec.lpos      = (int)roundf(sn);
-    ec.sigma     = d_consts.sigma0 * pow(d_consts.sigma_k, sn); // * 2;
-    ec.cell      = floorf( yn / h_grid_divider ) * grid_width + floorf( xn / w_grid_divider );
-        // const float sigma_k = powf(2.0f, 1.0f / levels );
+    ec.set( octave,
+            xn, yn, sn,
+            floorf( yn / h_grid_divider ) * grid_width + floorf( xn / w_grid_divider ) );
 
     return true;
 }
@@ -510,6 +511,8 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
                           int                 width,
                           int                 height,
                           const uint32_t      maxlevel,
+                          ExtremaCounters*    ct,
+                          ExtremaBuffers*     buf,
                           int*                d_number_of_blocks,
                           int                 number_of_blocks,
                           const float         w_grid_divider,
@@ -517,7 +520,6 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
                           const int           grid_width )
 {
     InitialExtremum ec;
-    ec.ignore = false;
 
     bool indicator = find_extrema_in_dog_sub<sift_mode>( dog,
                                                          octave,
@@ -529,13 +531,12 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
                                                          grid_width,
                                                          ec );
 
-    uint32_t write_index = extrema_count<HEIGHT>( indicator, &dct.ext_ct[octave] );
+    uint32_t write_index = extrema_count<HEIGHT>( indicator, &ct->ext_ct[octave] );
 
-    InitialExtremum* d_extrema = dobuf.i_ext_dat[octave];
-    int*             d_ext_off = dobuf.i_ext_off[octave];
+    InitialExtremum* d_extrema = buf->i_ext_dat[octave];
+    int*             d_ext_off = buf->i_ext_off[octave];
 
     if( indicator && write_index < d_consts.max_extrema ) {
-        ec.write_index = write_index;
         // store the initial extremum in an array
         d_extrema[write_index] = ec;
 
@@ -549,10 +550,13 @@ void find_extrema_in_dog( cudaTextureObject_t dog,
     __syncthreads();
 
     if( threadIdx.x == 0 && threadIdx.y == 0 ) {
-        int ct = atomicAdd( d_number_of_blocks, 1 );
-        if( ct >= number_of_blocks-1 ) {
-            int num_ext = atomicMin( &dct.ext_ct[octave], d_consts.max_extrema );
-            // printf( "Block %d,%d,%d num ext %d\n", blockIdx.x, blockIdx.y, blockIdx.z, dct.ext_ct[octave] );
+        // This works as a global barrier. Only thread 0 of the last thread block
+        // that finishes will call the atomicMin function.
+        // The atomicMin enforces an upper limit on the octave's number of extrema.
+        int count = atomicAdd( d_number_of_blocks, 1 );
+        if( count >= number_of_blocks-1 ) {
+            int num_ext = atomicMin( &ct->ext_ct[octave], d_consts.max_extrema );
+            // printf( "Block %d,%d,%d num ext %d\n", blockIdx.x, blockIdx.y, blockIdx.z, ct->ext_ct[octave] );
         }
     }
 }
@@ -595,6 +599,8 @@ void Pyramid::find_extrema( const Config& conf )
                       cols,
                       rows,
                       _levels-1,
+                      _ct,
+                      _buf,
                       num_blocks,
                       grid.x * grid.y,
                       oct_obj.getWGridDivider(),
@@ -610,6 +616,8 @@ void Pyramid::find_extrema( const Config& conf )
                       cols,
                       rows,
                       _levels-1,
+                      _ct,
+                      _buf,
                       num_blocks,
                       grid.x * grid.y,
                       oct_obj.getWGridDivider(),
@@ -625,6 +633,8 @@ void Pyramid::find_extrema( const Config& conf )
                       cols,
                       rows,
                       _levels-1,
+                      _ct,
+                      _buf,
                       num_blocks,
                       grid.x * grid.y,
                       oct_obj.getWGridDivider(),

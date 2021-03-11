@@ -13,6 +13,8 @@
 
 #include <cstdio>
 
+#define IGRID_NUMLINES 1
+
 using namespace popsift;
 
 __device__ static inline
@@ -74,17 +76,23 @@ void ext_desc_igrid_sub( const float x, const float y, const int level,
     }
 }
 
-__global__ void ext_desc_igrid(int octave, cudaTextureObject_t texLinear)
+/*
+ * We assume that this is started with
+ * block = 16,4,4 or with 32,4,4, depending on macros
+ * grid  = nunmber of orientations
+ */
+__global__ void ext_desc_igrid( ExtremaBuffers* buf, const int ori_base_index,
+                                cudaTextureObject_t texLinear)
 {
-    const int   num      = dct.ori_ct[octave];
+    const int   num      = gridDim.x;
 
     const int   offset   = blockIdx.x * blockDim.z + threadIdx.z;
-    const int   o_offset =  dct.ori_ps[octave] + offset;
+    const int   o_offset =  ori_base_index + offset;
     if( offset >= num ) return;
 
-    Descriptor* desc     = &dbuf.desc           [o_offset];
-    const int   ext_idx  =  dobuf.feat_to_ext_map[o_offset];
-    Extremum*   ext      =  dobuf.extrema + ext_idx;
+    Descriptor* desc     = &buf->desc[o_offset];
+    const int   ext_idx  =  buf->feat_to_ext_map[o_offset];
+    Extremum*   ext      =  buf->extrema + ext_idx;
 
     if( ext->sigma == 0 ) return;
     const float SBP      = fabsf( DESC_MAGNIFY * ext->sigma );
@@ -103,4 +111,34 @@ __global__ void ext_desc_igrid(int octave, cudaTextureObject_t texLinear)
                         desc->features,
                         texLinear );
 }
+
+namespace popsift
+{
+
+bool start_ext_desc_igrid( const ExtremaCounters* ct, ExtremaBuffers* buf, const int octave, Octave& oct_obj )
+{
+    dim3 block;
+    dim3 grid;
+    grid.x = ct->ori_ct[octave];
+    grid.y = 1;
+    grid.z = 1;
+
+    if( grid.x == 0 ) return false;
+
+    block.x = 16;
+    block.y = 16;
+    block.z = IGRID_NUMLINES;
+
+    ext_desc_igrid
+        <<<grid,block,0,oct_obj.getStream()>>>
+        ( buf,
+          ct->getOrientationBase( octave ),
+          oct_obj.getDataTexLinear( ).tex );
+
+    POP_SYNC_CHK;
+
+    return true;
+}
+
+}; // namespace popsift
 
