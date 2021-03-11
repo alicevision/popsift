@@ -10,7 +10,6 @@ Check out the [documentation](https://popsift.readthedocs.io/) for more info.
 
 ## HW requirements
 
-
 PopSift compiles and works with NVidia cards of compute capability >= 3.0 (including the GT 650M), but the code is developed with the compute capability 5.2 card GTX 980 Ti in mind.
 
 CUDA SDK 11 does no longer support compute capability 3.0. 3.5 is still supported with deprecation warning.
@@ -46,15 +45,6 @@ Some build options are available:
 
 * `BUILD_SHARED_LIBS` (default: `ON`) controls the type of library to build (`ON` for shared libraries, `OFF` for static)
 
-
-### Continuous integration:
-- [![Build Status](https://travis-ci.org/alicevision/popsift.svg?branch=master)](https://travis-ci.org/alicevision/popsift) master branch.
-- [![Build Status](https://travis-ci.org/alicevision/popsift.svg?branch=develop)](https://travis-ci.org/alicevision/popsift) develop branch.
-- [![Build status](https://ci.appveyor.com/api/projects/status/rsm5269hs288c2ji/branch/develop?svg=true)](https://ci.appveyor.com/project/AliceVision/popsift/branch/develop)
- develop branch.
-
-
-
 ## Usage
 
 The main artifact created is `libpopsift`.
@@ -86,8 +76,6 @@ Then, in order to build just pass the location of `PopSiftConfig.cmake` from the
 cmake .. -DPopSift_DIR=<prefix>/lib/cmake/PopSift/
 ```
 
-
-
 ### Calling the API
 
 The caller must create a `popart::Config` struct (documented in `src/sift/sift_conf.h`) to control the behaviour of the PopSift, and instantiate an object of class `PopSift` (found in `src/sift/popsift.h`).
@@ -111,6 +99,11 @@ PopSift can be configured at runtime to use constants that affect it behaviours.
 In particular, users can choose to generate results very similar to VLFeat or results that are closer (but not as close) to the SIFT implementation of the OpenCV extras.
 We acknowledge that there is at least one SIFT implementation that is vastly faster, but it makes considerable sacrifices in terms of accuracy and compatibility.
 
+## Continuous integration:
+- [![Build Status](https://travis-ci.org/alicevision/popsift.svg?branch=master)](https://travis-ci.org/alicevision/popsift) master branch.
+- [![Build Status](https://travis-ci.org/alicevision/popsift.svg?branch=develop)](https://travis-ci.org/alicevision/popsift) develop branch.
+- [![Build status](https://ci.appveyor.com/api/projects/status/rsm5269hs288c2ji/branch/develop?svg=true)](https://ci.appveyor.com/project/AliceVision/popsift/branch/develop)
+  develop branch.
 
 ## License
 
