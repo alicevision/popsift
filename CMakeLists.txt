@@ -145,6 +145,8 @@ if(MSVC)
   list(APPEND CUDA_NVCC_FLAGS   -Xcompiler ${PopSift_MVSC_LINKER})
 endif()
 
+list(APPEND CUDA_NVCC_FLAGS "-lineinfo")
+
 # default stream per-thread implies that each host thread has one non-synchronizing 0-stream
 # currently, the code requires legacy mode
 list(APPEND CUDA_NVCC_FLAGS "--default-stream;legacy")
