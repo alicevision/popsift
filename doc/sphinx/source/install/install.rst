@@ -50,9 +50,20 @@ vcpkg
 
 `vcpkg <https://github.com/microsoft/vcpkg>`_ is a cross-platform (Windows, Linux and MacOS), open-source package manager created by Microsoft.
 
-We are planning to release a port of the library so that it can be easily built using the package manager on all supported platforms.
-Stay tuned!
+Starting from v0.9, PopSift package can be installed on each platform via vcpkg.
+To install the library:
 
+.. code:: shell
+
+  vcpkg install popsift --triplet <arch>
+
+where :code:`<arch>` is the architecture to build for (e.g. :code:`x64-windows`, :code:`x64-linux-dynamic` etc.)
+
+If you want to install the demo applications that come with the library you can add the option :code:`apps`:
+
+.. code:: shell
+
+  vcpkg install popsift[apps] --triplet <arch>
 
 ------------
 
