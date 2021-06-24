@@ -53,6 +53,7 @@ author = 'AliceVision'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ['breathe', 'sphinxcontrib.bibtex']
+bibtex_bibfiles = ['biblio.bib']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
