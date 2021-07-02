@@ -232,6 +232,8 @@ int main(int argc, char **argv)
 
     std::cout << "PopSift version: " << POPSIFT_VERSION_STRING << std::endl;
 
+    config.setDescMode( popsift::Config::VLFeat_Desc );
+
     try {
         parseargs( argc, argv, config, inputFile ); // Parse command line
         std::cout << inputFile << std::endl;

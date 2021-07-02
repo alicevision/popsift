@@ -187,6 +187,8 @@ int main(int argc, char **argv)
 
     std::cout << "PopSift version: " << POPSIFT_VERSION_STRING << std::endl;
 
+    config.setDescMode( popsift::Config::VLFeat_Desc );
+
     try {
         parseargs( argc, argv, config, lFile, rFile ); // Parse command line
         std::cout << lFile << " <-> " << rFile << std::endl;
@@ -227,7 +229,23 @@ int main(int argc, char **argv)
     cout << "Number of features:    " << rFeatures->getFeatureCount() << endl;
     cout << "Number of descriptors: " << rFeatures->getDescriptorCount() << endl;
 
-    lFeatures->match( rFeatures );
+    int3* matches = lFeatures->matchAndReturn( rFeatures );
+    cudaDeviceSynchronize();
+
+    for( int i=0; i<lFeatures->getDescriptorCount(); i++ )
+    {
+        int3& match = matches[i];
+        if( match.z )
+        {
+            const popsift::Feature* l_f = lFeatures->getFeatureForDescriptor( i );
+            const popsift::Feature* r_f = rFeatures->getFeatureForDescriptor( match.x );
+            cout << setprecision(5) << showpoint
+                 << "point (" << l_f->xpos << "," << l_f->ypos << ") in l matches "
+                 << "point (" << r_f->xpos << "," << r_f->ypos << ") in r" << endl;
+        }
+    }
+
+    cudaFree( matches );
 
     delete lFeatures;
     delete rFeatures;

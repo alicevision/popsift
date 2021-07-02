@@ -245,17 +245,25 @@ show_distance( int3*       match_matrix,
 	    if( threadIdx.x == 0 )
         {
             if( match_matrix[i].z )
-                printf( "accept feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f\n",
+            {
+                Feature* lx = &l_ext[l_fem[i]];
+                Feature* rx = &r_ext[r_fem[match_matrix[i].x]];
+                printf( "accept feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f"
+                        " (%.1f,%.1f)-(%.1f,%.1f)\n",
                         l_fem[i], i,
                         r_fem[match_matrix[i].x], match_matrix[i].x,
                         r_fem[match_matrix[i].y], match_matrix[i].y,
-                        d1, d2 );
-	    else
+                        d1, d2,
+                        lx->xpos, lx->ypos, rx->xpos, rx->ypos );
+            }
+            else
+            {
                 printf( "reject feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f\n",
                         l_fem[i], i,
                         r_fem[match_matrix[i].x], match_matrix[i].x,
                         r_fem[match_matrix[i].y], match_matrix[i].y,
                         d1, d2 );
+            }
         }
         __syncthreads();
     }
@@ -321,6 +329,26 @@ int3* FeaturesDev::matchAndReturn( FeaturesDev* other )
         ( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
 
     return match_matrix;
+}
+
+Descriptor* FeaturesDev::getDescriptor( int descIndex )
+{
+    return &_ori[descIndex];
+}
+
+const Descriptor* FeaturesDev::getDescriptor( int descIndex ) const
+{
+    return &_ori[descIndex];
+}
+
+Feature* FeaturesDev::getFeatureForDescriptor( int descIndex )
+{
+    return &_ext[_rev[descIndex]];
+}
+
+const Feature* FeaturesDev::getFeatureForDescriptor( int descIndex ) const
+{
+    return &_ext[_rev[descIndex]];
 }
 
 /*************************************************************
