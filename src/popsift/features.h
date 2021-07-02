@@ -103,9 +103,9 @@ std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature );
 
 class FeaturesDev : public FeaturesBase
 {
-    Feature*     _ext;
-    Descriptor*  _ori;
-    int*         _rev; // the reverse map from descriptors to extrema
+    Feature*     _ext;  // array of extrema
+    Descriptor*  _ori;  // array of desciptors
+    int*         _rev;  // the reverse map from descriptors to extrema
 
 public:
     FeaturesDev( );
@@ -114,7 +114,25 @@ public:
 
     void reset( int num_ext, int num_ori );
 
+    /** This function performs one-directional brute force matching on
+     *  the GPU between the Descriptors in this objects and the object
+     *  other.
+     *  The resulting matches are printed.
+     */
     void match( FeaturesDev* other );
+
+    /** This function performs one-directional brute force matching on
+     *  the GPU between the Descriptors in this objects and the object
+     *  other.
+     *  The resulting matches are returned in an array of int3 that must
+     *  be released with a call to cudaFree().
+     *  The length of the array is this->getDescriptorCount().
+     *  For each element:
+     *    int3.x is the index of a descriptor in this->getDescriptors()
+     *    int3.y is an index in other->getDescriptors()
+     *    int3.z indicates if the match is valid (non-zero) or not (zero)
+     */
+    int3* matchAndReturn( FeaturesDev* other );
 
     inline Feature*    getFeatures()    { return _ext; }
     inline Descriptor* getDescriptors() { return _ori; }
