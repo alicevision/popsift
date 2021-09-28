@@ -17,6 +17,7 @@
 
 #include <thrust/device_vector.h>
 #include <thrust/sort.h>
+#include <algorithm>
 
 namespace popsift
 {
@@ -213,7 +214,7 @@ void FilterGrid::sort_by_cell_and_scale( )
      * and never know the difference.
      */
     CellScaleCompare tc( _cells, _scales );
-#if 0
+#if 1
     cudaDeviceSynchronize();
     int* ptr = _sorting_index;
     std::sort( ptr, ptr + _ct->getTotalExtrema(), tc );
