@@ -32,9 +32,9 @@ struct ExtremaCounters
 
 private:
     /* Exclusive prefix sum of ext_ct */
-    int ext_ps[MAX_OCTAVES+1];
+    int ext_prefix_sum[MAX_OCTAVES+1];
     /* Exclusive prefix sum of ori_ct */
-    int ori_ps[MAX_OCTAVES+1];
+    int ori_prefix_sum[MAX_OCTAVES+1];
 
 public:
     /** host and device function helper function that updates the exclusive
@@ -46,19 +46,25 @@ public:
     __device__ __host__ inline
     int make_extrema_prefix_sums( )
     {
-        ext_ps[0] = 0;
+        ext_prefix_sum[0] = 0;
         for( int o=1; o<=MAX_OCTAVES; o++ ) {
-            ext_ps[o] = ext_ps[o-1] + ext_ct[o-1];
+            ext_prefix_sum[o] = ext_prefix_sum[o-1] + ext_ct[o-1];
         }
 
-        return ext_ps[MAX_OCTAVES];
+        return ext_prefix_sum[MAX_OCTAVES];
     }
 
     /** get total number of extrema */
     __device__ __host__ inline
     int getTotalExtrema( ) const
     {
-        return ext_ps[MAX_OCTAVES];
+        return ext_prefix_sum[MAX_OCTAVES];
+    }
+
+    __device__ __host__ inline
+    int getExtremaCount( int octave ) const
+    {
+        return ext_ct[octave];
     }
 
     /** in a sorted array of extrema, get the base index for the entries
@@ -66,26 +72,26 @@ public:
     __device__ __host__ inline
     int getExtremaBase( const int& octave ) const
     {
-        return ext_ps[octave];
+        return ext_prefix_sum[octave];
     }
 
     /** compute the prefix sum and total sum of orientation count per octave */
     __device__ __host__ inline
     int make_orientation_prefix_sums( )
     {
-        ori_ps[0] = 0;
+        ori_prefix_sum[0] = 0;
         for( int o=1; o<=MAX_OCTAVES; o++ ) {
-            ori_ps[o] = ori_ps[o-1] + ori_ct[o-1];
+            ori_prefix_sum[o] = ori_prefix_sum[o-1] + ori_ct[o-1];
         }
 
-        return ori_ps[MAX_OCTAVES];
+        return ori_prefix_sum[MAX_OCTAVES];
     }
 
     /** get total number of orientations */
     __device__ __host__ inline
     int getTotalOrientations( ) const
     {
-        return ori_ps[MAX_OCTAVES];
+        return ori_prefix_sum[MAX_OCTAVES];
     }
 
     /** in a sorted array of orientations, get the base index for the entries
@@ -93,7 +99,7 @@ public:
     __device__ __host__ inline
     int getOrientationBase( const int& octave ) const
     {
-        return ori_ps[octave];
+        return ori_prefix_sum[octave];
     }
 };
 
@@ -225,6 +231,7 @@ private:
     void reset_extrema_mgmt( );
     void build_pyramid( const Config& conf, ImageBase* base );
     void find_extrema( const Config& conf );
+    void finalize_extrema( );
     void reallocExtrema( int numExtrema );
 
     void orientation( const Config& conf );

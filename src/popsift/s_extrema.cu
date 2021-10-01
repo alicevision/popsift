@@ -649,5 +649,15 @@ void Pyramid::find_extrema( const Config& conf )
     }
 }
 
+void Pyramid::finalize_extrema( )
+{
+    /* Complete the extrema computation by computing the prefix sum of
+     * extrema counts for all octaves.
+     */
+    readDescCountersFromDevice( );
+
+    _ct->make_extrema_prefix_sums();
+}
+
 } // namespace popsift
 

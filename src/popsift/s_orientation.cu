@@ -322,10 +322,6 @@ void ori_prefix_sum( ExtremaCounters* ct, ExtremaBuffers* buf )
 __host__
 void Pyramid::orientation( const Config& conf )
 {
-    readDescCountersFromDevice( );
-
-    _ct->make_extrema_prefix_sums();
-
     // Filter functions are only called if necessary. They are very expensive,
     // therefore add 10% slack.
     if( conf.getFilterMaxExtrema() > 0 && int(conf.getFilterMaxExtrema()*1.1) < _ct->getTotalExtrema() )

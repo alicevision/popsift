@@ -87,8 +87,6 @@ void FilterGrid::init( ExtremaBuffers* buf, ExtremaCounters* ct )
 {
     _buf = buf;
     _ct  = ct;
-    _ct->make_extrema_prefix_sums();
-
 
     /* Allocate or reallocate memory to hold all indices */
     if( _alloc_size < _ct->getTotalExtrema() )

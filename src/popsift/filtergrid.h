@@ -45,7 +45,6 @@ public:
 private:
     /** Initialize the FilterGrid structure with the current counters
      *  and buffers.
-     *  Compute the exclusive prefix sum of extrema per octave.
      */
     void init( ExtremaBuffers* buf, ExtremaCounters* ct );
 

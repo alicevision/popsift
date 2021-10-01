@@ -168,6 +168,8 @@ void Pyramid::step2( const Config& conf )
 {
     find_extrema( conf );
 
+    finalize_extrema( );
+
     orientation( conf );
 
     descriptors( conf );
