@@ -7,6 +7,8 @@
  */
 #include "filtergrid.h"
 
+#include "filtergrid_debug.h"
+
 #include "sift_config.h"
 #include "sift_extremum.h"
 #include "sift_pyramid.h"
@@ -88,17 +90,19 @@ void FilterGrid::init( ExtremaBuffers* buf, ExtremaCounters* ct )
     _buf = buf;
     _ct  = ct;
 
+    const int extrema_ct_total = _ct->getTotalExtrema();
+
     /* Allocate or reallocate memory to hold all indices */
-    if( _alloc_size < _ct->getTotalExtrema() )
+    if( _alloc_size < extrema_ct_total )
     {
         if( _alloc_size > 0 )
         {
             popsift::cuda::free_mgd( _sorting_index );
-	    popsift::cuda::free_mgd( _cells );
-	    popsift::cuda::free_mgd( _scales );
-	    popsift::cuda::free_mgd( _initial_extrema_pointers );
+            popsift::cuda::free_mgd( _cells );
+            popsift::cuda::free_mgd( _scales );
+            popsift::cuda::free_mgd( _initial_extrema_pointers );
         }
-        _alloc_size = _ct->getTotalExtrema();
+        _alloc_size    = extrema_ct_total;
         _sorting_index = popsift::cuda::malloc_mgdT<int>( _alloc_size, __FILE__, __LINE__);
         _cells         = popsift::cuda::malloc_mgdT<int>( _alloc_size, __FILE__, __LINE__);
         _scales        = popsift::cuda::malloc_mgdT<float>( _alloc_size, __FILE__, __LINE__);
@@ -109,10 +113,15 @@ void FilterGrid::init( ExtremaBuffers* buf, ExtremaCounters* ct )
 
     for( int o=0; o<MAX_OCTAVES; o++ )
     {
-        if( _ct->ext_ct[o] == 0 ) continue;
+        const int extrema_ct_in_octave   = _ct->getExtremaCount(o);
+        const int extrema_base_in_octave = _ct->getExtremaBase(o);
+
+        if( extrema_ct_in_octave == 0 ) continue;
+std::cerr << "    " << extrema_ct_in_octave << " extrema in octave " << o
+          << ", base offset " << extrema_base_in_octave << std::endl;
 
         dim3 block( 32 );
-        dim3 grid( grid_divide( _ct->ext_ct[o], block.x ) );
+        dim3 grid( grid_divide( extrema_ct_in_octave, block.x ) );
         fg_init
             <<<grid,block>>>
             ( o,
@@ -131,7 +140,7 @@ fg_countcells( const int  ext_total,
                const int  cell_histogram_size,
                int*       cell_histogram )
 {
-    // The size of this chared memory region is computed from _slots in the
+    // The size of this shared memory region is computed from _slots in the
     // calling host code.
     extern __shared__ int cellcounts[];
 
@@ -317,9 +326,70 @@ int FilterGrid::filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers*
     init( buf, ct );
     count_cells( );
     make_histogram_prefix_sum( );
+
+    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
+                  _slots, _histogram_full, _histogram_eps,
+                  PrintHistogram,
+                  "**********************************************\n"
+                  "* Printing the histogram of cells            *\n"
+                  "**********************************************\n");
+    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
+                  _slots, _histogram_full, _histogram_eps,
+                  PrintUnsortedByOctave,
+                  "**********************************************\n"
+                  "* Printing all values sorted by their octave *\n"
+                  "**********************************************\n");
+    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
+                  _slots, _histogram_full, _histogram_eps,
+                  PrintUnsortedFlat,
+                  "****************************************************************************\n"
+                  "* Printing all values flat and unsorted in the entire array before sorting *\n"
+                  "****************************************************************************\n");
+    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
+                  _slots, _histogram_full, _histogram_eps,
+                  PrintSortedFlat,
+                  "********************************************************************************\n"
+                  "* Printing all values flat by sorting index in the entire array before sorting *\n"
+                  "********************************************************************************\n");
+
     sort_by_cell_and_scale( );
+
+    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
+                  _slots, _histogram_full, _histogram_eps,
+                  PrintSortedFlat,
+                  "********************************************************************************\n"
+                  "* Printing all values flat by sorting index in the entire array after sorting  *\n"
+                  "********************************************************************************\n");
+    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
+                  _slots, _histogram_full, _histogram_eps,
+                  PrintRest,
+                  "********************************************************************************\n"
+                  "* Printing all values flat by sorting index in the entire array after sorting  *\n"
+                  "********************************************************************************\n");
+
     level_histogram( max_extrema );
+
+    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
+                  _slots, _histogram_full, _histogram_eps,
+                  PrintHistogram,
+                  "**************************************************************\n"
+                  "* Printing the histogram of cells after levelling            *\n"
+                  "**************************************************************\n");
+    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
+                  _slots, _histogram_full, _histogram_eps,
+                  PrintRest,
+                  "********************************************************************************\n"
+                  "* Printing all values flat by sorting index in the entire array after sorting  *\n"
+                  "********************************************************************************\n");
+
     prune_extrema( conf.getFilterSorting() );
+
+    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
+                  _slots, _histogram_full, _histogram_eps,
+                  PrintRest,
+                  "********************************************************************************\n"
+                  "* Printing all values flat by sorting index in the entire array after pruning  *\n"
+                  "********************************************************************************\n");
 
     for( int o=0; o<MAX_OCTAVES; o++ )
     {
