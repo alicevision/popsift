@@ -40,7 +40,7 @@ public:
 
     ~FilterGrid( );
 
-    int filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers* buf, int ext_total );
+    int filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers* buf );
 
 private:
     /** Initialize the FilterGrid structure with the current counters

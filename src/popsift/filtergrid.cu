@@ -30,8 +30,6 @@ FilterGrid::FilterGrid( const Config& conf )
     , _scales( 0 )
     , _initial_extrema_pointers( 0 )
 {
-    if( _slots > 1 )
-    {
         /* refresh the exclsuive prefix sum over the per-octave extrema counts */
         _histogram      = popsift::cuda::malloc_mgdT<int>( MAX_OCTAVES*_slots, __FILE__, __LINE__);
         _histogram_full = popsift::cuda::malloc_mgdT<int>( _slots, __FILE__, __LINE__);
@@ -40,21 +38,17 @@ FilterGrid::FilterGrid( const Config& conf )
         // initialize histogram to zero, implicitly move to device
         popcuda_memset_sync( _histogram, 0, MAX_OCTAVES * _slots * sizeof(int) );
         popcuda_memset_sync( _histogram_full, 0, _slots * sizeof(int) );
-    }
 }
 
 FilterGrid::~FilterGrid( )
 {
-    if( _slots > 1 )
-    {
-        cudaFree( _histogram_eps );
-        cudaFree( _histogram_full );
-        cudaFree( _histogram );
-        cudaFree( _sorting_index );
-        cudaFree( _cells );
-        cudaFree( _scales );
-        cudaFree( _initial_extrema_pointers );
-    }
+    popsift::cuda::free_mgd( _histogram_eps );
+    popsift::cuda::free_mgd( _histogram_full );
+    popsift::cuda::free_mgd( _histogram );
+    popsift::cuda::free_mgd( _sorting_index );
+    popsift::cuda::free_mgd( _cells );
+    popsift::cuda::free_mgd( _scales );
+    popsift::cuda::free_mgd( _initial_extrema_pointers );
 }
 
 __global__ void
@@ -96,14 +90,15 @@ void FilterGrid::init( ExtremaBuffers* buf, ExtremaCounters* ct )
     _ct->make_extrema_prefix_sums();
 
 
+    /* Allocate or reallocate memory to hold all indices */
     if( _alloc_size < _ct->getTotalExtrema() )
     {
         if( _alloc_size > 0 )
         {
-            cudaFree( _sorting_index );
-            cudaFree( _cells );
-            cudaFree( _scales );
-            cudaFree( _initial_extrema_pointers );
+            popsift::cuda::free_mgd( _sorting_index );
+	    popsift::cuda::free_mgd( _cells );
+	    popsift::cuda::free_mgd( _scales );
+	    popsift::cuda::free_mgd( _initial_extrema_pointers );
         }
         _alloc_size = _ct->getTotalExtrema();
         _sorting_index = popsift::cuda::malloc_mgdT<int>( _alloc_size, __FILE__, __LINE__);
@@ -309,7 +304,7 @@ void FilterGrid::prune_extrema( GridFilterConfig::Mode mode )
 /* Discard some extrema that exceed a conf.getFilterMaxExtrema().
  * The caller should ensure that filtering is actually needed. */
 __host__
-int FilterGrid::filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers* buf, int ext_total )
+int FilterGrid::filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers* buf )
 {
     /* At this time, we have host-side information about ext_ct[o], the number
      * of extrema we have found in octave o, and we have summed it up on the

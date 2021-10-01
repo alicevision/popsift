@@ -330,7 +330,7 @@ void Pyramid::orientation( const Config& conf )
     // therefore add 10% slack.
     if( conf.getFilterMaxExtrema() > 0 && int(conf.getFilterMaxExtrema()*1.1) < _ct->getTotalExtrema() )
     {
-        _fg.filter( conf, _ct, _buf, _ct->getTotalExtrema() );
+        _fg.filter( conf, _ct, _buf );
     }
 
     reallocExtrema( _ct->getTotalExtrema() );

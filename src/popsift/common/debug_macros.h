@@ -61,6 +61,10 @@ T* malloc_mgdT( int num, const char* file, int line ) {
     return (T*)ptr;
 }
 
+inline void free_mgd( void* ptr ) {
+    cudaFree( ptr );
+}
+
 void memcpy_sync( void* dst, const void* src, size_t sz,
                    cudaMemcpyKind type,
                    const char* file, size_t line );
