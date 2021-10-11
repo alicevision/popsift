@@ -117,7 +117,7 @@ void FilterGrid::init( ExtremaBuffers* buf, ExtremaCounters* ct )
         const int extrema_base_in_octave = _ct->getExtremaBase(o);
 
         if( extrema_ct_in_octave == 0 ) continue;
-std::cerr << "    " << extrema_ct_in_octave << " extrema in octave " << o
+std::cout << "    " << extrema_ct_in_octave << " extrema in octave " << o
           << ", base offset " << extrema_base_in_octave << std::endl;
 
         dim3 block( 32 );
@@ -145,7 +145,13 @@ fg_countcells( const int  ext_total,
     extern __shared__ int cellcounts[];
 
     const int tid = threadIdx.x;
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int idx = blockIdx.x * blockDim.x + tid;
+
+    for( int c=tid; c<cell_histogram_size; c+=blockDim.x )
+    {
+        cellcounts[c] = 0;
+    }
+    __syncthreads();
 
     if( idx >= ext_total ) return;
 
@@ -162,12 +168,16 @@ fg_countcells( const int  ext_total,
 
 void FilterGrid::count_cells( )
 {
+    const int total_extrema_count = _ct->getTotalExtrema();
+
+    std::cout << "Counting cells for a total of " << total_extrema_count << " extrema" << std::endl;
+
     dim3 block( 32 );
-    dim3 grid( grid_divide( _ct->getTotalExtrema(), block.x ) );
+    dim3 grid( grid_divide( total_extrema_count, block.x ) );
 
     fg_countcells
         <<<grid,block,sizeof(int)*_slots>>>
-        ( _ct->getTotalExtrema(),
+        ( total_extrema_count,
           _cells,
           _slots,
           _histogram_full );
@@ -379,11 +389,17 @@ int FilterGrid::filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers*
                   _slots, _histogram_full, _histogram_eps,
                   PrintRest,
                   "********************************************************************************\n"
-                  "* Printing all values flat by sorting index in the entire array after sorting  *\n"
+                  "* Printing all values flat by sorting index in the entire array after leveling *\n"
                   "********************************************************************************\n");
 
     prune_extrema( conf.getFilterSorting() );
 
+    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
+                  _slots, _histogram_full, _histogram_eps,
+                  PrintHistogram,
+                  "**************************************************************\n"
+                  "* Printing the histogram of cells after pruning              *\n"
+                  "**************************************************************\n");
     debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
                   _slots, _histogram_full, _histogram_eps,
                   PrintRest,
@@ -391,9 +407,12 @@ int FilterGrid::filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers*
                   "* Printing all values flat by sorting index in the entire array after pruning  *\n"
                   "********************************************************************************\n");
 
+    int debug_sum = 0;
     for( int o=0; o<MAX_OCTAVES; o++ )
     {
-        const int max_ct = ct->ext_ct[o];
+        // const int max_ct = ct->ext_ct[o];
+        const int max_ct = ct->getExtremaCount(o);
+
         int counter = 0;
         for( int i=0; i<max_ct; i++ )
         {
@@ -404,8 +423,14 @@ int FilterGrid::filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers*
                 counter += 1;
             }
         }
+        if( counter != 0 )
+        {
+            std::cout << "The number of initial extrema not ignored in octave " << o << " is " << counter << std::endl;
+            debug_sum += counter;
+        }
         ct->ext_ct[o] = counter;
     }
+    std::cout << "The total number of initial extrema not ignored is " << debug_sum << std::endl;
 
     ct->make_extrema_prefix_sums();
 
