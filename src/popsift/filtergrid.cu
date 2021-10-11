@@ -15,9 +15,16 @@
 
 #if ! POPSIFT_IS_DEFINED(POPSIFT_DISABLE_GRID_FILTER)
 
+#include <algorithm>
+
+#define PREFER_CPU 0
+
+#if PREFER_CPU == 0
+#include <thrust/scan.h>
+#include <thrust/execution_policy.h>
 #include <thrust/device_vector.h>
 #include <thrust/sort.h>
-#include <algorithm>
+#endif
 
 namespace popsift
 {
@@ -180,6 +187,15 @@ void FilterGrid::count_cells( )
 void FilterGrid::make_histogram_prefix_sum( )
 {
     // We could to this on the device !
+#if PREFER_CPU == 0
+    popcuda_memset_sync( _histogram_eps, 0, (_slots+1) * sizeof(int) );
+
+    thrust::device_ptr<int> src_begin = thrust::device_pointer_cast( &_histogram_full[0] );
+    thrust::device_ptr<int> src_end   = thrust::device_pointer_cast( &_histogram_full[_slots] );
+    thrust::device_ptr<int> dst_begin = thrust::device_pointer_cast( &_histogram_eps[1] );
+
+    thrust::inclusive_scan( src_begin, src_end, dst_begin );
+#else
     cudaDeviceSynchronize();
 
     _histogram_eps[0] = 0;
@@ -188,6 +204,7 @@ void FilterGrid::make_histogram_prefix_sum( )
     {
         _histogram_eps[i] = _histogram_eps[i-1] + _histogram_full[i-1];
     }
+#endif
 }
 
 
@@ -220,13 +237,13 @@ void FilterGrid::sort_by_cell_and_scale( )
      * and never know the difference.
      */
     CellScaleCompare tc( _cells, _scales );
-#if 1
+#if PREFER_CPU == 0
+    thrust::device_ptr<int> ptr = thrust::device_pointer_cast( _sorting_index );
+    thrust::sort( ptr, ptr + _ct->getTotalExtrema(), tc );
+#else
     cudaDeviceSynchronize();
     int* ptr = _sorting_index;
     std::sort( ptr, ptr + _ct->getTotalExtrema(), tc );
-#else
-    thrust::device_ptr<int> ptr = thrust::device_pointer_cast( _sorting_index );
-    thrust::sort( ptr, ptr + _ct->getTotalExtrema(), tc );
 #endif
 }
 
