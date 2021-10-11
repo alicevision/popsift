@@ -7,8 +7,6 @@
  */
 #include "filtergrid.h"
 
-#include "filtergrid_debug.h"
-
 #include "sift_config.h"
 #include "sift_extremum.h"
 #include "sift_pyramid.h"
@@ -117,8 +115,6 @@ void FilterGrid::init( ExtremaBuffers* buf, ExtremaCounters* ct )
         const int extrema_base_in_octave = _ct->getExtremaBase(o);
 
         if( extrema_ct_in_octave == 0 ) continue;
-std::cout << "    " << extrema_ct_in_octave << " extrema in octave " << o
-          << ", base offset " << extrema_base_in_octave << std::endl;
 
         dim3 block( 32 );
         dim3 grid( grid_divide( extrema_ct_in_octave, block.x ) );
@@ -169,8 +165,6 @@ fg_countcells( const int  ext_total,
 void FilterGrid::count_cells( )
 {
     const int total_extrema_count = _ct->getTotalExtrema();
-
-    std::cout << "Counting cells for a total of " << total_extrema_count << " extrema" << std::endl;
 
     dim3 block( 32 );
     dim3 grid( grid_divide( total_extrema_count, block.x ) );
@@ -337,80 +331,14 @@ int FilterGrid::filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers*
     count_cells( );
     make_histogram_prefix_sum( );
 
-    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
-                  _slots, _histogram_full, _histogram_eps,
-                  PrintHistogram,
-                  "**********************************************\n"
-                  "* Printing the histogram of cells            *\n"
-                  "**********************************************\n");
-    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
-                  _slots, _histogram_full, _histogram_eps,
-                  PrintUnsortedByOctave,
-                  "**********************************************\n"
-                  "* Printing all values sorted by their octave *\n"
-                  "**********************************************\n");
-    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
-                  _slots, _histogram_full, _histogram_eps,
-                  PrintUnsortedFlat,
-                  "****************************************************************************\n"
-                  "* Printing all values flat and unsorted in the entire array before sorting *\n"
-                  "****************************************************************************\n");
-    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
-                  _slots, _histogram_full, _histogram_eps,
-                  PrintSortedFlat,
-                  "********************************************************************************\n"
-                  "* Printing all values flat by sorting index in the entire array before sorting *\n"
-                  "********************************************************************************\n");
-
     sort_by_cell_and_scale( );
-
-    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
-                  _slots, _histogram_full, _histogram_eps,
-                  PrintSortedFlat,
-                  "********************************************************************************\n"
-                  "* Printing all values flat by sorting index in the entire array after sorting  *\n"
-                  "********************************************************************************\n");
-    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
-                  _slots, _histogram_full, _histogram_eps,
-                  PrintRest,
-                  "********************************************************************************\n"
-                  "* Printing all values flat by sorting index in the entire array after sorting  *\n"
-                  "********************************************************************************\n");
 
     level_histogram( max_extrema );
 
-    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
-                  _slots, _histogram_full, _histogram_eps,
-                  PrintHistogram,
-                  "**************************************************************\n"
-                  "* Printing the histogram of cells after levelling            *\n"
-                  "**************************************************************\n");
-    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
-                  _slots, _histogram_full, _histogram_eps,
-                  PrintRest,
-                  "********************************************************************************\n"
-                  "* Printing all values flat by sorting index in the entire array after leveling *\n"
-                  "********************************************************************************\n");
-
     prune_extrema( conf.getFilterSorting() );
 
-    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
-                  _slots, _histogram_full, _histogram_eps,
-                  PrintHistogram,
-                  "**************************************************************\n"
-                  "* Printing the histogram of cells after pruning              *\n"
-                  "**************************************************************\n");
-    debug_arrays( _sorting_index, _cells, _scales, _initial_extrema_pointers, _ct,
-                  _slots, _histogram_full, _histogram_eps,
-                  PrintRest,
-                  "********************************************************************************\n"
-                  "* Printing all values flat by sorting index in the entire array after pruning  *\n"
-                  "********************************************************************************\n");
-
-    int debug_sum = 0;
     for( int o=0; o<MAX_OCTAVES; o++ )
     {
-        // const int max_ct = ct->ext_ct[o];
         const int max_ct = ct->getExtremaCount(o);
 
         int counter = 0;
@@ -423,14 +351,8 @@ int FilterGrid::filter( const Config& conf, ExtremaCounters* ct, ExtremaBuffers*
                 counter += 1;
             }
         }
-        if( counter != 0 )
-        {
-            std::cout << "The number of initial extrema not ignored in octave " << o << " is " << counter << std::endl;
-            debug_sum += counter;
-        }
         ct->ext_ct[o] = counter;
     }
-    std::cout << "The total number of initial extrema not ignored is " << debug_sum << std::endl;
 
     ct->make_extrema_prefix_sums();
 

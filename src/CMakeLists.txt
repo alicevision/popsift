@@ -6,7 +6,6 @@ CUDA_ADD_LIBRARY(popsift
         popsift/sift_conf.cu popsift/sift_conf.h
         popsift/gauss_filter.cu popsift/gauss_filter.h
         popsift/filtergrid.cu popsift/filtergrid.h
-        popsift/filtergrid_debug.cu popsift/filtergrid_debug.h
         popsift/initial_extremum.h
         popsift/s_image.cu popsift/s_image.h
         popsift/sift_pyramid.cu popsift/sift_pyramid.h
