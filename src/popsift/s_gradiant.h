@@ -14,6 +14,10 @@
 #include <cinttypes>
 #include <cstdio>
 
+#include "popsift/sift_config.h"
+
+#include "s_gradiant_cuda9plus.h" // functions that work with CUDA SDK 9 and later
+
 namespace popsift
 {
 /*
@@ -67,6 +71,39 @@ void get_gradiant( float&              grad,
     grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
     theta    = atan2f(dy, dx);
 }
+
+#if POPSIFT_IS_UNDEFINED(POPSIFT_HAVE_COOPERATIVE_GROUPS)
+/* A version of get_gradiant that works for a (32,1,1) threadblock
+ * and pulls data to shared memory before computing. Data is pulled
+ * less frequently, meaning that we do not rely on the L1 cache.
+ */
+__device__ static inline
+void get_gradiant32( float&              grad,
+                     float&              theta,
+                     const int           x,
+                     const int           y,
+                     cudaTextureObject_t layer,
+                     const int           level )
+{
+    const int idx = threadIdx.x;
+
+    __shared__ float x_array[34];
+
+    for( int i=idx; i<34; i += blockDim.x )
+    {
+        x_array[i] = readTex( layer, x+i-1.0f, y, level );
+    }
+    __syncthreads();
+
+    const float dx = x_array[idx+2]  - x_array[idx];
+
+    const float dy = readTex( layer, x+idx, y+1.0f, level )
+                   - readTex( layer, x+idx, y-1.0f, level );
+
+    grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
+    theta    = atan2f(dy, dx);
+}
+#endif
 
 __device__ static inline
 void get_gradiant( float&              grad,

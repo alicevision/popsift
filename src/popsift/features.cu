@@ -107,16 +107,16 @@ void FeaturesHost::unpin( )
     cudaHostUnregister( _ori );
 }
 
-void FeaturesHost::print( std::ostream& ostr, bool write_as_uchar ) const
+void FeaturesHost::print( std::ostream& ostr, bool write_as_uchar, bool with_orientation ) const
 {
     for( int i=0; i<size(); i++ ) {
-        _ext[i].print( ostr, write_as_uchar );
+        _ext[i].print( ostr, write_as_uchar, with_orientation );
     }
 }
 
 std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature )
 {
-    feature.print( ostr, false );
+    feature.print( ostr, false, false );
     return ostr;
 }
 
@@ -151,9 +151,9 @@ void FeaturesDev::reset( int num_ext, int num_ori )
     if( _ori != nullptr ) { cudaFree( _ori ); _ori = nullptr; }
     if( _rev != nullptr ) { cudaFree( _rev ); _rev = nullptr; }
 
-    _ext = popsift::cuda::malloc_devT<Feature>   ( num_ext, __FILE__, __LINE__ );
-    _ori = popsift::cuda::malloc_devT<Descriptor>( num_ori, __FILE__, __LINE__ );
-    _rev = popsift::cuda::malloc_devT<int>       ( num_ori, __FILE__, __LINE__ );
+    _ext = popsift::cuda::malloc_mgdT<Feature>   ( num_ext, __FILE__, __LINE__ );
+    _ori = popsift::cuda::malloc_mgdT<Descriptor>( num_ori, __FILE__, __LINE__ );
+    _rev = popsift::cuda::malloc_mgdT<int>       ( num_ori, __FILE__, __LINE__ );
 
     setFeatureCount( num_ext );
     setDescriptorCount( num_ori );
@@ -240,22 +240,30 @@ show_distance( int3*       match_matrix,
         const float4* lptr  = (const float4*)( &l_ori[i] );
         const float4* rptr1 = (const float4*)( &r_ori[match_matrix[i].x] );
         const float4* rptr2 = (const float4*)( &r_ori[match_matrix[i].y] );
-	float d1 = l2_in_t0( lptr, rptr1 );
-	float d2 = l2_in_t0( lptr, rptr2 );
-	if( threadIdx.x == 0 )
+	    float d1 = l2_in_t0( lptr, rptr1 );
+	    float d2 = l2_in_t0( lptr, rptr2 );
+	    if( threadIdx.x == 0 )
         {
             if( match_matrix[i].z )
-                printf( "accept feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f\n",
+            {
+                Feature* lx = &l_ext[l_fem[i]];
+                Feature* rx = &r_ext[r_fem[match_matrix[i].x]];
+                printf( "accept feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f"
+                        " (%.1f,%.1f)-(%.1f,%.1f)\n",
                         l_fem[i], i,
                         r_fem[match_matrix[i].x], match_matrix[i].x,
                         r_fem[match_matrix[i].y], match_matrix[i].y,
-                        d1, d2 );
-	    else
+                        d1, d2,
+                        lx->xpos, lx->ypos, rx->xpos, rx->ypos );
+            }
+            else
+            {
                 printf( "reject feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f\n",
                         l_fem[i], i,
                         r_fem[match_matrix[i].x], match_matrix[i].x,
                         r_fem[match_matrix[i].y], match_matrix[i].y,
                         d1, d2 );
+            }
         }
         __syncthreads();
     }
@@ -300,17 +308,77 @@ void FeaturesDev::match( FeaturesDev* other )
     cudaFree( match_matrix );
 }
 
+int3* FeaturesDev::matchAndReturn( FeaturesDev* other )
+{
+    int l_len = getDescriptorCount( );
+    int r_len = other->getDescriptorCount( );
+
+    int3* match_matrix = popsift::cuda::malloc_mgdT<int3>( l_len, __FILE__, __LINE__ );
+
+    dim3 grid;
+    grid.x = l_len;
+    grid.y = 1;
+    grid.z = 1;
+    dim3 block;
+    block.x = 32;
+    block.y = 1;
+    block.z = 1;
+
+    compute_distance
+        <<<grid,block>>>
+        ( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
+
+    return match_matrix;
+}
+
+Descriptor* FeaturesDev::getDescriptor( int descIndex )
+{
+    return &_ori[descIndex];
+}
+
+const Descriptor* FeaturesDev::getDescriptor( int descIndex ) const
+{
+    return &_ori[descIndex];
+}
+
+Feature* FeaturesDev::getFeatureForDescriptor( int descIndex )
+{
+    return &_ext[_rev[descIndex]];
+}
+
+const Feature* FeaturesDev::getFeatureForDescriptor( int descIndex ) const
+{
+    return &_ext[_rev[descIndex]];
+}
+
 /*************************************************************
  * Feature
  *************************************************************/
 
-void Feature::print( std::ostream& ostr, bool write_as_uchar ) const
+void Feature::print( std::ostream& ostr, bool write_as_uchar, bool with_orientation ) const
 {
     float sigval =  1.0f / ( sigma * sigma );
 
     for( int ori=0; ori<num_ori; ori++ ) {
-        ostr << xpos << " " << ypos << " "
-             << sigval << " 0 " << sigval << " ";
+        if( with_orientation )
+        {
+            float dom_ori = orientation[ori];
+            // dom_ori = dom_ori / M_PI2 * 360;
+            // if (dom_ori < 0) dom_ori += 360;
+            if (dom_ori < 0) dom_ori += M_PI2;
+
+            ostr << std::setprecision(6)
+                 << xpos << " " << ypos << " "
+                 << sigma << " "
+                 << dom_ori << " ";
+        }
+        else
+        {
+            ostr << std::setprecision(6)
+                 << xpos << " " << ypos << " "
+                 << sigval << " 0 "
+                 << sigval << " ";
+        }
         if( write_as_uchar ) {
             for( int i=0; i<128; i++ ) {
                 ostr << roundf(desc[ori]->features[i]) << " ";
@@ -328,7 +396,7 @@ void Feature::print( std::ostream& ostr, bool write_as_uchar ) const
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature )
 {
-    feature.print( ostr, false );
+    feature.print( ostr, false, false );
     return ostr;
 }
 

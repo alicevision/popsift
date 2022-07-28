@@ -37,6 +37,9 @@ void malloc_dev( void** ptr, int sz,
 void malloc_hst( void** ptr, int sz,
                  const char* file, int line );
 
+void malloc_mgd( void** ptr, int sz,
+                 const char* file, int line );
+
 template<class T>
 T* malloc_devT( int num, const char* file, int line ) {
     void* ptr;
@@ -49,6 +52,17 @@ T* malloc_hstT( int num, const char* file, int line ) {
     void* ptr;
     malloc_hst( &ptr, num*sizeof(T), file, line );
     return (T*)ptr;
+}
+
+template<class T>
+T* malloc_mgdT( int num, const char* file, int line ) {
+    void* ptr;
+    malloc_mgd( &ptr, num*sizeof(T), file, line );
+    return (T*)ptr;
+}
+
+inline void free_mgd( void* ptr ) {
+    cudaFree( ptr );
 }
 
 void memcpy_sync( void* dst, const void* src, size_t sz,

@@ -9,8 +9,17 @@
 #include "sift_conf.h"
 
 #include <iostream>
+#include <sstream>
+#include <algorithm>
 
 using namespace std;
+
+static bool stringIsame( string l, string r )
+{
+    std::for_each( l.begin(), l.end(), [](char& c) { c = ::tolower(c); });
+    std::for_each( r.begin(), r.end(), [](char& c) { c = ::tolower(c); });
+    return l == r;
+}
 
 namespace popsift
 {
@@ -20,19 +29,16 @@ Config::Config( )
     , octaves( -1 )
     , levels( 3 )
     , sigma( 1.6f )
-    , _edge_limit( 10.0f )
-    , _threshold( 0.04 ) // ( 10.0f / 256.0f )
+    , _edge_limit( getEdgeThreshDefault( ) )
+    , _threshold( getPeakThreshDefault() )
     , _gauss_mode( getGaussModeDefault() )
     , _sift_mode( Config::PopSift )
     , _log_mode( Config::None )
     , _scaling_mode( Config::ScaleDefault )
     , _desc_mode( Config::Loop )
-    , _grid_filter_mode( Config::RandomScale )
     , verbose( false )
     // , _max_extrema( 20000 )
     , _max_extrema( 100000 )
-    , _filter_max_extrema( -1 )
-    , _filter_grid_size( 2 )
     , _assume_initial_blur( true )
     , _initial_blur( 0.5f )
     , _normalization_mode( getNormModeDefault() )
@@ -72,6 +78,8 @@ void Config::setDescMode( const std::string& text )
         setDescMode( Config::IGrid );
     else if( text == "notile" )
         setDescMode( Config::NoTile );
+    else if( text == "vlfeat" )
+        setDescMode( Config::VLFeat_Desc );
     else
         POP_FATAL( "specified descriptor extraction mode must be one of loop, grid or igrid" );
 }
@@ -79,6 +87,25 @@ void Config::setDescMode( const std::string& text )
 void Config::setDescMode( Config::DescMode m )
 {
     _desc_mode = m;
+}
+
+const char* Config::getDescModeUsage( )
+{
+    return "Choice of descriptor extraction modes:\n"
+           "loop, iloop, grid, igrid, notile, vlfeat\n"
+	       "Default is loop\n"
+           "loop is OpenCV-like horizontal scanning, sampling every pixel in a radius around the "
+           "centers or the 16 tiles arond the keypoint. Each sampled point contributes to two "
+           "histogram bins."
+           "iloop is like loop but samples all constant 1-pixel distances from the keypoint, "
+           "using the CUDA texture engine for interpolation. "
+           "grid is like loop but works on rotated, normalized tiles, relying on CUDA 2D cache "
+           "to replace the manual data aligment idea of loop. "
+           "igrid iloop and grid. "
+           "notile is like igrid but handles all 16 tiles at once.\n"
+           "vlfeat is VLFeat-like horizontal scanning, sampling every pixel in a radius around "
+           "keypoint itself, using the 16 tile centers only for weighting. Every sampled point "
+           "contributes to up to eight historgram bins.";
 }
 
 void Config::setGaussMode( const std::string& m )
@@ -120,6 +147,16 @@ const char* Config::getGaussModeUsage( )
         "relative (synonym for vlfeat-hw-interpolated)";
 }
 
+void Config::setFilterMaxExtrema( int ext )
+{
+    _grid_filter._max_extrema = ext;
+}
+
+void Config::setFilterGridSize( int sz )
+{
+    _grid_filter._size = sz;
+}
+
 bool Config::getCanFilterExtrema() const
 {
 #if __CUDACC_VER_MAJOR__ >= 8
@@ -129,21 +166,36 @@ bool Config::getCanFilterExtrema() const
 #endif
 }
 
-void Config::setFilterSorting( const std::string& text )
+const char* Config::getFilterGridModeUsage( )
 {
-    if( text == "up" )
-        _grid_filter_mode = Config::SmallestScaleFirst;
-    else if( text == "down" )
-        _grid_filter_mode = Config::LargestScaleFirst;
-    else if( text == "random" )
-        _grid_filter_mode = Config::RandomScale;
-    else
-        POP_FATAL( "filter sorting mode must be one of up, down or random" );
+    return "l/largest (default) or s/smallest. "
+           "largest: keep the extrema with the largest scales from each grid-filtered cell. "
+           "smallest: keep the extrema with the smallest scales. "
+           "The first octave has the smallest scales.";
 }
 
-void Config::setFilterSorting( Config::GridFilterMode m )
+GridFilterConfig::Mode Config::getFilterGridModeDefault( )
 {
-    _grid_filter_mode = m;
+    return GridFilterConfig::LargestScaleFirst;
+}
+
+void Config::setFilterSorting( const std::string& text )
+{
+    if( stringIsame( text, "smallest" ) )
+        _grid_filter._mode = GridFilterConfig::SmallestScaleFirst;
+    if( stringIsame( text, "s" ) )
+        _grid_filter._mode = GridFilterConfig::SmallestScaleFirst;
+    else if( stringIsame( text, "largest" ) )
+        _grid_filter._mode = GridFilterConfig::LargestScaleFirst;
+    else if( stringIsame( text, "l" ) )
+        _grid_filter._mode = GridFilterConfig::LargestScaleFirst;
+    else
+        POP_FATAL( string("bad grid filter mode, ") + getFilterGridModeUsage() );
+}
+
+void Config::setFilterSorting( GridFilterConfig::Mode m )
+{
+    _grid_filter._mode = m;
 }
 
 void Config::setVerbose( bool on )
@@ -196,15 +248,25 @@ void Config::setNormMode( Config::NormMode m )
 
 void Config::setNormMode( const std::string& m )
 {
-    if( m == "RootSift" ) setNormMode( Config::RootSift );
-    else if( m == "classic" ) setNormMode( Config::Classic );
+    if( stringIsame( m, "RootSift" ) )
+    {
+        setNormMode( Config::RootSift );
+    }
+    else if( stringIsame( m, "L2" ) )
+    {
+        setNormMode( Config::Classic );
+    }
+    else if( stringIsame( m, "Classic" ) )
+    {
+        setNormMode( Config::Classic );
+    }
     else
         POP_FATAL( string("Bad Normalization mode.\n") + getGaussModeUsage() );
 }
 
 Config::NormMode Config::getNormModeDefault( )
 {
-    return Config::RootSift;
+    return Config::NormDefault;
 }
 
 const char* Config::getNormModeUsage( )
@@ -232,15 +294,54 @@ int Config::getNormalizationMultiplier( ) const
     return _normalization_multiplier;
 }
 
-void Config::setDownsampling( float v ) { _upscale_factor = -v; }
+void  Config::setDownsampling( float v ) { _upscale_factor = -v; }
+float Config::getDownsampling( ) const   { return -_upscale_factor; }
+
 void Config::setOctaves( int v ) { octaves = v; }
+int  Config::getOctaves( ) const { return octaves; }
+
 void Config::setLevels( int v ) { levels = v; }
-void Config::setSigma( float v ) { sigma = v; }
-void Config::setEdgeLimit( float v ) { _edge_limit = v; }
-void Config::setThreshold( float v ) { _threshold = v; }
+int  Config::getLevels( ) const { return levels; }
+
+void  Config::setSigma( float v ) { sigma = v; }
+float Config::getSigma( ) const { return sigma; }
+
+void  Config::setEdgeLimit( float v ) { _edge_limit = v; }
+float Config::getEdgeLimit( ) const   { return _edge_limit; }
+float Config::getEdgeThreshDefault( )
+{
+    return 10.0f;
+}
+std::string Config::getEdgeThreshUsage( )
+{
+    std::ostringstream ostr;
+    ostr << "Edge Threshold: eliminates peaks of the DoG scale space whose curvature is too small." << endl
+         << "Default: " << getEdgeThreshDefault() << endl
+         << "Set to a value <= 0 to disable." << endl;
+    return ostr.str();
+}
+
+void  Config::setThreshold( float v ) { _threshold = v; }
+float Config::getThreshold( ) const   { return _threshold; }
+float Config::getPeakThreshold() const
+{
+    return ( _threshold * 0.5f * 255.0f / levels );
+}
+float Config::getPeakThreshDefault( )
+{
+    return 0.04f; // ( 10.0f / 256.0f )
+}
+std::string Config::getPeakThreshUsage( )
+{
+    std::ostringstream ostr;
+    ostr << "Peak Threshold: eliminates peaks of the DoG scale space that are too small" <<endl
+         << "(contrast too small in absolute value)." << endl
+         << "Default: " << getPeakThreshDefault() << endl
+         << "Set to a value <= 0 to disable." << endl;
+    return ostr.str();
+}
+
 void Config::setPrintGaussTables() { _print_gauss_tables = true; }
-void Config::setFilterMaxExtrema( int ext ) { _filter_max_extrema = ext; }
-void Config::setFilterGridSize( int sz ) { _filter_grid_size = sz; }
 
 void Config::setInitialBlur( float blur )
 {
@@ -252,6 +353,15 @@ void Config::setInitialBlur( float blur )
         _initial_blur        = blur;
     }
 }
+bool Config::hasInitialBlur( ) const
+{
+    return _assume_initial_blur;
+}
+float Config::getInitialBlur( ) const
+{
+    return _initial_blur;
+}
+
 
 Config::GaussMode Config::getGaussMode( ) const
 {
@@ -261,21 +371,6 @@ Config::GaussMode Config::getGaussMode( ) const
 Config::SiftMode Config::getSiftMode() const
 {
     return _sift_mode;
-}
-
-bool Config::hasInitialBlur( ) const
-{
-    return _assume_initial_blur;
-}
-
-float Config::getInitialBlur( ) const
-{
-    return _initial_blur;
-}
-
-float Config::getPeakThreshold() const
-{
-    return ( _threshold * 0.5f * 255.0f / levels );
 }
 
 bool Config::ifPrintGaussTables() const
@@ -303,5 +398,10 @@ bool Config::equal( const Config& other ) const
     return true;
 }
 
-}; // namespace popsift
+GridFilterConfig::GridFilterConfig( )
+    : _max_extrema( -1 )
+    , _size( 2 )
+    , _mode( LargestScaleFirst )
+{ }
 
+}; // namespace popsift

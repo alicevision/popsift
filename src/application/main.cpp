@@ -29,6 +29,7 @@
 #include <devil_cpp_wrapper.hpp>
 #endif
 #include "pgmread.h"
+#include "common_opt.h"
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
@@ -42,6 +43,7 @@ using namespace std;
 static bool print_dev_info  = false;
 static bool print_time_info = false;
 static bool write_as_uchar  = false;
+static bool write_with_ori  = false;
 static bool dont_write      = false;
 static bool pgmread_loading = false;
 static bool float_mode      = false;
@@ -59,57 +61,13 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
             ("input-file,i", value<std::string>(&inputFile)->required(), "Input file");
     
     }
+
     options_description parameters("Parameters");
-    {
-        parameters.add_options()
-            ("octaves", value<int>(&config.octaves), "Number of octaves")
-            ("levels", value<int>(&config.levels), "Number of levels per octave")
-            ("sigma", value<float>()->notifier([&](float f) { config.setSigma(f); }), "Initial sigma value")
-
-            ("threshold", value<float>()->notifier([&](float f) { config.setThreshold(f); }), "Contrast threshold")
-            ("edge-threshold", value<float>()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
-            ("edge-limit", value<float>()->notifier([&](float f) { config.setEdgeLimit(f); }), "On-edge threshold")
-            ("downsampling", value<float>()->notifier([&](float f) { config.setDownsampling(f); }), "Downscale width and height of input by 2^N")
-            ("initial-blur", value<float>()->notifier([&](float f) {config.setInitialBlur(f); }), "Assume initial blur, subtract when blurring first time");
-    }
     options_description modes("Modes");
-    {
-    modes.add_options()
-        ( "gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
-          popsift::Config::getGaussModeUsage() )
-        // "Choice of span (1-sided) for Gauss filters. Default is VLFeat-like computation depending on sigma. "
-        // "Options are: vlfeat, relative, relative-all, opencv, fixed9, fixed15"
-        ("desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
-        "Choice of descriptor extraction modes:\n"
-        "loop, iloop, grid, igrid, notile\n"
-	"Default is loop\n"
-        "loop is OpenCV-like horizontal scanning, computing only valid points, grid extracts only useful points but rounds them, iloop uses linear texture and rotated gradiant fetching. igrid is grid with linear interpolation. notile is like igrid but avoids redundant gradiant fetching.")
-        ("popsift-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::PopSift); }),
-        "During the initial upscale, shift pixels by 1. In extrema refinement, steps up to 0.6, do not reject points when reaching max iterations, "
-        "first contrast threshold is .8 * peak thresh. Shift feature coords octave 0 back to original pos.")
-        ("vlfeat-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::VLFeat); }),
-        "During the initial upscale, shift pixels by 1. That creates a sharper upscaled image. "
-        "In extrema refinement, steps up to 0.6, levels remain unchanged, "
-        "do not reject points when reaching max iterations, "
-        "first contrast threshold is .8 * peak thresh.")
-        ("opencv-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::OpenCV); }),
-        "During the initial upscale, shift pixels by 0.5. "
-        "In extrema refinement, steps up to 0.5, "
-        "reject points when reaching max iterations, "
-        "first contrast threshold is floor(.5 * peak thresh). "
-        "Computed filter width are lower than VLFeat/PopSift")
-        ("direct-scaling", bool_switch()->notifier([&](bool b) { if(b) config.setScalingMode(popsift::Config::ScaleDirect); }),
-         "Direct each octave from upscaled orig instead of blurred level.")
-        ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
-        ( "norm-mode", value<std::string>()->notifier([&](const std::string& s) { config.setNormMode(s); }),
-          popsift::Config::getNormModeUsage() )
-        ( "root-sift", bool_switch()->notifier([&](bool b) { if(b) config.setNormMode(popsift::Config::RootSift); }),
-          popsift::Config::getNormModeUsage() )
-        ("filter-max-extrema", value<int>()->notifier([&](int f) {config.setFilterMaxExtrema(f); }), "Approximate max number of extrema.")
-        ("filter-grid", value<int>()->notifier([&](int f) {config.setFilterGridSize(f); }), "Grid edge length for extrema filtering (ie. value 4 leads to a 4x4 grid)")
-        ("filter-sort", value<std::string>()->notifier([&](const std::string& s) {config.setFilterSorting(s); }), "Sort extrema in each cell by scale, either random (default), up or down");
 
-    }
+    option_init_parameters( config, parameters );
+    option_init_modes( config, modes );
+
     options_description informational("Informational");
     {
         informational.add_options()
@@ -118,6 +76,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         ("print-time-info", bool_switch(&print_time_info)->default_value(false), "A debug output printing image processing time after load()")
         ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded to int.\n"
          "Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar")
+        ("write-with-ori", bool_switch(&write_with_ori)->default_value(false), "Output points are written with sigma and orientation.\n")
         ("dont-write", bool_switch(&dont_write)->default_value(false), "Suppress descriptor output")
         ("pgmread-loading", bool_switch(&pgmread_loading)->default_value(false), "Use the old image loader instead of LibDevIL")
         ("float-mode", bool_switch(&float_mode)->default_value(false), "Upload image to GPU as float instead of byte")
@@ -254,7 +213,7 @@ void read_job( SiftJob* job, bool really_write )
         nvtxRangePushA( "Writing features to disk" );
 
         std::ofstream of( "output-features.txt" );
-        feature_list->print( of, write_as_uchar );
+        feature_list->print( of, write_as_uchar, write_with_ori );
     }
     delete feature_list;
 
@@ -272,6 +231,8 @@ int main(int argc, char **argv)
     string         inputFile{};
 
     std::cout << "PopSift version: " << POPSIFT_VERSION_STRING << std::endl;
+
+    config.setDescMode( popsift::Config::VLFeat_Desc );
 
     try {
         parseargs( argc, argv, config, inputFile ); // Parse command line
@@ -327,4 +288,3 @@ int main(int argc, char **argv)
 
     return EXIT_SUCCESS;
 }
-

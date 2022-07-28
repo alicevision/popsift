@@ -145,6 +145,8 @@ if(MSVC)
   list(APPEND CUDA_NVCC_FLAGS   -Xcompiler ${PopSift_MVSC_LINKER})
 endif()
 
+list(APPEND CUDA_NVCC_FLAGS "-lineinfo")
+
 # default stream per-thread implies that each host thread has one non-synchronizing 0-stream
 # currently, the code requires legacy mode
 list(APPEND CUDA_NVCC_FLAGS "--default-stream;legacy")
@@ -181,9 +183,11 @@ else()
 endif()
 
 if(CUDA_VERSION VERSION_GREATER_EQUAL "9.0")
-  set(HAVE_SHFL_DOWN_SYNC   1)
+  set(PopSift_HAVE_SHFL_DOWN_SYNC   1)
+  set(PopSift_HAVE_COOPERATIVE_GROUPS   1)
 else()
-  set(HAVE_SHFL_DOWN_SYNC   0)
+  set(PopSift_HAVE_SHFL_DOWN_SYNC   0)
+  set(PopSift_HAVE_COOPERATIVE_GROUPS   0)
 endif()
 
 if(NOT PopSift_USE_GRID_FILTER)

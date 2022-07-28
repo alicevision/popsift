@@ -33,7 +33,7 @@ struct Feature
     float       orientation[ORIENTATION_MAX_COUNT];
     Descriptor* desc[ORIENTATION_MAX_COUNT];
 
-    void print( std::ostream& ostr, bool write_as_uchar ) const;
+    void print( std::ostream& ostr, bool write_as_uchar, bool with_orientation ) const;
 };
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
@@ -91,7 +91,7 @@ public:
     inline Feature*    getFeatures()    { return _ext; }
     inline Descriptor* getDescriptors() { return _ori; }
 
-    void print( std::ostream& ostr, bool write_as_uchar ) const;
+    void print( std::ostream& ostr, bool write_as_uchar, bool with_orientation ) const;
 
 protected:
     friend class Pyramid;
@@ -103,9 +103,9 @@ std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature );
 
 class FeaturesDev : public FeaturesBase
 {
-    Feature*     _ext;
-    Descriptor*  _ori;
-    int*         _rev; // the reverse map from descriptors to extrema
+    Feature*     _ext;  // array of extrema
+    Descriptor*  _ori;  // array of desciptors
+    int*         _rev;  // the reverse map from descriptors to extrema
 
 public:
     FeaturesDev( );
@@ -114,11 +114,35 @@ public:
 
     void reset( int num_ext, int num_ori );
 
+    /** This function performs one-directional brute force matching on
+     *  the GPU between the Descriptors in this objects and the object
+     *  other.
+     *  The resulting matches are printed.
+     */
     void match( FeaturesDev* other );
+
+    /** This function performs one-directional brute force matching on
+     *  the GPU between the Descriptors in this objects and the object
+     *  other.
+     *  The resulting matches are returned in an array of int3 that must
+     *  be released with a call to cudaFree().
+     *  The length of the array is this->getDescriptorCount().
+     *  For each element at position i
+     *    i is the index of a descriptor in this->getDescriptors()
+     *    int3.x is the index of the best match in other->getDescriptors()
+     *    int3.y is the index of the second best match in other->getDescriptors()
+     *    int3.z indicates if the match is valid (non-zero) or not (zero)
+     */
+    int3* matchAndReturn( FeaturesDev* other );
 
     inline Feature*    getFeatures()    { return _ext; }
     inline Descriptor* getDescriptors() { return _ori; }
     inline int*        getReverseMap()  { return _rev; }
+
+    Descriptor*       getDescriptor( int descIndex );
+    const Descriptor* getDescriptor( int descIndex ) const;
+    Feature*          getFeatureForDescriptor( int descIndex );
+    const Feature*    getFeatureForDescriptor( int descIndex ) const;
 };
 
 } // namespace popsift

@@ -10,24 +10,20 @@
 #include "s_pyramid_build_aa.h"
 #include "sift_constants.h"
 
-namespace popsift {
-namespace gauss {
-namespace absoluteSource {
-
-__global__ void horiz(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
+__global__ void as_horiz(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
 {
     const int    src_level = dst_level - 1;
-    const int    span      =  d_gauss.inc.span[dst_level];
-    const float* filter    = &d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
+    const int    span      =  popsift::d_gauss.inc.span[dst_level];
+    const float* filter    = &popsift::d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
 
     const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
     const int off_y = blockIdx.y * blockDim.y + threadIdx.y;
 
     float out = 0.0f;
 
-    float A = readTex( src_point_texture, off_x - span, off_y, src_level );
-    float B = readTex( src_point_texture, off_x + span, off_y, src_level );
-    float C = readTex( src_point_texture, off_x       , off_y, src_level );
+    float A = popsift::readTex( src_point_texture, off_x - span, off_y, src_level );
+    float B = popsift::readTex( src_point_texture, off_x + span, off_y, src_level );
+    float C = popsift::readTex( src_point_texture, off_x       , off_y, src_level );
     float g  = filter[0];
     out += C * g;
     g    = filter[span];
@@ -49,10 +45,10 @@ __global__ void horiz(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t
     surf2DLayeredwrite( out, dst_data, off_x*4, off_y, dst_level, cudaBoundaryModeZero );
 }
 
-__global__ void vert(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
+__global__ void as_vert(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
 {
-    const int    span   =  d_gauss.inc.span[dst_level];
-    const float* filter = &d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
+    const int    span   =  popsift::d_gauss.inc.span[dst_level];
+    const float* filter = &popsift::d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
     int block_x = blockIdx.x * blockDim.x;
     int block_y = blockIdx.y * blockDim.y;
     int idx     = threadIdx.x;
@@ -66,17 +62,17 @@ __global__ void vert(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t 
         g  = filter[offset];
 
         idy = threadIdx.y - offset;
-        val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+        val = popsift::readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
         out += ( val * g );
 
         idy = threadIdx.y + offset;
-        val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+        val = popsift::readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
         out += ( val * g );
     }
 
     g  = filter[0];
     idy = threadIdx.y;
-    val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+    val = popsift::readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
     out += ( val * g );
 
     idx = block_x+threadIdx.x;
@@ -84,6 +80,10 @@ __global__ void vert(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t 
 
     surf2DLayeredwrite( out, dst_data, idx*4, idy, dst_level, cudaBoundaryModeZero );
 }
+
+namespace popsift {
+namespace gauss {
+namespace absoluteSource {
 
 __global__ void vert_abs0(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
 {

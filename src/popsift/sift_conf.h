@@ -23,6 +23,40 @@
 
 namespace popsift {
 
+struct GridFilterConfig
+{
+    /**
+     * @brief Filtering strategy.
+     * 
+     * To reduce time used in descriptor extraction, some extrema can be filtered
+     * immediately after finding them. It is possible to keep those with the largest
+     * scale (LargestScaleFirst), smallest scale (SmallestScaleFirst), or a random
+     * selection. Note that largest and smallest give a stable result, random does not.
+     */
+    enum Mode
+    {
+        /// keep those with the largest scale
+        LargestScaleFirst,
+        /// keep those with the smallest scale
+        SmallestScaleFirst
+    };
+
+    /// The maximum number of extrema that are returned. There may be
+    /// several descriptors for each extremum.
+    int _max_extrema;
+
+    /// Used to achieve an approximation of _max_entrema
+    /// Subdivide the image in this number of vertical and horizontal tiles,
+    /// i.e. the grid is actually _grid_size X _grid_size tiles.
+    /// default: 1
+    int _size;
+
+    /// default: RandomScale
+    Mode _mode;
+
+    GridFilterConfig( );
+};
+
 /**
  * @brief Struct containing the parameters that control the extraction algorithm
  */
@@ -74,6 +108,7 @@ struct Config
      */
     enum ScalingMode
     {
+        /// Experimental, non-working mode - scale direct from input
         ScaleDirect,
         /// Indirect - only working method
         ScaleDefault
@@ -84,16 +119,20 @@ struct Config
      */
     enum DescMode
     {
-        /// scan horizontal, extract valid points
+        /// scan horizontal, extract valid points - weight goes into 2 histogram bins
         Loop,
-        /// scan horizontal, extract valid points, interpolate with tex engine
+        /// loop-compatible; scan horizontal, extract valid points, interpolate with tex engine
         ILoop,
-        /// scan in rotated mode, round pixel address
+        /// loop-compatible; scan in rotated mode, round pixel address
         Grid,
-        /// scan in rotated mode, interpolate with tex engine
+        /// loop-compatible; scan in rotated mode, interpolate with tex engine
         IGrid,
-        /// variant of IGrid, no duplicate gradient fetching
-        NoTile
+        /// loop-compatible; variant of IGrid, no duplicate gradient fetching
+        NoTile,
+        /** extraction code according to VLFeat, similar to loop, weight goes into
+         *  up to 8 histogram bins
+         */
+        VLFeat_Desc
     };
 
     /**
@@ -104,24 +143,9 @@ struct Config
         /// The L1-inspired norm, gives better matching results ("RootSift")
         RootSift,
         /// The L2-inspired norm, all descriptors on a hypersphere ("classic")
-        Classic
-    };
-
-    /**
-     * @brief Filtering strategy.
-     * 
-     * To reduce time used in descriptor extraction, some extrema can be filtered
-     * immediately after finding them. It is possible to keep those with the largest
-     * scale (LargestScaleFirst), smallest scale (SmallestScaleFirst), or a random
-     * selection. Note that largest and smallest give a stable result, random does not.
-     */
-    enum GridFilterMode {
-        /// keep a random selection
-        RandomScale,
-        /// keep those with the largest scale
-        LargestScaleFirst,
-        /// keep those with the smallest scale
-        SmallestScaleFirst
+        Classic,
+        /// The current default value
+        NormDefault = RootSift
     };
 
     /**
@@ -160,6 +184,12 @@ struct Config
      * @see LogMode
      */
     void setLogMode( LogMode mode = All );
+
+    /**
+     * @brief Set the scaling mode.
+     * @param mode The scaling mode
+     * @see ScalingMode
+     */
     void setScalingMode( ScalingMode mode = ScaleDefault );
 
     /**
@@ -182,30 +212,60 @@ struct Config
     */
     void setDescMode( DescMode mode = Loop );
 
+    /**
+     * @brief Helper functions for the main program's usage string.
+     */
+    static const char* getDescModeUsage( );
+
 //    void setGaussGroup( int groupsize );
 //    int  getGaussGroup( ) const;
 
-    void setDownsampling( float v );
+    void  setDownsampling( float v );
+    float getDownsampling( ) const;
+
     void setOctaves( int v );
+    int  getOctaves( ) const;
+
     void setLevels( int v );
-    void setSigma( float v );
-    void setEdgeLimit( float v );
-    void setThreshold( float v );
-    void setInitialBlur( float blur );
+    int  getLevels( ) const;
+
+    void  setSigma( float v );
+    float getSigma( ) const;
+
+    /** Set the Edge threshold, which requires a minimum curviness in the
+     *  the extremum. Set to a value <= 0 to ignore.
+     */
+    void               setEdgeLimit( float v );
+    float              getEdgeLimit( ) const;
+    static std::string getEdgeThreshUsage( );
+    static float       getEdgeThreshDefault( );
+
+    /** Set the Peak threshold, which requires a minimum difference between
+     *  a peak and its surrounding pixels. Set to a value <= 0 to ignore.
+     */
+    void  setThreshold( float v );
+    float getThreshold( ) const;
+    /** computes the actual peak threshold depending on the threshold
+     *  parameter and the non-augmented number of levels
+     */
+    float getPeakThreshold() const;
+    static std::string getPeakThreshUsage( );
+    static float       getPeakThreshDefault( );
+
+    void  setInitialBlur( float blur );
+    bool  hasInitialBlur( ) const;
+    float getInitialBlur( ) const;
+
 //    void setMaxExtreme( int m );
     void setPrintGaussTables( );
 //    void setDPOrientation( bool on );
     void setFilterMaxExtrema( int extrema );
     void setFilterGridSize( int sz );
+
+    static GridFilterConfig::Mode getFilterGridModeDefault( );
+    static const char* getFilterGridModeUsage( );
     void setFilterSorting( const std::string& direction );
-    void setFilterSorting( GridFilterMode m );
-
-    bool  hasInitialBlur( ) const;
-    float getInitialBlur( ) const;
-
-    /// computes the actual peak threshold depending on the threshold
-    /// parameter and the non-augmented number of levels
-    float getPeakThreshold() const;
+    void setFilterSorting( GridFilterConfig::Mode m );
 
     /// print Gauss spans and tables?
     bool ifPrintGaussTables() const;
@@ -300,28 +360,29 @@ struct Config
      * should be computed. Default is -1, which sets the hard limit defined
      * by "number of octaves * getMaxExtrema()".
      */
-    int getFilterMaxExtrema() const { return _filter_max_extrema; }
+    int getFilterMaxExtrema() const { return _grid_filter._max_extrema; }
 
     /**
      * @brief Get the grid size for filtering.
      *
      * To avoid that grid filtering happens only in a tiny piece of an image,
      * the image is split into getFilterGridSize() X getFilterGridSize() tiles
-     * and we allow getFilterMaxExtrema() / getFilterGridSize() extrema in
-     * each tile.
+     * and we allow approximately getFilterMaxExtrema() / getFilterGridSize()
+     * extrema in each tile (grid cells can have more if one cell does not use
+     * its share.
      */
-    int getFilterGridSize() const { return _filter_grid_size; }
+    int getFilterGridSize() const { return _grid_filter._size; }
 
     /**
      * @brief Get the filtering mode.
      * @return the filtering mode.
      * @see GridFilterMode
      */
-    GridFilterMode getFilterSorting() const { return _grid_filter_mode; }
+    GridFilterConfig::Mode getFilterSorting() const { return _grid_filter._mode; }
 
     /**
      * @brief Get the scaling mode.
-     * @return the descriptor extraction mode.
+     * @return the extraction mode.
      * @see ScalingMode
      */
     inline ScalingMode getScalingMode() const { return _scaling_mode; }
@@ -358,9 +419,6 @@ private:
     /// default: DescMode::Loop
     DescMode    _desc_mode;
 
-    /// default: RandomScale
-    GridFilterMode _grid_filter_mode;
-
 public:
     bool     verbose;
 
@@ -369,15 +427,7 @@ private:
     /// This parameter changes memory requirements.
     int _max_extrema;
 
-    /// The maximum number of extrema that are returned. There may be
-    /// several descriptors for each extremum.
-    int _filter_max_extrema;
-
-    /// Used to achieve an approximation of _max_entrema
-    /// Subdivide the image in this number of vertical and horizontal tiles,
-    /// i.e. the grid is actually _grid_size X _grid_size tiles.
-    /// default: 1
-    int  _filter_grid_size;
+    GridFilterConfig _grid_filter;
 
     /// Modes are computation according to VLFeat or OpenCV,
     /// or fixed size. Default is VLFeat mode.

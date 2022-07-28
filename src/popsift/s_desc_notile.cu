@@ -95,19 +95,19 @@ __global__
 // __launch_bounds__(192) // 56/threads
 // no -- __launch_bounds__(128) // 63/thread
 // no -- no launch bound // 64/thread/thread
-void ext_desc_notile( const int           octave,
+void ext_desc_notile( ExtremaBuffers*     buf,
+                      const int           ori_count,
+                      const int           ori_base_index,
                       cudaTextureObject_t texLinear )
 {
-    const int   num      = dct.ori_ct[octave];
-
     const int   offset   = blockIdx.x * BLOCK_Z_NOTILE + threadIdx.z;
 
-    const int   o_offset =  dct.ori_ps[octave] + offset;
-    if( offset >= num ) return;
+    const int   o_offset =  ori_base_index + offset;
+    if( offset >= ori_count ) return;
 
-    Descriptor* desc     = &dbuf.desc            [o_offset];
-    const int   ext_idx  =  dobuf.feat_to_ext_map[o_offset];
-    Extremum*   ext      =  dobuf.extrema + ext_idx;
+    Descriptor* desc     = &buf->desc[o_offset];
+    const int   ext_idx  =  buf->feat_to_ext_map[o_offset];
+    Extremum*   ext      =  buf->extrema + ext_idx;
 
     if( ext->sigma == 0 ) return;
     const float SBP      = fabsf( DESC_MAGNIFY * ext->sigma );
@@ -130,7 +130,7 @@ void ext_desc_notile( const int           octave,
 namespace popsift
 {
 
-bool start_ext_desc_notile( int octave, Octave& oct_obj )
+bool start_ext_desc_notile( const ExtremaCounters* ct, ExtremaBuffers* buf, int octave, Octave& oct_obj )
 {
     dim3 block;
     dim3 grid;
@@ -139,7 +139,7 @@ bool start_ext_desc_notile( int octave, Octave& oct_obj )
     block.y = 4;
     block.z = BLOCK_Z_NOTILE;
 
-    grid.x = grid_divide( hct.ori_ct[octave], block.z );
+    grid.x = grid_divide( ct->ori_ct[octave], block.z );
     grid.y = 1;
     grid.z = 1;
 
@@ -147,7 +147,9 @@ bool start_ext_desc_notile( int octave, Octave& oct_obj )
 
     ext_desc_notile
         <<<grid,block,0,oct_obj.getStream()>>>
-        ( octave,
+        ( buf,
+          ct->ori_ct[octave],
+          ct->getOrientationBase( octave ),
           oct_obj.getDataTexLinear( ).tex );
     cudaDeviceSynchronize();
     cudaError_t err = cudaGetLastError( );

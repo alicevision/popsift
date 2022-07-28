@@ -9,6 +9,8 @@
 
 #include <cuda_runtime.h>
 
+#include "sift_config.h"
+
 #ifndef INF
 #define INF               (1<<29)
 #endif

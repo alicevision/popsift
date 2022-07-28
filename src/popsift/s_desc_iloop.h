@@ -12,36 +12,10 @@
 #include "sift_octave.h"
 #include "sift_pyramid.h"
 
-__global__ void ext_desc_iloop(int octave, cudaTextureObject_t layer_tex, int width, int height);
-
 namespace popsift
 {
 
-inline static bool start_ext_desc_iloop( const int octave, Octave& oct_obj )
-{
-    dim3 block;
-    dim3 grid;
-    grid.x = hct.ori_ct[octave];
-    grid.y = 1;
-    grid.z = 1;
-
-    if( grid.x == 0 ) return false;
-
-    block.x = 32;
-    block.y = 1;
-    block.z = 16;
-
-    ext_desc_iloop
-        <<<grid,block,0,oct_obj.getStream()>>>
-        ( octave,
-          oct_obj.getDataTexLinear( ).tex,
-          oct_obj.getWidth(),
-          oct_obj.getHeight() );
-
-    POP_SYNC_CHK;
-
-    return true;
-}
+bool start_ext_desc_iloop( const ExtremaCounters* ct, ExtremaBuffers* buf, const int octave, Octave& oct_obj );
 
 }; // namespace popsift
 

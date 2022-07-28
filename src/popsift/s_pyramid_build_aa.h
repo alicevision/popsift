@@ -7,13 +7,13 @@
  */
 #include "common/plane_2d.h"
 
+__global__ void as_horiz(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level);
+
+__global__ void as_vert(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level);
+
 namespace popsift {
 namespace gauss {
 namespace absoluteSource {
-
-__global__ void horiz(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level);
-
-__global__ void vert(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level);
 
 __global__ void vert_abs0(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level);
 

@@ -68,7 +68,7 @@ endif(PopSift_USE_NVTX_PROFILING)
 # popsift-demo
 #############################################################
 
-add_executable(popsift-demo  main.cpp pgmread.cpp pgmread.h)
+add_executable(popsift-demo  main.cpp pgmread.cpp pgmread.h common_opt.cpp)
 
 set_property(TARGET popsift-demo PROPERTY CXX_STANDARD 11)
 
@@ -82,7 +82,7 @@ target_link_libraries(popsift-demo PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 # popsift-match
 #############################################################
 
-add_executable(popsift-match match.cpp pgmread.cpp pgmread.h)
+add_executable(popsift-match match.cpp pgmread.cpp pgmread.h common_opt.cpp)
 
 set_property(TARGET popsift-match PROPERTY CXX_STANDARD 11)
 

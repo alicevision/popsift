@@ -1,0 +1,353 @@
+#!/bin/bash
+
+CMD_VLF=@VLFEAT@
+CMD_POP=@CMAKE_RUNTIME_OUTPUT_DIRECTORY@/popsift-demo
+CMD_AWK=@AWK@
+CMD_SORT=@SORT@
+CMD_GP=@GNUPLOT@
+CMD_CONVERT=@CONVERT@
+CMD_COMPARE=@CMAKE_RUNTIME_OUTPUT_DIRECTORY@/popsift-compareSiftFiles
+DIR_AWK=@CMAKE_CURRENT_SOURCE_DIR@/awk
+DIR_TEST=@PopSift_TESTFILE_PATH@
+
+VLFEAT_DEFAULT_PARAMETERS=""
+
+# VLFeat multiplies the descriptors with 512 before converting to uchar,
+# so we use 9 for a 2**9 multiplier as well.
+POPSIFT_DEFAULT_PARAMETERS="--pgmread-loading --norm-mode=classic --norm-multi 9 --write-as-uchar --write-with-ori --initial-blur 0.5 --sigma 1.6 --threshold 0 --edge-threshold 10.0"
+
+# FILES="hash level1 boat"
+# FILES="level1"
+# FILES="hash"
+# FILES="boat1 boat"
+# FILES="boat1"
+FILES="boat"
+
+run_all_extract() {
+    local file="$1"
+    local testname="$2"
+    local srcfile="tmp/${file}-${testname}.sift"
+    local dstfile="tmp/sum-${file}-${testname}.txt"
+    local coordfile="tmp/coord-${file}-${testname}.txt"
+
+    ${CMD_AWK} -e '{printf("%f %f %f %f\n",$1,$2,$3,$4);}' < ${srcfile} > ${coordfile}
+    ${CMD_AWK} -f ${DIR_AWK}/compute.awk ${srcfile} > ${dstfile}
+}
+
+run_vlfeat() {
+    local testname="$1"
+    local file="$2"
+    local par="$3"
+    local dstfile="tmp/${file}-${testname}.sift"
+
+    local PAR0="${VLFEAT_DEFAULT_PARAMETERS}"
+
+    echo ${CMD_VLF} ${par} -v ${file}.pgm
+    ${CMD_VLF} ${PAR0} ${par} -v ${file}.pgm
+    ${CMD_SORT} -n ${file}.sift > ${dstfile}
+    rm ${file}.sift
+    run_all_extract $file $testname
+}
+
+run_popsift() {
+    local testname="$1"
+    local file="$2"
+    local par="$3"
+    local dstfile="tmp/${file}-${testname}.sift"
+
+    local PAR0="${POPSIFT_DEFAULT_PARAMETERS}"
+
+    echo ${CMD_POP} ${PAR0} ${par} -i ${file}.pgm
+    ${CMD_POP} ${PAR0} ${par} -i ${file}.pgm
+    ${CMD_SORT} -n output-features.txt > ${dstfile}
+    rm output-features.txt
+    run_all_extract $file $testname
+}
+
+prepare_testfiles() {
+    for file in $1 ; do
+	if [ ! -f ${file}.pgm ]
+	then
+            ${CMD_CONVERT} ${DIR_TEST}/$file/img1.ppm ${file}.pgm
+            if [ $? -ne 0 ]
+            then
+                echo "  ${CMD_CONVERT} failed, test image not converted"
+                exit -1
+	    else
+                echo "  converted ${file} to PGM"
+            fi
+	fi
+    done
+}
+
+parse_commandline() {
+    local i=0
+    while [ $# -ne 0 ]
+    do
+        # echo "  #: $# p$i: p0=$0 p1=$1 p*=$*"
+    	if [[ "$1" =~ ^\-[0-9]$ ]] ; then
+	    shift 1
+	    if [ "$1" == "vlfeat" ] ; then
+	    	configurations["$i"]="vlfeat-$2"
+	    	echo "Valid configuration vlfeat-$2"
+	    	shift 1
+	    elif [ "$1" == "popsift" ] ; then
+	    	configurations["$i"]="popsift-$2"
+	    	echo "Valid configuration popsift-$2"
+	    	shift 1
+	    else
+	    	echo "Invalid configuration $1, skipping"
+	    fi
+    	elif [ $1 == "-h" ] ; then
+	    echo "Usage: $0 [ -<num> <params> ]+"
+	    echo "       <num> is a single-digital integer"
+	    echo "       <params> is either 'vlfeat <type>' or 'popsift <type>'"
+	    echo "                where <type> for vlfeat is 'default'"
+	    echo "                and <type> for popsift is 'default', 'loop' or 'vlfeat'"
+	    exit 0
+	fi
+	i=$((i+1))
+	shift 1
+    done
+}
+
+compare_configurations() {
+    local left=$1
+    local right=$2
+    local dest="$left-$right"
+    mkdir -p ${dest}/tmp
+    mkdir -p ${dest}
+
+    for file in ${FILES} ; do
+	echo "    ----------------------------------------------------------------------------"
+	echo "    BEGIN brute force matching  ${file} for ${dest}"
+	echo "    comparison tool: ${CMD_COMPARE}"
+	echo "    left input: tmp/${file}-${left}.sift"
+	echo "    right input: tmp/${file}-${right}.sift"
+	${CMD_COMPARE} -o ${dest}/tmp/UML-${file}.txt \
+	               -d ${dest}/tmp/descdist-${file}.txt \
+		       tmp/${file}-${left}.sift \
+                       tmp/${file}-${right}.sift
+
+	echo "    END brute force matching    ${file} for ${dest}"
+	echo "    ----------------------------------------------------------------------------"
+    done
+}
+
+sort_configuration() {
+    local dest=$1
+
+    for file in ${FILES} ; do
+        echo "    Sorting ${dest} for ${file}"
+        ${CMD_SORT} -k3  -g ${dest}/tmp/UML-${file}.txt > ${dest}/tmp/sort-${file}-by-1st-match.txt
+        ${CMD_SORT} -k6  -g ${dest}/tmp/UML-${file}.txt > ${dest}/tmp/sort-${file}-by-pixdist.txt
+        ${CMD_SORT} -k8  -g ${dest}/tmp/UML-${file}.txt > ${dest}/tmp/sort-${file}-by-angle.txt
+        ${CMD_SORT} -k10 -g ${dest}/tmp/UML-${file}.txt > ${dest}/tmp/sort-${file}-by-2nd-match.txt
+    done
+}
+
+make_distance_stats() {
+    local dest=$1
+    local awkfile="${DIR_AWK}/desc-to-heat.awk"
+    local srcfile="${dest}/tmp/descdist-${file}.txt"
+    local dstfile="${dest}/descdist-${file}.txt"
+
+    for file in ${FILES} ; do
+	echo "    Converting descriptor distance stats"
+	awk -vCOL=3  -f ${awkfile} ${srcfile} >  ${dstfile}
+	awk -vCOL=4  -f ${awkfile} ${srcfile} >> ${dstfile}
+	awk -vCOL=5  -f ${awkfile} ${srcfile} >> ${dstfile}
+	awk -vCOL=6  -f ${awkfile} ${srcfile} >> ${dstfile}
+	awk -vCOL=7  -f ${awkfile} ${srcfile} >> ${dstfile}
+	awk -vCOL=8  -f ${awkfile} ${srcfile} >> ${dstfile}
+	awk -vCOL=9  -f ${awkfile} ${srcfile} >> ${dstfile}
+	awk -vCOL=10 -f ${awkfile} ${srcfile} >> ${dstfile}
+    done
+}
+
+make_plots() {
+    local dest=$1
+
+    for file in ${FILES} ; do
+	echo "Calling gnuplot (pixdist)"
+	echo "set title \"L2 distance between pixels, ${dest}" > cmd.gp
+	echo "set xlabel \"Keypoint index sorted by closest best match\"" >> cmd.gp
+	echo "set logscale y" >> cmd.gp
+	echo "set terminal png" >> cmd.gp
+	echo "set output \"${dest}/sort-${file}-by-pixdist.png\"" >> cmd.gp
+	echo "plot \"${dest}/tmp/sort-${file}-by-pixdist.txt\" using (\$6+0.00001) notitle" >> cmd.gp
+	${CMD_GP} cmd.gp
+
+	echo "Calling gnuplot (1st dist)"
+	echo "set title \"L2 distance between descriptors, ${dest}" > cmd.gp
+	echo "set xlabel \"Keypoint index sorted by closest best match\"" >> cmd.gp
+	echo "set terminal png" >> cmd.gp
+	echo "set output \"/dev/null\"" >> cmd.gp
+	echo "plot   \"${dest}/tmp/sort-${file}-by-1st-match.txt\" using 3 title \"best distance\"" >> cmd.gp
+	echo "replot \"${dest}/tmp/sort-${file}-by-1st-match.txt\" using 10 title \"2nd best distance\"" >> cmd.gp
+	echo "set output \"${dest}/sort-${file}-by-1st-match.png\"" >> cmd.gp
+	echo "replot" >> cmd.gp
+	${CMD_GP} cmd.gp
+
+	echo "Calling gnuplot for angular diff (1st dist)"
+	echo "set title \"Distance in degree between orientations, ${dest}" > cmd.gp
+	echo "set ylabel \"Difference (degree)\"" >> cmd.gp
+	echo "set xlabel \"Keypoint index sorted by orientation difference\"" >> cmd.gp
+	echo "set grid" >> cmd.gp
+	echo "set logscale y" >> cmd.gp
+	echo "set yrange [0.001:*]" >> cmd.gp
+	echo "set style data lines" >> cmd.gp
+	echo "set terminal png" >> cmd.gp
+	echo "set output \"${dest}/sort-${file}-by-angle.png\"" >> cmd.gp
+	echo "plot \"${dest}/tmp/sort-${file}-by-angle.txt\" using 8 notitle" >> cmd.gp
+	${CMD_GP} cmd.gp
+
+	echo "Calling gnuplot (2nd dist)"
+	echo "set title \"L2 distance between descriptors, ${dest}" > cmd.gp
+	echo "set xlabel \"Keypoint index sorted by 2nd best match\"" >> cmd.gp
+	echo "set terminal png" >> cmd.gp
+	echo "set output \"/dev/null\"" >> cmd.gp
+	echo "plot   \"${dest}/tmp/sort-${file}-by-2nd-match.txt\" using 3 title \"best distance\"" >> cmd.gp
+	echo "replot \"${dest}/tmp/sort-${file}-by-2nd-match.txt\" using 10 title \"2nd best distance\"" >> cmd.gp
+	echo "set output \"${dest}/sort-${file}-by-2nd-match.png\"" >> cmd.gp
+	echo "replot" >> cmd.gp
+	${CMD_GP} cmd.gp
+
+	echo "Calling gnuplot (descriptor summary)"
+	echo "set view 80, 20, 1, 1.48" > cmd.gp
+	echo "set xrange [ -1.5 : 1.5 ]" >> cmd.gp
+	echo "set yrange [ -1.5 : 1.5 ]" >> cmd.gp
+	echo "set zrange [ -5 : 5 ]" >> cmd.gp
+	echo "set xtics -1.5,3 offset 0,-0.5" >> cmd.gp
+	echo "set ytics 1.5,3 offset 0.5" >> cmd.gp
+	echo "set ztics -3,3" >> cmd.gp
+	echo "set ticslevel 0" >> cmd.gp
+	echo "set format cb '%4.1f'" >> cmd.gp
+	echo "unset colorbox" >> cmd.gp
+	echo "set pm3d implicit at s" >> cmd.gp
+	echo "set terminal png size 1080, 250" >> cmd.gp
+	echo "set output \"${dest}/descdist-${file}.png\"" >> cmd.gp
+	echo "set multiplot layout 1,8 title '8 bins in each of 16 sections'" >> cmd.gp
+	echo "set title 'bin 0 '" >> cmd.gp
+	echo "splot \"${dest}/descdist-${file}.txt\" index 0 using 1:2:3:3 with pm3d notitle" >> cmd.gp
+	echo "set title 'bin 1 '" >> cmd.gp
+	echo "splot \"${dest}/descdist-${file}.txt\" index 1 using 1:2:3:3 with pm3d notitle" >> cmd.gp
+	echo "set title 'bin 2 '" >> cmd.gp
+	echo "splot \"${dest}/descdist-${file}.txt\" index 2 using 1:2:3:3 with pm3d notitle" >> cmd.gp
+	echo "set title 'bin 3 '" >> cmd.gp
+	echo "splot \"${dest}/descdist-${file}.txt\" index 3 using 1:2:3:3 with pm3d notitle" >> cmd.gp
+	echo "set title 'bin 4 '" >> cmd.gp
+	echo "splot \"${dest}/descdist-${file}.txt\" index 4 using 1:2:3:3 with pm3d notitle" >> cmd.gp
+	echo "set title 'bin 5 '" >> cmd.gp
+	echo "splot \"${dest}/descdist-${file}.txt\" index 5 using 1:2:3:3 with pm3d notitle" >> cmd.gp
+	echo "set title 'bin 6 '" >> cmd.gp
+	echo "splot \"${dest}/descdist-${file}.txt\" index 6 using 1:2:3:3 with pm3d notitle" >> cmd.gp
+	echo "set title 'bin 7 '" >> cmd.gp
+	echo "splot \"${dest}/descdist-${file}.txt\" index 7 using 1:2:3:3 with pm3d notitle" >> cmd.gp
+	${CMD_GP} cmd.gp
+
+	rm -f cmd.gp
+    done
+}
+
+mkdir -p tmp
+
+declare -A configurations
+parse_commandline $*
+
+for i in "${!configurations[@]}"
+do
+    echo "    Conf $i : ${configurations[$i]}"
+done
+
+prepare_testfiles "${FILES}"
+
+echo "################################################################################"
+echo "All configurations: ${configurations[@]}"
+echo "################################################################################"
+
+for TESTNAME in "${configurations[@]}" ; do
+    rm -f hash.sift*
+    rm -f level1.sift*
+    rm -f coord-*
+    rm -f sum-*
+
+    for file in ${FILES} ; do
+        if [ "$TESTNAME" = "vlfeat-default" ]; then
+	    echo "Test is vlfeat"
+	    PAR1=" "
+    	    run_vlfeat ${TESTNAME} ${file} ${PAR1}
+        elif [ "$TESTNAME" = "popsift-default" ]; then
+	    echo "Test is popsift-default"
+	    PAR1=" "
+    	    run_popsift ${TESTNAME} ${file} ${PAR1}
+        elif [ "$TESTNAME" = "popsift-loop" ]; then
+	    echo "Test is popsift-loop: --desc-mode=loop"
+	    PAR1="--desc-mode=loop"
+    	    run_popsift ${TESTNAME} ${file} ${PAR1}
+        elif [ "$TESTNAME" = "popsift-vlfeat" ]; then
+	    echo "Test is popsift-vlfeat: --desc-mode=vlfeat"
+	    PAR1="--desc-mode=vlfeat"
+    	    run_popsift ${TESTNAME} ${file} ${PAR1}
+        else
+	    echo "Test is undefined, $TESTNAME"
+	    exit
+        fi
+    done
+done
+
+echo "################################################################################"
+echo "Configurations valid for comparison"
+echo "################################################################################"
+
+for left in "${configurations[@]}" ; do
+    mustCompare=0
+    for right in "${configurations[@]}" ; do
+	if [ ${mustCompare} -eq 1 ] ; then
+	    echo "    $left vs $right"
+	else
+	    if [ "$left" == "$right" ] ; then
+	        mustCompare=1
+	    fi
+	fi
+    done
+done
+
+echo "################################################################################"
+echo "Performing brute-force matching"
+echo "################################################################################"
+
+for left in "${configurations[@]}" ; do
+    mustCompare=0
+    for right in "${configurations[@]}" ; do
+	if [ ${mustCompare} -eq 1 ] ; then
+	    compare_configurations $left $right
+	else
+	    if [ "$left" == "$right" ] ; then
+	        mustCompare=1
+	    fi
+	fi
+    done
+done
+
+echo "################################################################################"
+echo "Creating output"
+echo "################################################################################"
+
+for left in "${configurations[@]}" ; do
+    mustCompare=0
+    for right in "${configurations[@]}" ; do
+	if [ ${mustCompare} -eq 1 ] ; then
+	    sort_configuration "$left-$right"
+	    make_distance_stats "$left-$right"
+	    make_plots "$left-$right"
+	else
+	    if [ "$left" == "$right" ] ; then
+	        mustCompare=1
+	    fi
+	fi
+    done
+done
+
+exit 0
+

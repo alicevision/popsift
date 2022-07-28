@@ -128,12 +128,12 @@ void ext_desc_iloop_sub( const float         ang,
     }
 }
 
-__global__ void ext_desc_iloop(int octave, cudaTextureObject_t layer_tex, int w, int h)
+__global__ void ext_desc_iloop( ExtremaBuffers* buf, int octave, const int ori_base_index, cudaTextureObject_t layer_tex, int w, int h)
 {
-    const int   o_offset =  dct.ori_ps[octave] + blockIdx.x;
-    Descriptor* desc     = &dbuf.desc           [o_offset];
-    const int   ext_idx  =  dobuf.feat_to_ext_map[o_offset];
-    Extremum*   ext      =  dobuf.extrema + ext_idx;
+    const int   o_offset =  ori_base_index + blockIdx.x;
+    Descriptor* desc     = &buf->desc[o_offset];
+    const int   ext_idx  =  buf->feat_to_ext_map[o_offset];
+    Extremum*   ext      =  buf->extrema + ext_idx;
 
     const int   ext_base =  ext->idx_ori;
     const int   ori_num  =  o_offset - ext_base;
@@ -147,3 +147,35 @@ __global__ void ext_desc_iloop(int octave, cudaTextureObject_t layer_tex, int w,
                         h );
 }
 
+namespace popsift
+{
+
+bool start_ext_desc_iloop( const ExtremaCounters* ct, ExtremaBuffers* buf, const int octave, Octave& oct_obj )
+{
+    dim3 block;
+    dim3 grid;
+    grid.x = ct->ori_ct[octave];
+    grid.y = 1;
+    grid.z = 1;
+
+    if( grid.x == 0 ) return false;
+
+    block.x = 32;
+    block.y = 1;
+    block.z = 16;
+
+    ext_desc_iloop
+        <<<grid,block,0,oct_obj.getStream()>>>
+        ( buf,
+          octave,
+          ct->getOrientationBase( octave ),
+          oct_obj.getDataTexLinear( ).tex,
+          oct_obj.getWidth(),
+          oct_obj.getHeight() );
+
+    POP_SYNC_CHK;
+
+    return true;
+}
+
+}; // namespace popsift

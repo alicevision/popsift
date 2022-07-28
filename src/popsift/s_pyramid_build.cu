@@ -279,7 +279,7 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t 
             grid.x  = grid_divide( width,  32 );
             grid.y  = grid_divide( height, block.y );
 
-            gauss::absoluteSource::horiz
+            as_horiz
                 <<<grid,block,0,stream>>>
                 ( oct_obj.getDataTexPoint( ),
                   oct_obj.getIntermediateSurface( ),
@@ -345,7 +345,7 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
             grid.x = (unsigned int)grid_divide( width,  block.x );
             grid.y = (unsigned int)grid_divide( height, block.y );
 
-            gauss::absoluteSource::vert
+            as_vert
                 <<<grid,block,0,stream>>>
                 ( oct_obj.getIntermDataTexPoint( ),
                   oct_obj.getDataSurface( ),
