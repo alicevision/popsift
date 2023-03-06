@@ -274,7 +274,7 @@ bool device_prop_t::checkLimit_2DsurfLayered( int& width, int& height, int& laye
             std::cerr << __FILE__ << ":" << __LINE__
                       << ": CUDA device " << currentDevice << std::endl
                       << "    does not support layered 2D surfaces " << width
-                      << " bytes wide." << endl;
+                      << " pixels wide." << endl;
         }
         width = ptr->maxSurface2DLayered[0];
         returnSuccess = false;
