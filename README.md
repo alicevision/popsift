@@ -1,7 +1,7 @@
 
 # PopSift
 
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3728/badge)](https://bestpractices.coreinfrastructure.org/projects/3728)  [!
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3728/badge)](https://bestpractices.coreinfrastructure.org/projects/3728) 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/64f9192b53df46b483e7cf5be7e2dddd)](https://app.codacy.com/gh/alicevision/popsift/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 PopSift is an open-source implementation of the SIFT algorithm in CUDA.
@@ -101,10 +101,10 @@ In particular, users can choose to generate results very similar to VLFeat or re
 We acknowledge that there is at least one SIFT implementation that is vastly faster, but it makes considerable sacrifices in terms of accuracy and compatibility.
 
 ## Continuous integration:
-- [![Build Status](https://travis-ci.org/alicevision/popsift.svg?branch=master)](https://travis-ci.org/alicevision/popsift) master branch.
-- [![Build Status](https://travis-ci.org/alicevision/popsift.svg?branch=develop)](https://travis-ci.org/alicevision/popsift) develop branch.
+- ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=master) master branch on Linux.
+- ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=develop) develop branch on Linux.
 - [![Build status](https://ci.appveyor.com/api/projects/status/rsm5269hs288c2ji/branch/develop?svg=true)](https://ci.appveyor.com/project/AliceVision/popsift/branch/develop)
-  develop branch.
+  develop branch on Windows.
 
 ## License
 
