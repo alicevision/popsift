@@ -23,6 +23,10 @@ jobs:
       matrix:
         container: ["alicevision/popsift-deps:cuda10.2-ubuntu18.04", "alicevision/popsift-deps:cuda11.8.0-ubuntu20.04", "alicevision/popsift-deps:cuda12.1.0-ubuntu22.04"]
         build_tpe: ["Release", "Debug"]
+        exclude:
+        # excludes debug on this one as it has a segmentation fault during the compilation (!)
+        - container: "alicevision/popsift-deps:cuda12.1.0-ubuntu22.04"
+          build_tpe: "Debug"
 
     container:
       image: ${{ matrix.container }}
