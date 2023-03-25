@@ -101,8 +101,11 @@ In particular, users can choose to generate results very similar to VLFeat or re
 We acknowledge that there is at least one SIFT implementation that is vastly faster, but it makes considerable sacrifices in terms of accuracy and compatibility.
 
 ## Continuous integration:
+
 - ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=master) master branch on Linux.
+
 - ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=develop) develop branch on Linux.
+
 - [![Build status](https://ci.appveyor.com/api/projects/status/rsm5269hs288c2ji/branch/develop?svg=true)](https://ci.appveyor.com/project/AliceVision/popsift/branch/develop)
   develop branch on Windows.
 
