@@ -29,7 +29,7 @@ jobs:
 
     env:
       DEPS_INSTALL_DIR: /opt/
-      BUILD_TYPE: Release
+      BUILD_TYPE: ${{ matrix.build_tpe }}
       CTEST_OUTPUT_ON_FAILURE: 1
     steps:
       - uses: actions/checkout@v2
@@ -60,5 +60,6 @@ jobs:
         run: |
           cmake ../src/application \
            -DBUILD_SHARED_LIBS:BOOL=ON \
+           -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
            -DCMAKE_PREFIX_PATH:PATH="$PWD/../../popsift_install;${DEPS_INSTALL_DIR}"
           make -j$(nproc)
