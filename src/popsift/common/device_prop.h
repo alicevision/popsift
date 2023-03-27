@@ -91,8 +91,7 @@ public:
     /**
      * @brief Check if a request exceeds the current CUDA device's limit in
      *  surface2DLayered dimensions. surface2DLayered is the writable equivalent
-     *  to texture2DLayered, but the width must be given in bytes, not elements.
-     *  Since we use float, images cannot be as wide as expected.
+     *  to texture2DLayered.
      * @param[in,out] width  Desired width of the texture.
      * @param[in,out] height Desired height of the texture.
      * @param[in,out] layers Desired depth of the texture.
