@@ -187,12 +187,7 @@ PopSift::AllocTest PopSift::testTextureFit( int width, int height )
      */
     int depth = _config.levels + 3;
 
-    /* Surfaces have a limited width in bytes, not in elements.
-     * Our DOG pyramid stores 4/byte floats, so me must check for
-     * that width.
-     */
-    int byteWidth = width * sizeof(float);
-    retval = _device_properties.checkLimit_2DsurfLayered( byteWidth,
+    retval = _device_properties.checkLimit_2DsurfLayered( width,
                                                           height,
                                                           depth,
                                                           warn );
@@ -219,13 +214,13 @@ std::string PopSift::testTextureFitErrorString( AllocTest err, int width, int he
             {
                 const float upscaleFactor = _config.getUpscaleFactor();
                 const float scaleFactor = 1.0f / powf( 2.0f, -upscaleFactor );
-                int w = ceilf( width * scaleFactor ) * sizeof(float);
+                int w = ceilf( width  * scaleFactor );
                 int h = ceilf( height * scaleFactor );
                 int d = _config.levels + 3;
 
                 _device_properties.checkLimit_2DsurfLayered( w, h, d, false );
 
-                w = w / scaleFactor / sizeof(float);
+                w = w / scaleFactor;
                 h = h / scaleFactor;
                 ostr << "E    Cannot use"
                      << (upscaleFactor==1 ? " default " : " ")

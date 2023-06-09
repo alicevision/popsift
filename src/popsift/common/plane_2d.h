@@ -170,10 +170,10 @@ template <typename T> struct PitchPlane2D : public PlaneT<T>
         PlaneBase::freeHost2D( this->data, mode );
     }
     __host__ __device__
-    inline short getPitchInBytes( ) const { return _pitchInBytes; }
+    inline size_t getPitchInBytes( ) const { return _pitchInBytes; }
 
 protected:
-    int _pitchInBytes; // pitch width in bytes
+    size_t _pitchInBytes; // pitch width in bytes
 };
 
 /*************************************************************
@@ -340,7 +340,7 @@ public:
     __host__ __device__
     inline short getHeight( ) const { return _rows; }
     __host__ __device__
-    inline short getByteSize( ) const { return this->_pitchInBytes*_rows; }
+    inline size_t getByteSize( ) const { return this->_pitchInBytes * _rows; }
 
     __host__ inline void allocDev( int w, int h ) {
         _cols = w;
