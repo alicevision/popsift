@@ -1,6 +1,8 @@
 version: '1.0.{build}'
 
-image: Visual Studio 2015
+image:
+  - Visual Studio 2015
+  - Visual Studio 2022
 
 platform:
   - x64
@@ -8,11 +10,6 @@ platform:
 configuration:
   - Release
   - Debug
-
-#environment:
-#  matrix:
-#    - DBUILD_SHARED_LIBS: 0
-#    - DBUILD_SHARED_LIBS: 1
 
 install:
     - cmd: >-
@@ -26,7 +23,12 @@ install:
 before_build:
     - md build
     - cd build
-    - cmake -G "Visual Studio 14 2015" -A x64 -T v140,host=x64 -DBUILD_SHARED_LIBS:BOOL=ON -DPopSift_BUILD_DOCS:BOOL=OFF -DPopSift_USE_POSITION_INDEPENDENT_CODE:BOOL=ON -DPopSift_BUILD_EXAMPLES:BOOL=ON -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_TOOLCHAIN_FILE=c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake ..
+    - IF "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2015" (
+      cmake -G "Visual Studio 14 2015" -A x64 -T v140,host=x64 -DBUILD_SHARED_LIBS:BOOL=ON -DPopSift_BUILD_DOCS:BOOL=OFF -DPopSift_USE_POSITION_INDEPENDENT_CODE:BOOL=ON -DPopSift_BUILD_EXAMPLES:BOOL=ON -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_TOOLCHAIN_FILE=c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake ..
+      )
+      ELSE (
+      cmake -G "Visual Studio 17 2022" -A x64 -T v140,host=x64 -DBUILD_SHARED_LIBS:BOOL=ON -DPopSift_BUILD_DOCS:BOOL=OFF -DPopSift_USE_POSITION_INDEPENDENT_CODE:BOOL=ON -DPopSift_BUILD_EXAMPLES:BOOL=ON -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_TOOLCHAIN_FILE=c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake ..
+      )
     - ls -l
 
 build:
