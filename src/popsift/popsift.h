@@ -15,9 +15,11 @@
 
 #include <cuda_runtime.h>
 
+#include <exception>
 #include <future>
 #include <queue>
 #include <stack>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -47,6 +49,7 @@ class SiftJob
     int                 _h;
     unsigned char*      _imageData;
     popsift::ImageBase* _img;
+    std::exception_ptr _err;
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangeId_t       _nvtx_id;
 #endif
@@ -92,6 +95,8 @@ public:
 
     /** fulfill the promise */
     void setFeatures( popsift::FeaturesBase* f );
+
+    void setError(std::exception_ptr ptr);
 };
 
 /**

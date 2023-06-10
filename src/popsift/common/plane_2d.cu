@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <sstream>
 #ifndef _WIN32
 #include <unistd.h>
 #else
@@ -65,11 +66,11 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
 #else
         const char *buf = strerror(errno);
 #endif
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Failed to allocate " << sz << " bytes of unaligned host memory." << endl
-             << "    Cause: " << buf << endl;
-        exit( -1 );
-    } else if( m == PageAligned ) {
+        stringstream ss;
+        ss << "Failed to allocate " << sz << " bytes of unaligned host memory." << endl
+           << "Cause: " << buf;
+        POP_FATAL(ss.str());
+    } else if(m == PageAligned) {
         void* ptr = memalign(getPageSize(), sz);
         if(ptr)
             return ptr;
@@ -93,9 +94,7 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
         POP_CUDA_FATAL_TEST( err, "Failed to allocate aligned and pinned host memory: " );
         return ptr;
     } else {
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Alignment not correctly specified in host plane allocation" << endl;
-        exit( -1 );
+        POP_FATAL("Alignment not correctly specified in host plane allocation");
     }
 }
 

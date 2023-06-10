@@ -130,17 +130,17 @@ void init_filter( const Config& conf,
 {
     if( sigma0 > 2.0 )
     {
-        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
-             << " Sigma > 2.0 is not supported. Re-size __constant__ array and recompile."
-             << endl;
-        exit( -__LINE__ );
+        stringstream ss;
+        ss << "ERROR: "
+           << " Sigma > 2.0 is not supported. Re-size __constant__ array and recompile.";
+        POP_FATAL(ss.str());
     }
     if( levels > GAUSS_LEVELS )
     {
-        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
-             << " More than " << GAUSS_LEVELS << " levels not supported. Re-size __constant__ array and recompile."
-             << endl;
-        exit( -__LINE__ );
+        stringstream ss;
+        ss << "ERROR: "
+           << " More than " << GAUSS_LEVELS << " levels not supported. Re-size __constant__ array and recompile.";
+        POP_FATAL(ss.str());
     }
 
     if( conf.ifPrintGaussTables() ) {
@@ -291,10 +291,9 @@ int GaussInfo::getSpan( float sigma ) const
     case Config::Fixed15 :
         return 8;
     default :
-        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
-             << " The mode for computing Gauss filter scan is invalid"
-             << endl;
-        exit( -__LINE__ );
+        stringstream ss;
+        ss << "ERROR: The mode for computing Gauss filter scan is invalid";
+        POP_FATAL(ss.str());
     }
 }
 
