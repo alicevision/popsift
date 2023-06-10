@@ -15,6 +15,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <sstream>
 
 // synchronize device and check for an error
 void pop_sync_check_last_error( const char* file, size_t line );
