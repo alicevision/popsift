@@ -4,6 +4,7 @@ popsift/playground/try-gauss
 popsift/playground/try-gauss-param
 popsift/playground/try-gauss-interpolate
 popsift/playground/try-libav
+oxford
 
 # Prerequisites
 *.d
@@ -44,3 +45,5 @@ popsift/playground/try-libav
 # Temporary files
 .DS_Store
 
+# Downloaded archives for tests.
+*.tgz

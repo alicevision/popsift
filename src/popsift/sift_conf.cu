@@ -5,9 +5,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <iostream>
-#include "sift_conf.h"
 #include "common/debug_macros.h"
+#include "sift_conf.h"
+
+#include <iostream>
 
 using namespace std;
 
@@ -121,7 +122,7 @@ const char* Config::getGaussModeUsage( )
 
 bool Config::getCanFilterExtrema() const
 {
-#if __CUDACC_VER__ >= 80000
+#if __CUDACC_VER_MAJOR__ >= 8
     return true;
 #else
     return false;

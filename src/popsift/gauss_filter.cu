@@ -5,11 +5,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdio.h>
-#include <algorithm>
-
-#include "gauss_filter.h"
 #include "common/debug_macros.h"
+#include "gauss_filter.h"
+
+#include <algorithm>
+#include <cstdio>
 
 using namespace std;
 
@@ -18,7 +18,7 @@ namespace popsift {
 __device__ __constant__
 GaussInfo d_gauss;
 
-__align__(128) GaussInfo h_gauss;
+__align__(128) thread_local GaussInfo h_gauss;
 
 
 __global__
@@ -130,17 +130,17 @@ void init_filter( const Config& conf,
 {
     if( sigma0 > 2.0 )
     {
-        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
-             << " Sigma > 2.0 is not supported. Re-size __constant__ array and recompile."
-             << endl;
-        exit( -__LINE__ );
+        stringstream ss;
+        ss << "ERROR: "
+           << " Sigma > 2.0 is not supported. Re-size __constant__ array and recompile.";
+        POP_FATAL(ss.str());
     }
     if( levels > GAUSS_LEVELS )
     {
-        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
-             << " More than " << GAUSS_LEVELS << " levels not supported. Re-size __constant__ array and recompile."
-             << endl;
-        exit( -__LINE__ );
+        stringstream ss;
+        ss << "ERROR: "
+           << " More than " << GAUSS_LEVELS << " levels not supported. Re-size __constant__ array and recompile.";
+        POP_FATAL(ss.str());
     }
 
     if( conf.ifPrintGaussTables() ) {
@@ -291,10 +291,9 @@ int GaussInfo::getSpan( float sigma ) const
     case Config::Fixed15 :
         return 8;
     default :
-        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
-             << " The mode for computing Gauss filter scan is invalid"
-             << endl;
-        exit( -__LINE__ );
+        stringstream ss;
+        ss << "ERROR: The mode for computing Gauss filter scan is invalid";
+        POP_FATAL(ss.str());
     }
 }
 
@@ -377,7 +376,7 @@ void GaussTable<LEVELS>::transformBlurTable( )
 {
     for( int level=0; level<LEVELS; level++ ) {
         i_span[level] = span[level];
-        if( not ( i_span[level] & 1 ) ) {
+        if( ! ( i_span[level] & 1 ) ) {
             i_span[level] += 1;
         }
     }

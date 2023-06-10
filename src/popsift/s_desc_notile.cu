@@ -5,15 +5,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdio.h>
-#include <iso646.h>
-#include <iostream>
-
-#include "sift_constants.h"
-#include "s_gradiant.h"
-#include "s_desc_notile.h"
 #include "common/assist.h"
 #include "common/vec_macros.h"
+#include "s_desc_notile.h"
+#include "s_gradiant.h"
+#include "sift_constants.h"
+
+#include <cstdio>
+#include <iostream>
+#include <stdexcept>
 
 //   1    -> 19.6 on 980 Ti
 //   2    -> 19.5 on 980 Ti
@@ -25,6 +25,7 @@
 
 using namespace popsift;
 
+__device__
 static const float stepbase =  - 2.5f + 1.0f / 16.0f;
 
 __device__ static inline
@@ -77,12 +78,12 @@ void ext_desc_notile_sub( const float x, const float y, const int level,
         }
     }
 
-    for( int i=0; i<8; i++ )
+    for( int i=0; i<8; ++i)
     {
-        dpt[i] += __shfl_down( dpt[i], 4, 8 ); // add n+4
-        dpt[i] += __shfl_down( dpt[i], 2, 8 ); // add n+2
-        dpt[i] += __shfl_down( dpt[i], 1, 8 ); // add n+1
-        dpt[i]  = __shfl     ( dpt[i], 0, 8 ); // move 0 to all
+        dpt[i] += popsift::shuffle_down( dpt[i], 4, 8 ); // add n+4
+        dpt[i] += popsift::shuffle_down( dpt[i], 2, 8 ); // add n+2
+        dpt[i] += popsift::shuffle_down( dpt[i], 1, 8 ); // add n+1
+        dpt[i]  = popsift::shuffle     ( dpt[i], 0, 8 ); // move 0 to all
     }
 
     __syncthreads();
@@ -130,7 +131,7 @@ void ext_desc_notile( const int           octave,
 namespace popsift
 {
 
-bool start_ext_desc_notile( const int octave, Octave& oct_obj )
+bool start_ext_desc_notile( int octave, Octave& oct_obj )
 {
     dim3 block;
     dim3 grid;
@@ -151,11 +152,7 @@ bool start_ext_desc_notile( const int octave, Octave& oct_obj )
           oct_obj.getDataTexLinear( ).tex );
     cudaDeviceSynchronize();
     cudaError_t err = cudaGetLastError( );
-    if( err != cudaSuccess ) {
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
-                  << "    cudaGetLastError failed: " << cudaGetErrorString(err) << std::endl;
-        exit( -__LINE__ );
-    }
+    POP_CUDA_FATAL_TEST(err, "cudaGetLastError failed: ");
 
     POP_SYNC_CHK;
 

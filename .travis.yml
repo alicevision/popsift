@@ -1,40 +1,40 @@
-dist: trusty
-sudo: required
+dist: xenial
 
 language: cpp
 compiler: gcc
 
-cache:
-  apt: true
-
 addons:
   apt:
     packages:
-      - libboost-filesystem1.55-dev 
-      - libboost-system1.55-dev
-      - libboost-program-options1.55-dev
-      - libboost-thread1.55-dev
+      - libboost-filesystem-dev
+      - libboost-system-dev
+      - libboost-program-options-dev
+      - libboost-thread-dev
 
 env:
   matrix:
-    - CUDA_VERSION_MAJOR="7" CUDA_VERSION_MINOR="0" CUDA_PKG_LONGVERSION="${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}-28" CUDA_PKG_VERSION="${CUDA_VERSION_MAJOR}-${CUDA_VERSION_MINOR}"
-    - CUDA_VERSION_MAJOR="7" CUDA_VERSION_MINOR="5" CUDA_PKG_LONGVERSION="${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}-18" CUDA_PKG_VERSION="${CUDA_VERSION_MAJOR}-${CUDA_VERSION_MINOR}"
-    - CUDA_VERSION_MAJOR="8" CUDA_VERSION_MINOR="0" CUDA_PKG_LONGVERSION="${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}.61-1" CUDA_PKG_VERSION="${CUDA_VERSION_MAJOR}-${CUDA_VERSION_MINOR}" 
-  
+    - CUDA_VERSION_MAJOR="8" CUDA_VERSION_MINOR="0" CUDA_PKG_LONGVERSION="${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}.61-1" CUDA_PKG_VERSION="${CUDA_VERSION_MAJOR}-${CUDA_VERSION_MINOR}"
+    - CUDA_VERSION_MAJOR="9" CUDA_VERSION_MINOR="2" CUDA_PKG_LONGVERSION="${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}.148-1" CUDA_PKG_VERSION="${CUDA_VERSION_MAJOR}-${CUDA_VERSION_MINOR}"
+    - CUDA_VERSION_MAJOR="10" CUDA_VERSION_MINOR="2" CUDA_PKG_LONGVERSION="${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}.89-1" CUDA_PKG_VERSION="${CUDA_VERSION_MAJOR}-${CUDA_VERSION_MINOR}"
+    - CUDA_VERSION_MAJOR="11" CUDA_VERSION_MINOR="0" CUDA_PKG_LONGVERSION="${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}.2-1" CUDA_PKG_VERSION="${CUDA_VERSION_MAJOR}-${CUDA_VERSION_MINOR}"
+
+
   global:
     - NUM_CPU="`grep processor /proc/cpuinfo | wc -l`"; echo $NUM_CPU
-    - BUILD_TYPE="RELEASE"
     - BUILD_SYSTEM="`uname -s`"
     - BUILD_PROCESSOR="`uname -p`"
     - POPSIFT_SOURCE=${TRAVIS_BUILD_DIR}
-    - POPSIFT_BUILD=${TRAVIS_BUILD_DIR}/build
-    - POPSIFT_INSTALL=${POPSIFT_BUILD}/install
+    - POPSIFT_BUILD_RELEASE=${TRAVIS_BUILD_DIR}/build_release
+    - POPSIFT_BUILD_DEBUG=${TRAVIS_BUILD_DIR}/build_debug
+    - POPSIFT_INSTALL_RELEASE=${POPSIFT_BUILD_RELEASE}/install
+    - POPSIFT_INSTALL_DEBUG=${POPSIFT_BUILD_DEBUG}/install
     - POPSIFT_APP_SRC=${POPSIFT_SOURCE}/src/application
-    - POPSIFT_APP_BUILD=${POPSIFT_APP_SRC}/build
-    - POPSIFT_APP_INSTALL=${POPSIFT_APP_BUILD}/install
+    - POPSIFT_APP_BUILD_RELEASE=${POPSIFT_APP_SRC}/build_release
+    - POPSIFT_APP_BUILD_DEBUG=${POPSIFT_APP_SRC}/build_debug
+    - POPSIFT_APP_INSTALL_RELEASE=${POPSIFT_APP_BUILD_RELEASE}/install
+    - POPSIFT_APP_INSTALL_DEBUG=${POPSIFT_APP_BUILD_DEBUG}/install
     # CMAKE
-    # - CMAKE_URL="https://cmake.org/files/v3.6/cmake-3.6.1-Linux-x86_64.tar.gz"
-    - CMAKE_URL="https://cmake.org/files/v3.4/cmake-3.4.1-Linux-x86_64.tar.gz"
+    - CMAKE_URL="https://cmake.org/files/v3.13/cmake-3.13.5-Linux-x86_64.tar.gz"
     - CMAKE_ROOT=${TRAVIS_BUILD_DIR}/cmake
     - CMAKE_SOURCE=${CMAKE_ROOT}/source
     - CMAKE_INSTALL=${CMAKE_ROOT}/install
@@ -57,34 +57,77 @@ before_install:
     fi
 
 install:
-  - CUDA_REPO_PKG=cuda-repo-ubuntu1404_${CUDA_PKG_LONGVERSION}_amd64.deb
-  - wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64/$CUDA_REPO_PKG
-  - sudo dpkg -i $CUDA_REPO_PKG
-  - rm ${CUDA_REPO_PKG}
-  - sudo apt-get -y update
-  - sudo apt-get install -y --no-install-recommends  cuda-core-$CUDA_PKG_VERSION  cuda-cudart-dev-$CUDA_PKG_VERSION  cuda-cublas-dev-$CUDA_PKG_VERSION cuda-curand-dev-$CUDA_PKG_VERSION
-  - sudo ln -s /usr/local/cuda-${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR} /usr/local/cuda
+  - UBUNTU_VERSION=ubuntu1604
+  - >
+    if [ ${CUDA_VERSION_MAJOR} -lt 11 ]; then
+        CUDA_REPO_PKG=cuda-repo-${UBUNTU_VERSION}_${CUDA_PKG_LONGVERSION}_amd64.deb
+        wget http://developer.download.nvidia.com/compute/cuda/repos/${UBUNTU_VERSION}/x86_64/$CUDA_REPO_PKG
+        travis_retry sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/${UBUNTU_VERSION}/x86_64/7fa2af80.pub
+        sudo dpkg -i $CUDA_REPO_PKG
+        rm ${CUDA_REPO_PKG}
+        travis_retry sudo apt-get -y update
+        # cuda > 10.0 changed cublas naming
+        if [ ${CUDA_VERSION_MAJOR} -lt 10 ]; then
+              CUBLAS_PKG=cuda-cublas-dev-$CUDA_PKG_VERSION
+        else
+              CUBLAS_PKG=libcublas-dev
+        fi
+        travis_retry sudo apt-get install -y --no-install-recommends --allow-unauthenticated cuda-core-$CUDA_PKG_VERSION  cuda-cudart-dev-$CUDA_PKG_VERSION  ${CUBLAS_PKG} cuda-curand-dev-$CUDA_PKG_VERSION
+        sudo ln -s /usr/local/cuda-${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR} /usr/local/cuda
+    else
+        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-ubuntu1604.pin
+        travis_retry sudo mv cuda-ubuntu1604.pin /etc/apt/preferences.d/cuda-repository-pin-600
+        travis_retry sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
+        travis_retry sudo add-apt-repository "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/ /"
+        sudo apt-get update && sudo apt-get -y install cuda
+    fi
+#  - CUDA_REPO_PKG=cuda-repo-${UBUNTU_VERSION}_${CUDA_PKG_LONGVERSION}_amd64.deb
+#  - wget http://developer.download.nvidia.com/compute/cuda/repos/${UBUNTU_VERSION}/x86_64/$CUDA_REPO_PKG
+
+
 
 before_script:
-  # Create build folder
-  - mkdir -p ${POPSIFT_BUILD}
-  - cd ${POPSIFT_BUILD}
   # Classic release build
+  # Create build folder
+  - mkdir -p ${POPSIFT_BUILD_RELEASE}
+  - cd ${POPSIFT_BUILD_RELEASE}
   - >
-     cmake . ${POPSIFT_SOURCE} -DCMAKE_INSTALL_PREFIX=${POPSIFT_INSTALL}
+     cmake . ${POPSIFT_SOURCE} -DCMAKE_INSTALL_PREFIX=${POPSIFT_INSTALL_RELEASE} -DCMAKE_BUILD_TYPE=Release -DPopSift_BUILD_DOCS:BOOL=OFF
+
+  # Classic debug build
+  # Create build folder
+  - mkdir -p ${POPSIFT_BUILD_DEBUG}
+  - cd ${POPSIFT_BUILD_DEBUG}
+  - >
+   cmake . ${POPSIFT_SOURCE} -DCMAKE_INSTALL_PREFIX=${POPSIFT_INSTALL_DEBUG} -DCMAKE_BUILD_TYPE=Debug -DPopSift_BUILD_DOCS:BOOL=OFF
 
 script:
+  - cd ${POPSIFT_BUILD_RELEASE}
 # limit GCC builds to a reduced number of thread for the virtual machine
   - make install -j 2 VERBOSE=1
 # Perform unit tests
   # - make test
 # Perform tests building application with PopSift as 3rd party
   - cd ${POPSIFT_APP_SRC}
-  - mkdir -p ${POPSIFT_APP_BUILD}
-  - cd ${POPSIFT_APP_BUILD}
-  - cmake .. -DPopSift_DIR=${POPSIFT_INSTALL}/lib/cmake/PopSift/ -DCMAKE_INSTALL_PREFIX=${POPSIFT_APP_INSTALL}
+  - mkdir -p ${POPSIFT_APP_BUILD_RELEASE}
+  - cd ${POPSIFT_APP_BUILD_RELEASE}
+  - cmake .. -DPopSift_DIR=${POPSIFT_INSTALL_RELEASE}/lib/cmake/PopSift/ -DCMAKE_INSTALL_PREFIX=${POPSIFT_APP_INSTALL_RELEASE} -DCMAKE_BUILD_TYPE=Release -DPopSift_BUILD_DOCS:BOOL=OFF
+  - make install -j 2 VERBOSE=1
+
+# same for debug
+  - cd ${POPSIFT_BUILD_DEBUG}
+  # limit GCC builds to a reduced number of thread for the virtual machine
+  - make install -j 2 VERBOSE=1
+  # Perform unit tests
+  # - make test
+  # Perform tests building application with PopSift as 3rd party
+  - cd ${POPSIFT_APP_SRC}
+  - mkdir -p ${POPSIFT_APP_BUILD_DEBUG}
+  - cd ${POPSIFT_APP_BUILD_DEBUG}
+  - cmake .. -DPopSift_DIR=${POPSIFT_INSTALL_DEBUG}/lib/cmake/PopSift/ -DCMAKE_INSTALL_PREFIX=${POPSIFT_APP_INSTALL_DEBUG} -DCMAKE_BUILD_TYPE=Debug -DPopSift_BUILD_DOCS:BOOL=OFF
   - make install -j 2 VERBOSE=1
 
 cache:
+  apt: true
   directories:
     - ${CMAKE_INSTALL}

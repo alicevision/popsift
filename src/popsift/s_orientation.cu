@@ -5,19 +5,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <math.h>
-#include <stdio.h>
-#include <inttypes.h>
-
 #include "common/assist.h"
-#include "sift_pyramid.h"
-#include "sift_constants.h"
-#include "s_gradiant.h"
+#include "common/debug_macros.h"
 #include "common/excl_blk_prefix_sum.h"
 #include "common/warp_bitonic_sort.h"
-#include "common/debug_macros.h"
+#include "s_gradiant.h"
+#include "sift_config.h"
+#include "sift_constants.h"
+#include "sift_pyramid.h"
 
-#ifdef USE_NVTX
+#include <cinttypes>
+#include <cmath>
+#include <cstdio>
+
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
 #else
 #define nvtxRangePushA(a)
@@ -52,6 +53,21 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
 }
 
 /*
+ * Histogram smoothing helper
+ */
+template<int D>
+__device__
+inline static float smoothe( const float* const src, const int bin )
+{
+    const int prev = (bin == 0) ? ORI_NBINS-1 : bin-1;
+    const int next = (bin == ORI_NBINS-1) ? 0 : bin+1;
+
+    const float f  = ( src[prev] + src[bin] + src[next] ) / 3.0f;
+
+    return f;
+}
+
+/*
  * Compute the keypoint orientations for each extremum
  * using 16 threads for each of them.
  * direct curve fitting approach
@@ -65,15 +81,18 @@ void ori_par( const int           octave,
 {
     const int extremum_index  = blockIdx.x * blockDim.y;
 
-    if( extremum_index >= dct.ext_ct[octave] ) return; // a few trailing warps
+    if( popsift::all( extremum_index >= dct.ext_ct[octave] ) ) return; // a few trailing warps
 
     const int              iext_off =  dobuf.i_ext_off[octave][extremum_index];
     const InitialExtremum* iext     = &dobuf.i_ext_dat[octave][iext_off];
 
-    __shared__ float hist   [ORI_NBINS];
-    __shared__ float sm_hist[ORI_NBINS];
+    __shared__ float hist         [64];
+    __shared__ float sm_hist      [64];
+    __shared__ float refined_angle[64];
+    __shared__ float yval         [64];
 
-    for( int i = threadIdx.x; i < ORI_NBINS; i += blockDim.x )  hist[i] = 0.0f;
+    hist[threadIdx.x+ 0] = 0.0f;
+    hist[threadIdx.x+32] = 0.0f;
 
     /* keypoint fractional geometry */
     const float x     = iext->xpos;
@@ -82,11 +101,11 @@ void ori_par( const int           octave,
     const float sig   = iext->sigma;
 
     /* orientation histogram radius */
-    float  sigw = ORI_WINFACTOR * sig;
-    int32_t rad  = (int)roundf((3.0f * sigw));
+    const float  sigw = ORI_WINFACTOR * sig;
+    const int32_t rad  = (int)roundf((3.0f * sigw));
 
-    float factor = __fdividef( -0.5f, (sigw * sigw) );
-    int sq_thres  = rad * rad;
+    const float factor = __fdividef( -0.5f, (sigw * sigw) );
+    const int sq_thres  = rad * rad;
 
     // int xmin = max(1,     (int)floor(x - rad));
     // int xmax = min(w - 2, (int)floor(x + rad));
@@ -101,7 +120,8 @@ void ori_par( const int           octave,
     int hy = ymax - ymin + 1;
     int loops = wx * hy;
 
-    for( int i = threadIdx.x; ::__any(i < loops); i += blockDim.x )
+    __syncthreads();
+    for( int i = threadIdx.x; popsift::any(i < loops); i += blockDim.x )
     {
         if( i < loops ) {
             int yy = i / wx + ymin;
@@ -120,7 +140,8 @@ void ori_par( const int           octave,
             float dy = yy - y;
 
             int sq_dist  = dx * dx + dy * dy;
-            if (sq_dist <= sq_thres) {
+            if (sq_dist <= sq_thres)
+            {
                 float weight = grad * expf(sq_dist * factor);
 
                 // int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
@@ -129,33 +150,31 @@ void ori_par( const int           octave,
                 if( bidx > ORI_NBINS ) {
                     printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
                 }
+                if( bidx < 0 ) {
+                    printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
+                }
 
                 bidx = (bidx == ORI_NBINS) ? 0 : bidx;
 
                 atomicAdd( &hist[bidx], weight );
             }
         }
+    }
+    __syncthreads();
+
+#ifdef WITH_VLFEAT_SMOOTHING
+    for( int i=0; i<3 ; i++ )
+    {
+        sm_hist[threadIdx.x+ 0] = smoothe<0>( hist, threadIdx.x+ 0 );
+        sm_hist[threadIdx.x+32] = smoothe<1>( hist, threadIdx.x+32 );
+        __syncthreads();
+        hist[threadIdx.x+ 0]    = smoothe<2>( sm_hist, threadIdx.x+ 0 );
+        hist[threadIdx.x+32]    = smoothe<3>( sm_hist, threadIdx.x+32 );
         __syncthreads();
     }
 
-#ifdef WITH_VLFEAT_SMOOTHING
-    for( int i=0; i<3; i++ ) {
-        for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
-            int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
-            int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            sm_hist[bin] = ( hist[prev] + hist[bin] + hist[next] ) / 3.0f;
-        }
-        __syncthreads();
-        for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
-            int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
-            int next = bin == ORI_NBINS-1 ? 0 : bin+1;
-            hist[bin] = ( sm_hist[prev] + sm_hist[bin] + sm_hist[next] ) / 3.0f;
-        }
-        __syncthreads();
-    }
-    for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
-        sm_hist[bin] = hist[bin];
-    }
+    sm_hist[threadIdx.x+ 0] = hist[threadIdx.x+ 0];
+    sm_hist[threadIdx.x+32] = hist[threadIdx.x+32];
     __syncthreads();
 #else // not WITH_VLFEAT_SMOOTHING
     for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
@@ -176,10 +195,8 @@ void ori_par( const int           octave,
 
     // sub-cell refinement of the histogram cell index, yielding the angle
     // not necessary to initialize, every cell is computed
-    __shared__ float refined_angle[64];
-    __shared__ float yval         [64];
 
-    for( int bin = threadIdx.x; ::__any( bin < ORI_NBINS ); bin += blockDim.x ) {
+    for( int bin = threadIdx.x; popsift::any( bin < ORI_NBINS ); bin += blockDim.x ) {
         const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
         const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
 
@@ -202,6 +219,7 @@ void ori_par( const int           octave,
         refined_angle[bin] = predicate ? prev + newbin : -1;
         yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
     }
+    __syncthreads();
 
     int2 best_index = make_int2( threadIdx.x, threadIdx.x + 32 );
 
@@ -212,7 +230,7 @@ void ori_par( const int           octave,
     // All threads retrieve the yval of thread 0, the largest
     // of all yvals.
     const float best_val = yval[best_index.x];
-    const float yval_ref = 0.8f * __shfl( best_val, 0 );
+    const float yval_ref = 0.8f * popsift::shuffle( best_val, 0 );
     const bool  valid    = ( best_val >= yval_ref );
     bool        written  = false;
 
@@ -229,7 +247,7 @@ void ori_par( const int           octave,
         }
     }
 
-    int angles = __popc( __ballot( written ) );
+    int angles = __popc( popsift::ballot( written ) );
     if( threadIdx.x == 0 ) {
         ext->xpos    = iext->xpos;
         ext->ypos    = iext->ypos;
@@ -247,7 +265,7 @@ class ExtremaRead
     const Extremum* const _oris;
 public:
     inline __device__
-    ExtremaRead( const Extremum* const d_oris ) : _oris( d_oris ) { }
+    explicit ExtremaRead( const Extremum* const d_oris ) : _oris( d_oris ) { }
 
     inline __device__
     int get( int n ) const { return _oris[n].num_ori; }
@@ -258,7 +276,7 @@ class ExtremaWrt
     Extremum* _oris;
 public:
     inline __device__
-    ExtremaWrt( Extremum* d_oris ) : _oris( d_oris ) { }
+    explicit ExtremaWrt( Extremum* d_oris ) : _oris( d_oris ) { }
 
     inline __device__
     void set( int n, int value ) { _oris[n].idx_ori = value; }
@@ -269,7 +287,7 @@ class ExtremaTot
     int& _extrema_counter;
 public:
     inline __device__
-    ExtremaTot( int& extrema_counter ) : _extrema_counter( extrema_counter ) { }
+    explicit ExtremaTot( int& extrema_counter ) : _extrema_counter( extrema_counter ) { }
 
     inline __device__
     void set( int value ) { _extrema_counter = value; }
@@ -346,15 +364,14 @@ void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
 __host__
 void Pyramid::orientation( const Config& conf )
 {
-    nvtxRangePushA( "reading extrema count" );
     readDescCountersFromDevice( );
-    nvtxRangePop( );
 
-    nvtxRangePushA( "filtering grid" );
     int ext_total = 0;
-    for( int o=0; o<MAX_OCTAVES; o++ ) {
-        if( hct.ext_ct[o] > 0 ) {
-            ext_total += hct.ext_ct[o];
+    for(int o : hct.ext_ct)
+    {
+        if( o > 0 )
+        {
+            ext_total += o;
         }
     }
 
@@ -364,11 +381,8 @@ void Pyramid::orientation( const Config& conf )
     {
         ext_total = extrema_filter_grid( conf, ext_total );
     }
-    nvtxRangePop( );
 
-    nvtxRangePushA( "reallocating extrema arrays" );
     reallocExtrema( ext_total );
-    nvtxRangePop( );
 
     int ext_ct_prefix_sum = 0;
     for( int octave=0; octave<_num_octaves; octave++ ) {
@@ -397,7 +411,7 @@ void Pyramid::orientation( const Config& conf )
             grid.x  = num;
 
             ori_par
-                <<<grid,block,0,oct_str>>>
+                <<<grid,block,4*64*sizeof(float),oct_str>>>
                 ( octave,
                   hct.ext_ps[octave],
                   oct_obj.getDataTexPoint( ),

@@ -7,12 +7,15 @@
  */
 #pragma once
 
-#include <iostream>
-#include <iomanip>
-#include <string>
-#include <stdlib.h>
-#include <assert.h>
 #include <cuda_runtime.h>
+
+#include <cassert>
+#include <cstdlib>
+#include <iomanip>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <sstream>
 
 // synchronize device and check for an error
 void pop_sync_check_last_error( const char* file, size_t line );
@@ -116,14 +119,18 @@ public:
 };
 };
 
-#define POP_FATAL(s) { \
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl << "    " << s << std::endl; \
-        exit( -__LINE__ ); \
+#define POP_FATAL(s)                                                                                                   \
+    {                                                                                                                  \
+        std::stringstream ss;                                                                                          \
+        ss << __FILE__ << ":" << __LINE__ << std::endl << "    " << s;                                                 \
+        throw std::runtime_error{ss.str()};                                                                            \
     }
 
-#define POP_FATAL_FL(s,file,line) { \
-        std::cerr << file << ":" << line << std::endl << "    " << s << std::endl; \
-        exit( -__LINE__ ); \
+#define POP_FATAL_FL(s, file, line)                                                                                    \
+    {                                                                                                                  \
+        std::stringstream ss;                                                                                          \
+        ss << file << ":" << line << std::endl << "    " << s << std::endl;                                            \
+        throw std::runtime_error{ss.str()};                                                                            \
     }
 
 #define POP_CHECK_NON_NULL(ptr,s) if( ptr == 0 ) { POP_FATAL_FL(s,__FILE__,__LINE__); }
@@ -134,14 +141,24 @@ public:
 // #define POP_INFO(s) cerr << __FILE__ << ":" << __LINE__ << std::endl << "    " << s << endl
 
 #define POP_INFO2(silent,s) \
-    if (not silent) { \
+    if (! silent) { \
         std::cerr << __FILE__ << ":" << __LINE__ << std::endl << "    " << s << std::endl; \
     }
 
-#define POP_CUDA_FATAL(err,s) { \
+#define POP_WARN(s) { \
         std::cerr << __FILE__ << ":" << __LINE__ << std::endl; \
-        std::cerr << "    " << s << cudaGetErrorString(err) << std::endl; \
-        exit( -__LINE__ ); \
+        std::cerr << "    WARNING: " << s << std::endl; \
+    }
+#define POP_CUDA_WARN(err,s) { \
+        std::cerr << __FILE__ << ":" << __LINE__ << std::endl; \
+        std::cerr << "    WARNING: " << s << cudaGetErrorString(err) << std::endl; \
+    }
+#define POP_CUDA_FATAL(err,s)                                                                                         \
+    {                                                                                                                  \
+        std::stringstream ss;                                                                                          \
+        ss << __FILE__ << ":" << __LINE__ << std::endl;                                                                \
+        ss << "    " << s << cudaGetErrorString(err) << std::endl;                                                     \
+        throw std::runtime_error{ss.str()};                                                                            \
     }
 #define POP_CUDA_FATAL_TEST(err,s) if( err != cudaSuccess ) { POP_CUDA_FATAL(err,s); }
 

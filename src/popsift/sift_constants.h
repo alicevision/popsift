@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <cuda_runtime.h>
+
 #ifndef INF
 #define INF               (1<<29)
 #endif
@@ -66,7 +68,7 @@ struct ConstInfo
     float desc_tile[16];
 };
 
-extern                         ConstInfo h_consts;
+extern thread_local            ConstInfo h_consts;
 extern __device__ __constant__ ConstInfo d_consts;
 
 

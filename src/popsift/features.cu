@@ -5,19 +5,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <iomanip>
-#include <iostream>
-#include <unistd.h>
-#ifndef __APPLE__
-#include <malloc.h>
-#endif
-#include <stdlib.h>
-#include <errno.h>
-#include <math_constants.h>
-
+#include "common/assist.h"
+#include "common/debug_macros.h"
 #include "features.h"
 #include "sift_extremum.h"
-#include "common/debug_macros.h"
+
+#include <math_constants.h>
+
+#include <cerrno>
+#include <cstdlib>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
 
 using namespace std;
 
@@ -32,64 +31,52 @@ FeaturesBase::FeaturesBase( )
     , _num_ori( 0 )
 { }
 
-FeaturesBase::~FeaturesBase( )
-{ }
+FeaturesBase::~FeaturesBase( ) = default;
 
 /*************************************************************
  * FeaturesHost
  *************************************************************/
 
 FeaturesHost::FeaturesHost( )
-    : _ext( 0 )
-    , _ori( 0 )
+    : _ext( nullptr )
+    , _ori( nullptr )
 { }
 
 FeaturesHost::FeaturesHost( int num_ext, int num_ori )
-    : _ext( 0 )
-    , _ori( 0 )
+    : _ext( nullptr )
+    , _ori( nullptr )
 {
     reset( num_ext, num_ori );
 }
 
 FeaturesHost::~FeaturesHost( )
 {
-    free( _ext );
-    free( _ori );
+    memalign_free( _ext );
+    memalign_free( _ori );
 }
-
-#ifdef __APPLE__
-static void* memalign( size_t alignment, size_t size )
-{
-    void* ret;
-    int err = posix_memalign( &ret, alignment, size );
-    if( err != 0 ) {
-        errno = err;
-        ret = 0;
-    }
-    return ret;
-}
-#endif
 
 void FeaturesHost::reset( int num_ext, int num_ori )
 {
-    if( _ext != 0 ) { free( _ext ); _ext = 0; }
-    if( _ori != 0 ) { free( _ori ); _ori = 0; }
+    if( _ext != nullptr ) { free( _ext ); _ext = nullptr; }
+    if( _ori != nullptr ) { free( _ori ); _ori = nullptr; }
 
-    _ext = (Feature*)memalign( sysconf(_SC_PAGESIZE), num_ext * sizeof(Feature) );
-    if( _ext == 0 ) {
-        cerr << __FILE__ << ":" << __LINE__ << " Runtime error:" << endl
-             << "    Failed to (re)allocate memory for downloading " << num_ext << " features" << endl;
-        if( errno == EINVAL ) cerr << "    Alignment is not a power of two." << endl;
-        if( errno == ENOMEM ) cerr << "    Not enough memory." << endl;
-        exit( -1 );
+    _ext = (Feature*)memalign( getPageSize(), num_ext * sizeof(Feature) );
+    if( _ext == nullptr ) {
+        std::stringstream ss;
+        ss << "Runtime error:" << endl
+           << "    Failed to (re)allocate memory for downloading " << num_ext << " features" << endl;
+        if(errno == EINVAL) ss << "    Alignment is not a power of two.";
+        if(errno == ENOMEM) ss << "    Not enough memory.";
+        POP_FATAL(ss.str());
     }
-    _ori = (Descriptor*)memalign( sysconf(_SC_PAGESIZE), num_ori * sizeof(Descriptor) );
-    if( _ori == 0 ) {
-        cerr << __FILE__ << ":" << __LINE__ << " Runtime error:" << endl
-             << "    Failed to (re)allocate memory for downloading " << num_ori << " descriptors" << endl;
-        if( errno == EINVAL ) cerr << "    Alignment is not a power of two." << endl;
-        if( errno == ENOMEM ) cerr << "    Not enough memory." << endl;
-        exit( -1 );
+    _ori = (Descriptor*)memalign( getPageSize(), num_ori * sizeof(Descriptor) );
+    if(_ori == nullptr) {
+        std::stringstream ss;
+        ss << "Runtime error:" << endl
+           << "    Failed to (re)allocate memory for downloading " << num_ori << " descriptors" << endl;
+        if(errno == EINVAL) ss << "    Alignment is not a power of two.";
+        if(errno == ENOMEM) ss << "    Not enough memory.";
+        POP_FATAL(ss.str());
     }
 
     setFeatureCount( num_ext );
@@ -103,12 +90,16 @@ void FeaturesHost::pin( )
     if( err != cudaSuccess ) {
         cerr << __FILE__ << ":" << __LINE__ << " Runtime warning:" << endl
              << "    Failed to register feature memory in CUDA." << endl
+             << "    Features count: " << getFeatureCount() << endl
+             << "    Memory size requested: " << getFeatureCount() * sizeof(Feature) << endl
              << "    " << cudaGetErrorString(err) << endl;
     }
     err = cudaHostRegister( _ori, getDescriptorCount() * sizeof(Descriptor), 0 );
     if( err != cudaSuccess ) {
         cerr << __FILE__ << ":" << __LINE__ << " Runtime warning:" << endl
              << "    Failed to register descriptor memory in CUDA." << endl
+             << "    Descriptors count: " << getDescriptorCount() << endl
+             << "    Memory size requested: " << getDescriptorCount() * sizeof(Descriptor) << endl
              << "    " << cudaGetErrorString(err) << endl;
     }
 }
@@ -137,15 +128,15 @@ std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature )
  *************************************************************/
 
 FeaturesDev::FeaturesDev( )
-    : _ext( 0 )
-    , _ori( 0 )
-    , _rev( 0 )
+    : _ext( nullptr )
+    , _ori( nullptr )
+    , _rev( nullptr )
 { }
 
 FeaturesDev::FeaturesDev( int num_ext, int num_ori )
-    : _ext( 0 )
-    , _ori( 0 )
-    , _rev( 0 )
+    : _ext( nullptr )
+    , _ori( nullptr )
+    , _rev( nullptr )
 {
     reset( num_ext, num_ori );
 }
@@ -159,9 +150,9 @@ FeaturesDev::~FeaturesDev( )
 
 void FeaturesDev::reset( int num_ext, int num_ori )
 {
-    if( _ext != 0 ) { cudaFree( _ext ); _ext = 0; }
-    if( _ori != 0 ) { cudaFree( _ori ); _ori = 0; }
-    if( _rev != 0 ) { cudaFree( _rev ); _rev = 0; }
+    if( _ext != nullptr ) { cudaFree( _ext ); _ext = nullptr; }
+    if( _ori != nullptr ) { cudaFree( _ori ); _ori = nullptr; }
+    if( _rev != nullptr ) { cudaFree( _rev ); _rev = nullptr; }
 
     _ext = popsift::cuda::malloc_devT<Feature>   ( num_ext, __FILE__, __LINE__ );
     _ori = popsift::cuda::malloc_devT<Descriptor>( num_ori, __FILE__, __LINE__ );
@@ -184,11 +175,11 @@ l2_in_t0( const float4* lptr, const float4* rptr )
 	        + mval.y * mval.y
 	        + mval.z * mval.z
 	        + mval.w * mval.w;
-    res += __shfl_down( res, 16 );
-    res += __shfl_down( res,  8 );
-    res += __shfl_down( res,  4 );
-    res += __shfl_down( res,  2 );
-    res += __shfl_down( res,  1 );
+    res += shuffle_down( res, 16 );
+    res += shuffle_down( res,  8 );
+    res += shuffle_down( res,  4 );
+    res += shuffle_down( res,  2 );
+    res += shuffle_down( res,  1 );
     return res;
 }
 

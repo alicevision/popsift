@@ -6,6 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #pragma once
+#include "common/assist.h"
 #include "s_desc_normalize.h"
 
 using namespace popsift;
@@ -15,20 +16,17 @@ class NormalizeRootSift
 {
 public:
     __device__ static inline
-    void normalize( float* features, const bool ignoreme );
+    void normalize( float* features, bool ignoreme );
 
     __device__ static inline
     void normalize_restrict( const float* __restrict__ src_desc,
                              float* __restrict__       dest_desc );
 
-    __device__ static inline
-    void normalize( const float* src_desc,
-                    float*       dest_desc,
-                    const  bool  ignoreme );
+    __device__ static inline void normalize(const float* src_desc, float* dest_desc, bool ignoreme);
 };
 
 __device__ inline
-void NormalizeRootSift::normalize( float* features, const bool ignoreme )
+void NormalizeRootSift::normalize( float* features, bool ignoreme )
 {
     normalize( features, features, ignoreme );
 }
@@ -41,7 +39,7 @@ void NormalizeRootSift::normalize_restrict( const float* __restrict__ src_desc,
 }
 
 __device__ inline
-void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, const bool ignoreme )
+void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, bool ignoreme )
 {
     const float4* ptr4 = (const float4*)src_desc;
 
@@ -50,13 +48,13 @@ void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, const
 
     float sum = descr.x + descr.y + descr.z + descr.w;
 
-    sum += __shfl_down( sum, 16 );
-    sum += __shfl_down( sum,  8 );
-    sum += __shfl_down( sum,  4 );
-    sum += __shfl_down( sum,  2 );
-    sum += __shfl_down( sum,  1 );
+    sum += popsift::shuffle_down( sum, 16 );
+    sum += popsift::shuffle_down( sum,  8 );
+    sum += popsift::shuffle_down( sum,  4 );
+    sum += popsift::shuffle_down( sum,  2 );
+    sum += popsift::shuffle_down( sum,  1 );
 
-    sum = __shfl( sum,  0 );
+    sum = popsift::shuffle( sum,  0 );
 
     float val;
     val = scalbnf( __fsqrt_rn( __fdividef( descr.x, sum ) ),
@@ -72,7 +70,7 @@ void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, const
                    d_consts.norm_multi );
     descr.w = val;
 
-    if( not ignoreme ) {
+    if( ! ignoreme ) {
         float4* out4 = (float4*)dst_desc;
         out4[threadIdx.x] = descr;
     }

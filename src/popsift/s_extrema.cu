@@ -5,25 +5,25 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <cuda_runtime.h>
-#include <texture_fetch_functions.h>
-#include <stdio.h>
-#include <iso646.h>
-
-#include "sift_pyramid.h"
-#include "sift_constants.h"
-#include "s_solve.h"
-#include "common/debug_macros.h"
 #include "common/assist.h"
 #include "common/clamp.h"
+#include "common/debug_macros.h"
+#include "s_solve.h"
+#include "sift_constants.h"
+#include "sift_pyramid.h"
+
+#include <cuda_runtime.h>
+#include <texture_fetch_functions.h>
+
+#include <cstdio>
 
 namespace popsift{
 
 template<int HEIGHT>
 __device__ static inline
-uint32_t extrema_count( int indicator, int* extrema_counter )
+uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
 {
-    uint32_t mask = __ballot( indicator ); // bitfield of warps with results
+    uint32_t mask = popsift::ballot( indicator ); // bitfield of warps with results
 
     int ct = __popc( mask );          // horizontal reduce
 
@@ -34,7 +34,7 @@ uint32_t extrema_count( int indicator, int* extrema_counter )
         write_index = atomicAdd( extrema_counter, ct );
     }
     // broadcast from thread 0 to all threads in warp
-    write_index = __shfl( write_index, 0 );
+    write_index = popsift::shuffle( write_index, 0 );
 
     // this thread's offset: count only bits below the bit of the own
     // thread index; this provides the 0 result and every result up to ct
@@ -124,7 +124,7 @@ class ModeFunctions
 {
 public:
     inline __device__
-    bool first_contrast_ok( const float val ) const;
+    bool first_contrast_ok( float val ) const;
 
     /* refine
      * returns -1 : break loop and fail
@@ -132,14 +132,14 @@ public:
      *          1 : break loop and succeed
      */
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it );
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it );
 
     /*
      * returns true  : values after refine make sense
      *         false : they do not
      */
     inline __device__
-    bool verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const;
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const;
 };
 
 template<>
@@ -147,13 +147,13 @@ class ModeFunctions<Config::OpenCV>
 {
 public:
     inline __device__
-    bool first_contrast_ok( const float val ) const
+    bool first_contrast_ok( float val ) const
     {
         return ( fabsf( val ) >= floorf( d_consts.threshold ) );
     }
 
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it ) const
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         // OpenCV mode is a special case because d remains unmodified.
         // Either we return 1, and n has not been modified.
@@ -187,7 +187,7 @@ public:
     }
 
     inline __device__
-    int verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         return true;
     }
@@ -204,7 +204,7 @@ public:
     }
 
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it ) const
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         if( last_it ) return 0;
 
@@ -232,7 +232,7 @@ public:
     }
 
     inline __device__
-    int verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         // reject if outside of image bounds or far outside DoG bounds
         return ( ( xn < 0.0f ||
@@ -256,7 +256,7 @@ public:
     }
 
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it ) const
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         if( last_it ) return 0;
 
@@ -284,7 +284,7 @@ public:
     }
 
     inline __device__
-    int verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         // reject if outside of image bounds or far outside DoG bounds
         return ( ( xn < 0.0f ||
@@ -298,16 +298,15 @@ public:
 };
 
 template<int sift_mode>
-__device__ inline
-bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
-                              int                 debug_octave,
-                              int                 width,
-                              int                 height,
-                              const uint32_t      maxlevel,
-                              const float         w_grid_divider,
-                              const float         h_grid_divider,
-                              const int           grid_width,
-                              InitialExtremum&    ec )
+__device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
+                                               int debug_octave,
+                                               int width,
+                                               int height,
+                                               uint32_t maxlevel,
+                                               float w_grid_divider,
+                                               float h_grid_divider,
+                                               int grid_width,
+                                               InitialExtremum& ec)
 {
     ec.xpos    = 0.0f;
     ec.ypos    = 0.0f;
@@ -342,9 +341,9 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
     const float val = readTex( dog, x, y, level );
 
     ModeFunctions<sift_mode> f;
-    if( not f.first_contrast_ok( val ) ) return false;
+    if( ! f.first_contrast_ok( val ) ) return false;
 
-    if( not is_extremum( dog, x-1, y-1, level-1 ) ) {
+    if( ! is_extremum( dog, x-1, y-1, level-1 ) ) {
         // if( debug_octave==0 && level==2 && x==14 && y==73 ) printf("But I fail\n");
         return false;
     }
@@ -423,7 +422,7 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
         b.y = -D.y;
         b.z = -D.z;
 
-        if( solve( A, b ) == false ) {
+        if(!solve(A, b)) {
             d.x = 0;
             d.y = 0;
             d.z = 0;
@@ -463,7 +462,7 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
     const float yn      = n.y + d.y;
     const float sn      = n.z + d.z;
 
-    if( not f.verify( xn, yn, sn, width, height, maxlevel ) ) {
+    if( ! f.verify( xn, yn, sn, width, height, maxlevel ) ) {
         return false;
     }
 
@@ -506,9 +505,6 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
 
 template<int HEIGHT, int sift_mode>
 __global__
-#ifdef NDEBUG
-__launch_bounds__(128,16)
-#endif
 void find_extrema_in_dog( cudaTextureObject_t dog,
                           int                 octave,
                           int                 width,

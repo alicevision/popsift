@@ -1,0 +1,69 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+    # Skip jobs when only documentation files are changed
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["alicevision/popsift-deps:cuda10.2-ubuntu18.04", "alicevision/popsift-deps:cuda11.8.0-ubuntu20.04", "alicevision/popsift-deps:cuda12.1.0-ubuntu22.04"]
+        build_tpe: ["Release", "Debug"]
+        exclude:
+        # excludes debug on this one as it has a segmentation fault during the compilation (!)
+        - container: "alicevision/popsift-deps:cuda12.1.0-ubuntu22.04"
+          build_tpe: "Debug"
+
+    container:
+      image: ${{ matrix.container }}
+
+    env:
+      DEPS_INSTALL_DIR: /opt/
+      BUILD_TYPE: ${{ matrix.build_tpe }}
+      CTEST_OUTPUT_ON_FAILURE: 1
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Prepare File Tree
+        run: |
+          mkdir ./build
+          mkdir ./build_as_3rdparty
+          mkdir ../popsift_install
+
+      - name: Configure CMake
+        working-directory: ./build
+        run: |
+          cmake .. \
+           -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+           -DBUILD_SHARED_LIBS:BOOL=ON \
+           -DCMAKE_PREFIX_PATH="${DEPS_INSTALL_DIR}" \
+           -DPopSift_BUILD_DOCS:BOOL=OFF \
+           -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../../popsift_install
+
+      - name: Build
+        working-directory: ./build
+        run: |
+          make -j$(nproc) install
+
+      - name: Build As Third Party
+        working-directory: ./build_as_3rdparty
+        run: |
+          cmake ../src/application \
+           -DBUILD_SHARED_LIBS:BOOL=ON \
+           -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+           -DCMAKE_PREFIX_PATH:PATH="$PWD/../../popsift_install;${DEPS_INSTALL_DIR}"
+          make -j$(nproc)

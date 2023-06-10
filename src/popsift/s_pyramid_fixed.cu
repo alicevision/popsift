@@ -13,7 +13,7 @@
 #include "common/clamp.h"
 
 #include <iostream>
-#include <stdio.h>
+#include <cstdio>
 
 namespace popsift {
 
@@ -33,11 +33,11 @@ inline float octave_fixed_horiz( float fval, const float* filter )
     float out = fval * filter[0];
     #pragma unroll
     for( int i=1; i<=SHIFT; i++ ) {
-        float val  = __shfl_up( fval, i ) + __shfl_down( fval, i );
+        float val  = popsift::shuffle_up( fval, i ) + popsift::shuffle_down( fval, i );
         out += val * filter[i];
     }
 
-    fval = __shfl_down( out, SHIFT );
+    fval = popsift::shuffle_down( out, SHIFT );
 
     return fval;
 }

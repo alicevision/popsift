@@ -6,13 +6,17 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #pragma once
-
-#include <assert.h>
-#include <inttypes.h>
-#include <errno.h>
-#include <stdlib.h>
 #include <cuda_runtime.h>
+
+#include <cassert>
+#include <cerrno>
+#include <cinttypes>
+#include <cstdlib>
 #include <iostream>
+#include <sstream>
+#include <stdexcept>
+
+#include "debug_macros.h"
 
 #define PLANE2D_CUDA_OP_DEBUG
 
@@ -90,7 +94,7 @@ template <typename T> struct PlaneT : public PlaneBase
     T* data;
 
     __host__ __device__ PlaneT( )      : data(0) { }
-    __host__ __device__ PlaneT( T* d ) : data(d) { }
+    __host__ __device__ explicit PlaneT( T* d ) : data(d) { }
 
     __host__ __device__ inline size_t elemSize() const { return elem_size; }
 };
@@ -104,13 +108,11 @@ template <typename T> struct PlaneT : public PlaneBase
 
 template <typename T> struct PitchPlane2D : public PlaneT<T>
 {
-    int step; // this is the pitch width in bytes!!!
+    __host__ __device__
+    PitchPlane2D( ) : _pitchInBytes(0) { }
 
     __host__ __device__
-    PitchPlane2D( ) : step(0) { }
-
-    __host__ __device__
-    PitchPlane2D( T* d, int s ) : PlaneT<T>(d) , step(s) { }
+    PitchPlane2D( T* d, int s ) : PlaneT<T>(d) , _pitchInBytes(s) { }
 
     /** cuda memcpy from this (plane allocated on host) to
      *  parameter (plane allocated on device) */
@@ -141,16 +143,16 @@ template <typename T> struct PitchPlane2D : public PlaneT<T>
                                        short cols, short rows, cudaStream_t stream );
 
     __host__ __device__ inline const T* ptr( int y ) const {
-        return (const T*)( (const char*)this->data + y * step );
+        return (const T*)( (const char*)this->data + y * _pitchInBytes );
     }
     __host__ __device__ inline       T* ptr( int y )       {
-        return (T*)( (char*)this->data + y * step );
+        return (T*)( (char*)this->data + y * _pitchInBytes );
     }
 
     __host__ inline void allocDev( int w, int h ) {
         size_t pitch;
         this->data = (T*)PlaneBase::allocDev2D( pitch, w, h, this->elemSize() );
-        this->step = pitch;
+        this->_pitchInBytes = pitch;
     }
 
     __host__ inline void freeDev( ) {
@@ -161,14 +163,17 @@ template <typename T> struct PitchPlane2D : public PlaneT<T>
 
     __host__ inline void allocHost( int w, int h, PlaneMapMode mode ) {
         this->data = (T*)PlaneBase::allocHost2D( w, h, this->elemSize(), mode );
-        this->step = w * this->elemSize();
+        this->_pitchInBytes = w * this->elemSize();
     }
 
     __host__ inline void freeHost( PlaneMapMode mode ) {
         PlaneBase::freeHost2D( this->data, mode );
     }
     __host__ __device__
-    inline short getPitch( ) const { return step; }
+    inline size_t getPitchInBytes( ) const { return _pitchInBytes; }
+
+protected:
+    size_t _pitchInBytes; // pitch width in bytes
 };
 
 /*************************************************************
@@ -181,8 +186,8 @@ template <typename T>
 __host__
 inline void PitchPlane2D<T>::memcpyToDevice( PitchPlane2D<T>& devPlane, short cols, short rows )
 {
-    PlaneBase::memcpyToDevice( devPlane.data, devPlane.step,
-                               this->data, this->step,
+    PlaneBase::memcpyToDevice( devPlane.data, devPlane._pitchInBytes,
+                               this->data, this->_pitchInBytes,
                                cols, rows,
                                sizeof(T) );
 }
@@ -191,8 +196,8 @@ template <typename T>
 __host__
 inline void PitchPlane2D<T>::memcpyToDevice( PitchPlane2D<T>& devPlane, short cols, short rows, cudaStream_t stream )
 {
-    PlaneBase::memcpyToDevice( devPlane.data, devPlane.step,
-                               this->data, this->step,
+    PlaneBase::memcpyToDevice( devPlane.data, devPlane._pitchInBytes,
+                               this->data, this->_pitchInBytes,
                                cols, rows,
                                sizeof(T),
                                stream );
@@ -216,8 +221,8 @@ template <typename T>
 __host__
 inline void PitchPlane2D<T>::memcpyFromDevice( PitchPlane2D<T>& devPlane, short cols, short rows )
 {
-    PlaneBase::memcpyToHost( this->data, this->step,
-                             devPlane.data, devPlane.step,
+    PlaneBase::memcpyToHost( this->data, this->_pitchInBytes,
+                             devPlane.data, devPlane._pitchInBytes,
                              cols, rows,
                              sizeof(T) );
 }
@@ -226,8 +231,8 @@ template <typename T>
 __host__
 inline void PitchPlane2D<T>::memcpyFromDevice( PitchPlane2D<T>& devPlane, short cols, short rows, cudaStream_t stream )
 {
-    PlaneBase::memcpyToHost( this->data, this->step,
-                             devPlane.data, devPlane.step,
+    PlaneBase::memcpyToHost( this->data, this->_pitchInBytes,
+                             devPlane.data, devPlane._pitchInBytes,
                              cols, rows,
                              sizeof(T),
                              stream );
@@ -275,7 +280,7 @@ public:
     template <typename U>
     __host__ __device__
     explicit Plane2D( const Plane2D<U>& orig )
-        : PitchPlane2D<T>( (T*)orig.data, orig.step )
+        : PitchPlane2D<T>( (T*)orig.data, orig._pitchInBytes )
         , _rows( orig.getRows() )
     {
         // careful computation: cols is a short
@@ -285,10 +290,18 @@ public:
     }
 
     /** Overwrite the width and height information. Useful if smaller
-     *  planes should be loaded into larger preallocated planes
+     *  planes should be loaded into larger preallocated host planes
      *  without actually allocating again, but dangerous.
+     *  @warning: pitch is updated (host side)
      */
-    __host__ void resetDimensions( int w, int h );
+    __host__ void resetDimensionsHost( int w, int h );
+
+    /** Overwrite the width and height information. Useful if smaller
+     *  planes should be loaded into larger preallocated device planes
+     *  without actually allocating again, but dangerous.
+     *  @warning: pitch is not updated (device side)
+     */
+    __host__ void resetDimensionsDev( int w, int h );
 
     /** cuda memcpy from this (plane allocated on host) to
      *  parameter (plane allocated on device) */
@@ -327,7 +340,7 @@ public:
     __host__ __device__
     inline short getHeight( ) const { return _rows; }
     __host__ __device__
-    inline short getByteSize( ) const { return this->step*_rows; }
+    inline size_t getByteSize( ) const { return this->_pitchInBytes * _rows; }
 
     __host__ inline void allocDev( int w, int h ) {
         _cols = w;
@@ -350,16 +363,29 @@ public:
 
 template <typename T>
 __host__
-void Plane2D<T>::resetDimensions( int w, int h )
+void Plane2D<T>::resetDimensionsHost( int w, int h )
 {
-    if( w*sizeof(T) > this->getPitch() ) {
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
-                  << "    Error: trying to reinterpret plane width to " << w << " units a " << sizeof(T) << " bytes, "
-                     "only " << this->getPitch() << " bytes allocated" << std::endl;
-        exit( -1 );
+    this->_cols = w;
+    this->_rows = h;
+    // on the host side, memory is contiguous (no padding) => pitch must be updated to match data
+    this->_pitchInBytes  = w * this->elemSize();
+}
+
+template <typename T>
+__host__
+void Plane2D<T>::resetDimensionsDev( int w, int h )
+{
+    // validate pitch
+    if( w * this->elemSize() > this->getPitchInBytes() ) {
+        std::stringstream err; 
+        err << __FILE__ << ":" << __LINE__ << std::endl
+        << " Error: trying to reinterpret plane width to " << w << " units a " << sizeof(T) << " bytes, "
+        << "only " << this->getPitchInBytes() << " bytes allocated";
+        throw std::runtime_error(err.str());
     }
     this->_cols = w;
     this->_rows = h;
+    // on the device side, memory is NOT contiguous (CUDA may add padding) => pitch can not be changed without reallocation
 }
 
 template <typename T>
@@ -383,14 +409,16 @@ __host__
 inline void Plane2D<T>::memcpyToDevice( Plane2D<T>& devPlane, cudaStream_t stream )
 {
     if( devPlane._cols != this->_cols ) {
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
-                  << "    Error: source columns (" << this->_cols << ") and dest columns (" << devPlane._cols << ") must be identical" << std::endl;
-        exit( -1 );
+        std::stringstream ss;
+        ss << "Error: source columns (" << this->_cols << ") and dest columns (" << devPlane._cols
+           << ") must be identical";
+        POP_FATAL(ss.str());
     }
     if( devPlane._rows != this->_rows ) {
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl
-                  << "    Error: source rows (" << this->_rows << ") and dest rows (" << devPlane._rows << ") must be identical" << std::endl;
-        exit( -1 );
+        std::stringstream ss;
+        ss << "Error: source rows (" << this->_rows << ") and dest rows (" << devPlane._rows
+           << ") must be identical";
+        POP_FATAL(ss.str());
     }
     PitchPlane2D<T>::memcpyToDevice( devPlane, this->_cols, this->_rows, stream );
 }

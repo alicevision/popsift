@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include "assist.h"
+
 #include <cuda_runtime.h>
 #include <typeinfo>
 
@@ -90,7 +92,7 @@ private:
 
             // This loop is an exclusive prefix sum for one warp
             for( int s=0; s<5; s++ ) {
-                const int add = __shfl_up( ews+self, 1<<s );
+                const int add = popsift::shuffle_up( ews+self, 1<<s );
                 ews += threadIdx.x < (1<<s) ? 0 : add;
             }
 
@@ -107,7 +109,7 @@ private:
                 int self = sum[threadIdx.x];
 
                 for( int s=0; s<5; s++ ) {
-                    const int add = __shfl_up( ebs+self, 1<<s );
+                    const int add = popsift::shuffle_up( ebs+self, 1<<s );
                     ebs += threadIdx.x < (1<<s) ? 0 : add;
                 }
 
@@ -130,6 +132,7 @@ private:
                  */
                 _mapping_writer.set( ebs, self, cell );
             }
+            __syncthreads();
 
             if( threadIdx.y == 0 && threadIdx.x == 31 ) {
                 loop_total += ibs;
@@ -137,12 +140,7 @@ private:
             __syncthreads();
         }
 
-        // if( threadIdx.y == 0 && threadIdx.x == 31 )
-        if( threadIdx.y == 0 )
-        {
-            loop_total = __shfl( loop_total, 31 );
-            _total_writer.set( loop_total );
-        }
+        _total_writer.set( loop_total );
     }
 };
 

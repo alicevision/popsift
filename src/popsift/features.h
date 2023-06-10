@@ -7,16 +7,17 @@
  */
 #pragma once
 
+#include "sift_constants.h"
+
 #include <iostream>
 #include <vector>
-
-#include "sift_constants.h"
 
 namespace popsift {
 
 struct Descriptor; // float features[128];
 
-/* This is a data structure that is returned to a calling program.
+/**
+ * @brief This is a data structure that is returned to a calling program.
  * The xpos/ypos information in feature is scale-adapted.
  */
 struct Feature
@@ -24,9 +25,11 @@ struct Feature
     int         debug_octave;
     float       xpos;
     float       ypos;
-    float       sigma;   // scale;
-    int         num_ori; // number of this extremum's orientations
-                         // remaining entries in desc are 0
+    /// scale
+    float       sigma;
+    /// number of this extremum's orientations
+    /// remaining entries in desc are 0
+    int         num_ori;
     float       orientation[ORIENTATION_MAX_COUNT];
     Descriptor* desc[ORIENTATION_MAX_COUNT];
 
@@ -52,7 +55,8 @@ public:
     inline void    setDescriptorCount( int num_ori ) { _num_ori = num_ori; }
 };
 
-/* This is a data structure that is returned to a calling program.
+/**
+ * @brief This is a data structure that is returned to a calling program.
  * _ori is a transparent flat memory holding descriptors
  * that are referenced by the extrema.
  *
@@ -70,7 +74,7 @@ class FeaturesHost : public FeaturesBase
 public:
     FeaturesHost( );
     FeaturesHost( int num_ext, int num_ori );
-    virtual ~FeaturesHost( );
+    ~FeaturesHost( ) override;
 
     typedef Feature*       F_iterator;
     typedef const Feature* F_const_iterator;
@@ -93,7 +97,7 @@ protected:
     friend class Pyramid;
 };
 
-typedef FeaturesHost Features;
+using Features = FeaturesHost;
 
 std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature );
 
@@ -106,7 +110,7 @@ class FeaturesDev : public FeaturesBase
 public:
     FeaturesDev( );
     FeaturesDev( int num_ext, int num_ori );
-    virtual ~FeaturesDev( );
+    ~FeaturesDev( ) override;
 
     void reset( int num_ext, int num_ori );
 

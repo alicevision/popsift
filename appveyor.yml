@@ -1,0 +1,38 @@
+version: '1.0.{build}'
+
+image: Visual Studio 2015
+
+platform:
+  - x64
+
+configuration:
+  - Release
+  - Debug
+
+#environment:
+#  matrix:
+#    - DBUILD_SHARED_LIBS: 0
+#    - DBUILD_SHARED_LIBS: 1
+
+install:
+    - cmd: >-
+          call cudaInstallAppveyor.cmd
+    - vcpkg upgrade --no-dry-run
+    - vcpkg install
+          boost-system boost-program-options boost-thread boost-filesystem
+          --triplet %PLATFORM%-windows
+          # devil
+
+before_build:
+    - md build
+    - cd build
+    - cmake -G "Visual Studio 14 2015" -A x64 -T v140,host=x64 -DBUILD_SHARED_LIBS=%DBUILD_SHARED_LIBS% -DPopSift_BUILD_DOCS:BOOL=OFF -DPopSift_USE_POSITION_INDEPENDENT_CODE:BOOL=%DBUILD_SHARED_LIBS% -DPopSift_BUILD_EXAMPLES:BOOL=ON -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_TOOLCHAIN_FILE=c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake ..
+    - ls -l
+
+build:
+  verbosity: detailed
+  project: $(APPVEYOR_BUILD_FOLDER)\build\PopSift.sln
+  parallel: true
+
+cache:
+  - c:\tools\vcpkg\installed\

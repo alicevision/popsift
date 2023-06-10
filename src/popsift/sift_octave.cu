@@ -5,22 +5,23 @@
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
-#include <sstream>
+
+#include "common/clamp.h"
+#include "common/debug_macros.h"
+#include "common/write_plane_2d.h"
+#include "sift_constants.h"
+#include "sift_octave.h"
+#include "sift_pyramid.h"
+
 #include <sys/stat.h>
+
+#include <new> // for placement new
+#include <sstream>
 #ifdef _WIN32
 #include <direct.h>
 #define stat _stat
 #define mkdir(name, mode) _mkdir(name)
 #endif
-
-#include <new> // for placement new
-
-#include "sift_pyramid.h"
-#include "sift_constants.h"
-#include "common/debug_macros.h"
-#include "common/clamp.h"
-#include "common/write_plane_2d.h"
-#include "sift_octave.h"
 
 using namespace std;
 
@@ -219,14 +220,14 @@ void Octave::alloc_data_tex()
 {
     cudaError_t err;
 
-    cudaResourceDesc res_desc;
+    cudaResourceDesc res_desc{};
     res_desc.resType = cudaResourceTypeArray;
     res_desc.res.array.array = _data;
 
     err = cudaCreateSurfaceObject(&_data_surf, &res_desc);
     POP_CUDA_FATAL_TEST(err, "Could not create Blur data surface: ");
 
-    cudaTextureDesc      tex_desc;
+    cudaTextureDesc      tex_desc{};
 
     memset(&tex_desc, 0, sizeof(cudaTextureDesc));
     tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
@@ -236,7 +237,7 @@ void Octave::alloc_data_tex()
     tex_desc.readMode         = cudaReadModeElementType; // read as float
     tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
 
-    err = cudaCreateTextureObject( &_data_tex_point, &res_desc, &tex_desc, 0 );
+    err = cudaCreateTextureObject( &_data_tex_point, &res_desc, &tex_desc, nullptr );
     POP_CUDA_FATAL_TEST(err, "Could not create Blur data point texture: ");
 
     memset(&tex_desc, 0, sizeof(cudaTextureDesc));
@@ -247,7 +248,7 @@ void Octave::alloc_data_tex()
     tex_desc.readMode         = cudaReadModeElementType; // read as float
     tex_desc.filterMode       = cudaFilterModeLinear; // no interpolation
 
-    err = cudaCreateTextureObject( &_data_tex_linear.tex, &res_desc, &tex_desc, 0 );
+    err = cudaCreateTextureObject( &_data_tex_linear.tex, &res_desc, &tex_desc, nullptr );
     POP_CUDA_FATAL_TEST(err, "Could not create Blur data point texture: ");
 }
 
@@ -298,14 +299,14 @@ void Octave::alloc_interm_tex()
 {
     cudaError_t err;
 
-    cudaResourceDesc res_desc;
+    cudaResourceDesc res_desc{};
     res_desc.resType = cudaResourceTypeArray;
     res_desc.res.array.array = _intm;
 
     err = cudaCreateSurfaceObject(&_intm_surf, &res_desc);
     POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate surface: ");
 
-    cudaTextureDesc      tex_desc;
+    cudaTextureDesc      tex_desc{};
 
     memset(&tex_desc, 0, sizeof(cudaTextureDesc));
     tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
@@ -315,12 +316,12 @@ void Octave::alloc_interm_tex()
     tex_desc.readMode         = cudaReadModeElementType; // read as float
     tex_desc.filterMode       = cudaFilterModePoint; // no interpolation
 
-    err = cudaCreateTextureObject( &_intm_tex_point, &res_desc, &tex_desc, 0 );
+    err = cudaCreateTextureObject( &_intm_tex_point, &res_desc, &tex_desc, nullptr );
     POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate point texture: ");
 
     tex_desc.filterMode       = cudaFilterModeLinear; // no interpolation
 
-    err = cudaCreateTextureObject( &_intm_tex_linear.tex, &res_desc, &tex_desc, 0 );
+    err = cudaCreateTextureObject( &_intm_tex_linear.tex, &res_desc, &tex_desc, nullptr );
     POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate point texture: ");
 }
 
@@ -371,14 +372,14 @@ void Octave::alloc_dog_tex()
 {
         cudaError_t err;
 
-        cudaResourceDesc dog_res_desc;
+        cudaResourceDesc dog_res_desc{};
         dog_res_desc.resType = cudaResourceTypeArray;
         dog_res_desc.res.array.array = _dog_3d;
 
         err = cudaCreateSurfaceObject(&_dog_3d_surf, &dog_res_desc);
         POP_CUDA_FATAL_TEST(err, "Could not create DoG surface: ");
 
-        cudaTextureDesc      dog_tex_desc;
+        cudaTextureDesc      dog_tex_desc{};
         memset(&dog_tex_desc, 0, sizeof(cudaTextureDesc));
         dog_tex_desc.normalizedCoords = 0; // addressed (x,y) in [width,height]
         dog_tex_desc.addressMode[0] = cudaAddressModeClamp;

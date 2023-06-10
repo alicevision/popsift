@@ -5,14 +5,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdio.h>
-#include <iso646.h>
-
-#include "sift_constants.h"
-#include "s_gradiant.h"
-#include "s_desc_grid.h"
 #include "common/assist.h"
 #include "common/vec_macros.h"
+#include "s_desc_grid.h"
+#include "s_gradiant.h"
+#include "sift_constants.h"
+
+#include <cstdio>
 
 using namespace popsift;
 
@@ -108,12 +107,12 @@ void ext_desc_grid_sub( const int           ix,
 
     /* reduction here */
     for (int i = 0; i < 8; i++) {
-        // dpt[i] += __shfl_down( dpt[i], 16 );
-        dpt[i] += __shfl_down( dpt[i], 8, 16 );
-        dpt[i] += __shfl_down( dpt[i], 4, 16 );
-        dpt[i] += __shfl_down( dpt[i], 2, 16 );
-        dpt[i] += __shfl_down( dpt[i], 1, 16 );
-        dpt[i]  = __shfl     ( dpt[i], 0, 16 );
+        // dpt[i] += popsift::shuffle_down( dpt[i], 16 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 8, 16 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 4, 16 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 2, 16 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 1, 16 );
+        dpt[i]  = popsift::shuffle     ( dpt[i], 0, 16 );
     }
 
 
@@ -122,9 +121,7 @@ void ext_desc_grid_sub( const int           ix,
     }
 }
 
-__global__
-void ext_desc_grid( const int           octave,
-                    cudaTextureObject_t layer_tex )
+__global__ void ext_desc_grid(int octave, cudaTextureObject_t layer_tex)
 {
     const int   o_offset =  dct.ori_ps[octave] + blockIdx.x;
     const int   ix       = threadIdx.y;

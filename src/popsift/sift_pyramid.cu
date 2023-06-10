@@ -5,24 +5,27 @@
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
-#include <iostream>
+
+#include "common/assist.h"
+#include "common/debug_macros.h"
+#include "sift_config.h"
+#include "sift_extremum.h"
+#include "sift_pyramid.h"
+
+#include <sys/stat.h>
+
+#include <cstdio>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <vector>
-#include <stdio.h>
-#include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
 #define stat _stat
 #define mkdir(path, perm) _mkdir(path)
 #endif
 
-#include "sift_pyramid.h"
-#include "sift_extremum.h"
-#include "common/debug_macros.h"
-#include "common/assist.h"
-
-#ifdef USE_NVTX
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvToolsExtCuda.h>
 #else
 #define nvtxRangePushA(a)
@@ -35,18 +38,15 @@ using namespace std;
 
 namespace popsift {
 
-__device__
-ExtremaCounters dct;
-ExtremaCounters hct;
+__device__ ExtremaCounters   dct;
+thread_local ExtremaCounters hct;
 
-__device__
-ExtremaBuffers  dbuf;
-ExtremaBuffers  dbuf_shadow; // just for managing memories
-ExtremaBuffers  hbuf;
+__device__ ExtremaBuffers   dbuf;
+thread_local ExtremaBuffers dbuf_shadow; // just for managing memories
+thread_local ExtremaBuffers hbuf;
 
-__device__
-DevBuffers      dobuf;
-DevBuffers      dobuf_shadow; // just for managing memories
+__device__ DevBuffers       dobuf;
+thread_local DevBuffers     dobuf_shadow; // just for managing memories
 
 __global__
     void py_print_corner_float(float* img, uint32_t pitch, uint32_t height, uint32_t level)
@@ -141,8 +141,8 @@ Pyramid::Pyramid( const Config& config,
         dobuf_shadow.i_ext_off[o] = dobuf_shadow.i_ext_off[0] + (o*h_consts.max_extrema);
     }
     for (int o = _num_octaves; o<MAX_OCTAVES; o++) {
-        dobuf_shadow.i_ext_dat[o] = 0;
-        dobuf_shadow.i_ext_off[o] = 0;
+        dobuf_shadow.i_ext_dat[o] = nullptr;
+        dobuf_shadow.i_ext_off[o] = nullptr;
     }
 
     sz = h_consts.max_extrema;
@@ -212,6 +212,7 @@ Pyramid::~Pyramid()
 {
     cudaStreamDestroy( _download_stream );
 
+    cudaFree(     _d_extrema_num_blocks );
     cudaFree(     dobuf_shadow.i_ext_dat[0] );
     cudaFree(     dobuf_shadow.i_ext_off[0] );
     cudaFree(     dobuf_shadow.features );
@@ -273,7 +274,7 @@ void prep_features( Descriptor* descriptor_base, int up_fac )
         fet.orientation[ori] = ext.orientation[ori];
     }
     for( ; ori<ORIENTATION_MAX_COUNT; ori++ ) {
-        fet.desc[ori]        = 0;
+        fet.desc[ori]        = nullptr;
         fet.orientation[ori] = 0;
     }
 }
@@ -287,7 +288,7 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
     nvtxRangePushA( "download descriptors" );
     FeaturesHost* features = new FeaturesHost( hct.ext_total, hct.ori_total );
 
-    if( hct.ext_total == 0 )
+    if( hct.ext_total == 0 || hct.ori_total == 0 )
     {
         nvtxRangePop();
         return features;
@@ -432,8 +433,9 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* 
                      << 1.0f / (sigma * sigma) << " ";
 
             if (really) {
-                for (int i = 0; i<128; i++) {
-                    ostr << desc.features[i] << " ";
+                for (float feature : desc.features)
+                {
+                    ostr << feature << " ";
                 }
             }
             ostr << endl;
