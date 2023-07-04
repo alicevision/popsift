@@ -259,7 +259,11 @@ void prep_features( Descriptor* descriptor_base, int up_fac )
     const float xpos    = ext.xpos  * powf(2.0f, float(octave - up_fac));
     const float ypos    = ext.ypos  * powf(2.0f, float(octave - up_fac));
     const float sigma   = ext.sigma * powf(2.0f, float(octave - up_fac));
-    const int   num_ori = ext.num_ori;
+    int   num_ori = ext.num_ori;
+
+    if( ext.idx_ori + num_ori > dct.ori_total ) {
+        num_ori = max(dct.ori_total - ext.idx_ori, 0);
+    }
 
     fet.xpos    = xpos;
     fet.ypos    = ypos;
