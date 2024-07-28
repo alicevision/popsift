@@ -154,9 +154,9 @@ void FeaturesDev::reset( int num_ext, int num_ori )
     if( _ori != nullptr ) { cudaFree( _ori ); _ori = nullptr; }
     if( _rev != nullptr ) { cudaFree( _rev ); _rev = nullptr; }
 
-    _ext = popsift::cuda::malloc_devT<Feature>   ( num_ext, __FILE__, __LINE__ );
-    _ori = popsift::cuda::malloc_devT<Descriptor>( num_ori, __FILE__, __LINE__ );
-    _rev = popsift::cuda::malloc_devT<int>       ( num_ori, __FILE__, __LINE__ );
+    _ext = popsift::cuda::malloc_mgdT<Feature>   ( num_ext, __FILE__, __LINE__ );
+    _ori = popsift::cuda::malloc_mgdT<Descriptor>( num_ori, __FILE__, __LINE__ );
+    _rev = popsift::cuda::malloc_mgdT<int>       ( num_ori, __FILE__, __LINE__ );
 
     setFeatureCount( num_ext );
     setDescriptorCount( num_ori );
@@ -248,17 +248,25 @@ show_distance( int3*       match_matrix,
 	if( threadIdx.x == 0 )
         {
             if( match_matrix[i].z )
-                printf( "accept feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f\n",
+            {
+                Feature* lx = &l_ext[l_fem[i]];
+                Feature* rx = &r_ext[r_fem[match_matrix[i].x]];
+                printf( "accept feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f"
+                        " (%.1f,%.1f)-(%.1f,%.1f)\n",
                         l_fem[i], i,
                         r_fem[match_matrix[i].x], match_matrix[i].x,
                         r_fem[match_matrix[i].y], match_matrix[i].y,
-                        d1, d2 );
+                        d1, d2,
+                        lx->xpos, lx->ypos, rx->xpos, rx->ypos );
+            }
 	    else
+            {
                 printf( "reject feat %4d [%4d] matches feat %4d [%4d] ( 2nd feat %4d [%4d] ) dist %.3f vs %.3f\n",
                         l_fem[i], i,
                         r_fem[match_matrix[i].x], match_matrix[i].x,
                         r_fem[match_matrix[i].y], match_matrix[i].y,
                         d1, d2 );
+        }
         }
         __syncthreads();
     }
@@ -301,6 +309,54 @@ void FeaturesDev::match( FeaturesDev* other )
     POP_SYNC_CHK;
 
     cudaFree( match_matrix );
+}
+
+int3* FeaturesDev::matchAndReturn( FeaturesDev* other )
+{
+    int l_len = getDescriptorCount( );
+    int r_len = other->getDescriptorCount( );
+
+    int3* match_matrix = popsift::cuda::malloc_mgdT<int3>( l_len, __FILE__, __LINE__ );
+
+    dim3 grid;
+    grid.x = l_len;
+    grid.y = 1;
+    grid.z = 1;
+    dim3 block;
+    block.x = 32;
+    block.y = 1;
+    block.z = 1;
+
+    compute_distance
+        <<<grid,block>>>
+        ( match_matrix, getDescriptors(), l_len, other->getDescriptors(), r_len );
+
+    return match_matrix;
+}
+
+void FeaturesDev::freeMatches( int3* match_matrix )
+{
+    popsift::cuda::free_mgd( match_matrix );
+}
+
+Descriptor* FeaturesDev::getDescriptor( int descIndex )
+{
+    return &_ori[descIndex];
+}
+
+const Descriptor* FeaturesDev::getDescriptor( int descIndex ) const
+{
+    return &_ori[descIndex];
+}
+
+Feature* FeaturesDev::getFeatureForDescriptor( int descIndex )
+{
+    return &_ext[_rev[descIndex]];
+}
+
+const Feature* FeaturesDev::getFeatureForDescriptor( int descIndex ) const
+{
+    return &_ext[_rev[descIndex]];
 }
 
 /*************************************************************
