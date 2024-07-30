@@ -123,101 +123,30 @@ template<int sift_mode>
 class ModeFunctions
 {
 public:
-    inline __device__
-    bool first_contrast_ok( float val ) const;
-
     /* refine
-     * returns -1 : break loop and fail
-     *          0 : continue looping
-     *          1 : break loop and succeed
+     * returns 0 : continue looping
+     *         1 : break loop and succeed
      */
     inline __device__
     int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it );
-
-    /*
-     * returns true  : values after refine make sense
-     *         false : they do not
-     */
-    inline __device__
-    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const;
 };
 
 template<>
-class ModeFunctions<Config::OpenCV>
+class ModeFunctions<Config::RefineInLevel>
 {
 public:
-    inline __device__
-    bool first_contrast_ok( float val ) const
-    {
-        return ( fabsf( val ) >= floorf( d_consts.threshold ) );
-    }
-
-    inline __device__
-    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
-    {
-        // OpenCV mode is a special case because d remains unmodified.
-        // Either we return 1, and n has not been modified.
-        // Or we quit the loop by exceeding the limit, and reject the point anyway.
-
-        const float3 t = make_float3( fabsf(d.x), fabsf(d.y), fabsf(d.z) );
-
-        if( t.x < 0.5f && t.y < 0.5f && t.z < 0.5f ) {
-            // return false, quit the loop, success
-            return 1;
-        }
-
-        // This test in OpenCV is totally useless in CUDA because the thread
-        // would simply idle before failing 7 instructions below anyway.
-        // if( t.x > (float)(INT_MAX/3) || t.y > (float)(INT_MAX/3) || t.z > (float)(INT_MAX/3) ) {
-            // return false, quit the loop, fail
-            // return -1;
-        // }
-
-        n.x += roundf( d.x );  // choose rintf or roundf
-        n.y += roundf( d.y );  // rintf is quicker, roundf is more exact
-        n.z += roundf( d.z );
-
-        const int retval = ( n.x < 5 || n.x >= width-5 ||
-                             n.y < 5 || n.y >= height-5 ||
-                             n.z < 1 || n.z > maxlevel-2 ) ? -1 : 0;
-            // if outside of all DoG images (minus border),
-            // quit the loop, fail
-
-        return retval;
-    }
-
-    inline __device__
-    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
-    {
-        return true;
-    }
-};
-
-template<>
-class ModeFunctions<Config::VLFeat>
-{
-public:
-    inline __device__
-    bool first_contrast_ok( const float val ) const
-    {
-        return ( fabsf( val ) >= 0.8f * 2.0f * d_consts.threshold );
-    }
-
     inline __device__
     int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         if( last_it ) return 0;
 
-        float2 t;
+        int2 t;
 
-        t.x = ((d.x >= 0.6f && n.x < width-2) ?  1.0f : 0.0f )
-            + ((d.x <= -0.6f && n.x > 1)? -1.0f : 0.0f );
+        t.x = ((d.x >=  0.6f && n.x < width-2) ?  1 : 0 )
+            + ((d.x <= -0.6f && n.x > 1)       ? -1 : 0 );
 
-        t.y = ((d.y >= 0.6f && n.y < height-2)  ?  1.0f : 0.0f )
-            + ((d.y <= -0.6f && n.y > 1) ? -1.0f : 0.0f );
-
-        // t.z = ((d.z >= 0.6f && n.z < maxlevel-1)  ?  1 : 0 )
-            // + ((d.z <= -0.6f && n.z > 1) ? -1 : 0 );
+        t.y = ((d.y >=  0.6f && n.y < height-2)  ?  1 : 0 )
+            + ((d.y <= -0.6f && n.y > 1)         ? -1 : 0 );
 
         if( t.x == 0 && t.y == 0 ) {
             // no more changes
@@ -230,31 +159,12 @@ public:
 
         return 0;
     }
-
-    inline __device__
-    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
-    {
-        // reject if outside of image bounds or far outside DoG bounds
-        return ( ( xn < 0.0f ||
-                   xn > width - 1.0f ||
-                   yn < 0.0f ||
-                   yn > height - 1.0f ||
-                   sn < 0.0f ||
-                   sn > maxlevel ) ? false
-                                   : true );
-    }
 };
 
 template<>
-class ModeFunctions<Config::PopSift>
+class ModeFunctions<Config::RefineInOctave>
 {
 public:
-    inline __device__
-    bool first_contrast_ok( const float val ) const
-    {
-        return ( fabsf( val ) >= 1.6f * d_consts.threshold );
-    }
-
     inline __device__
     int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
@@ -282,20 +192,31 @@ public:
 
         return 0;
     }
-
-    inline __device__
-    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
-    {
-        // reject if outside of image bounds or far outside DoG bounds
-        return ( ( xn < 0.0f ||
-                   xn > width - 1.0f ||
-                   yn < 0.0f ||
-                   yn > height - 1.0f ||
-                   sn < -0.0f ||
-                   sn > maxlevel ) ? false
-                                   : true );
-    }
 };
+
+__device__ inline static
+bool first_contrast_ok( const float val )
+{
+    return ( fabsf( val ) >= 1.6f * d_consts.threshold );
+}
+
+/** verify() checks whether a refine position is outside the image boundaries or
+ *  outside the DoG boundaries.
+ *  returns true  : values after refine make sense
+ *          false : they do not
+ */
+__device__ inline static
+bool verify( float xn, float yn, float sn, int width, int height, int maxlevel )
+{
+    // reject if outside of image bounds or far outside DoG bounds
+    return ( ( xn < 0.0f ||
+               xn > width - 1.0f ||
+               yn < 0.0f ||
+               yn > height - 1.0f ||
+               sn < -0.0f ||
+               sn > maxlevel ) ? false
+                               : true );
+}
 
 template<int sift_mode>
 __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
@@ -332,16 +253,10 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
     const int x       = block_x + threadIdx.x + 1;
     const int level   = block_z + 1;
 
-    if( sift_mode == Config::OpenCV ) {
-        if( x < 5 || y < 5 || x >= width-5 || y >= height-5 ) {
-            return false;
-        }
-    }
-
     const float val = readTex( dog, x, y, level );
 
     ModeFunctions<sift_mode> f;
-    if( ! f.first_contrast_ok( val ) ) return false;
+    if( ! first_contrast_ok( val ) ) return false;
 
     if( ! is_extremum( dog, x-1, y-1, level-1 ) ) {
         // if( debug_octave==0 && level==2 && x==14 && y==73 ) printf("But I fail\n");
@@ -436,33 +351,22 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
          */
         const int retval = f.refine( d, n, width, height, maxlevel, iter==MAX_ITERATIONS );
 
-        if( retval == -1 ) {
-            return false;
-        } else if( retval == 1 ) {
+        if( retval == 1 ) {
             break;
         }
     }
     while( iter < MAX_ITERATIONS ); /* go to next iter */
 
-    if (iter >= MAX_ITERATIONS) {
-        if( sift_mode == Config::OpenCV ) {
-            /* ensure convergence of interpolation */
-            return false;
-        }
-    }
-
-    if( sift_mode == Config::PopSift || sift_mode == Config::VLFeat ) {
-        if( d.x >= 1.5f || d.y >= 1.5f || d.z >= 1.5f ) {
-            // excessive pixel movement in at least dimension, reject
-            return false;
-        }
+    if( d.x >= 1.5f || d.y >= 1.5f || d.z >= 1.5f ) {
+        // excessive pixel movement in at least dimension, reject
+        return false;
     }
 
     const float xn      = n.x + d.x;
     const float yn      = n.y + d.y;
     const float sn      = n.z + d.z;
 
-    if( ! f.verify( xn, yn, sn, width, height, maxlevel ) ) {
+    if( ! verify( xn, yn, sn, width, height, maxlevel ) ) {
         return false;
     }
 
@@ -471,9 +375,6 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
     const float tr      = DD.x + DD.y;
     const float det     = DD.x * DD.y - DX.x * DX.x;
     const float edgeval = tr * tr / det;
-
-    // redundant check, verify() is stricter
-    // if( sift_mode == Config::PopSift && iter >= MAX_ITERATIONS && ( sn<0 || sn>maxlevel) ) { return false; }
 
     /* negative determinant => curvatures have different signs -> reject it */
     if (det <= 0.0f) {
@@ -580,32 +481,12 @@ void Pyramid::find_extrema( const Config& conf )
 
         int*  num_blocks      = extrema_num_blocks;
 
-#ifdef USE_DOG_TEX_LINEAR
-#define getDogTexture getDogTextureLinear
-#else
-#define getDogTexture getDogTexturePoint
-#endif
         switch( conf.getSiftMode() )
         {
-        case Config::VLFeat :
-                find_extrema_in_dog<HEIGHT,Config::VLFeat>
+        case Config::RefineInLevel :
+                find_extrema_in_dog<HEIGHT,Config::RefineInLevel>
                     <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
-                      octave,
-                      cols,
-                      rows,
-                      _levels-1,
-                      num_blocks,
-                      grid.x * grid.y,
-                      oct_obj.getWGridDivider(),
-                      oct_obj.getHGridDivider(),
-                      conf.getFilterGridSize() );
-                POP_SYNC_CHK;
-                break;
-        case Config::OpenCV :
-                find_extrema_in_dog<HEIGHT,Config::OpenCV>
-                    <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
+                    ( oct_obj.getDogTexturePoint( ),
                       octave,
                       cols,
                       rows,
@@ -618,9 +499,9 @@ void Pyramid::find_extrema( const Config& conf )
                 POP_SYNC_CHK;
                 break;
         default :
-                find_extrema_in_dog<HEIGHT,Config::PopSift>
+                find_extrema_in_dog<HEIGHT,Config::RefineInOctave>
                     <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
+                    ( oct_obj.getDogTexturePoint( ),
                       octave,
                       cols,
                       rows,
@@ -633,7 +514,6 @@ void Pyramid::find_extrema( const Config& conf )
                 POP_SYNC_CHK;
                 break;
         }
-#undef getDogTexture
 
         cuda::event_record( oct_obj.getEventExtremaDone(), oct_str, __FILE__, __LINE__ );
     }
