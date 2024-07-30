@@ -61,25 +61,11 @@ struct GaussInfo
      */
     GaussTable<GAUSS_LEVELS> inc;
 
-    /* Compute the 1D Gauss tables for all levels of octave 0.
-     * For octave 0, all of these tables derive from the input
-     * image.
+    /* This is the 1D Gauss table for filtering the input image.
+     * The input image is downscaled and blurred with sigma or by
+     * blurring the input image with 2*sigma and downscaling afterwards.
      */
-    GaussTable<GAUSS_LEVELS> abs_o0;
-
-    /* Compute the 1D Gauss tables for all levels of octaves 1 and up.
-     * Level 0 is empty, since it is created by other means.
-     * All other levels blur from level 0, not considering any
-     * initial blur.
-     */
-    GaussTable<GAUSS_LEVELS> abs_oN;
-
-    /* In theory, level 0 of octave 2 contains the same information
-     * whether it is constructed by downscaling and blurring the
-     * input image with sigma or by blurring the input image with 2*sigma
-     * and downscaling afterwards.
-     */
-    GaussTable<MAX_OCTAVES> dd;
+    GaussTable<1> dd;
 
     __host__
     void clearTables( );
@@ -99,9 +85,6 @@ private:
 
     __host__
     static int vlFeatRelativeSpan( float sigma );
-
-    __host__
-    static int openCVSpan( float sigma );
 };
 
 extern __device__ __constant__ GaussInfo d_gauss;

@@ -67,42 +67,7 @@ void print_gauss_filter_symbol( int columns )
 
     printf( "\n"
             "Gauss tables\n"
-            "      level span sigma : center value -> edge value\n"
-            "      absolute filters octave 0 (compute level 0, all other levels directly from level 0)\n");
-
-    for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
-        int span = d_gauss.abs_o0.span[lvl] + d_gauss.abs_o0.span[lvl] - 1;
-
-        printf("      %d %d %2.6f: ", lvl, span, d_gauss.abs_o0.sigma[lvl] );
-        int m = min( d_gauss.abs_o0.span[lvl], columns );
-        for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.abs_o0.filter[lvl*GAUSS_ALIGN+x] );
-        }
-        if( m < d_gauss.abs_o0.span[lvl] )
-            printf("...\n");
-        else
-            printf("\n");
-    }
-    printf( "\n"
-            "      absolute filters other octaves\n"
-            "      (level 0 via downscaling, all other levels directly from level 0)\n");
-
-    for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
-        int span = d_gauss.abs_oN.span[lvl] + d_gauss.abs_oN.span[lvl] - 1;
-
-        printf("      %d %d %2.6f: ", lvl, span, d_gauss.abs_oN.sigma[lvl] );
-        int m = min( d_gauss.abs_oN.span[lvl], columns );
-        for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.abs_oN.filter[lvl*GAUSS_ALIGN+x] );
-        }
-        if( m < d_gauss.abs_oN.span[lvl] )
-            printf("...\n");
-        else
-            printf("\n");
-    }
-    printf("\n");
-
-    printf("    level 0-filters for direct downscaling\n");
+            "    level 0-filters for direct downscaling\n");
 
     for( int lvl=0; lvl<MAX_OCTAVES; lvl++ ) {
         int span = d_gauss.dd.span[lvl] + d_gauss.dd.span[lvl] - 1;
@@ -187,33 +152,6 @@ void init_filter( const Config& conf,
 
     h_gauss.inc.computeBlurTable( &h_gauss );
 
-    /* abs_o0 :
-     * Gauss table to create octave 0 of the absolute filters directly from
-     * input images.
-     */
-    for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
-        const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl)/(float)levels );
-        h_gauss.abs_o0.sigma[lvl]  = sqrt( fabs( sigmaS * sigmaS - initial_blur * initial_blur ) );
-    }
-
-    h_gauss.abs_o0.computeBlurTable( &h_gauss );
-
-    /* abs_oN :
-     * Gauss tables to create levels 1 and above directly from level 0 of every
-     * octave. Could be used on octave 0, but abs_o0 is better.
-     * Level 0 must be created by other means (downscaling from previous octave,
-     * direct downscaling from input image, ...) before using abs_oN.
-     * 
-     */
-    h_gauss.abs_oN.sigma[0] = 0;
-    for( int lvl=1; lvl<h_gauss.required_filter_stages; lvl++ ) {
-        const float sigmaP = sigma0; // level 0 has already reached sigma0 blur
-        const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl)/(float)levels );
-        h_gauss.abs_oN.sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
-    }
-
-    h_gauss.abs_oN.computeBlurTable( &h_gauss );
-
     /* dd :
      * The direct-downscaling kernels make use of the assumption that downscaling
      * from MAX_LEVEL-3 is identical to applying 2*sigma on the identical image
@@ -224,17 +162,13 @@ void init_filter( const Config& conf,
      * octaves, where it is also good for performance.
      * dd is only for creating level 0 of all octave directly from the input image.
      */
-    for( int oct=0; oct<MAX_OCTAVES; oct++ ) {
-        // sigma * 2^i
-        float oct_sigma = scalbnf( sigma0, oct );
 
-        // subtract initial blur
-        float b = sqrt( fabs( oct_sigma * oct_sigma - initial_blur * initial_blur ) );
+    // subtract initial blur
+    const float b = sqrt( fabs( sigma0 * sigma0 - initial_blur * initial_blur ) );
 
-        // sigma / 2^i
-        h_gauss.dd.sigma[oct] = scalbnf( b, -oct );
-        h_gauss.dd.computeBlurTable( &h_gauss );
-    }
+    // sigma / 2^i
+    h_gauss.dd.sigma[0] = b;
+    h_gauss.dd.computeBlurTable( &h_gauss );
 
     cudaError_t err;
     err = cudaMemcpyToSymbol( d_gauss,
@@ -260,8 +194,6 @@ __host__
 void GaussInfo::clearTables( )
 {
     inc            .clearTables();
-    abs_o0         .clearTables();
-    abs_oN         .clearTables();
     dd             .clearTables();
 }
 
@@ -276,20 +208,10 @@ int GaussInfo::getSpan( float sigma ) const
 {
     switch( _span_mode )
     {
-    case Config::VLFeat_Relative_All :
-        // return GaussInfo::vlFeatRelativeSpan( sigma );
-        return GaussInfo::vlFeatSpan( sigma );
-
     case Config::VLFeat_Compute :
         return GaussInfo::vlFeatSpan( sigma );
     case Config::VLFeat_Relative :
         return GaussInfo::vlFeatRelativeSpan( sigma );
-    case Config::OpenCV_Compute :
-        return GaussInfo::openCVSpan( sigma );
-    case Config::Fixed9 :
-        return 5;
-    case Config::Fixed15 :
-        return 8;
     default :
         stringstream ss;
         ss << "ERROR: The mode for computing Gauss filter scan is invalid";
@@ -315,15 +237,6 @@ int GaussInfo::vlFeatRelativeSpan( float sigma )
     int spn = vlFeatSpan( sigma );
     if( ( spn & 1 ) == 0 ) spn += 1;
     return spn;
-}
-
-__host__
-int GaussInfo::openCVSpan( float sigma )
-{
-    int span = int( roundf( 2.0f * 4.0f * sigma + 1.0f ) ) | 1;
-    span >>= 1;
-    span  += 1;
-    return std::min<int>( span, GAUSS_ALIGN - 1 );
 }
 
 template<int LEVELS>
