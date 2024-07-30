@@ -23,9 +23,8 @@ Config::Config( )
     , _edge_limit( 10.0f )
     , _threshold( 0.04 ) // ( 10.0f / 256.0f )
     , _gauss_mode( getGaussModeDefault() )
-    , _sift_mode( Config::PopSift )
+    , _sift_mode( Config::RefineInOctave )
     , _log_mode( Config::None )
-    , _scaling_mode( Config::ScaleDefault )
     , _desc_mode( Config::Loop )
     , _grid_filter_mode( Config::RandomScale )
     , verbose( false )
@@ -89,14 +88,6 @@ void Config::setGaussMode( const std::string& m )
         setGaussMode( Config::VLFeat_Relative );
     else if( m == "relative" )
         setGaussMode( Config::VLFeat_Relative );
-    else if( m == "vlfeat-direct" )
-        setGaussMode( Config::VLFeat_Relative_All );
-    else if( m == "opencv" )
-        setGaussMode( Config::OpenCV_Compute );
-    else if( m == "fixed9" )
-        setGaussMode( Config::Fixed9 );
-    else if( m == "fixed15" )
-        setGaussMode( Config::Fixed15 );
     else
         POP_FATAL( string("Bad Gauss mode.\n") + getGaussModeUsage() );
 }
@@ -113,10 +104,6 @@ const char* Config::getGaussModeUsage( )
         "Options are: "
         "vlfeat (default), "
         "vlfeat-hw-interpolated, "
-        "vlfeat-direct, "
-        "opencv, "
-        "fixed9, "
-        "fixed15, "
         "relative (synonym for vlfeat-hw-interpolated)";
 }
 
@@ -159,11 +146,6 @@ void Config::setLogMode( LogMode mode )
 Config::LogMode Config::getLogMode( ) const
 {
     return _log_mode;
-}
-
-void Config::setScalingMode( ScalingMode mode )
-{
-    _scaling_mode = mode;
 }
 
 /**
@@ -292,7 +274,6 @@ bool Config::equal( const Config& other ) const
         COMPARE( _edge_limit ) ||
         COMPARE( _threshold ) ||
         COMPARE( _upscale_factor ) ||
-        COMPARE( _scaling_mode ) ||
         COMPARE( _max_extrema ) ||
         COMPARE( _gauss_mode ) ||
         COMPARE( _sift_mode ) ||

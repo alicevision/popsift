@@ -79,9 +79,7 @@ class Pyramid
 public:
     enum GaussTableChoice {
         Interpolated_FromPrevious,
-        Interpolated_FromFirst,
         NotInterpolated_FromPrevious,
-        NotInterpolated_FromFirst
     };
 
 public:
@@ -114,32 +112,19 @@ public:
     inline Octave& getOctave(const int o){ return _octaves[o]; }
 
 private:
-    inline void horiz_from_input_image( const Config&    conf,
-                                        ImageBase*       base,
-					                    int              octave,
-					                    cudaStream_t     stream );
-    inline void horiz_level_from_input_image( const Config&    conf,
-                                              ImageBase*       base,
-					                          int              octave,
-                                              int              level,
-					                          cudaStream_t     stream );
-    inline void horiz_all_from_input_image( const Config&    conf,
-                                            ImageBase*       base,
-                                            int              octave,
-                                            int              startlevel,
-                                            int              maxlevel,
-                                            cudaStream_t     stream );
-    inline void downscale_from_prev_octave( int octave, cudaStream_t stream, Config::SiftMode mode );
-    inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss );
-    inline void vert_from_interm( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss );
-    inline void vert_all_from_interm( int octave,
-                                      int start_level,
-                                      int max_level,
-                                      cudaStream_t stream,
-                                      GaussTableChoice useInterpolatedGauss );
-    inline void dogs_from_blurred( int octave, int max_level, cudaStream_t stream );
+    void horiz_from_input_image( const Config&    conf,
+                                 ImageBase*       base,
+					             cudaStream_t     stream );
+    inline void downscale_from_prev_octave( int octave, cudaStream_t stream );
 
-    void make_octave( const Config& conf, ImageBase* base, Octave& oct_obj, cudaStream_t stream, bool isOctaveZero );
+    void        horiz_from_prev_level_basic( int octave, int level, cudaStream_t stream );
+    void        horiz_from_prev_level_pairs( int octave, int level, cudaStream_t stream );
+    inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss );
+    void        vert_from_interm_basic( int octave, int level, cudaStream_t stream );
+    void        vert_from_interm_pairs( int octave, int level, cudaStream_t stream );
+    inline void vert_from_interm( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss );
+
+    inline void dogs_from_blurred( int octave, int max_level, cudaStream_t stream );
 
     void reset_extrema_mgmt( );
     void build_pyramid( const Config& conf, ImageBase* base );

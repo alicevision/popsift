@@ -53,7 +53,6 @@ class Octave
     cudaExtent            _dog_3d_ext{};
     cudaSurfaceObject_t   _dog_3d_surf{};
     cudaTextureObject_t   _dog_3d_tex_point{};
-    LinearTexture         _dog_3d_tex_linear{};
 
     // one CUDA stream per level
     // consider whether some of them can be removed
@@ -126,9 +125,6 @@ public:
     }
     inline cudaTextureObject_t& getDogTexturePoint( ) {
         return _dog_3d_tex_point;
-    }
-    inline LinearTexture& getDogTextureLinear( ) {
-        return _dog_3d_tex_linear;
     }
 
      /**
