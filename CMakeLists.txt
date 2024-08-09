@@ -166,6 +166,7 @@ if(PopSift_USE_TEST_CMD)
 endif()
 
 if(PopSift_USE_TESTS)
+  include(CTest)
   add_subdirectory(test)
 endif()
 

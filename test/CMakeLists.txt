@@ -5,6 +5,9 @@ include(FetchContent)
 # Consider replacing FetchContent with file(DOWNLOAD ...)
 # Docs: https://cmake.org/cmake/help/latest/command/file.html#download
 #
+# or perhaps with ExternalData_Add_Test
+# Docs: https://cmake.org/cmake/help/latest/module/ExternalData.html#module:ExternalData
+#
 
 # There is no need to check whether dataset files have been updates online. The haven't.
 set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
@@ -62,8 +65,21 @@ download_test_content(oxford_ubc    "http://www.robots.ox.ac.uk/~vgg/research/af
 get_property(tmp GLOBAL PROPERTY PopSift_TESTFILES_DIRS)
 
 if(PopSift_TESTFILES_DIRS_VERBOSE)
-	foreach(img ${tmp})
-		message(STATUS "Image: ${img}")
-	endforeach()
+  foreach(img ${tmp})
+    message(STATUS "Image: ${img}")
+  endforeach()
+endif()
+
+if(PopSift_USE_TESTS)
+  message(STATUS "Testing popsift-demo for ${tmp}")
+
+  foreach(img ${tmp})
+    cmake_path(GET img STEM FName)
+    cmake_path(GET img PARENT_PATH DName)
+    cmake_path(GET DName STEM PName)
+    set(TName "${PName}-${FName}")
+
+    add_test(NAME ${TName} COMMAND popsift-demo -i ${img})
+  endforeach()
 endif()
 
