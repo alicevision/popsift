@@ -32,6 +32,7 @@ option(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after e
 option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
 option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
+option(PopSift_USE_TESTS    "Generate test make rule" OFF)
 option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
@@ -164,6 +165,10 @@ if(PopSift_USE_TEST_CMD)
   add_subdirectory(testScripts)
 endif()
 
+if(PopSift_USE_TESTS)
+  add_subdirectory(test)
+endif()
+
 ########### Add uninstall target ###############
 CONFIGURE_FILE(
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
@@ -190,6 +195,7 @@ message(STATUS "Grid filtering: " ${PopSift_USE_GRID_FILTER})
 message(STATUS "Additional warning for CUDA nvcc: " ${PopSift_NVCC_WARNINGS})
 message(STATUS "Install path: " ${CMAKE_INSTALL_PREFIX})
 message(STATUS "Testing step: " ${PopSift_USE_TEST_CMD})
+message(STATUS "Test rule: " ${PopSift_USE_TESTS})
 
 message(STATUS "CMAKE_CUDA_COMPILER = ${CMAKE_CUDA_COMPILER}")
 message(STATUS "CMAKE_CUDA_COMPILER_ID = ${CMAKE_CUDA_COMPILER_ID}")
