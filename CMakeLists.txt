@@ -28,7 +28,6 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-$
 
 option(PopSift_BUILD_EXAMPLES "Build PopSift applications."  ON)
 option(PopSift_BUILD_DOCS "Build PopSift documentation."  OFF)
-option(PopSift_USE_NVTX_PROFILING     "Use CUDA NVTX for profiling." OFF)
 option(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after every kernel." OFF)
 option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
 option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
@@ -99,10 +98,6 @@ find_package(CUDAToolkit)
 message(STATUS "CUDA Version is ${CUDAToolkit_VERSION}")
 set(CUDA_VERSION ${CUDAToolkit_VERSION})
 
-if(PopSift_USE_NVTX_PROFILING)
-  message(STATUS "PROFILING CPU CODE: NVTX is in use")
-endif()
-
 if(PopSift_ERRCHK_AFTER_KERNEL)
   message(STATUS "Synchronizing and checking errors after every kernel call")
   list(APPEND CUDA_NVCC_FLAGS "-DERRCHK_AFTER_KERNEL")
@@ -153,13 +148,6 @@ else()
   set(DISABLE_GRID_FILTER   0)
 endif()
 
-if(PopSift_USE_NVTX_PROFILING)
-  # library required for NVTX profiling of the CPU
-  set(PopSift_USE_NVTX 1)
-else()
-  set(PopSift_USE_NVTX 0)
-endif()
-
 add_subdirectory(src)
 
 if(PopSift_BUILD_DOCS)
@@ -197,7 +185,6 @@ message(STATUS "Build Shared libs: " ${BUILD_SHARED_LIBS})
 message(STATUS "Build examples: " ${PopSift_BUILD_EXAMPLES})
 message(STATUS "Build documentation: " ${PopSift_BUILD_DOCS})
 message(STATUS "Generate position independent code: " ${CMAKE_POSITION_INDEPENDENT_CODE})
-message(STATUS "Use CUDA NVTX for profiling: " ${PopSift_USE_NVTX_PROFILING})
 message(STATUS "Synchronize and check CUDA error after every kernel: " ${PopSift_ERRCHK_AFTER_KERNEL})
 message(STATUS "Grid filtering: " ${PopSift_USE_GRID_FILTER})
 message(STATUS "Additional warning for CUDA nvcc: " ${PopSift_NVCC_WARNINGS})

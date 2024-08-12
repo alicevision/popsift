@@ -438,18 +438,12 @@ void SiftJob::setImg( popsift::ImageBase* img )
 
 popsift::ImageBase* SiftJob::getImg()
 {
-#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
-    _nvtx_id = nvtxRangeStartA( "inserting image" );
-#endif
     return _img;
 }
 
 void SiftJob::setFeatures( popsift::FeaturesBase* f )
 {
     _p.set_value( f );
-#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
-    nvtxRangeEnd( _nvtx_id );
-#endif
 }
 
 popsift::FeaturesHost* SiftJob::get()
