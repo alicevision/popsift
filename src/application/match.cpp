@@ -71,10 +71,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
         ( "gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
           popsift::Config::getGaussModeUsage() )
         ("desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
-        "Choice of descriptor extraction modes:\n"
-        "loop, iloop, grid, igrid, notile\n"
-	"Default is loop\n"
-        "loop is OpenCV-like horizontal scanning, computing only valid points, grid extracts only useful points but rounds them, iloop uses linear texture and rotated gradiant fetching. igrid is grid with linear interpolation. notile is like igrid but avoids redundant gradiant fetching.")
+         popsift::Config::getDescModeUsage() )
         ("popsift-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::PopSift); }),
         "During the initial upscale, shift pixels by 1. In extrema refinement, steps up to 0.6, do not reject points when reaching max iterations, "
         "first contrast threshold is .8 * peak thresh. Shift feature coords octave 0 back to original pos.")
