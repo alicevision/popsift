@@ -1,5 +1,5 @@
-include(FetchContent)
-# include(CTest)
+# include(FetchContent)
+include(CTest)
 
 #
 # Consider replacing FetchContent with file(DOWNLOAD ...)
@@ -9,80 +9,59 @@ include(FetchContent)
 # Docs: https://cmake.org/cmake/help/latest/module/ExternalData.html#module:ExternalData
 #
 
-# There is no need to check whether dataset files have been updates online. The haven't.
-set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
+# set_property(GLOBAL PROPERTY PopSift_TESTFILES_DIRS "")
 
-set_property(GLOBAL PROPERTY PopSift_TESTFILES_DIRS "")
+message(STATUS "Running CMake file the test directory")
 
 function(download_test_content name url hash)
+	set(localdir "${CMAKE_CURRENT_SOURCE_DIR}/dataset/${name}")
+	set(localarchive "${localdir}.tar.gz")
+
 	# Declare the URL to fetch the dataset file, its hash, and ask for storage in the source tree
-	FetchContent_Declare(
-		${name}
-  		URL      ${url}
-  		URL_HASH MD5=${hash}
-		SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/dataset
-		DOWNLOAD_NO_EXTRACT true
-	)
-
-	# Do the actual download
-	FetchContent_MakeAvailable(${name})
-
-	# Fill the variables _POPULATED, _SOURCE_DIR and _BINARY_DIR
-	FetchContent_GetProperties(${name})
-
-	if(NOT ${name}_POPULATED)
-		message(ERROR "${name} has not been downloaded")
+	if(EXISTS ${localarchive})
+		message(STATUS "Test image archive ${name} exists")
 	else()
-		# Extract the testfile from the archive into the build directory
-		set(dir "${CMAKE_BINARY_DIR}/dataset/${name}")
-
-		get_property(tmp GLOBAL PROPERTY PopSift_TESTFILES_DIRS)
-
-		file(ARCHIVE_EXTRACT INPUT ${${name}_SOURCE_DIR}/boat.tar.gz DESTINATION ${dir})
-		file(GLOB images "${dir}/*.pgm")
-		foreach(img "${images}")
-			if("${tmp}" STREQUAL "")
-				set(tmp "${img}")
-			else()
-				set(tmp "${tmp};${img}")
-			endif()
-		endforeach()
-
-		set_property(GLOBAL PROPERTY PopSift_TESTFILES_DIRS "${tmp}")
+		message(STATUS "Download ${url} for ${localarchive}")
+		file(DOWNLOAD ${url} ${localarchive} EXPECTED_HASH MD5=${hash} SHOW_PROGRESS STATUS status)
+		list(GET status 0 errcode)
+		list(GET status 1 errstring)
+		if(${errcode})
+			message(STATUS "Errror code is ${errcode}, error is ${errstring}")
+			return()
+		endif()
 	endif()
+
+	file(ARCHIVE_EXTRACT INPUT ${localarchive} DESTINATION ${localdir})
+
+	get_property(tmp GLOBAL PROPERTY PopSift_TESTFILES_DIRS)
+	list(APPEND tmp "${localdir}")
+	set_property(GLOBAL PROPERTY PopSift_TESTFILES_DIRS "${tmp}")
 endfunction(download_test_content)
 
 # The files of the Oxford dataset: boat bikes trees graf wall bark leuven ubc
-download_test_content(oxford_boat   "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/boat.tar.gz"   "d0d4c590adf5ab9a4f7aa39955022f7c")
-# download_test_content(oxford_bikes  "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/bikes.tar.gz"  "2809210051e160009c972595dfa42166")
-# download_test_content(oxford_trees  "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/trees.tar.gz"  "359991610db765c5ea42197734d2fa1f")
-# download_test_content(oxford_graf   "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/graf.tar.gz"   "5fba3852d4c0855f8756ad8e1998efed")
-# download_test_content(oxford_wall   "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/wall.tar.gz"   "6b7b381313864458580b6c580bfbf30b")
-# download_test_content(oxford_bark   "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/bark.tar.gz"   "83718e945463cdbe5ca687af125331af")
-# download_test_content(oxford_leuven "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/leuven.tar.gz" "b0fe0574b1fb14599a44eedeb087fb8d")
-# download_test_content(oxford_ubc    "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/ubc.tar.gz"    "3ff19120715b59ed8ea1bf5346ba99c0")
+download_test_content(ubc    "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/ubc.tar.gz"    "3ff19120715b59ed8ea1bf5346ba99c0")
+download_test_content(bark   "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/bark.tar.gz"   "83718e945463cdbe5ca687af125331af")
+# download_test_content(boat   "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/boat.tar.gz"   "d0d4c590adf5ab9a4f7aa39955022f7c")
+# download_test_content(graf   "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/graf.tar.gz"   "5fba3852d4c0855f8756ad8e1998efed")
+# download_test_content(wall   "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/wall.tar.gz"   "6b7b381313864458580b6c580bfbf30b")
+# download_test_content(bikes  "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/bikes.tar.gz"  "2809210051e160009c972595dfa42166")
+# download_test_content(trees  "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/trees.tar.gz"  "359991610db765c5ea42197734d2fa1f")
+# download_test_content(leuven "http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/leuven.tar.gz" "b0fe0574b1fb14599a44eedeb087fb8d")
 
 get_property(tmp GLOBAL PROPERTY PopSift_TESTFILES_DIRS)
 
-if(PopSift_TESTFILES_DIRS_VERBOSE)
-  foreach(img ${tmp})
-    message(STATUS "Image: ${img}")
-  endforeach()
-endif()
+# set(PopSift_TESTFILES_DIRS_VERBOSE OFF)
 
-if(PopSift_USE_TESTS)
-  message(STATUS "Testing popsift-demo for ${tmp}")
+# if(PopSift_TESTFILES_DIRS_VERBOSE)
+foreach(dir ${tmp})
+message(STATUS "Test directory: ${dir}")
+endforeach()
+# endif()
 
-  if(false)
-    foreach(img ${tmp})
-      cmake_path(GET img STEM FName)
-      cmake_path(GET img PARENT_PATH DName)
-      cmake_path(GET DName STEM PName)
-      set(TName "${PName}-${FName}")
+# if(PopSift_USE_TESTS)
+# message(STATUS "Testing popsift-demo for ${tmp}")
 
-      add_test(NAME ${TName} COMMAND popsift-demo -i ${img})
-    endforeach()
-  endif()
-  add_test(NAME compareOutput.py COMMAND popsift-demo ${tmp})
-endif()
+# message(STATUS "Adding test >>>compareOutput.py popsift-demo ${tmp}<<<")
+# add_test(NAME compareOutput.py COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/compareOutput.py ${CMAKE_BINARY_DIR}/Linux-x86_64/popsift-demo ${tmp})
+# endif()
 
