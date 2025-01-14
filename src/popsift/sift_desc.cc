@@ -7,7 +7,6 @@
  */
 #include "common/assist.h"
 #include "common/debug_macros.h"
-#include "s_desc_loop.h"
 #include "s_desc_vlfeat.h"
 #include "s_desc_normalize.h"
 #include "s_gradiant.h"
@@ -20,9 +19,6 @@
 
 using namespace popsift;
 using namespace std;
-
-        // start_ext_desc_notile<NormalizeRootSift>( octave, layer_tex );
-        // start_ext_desc_notile<NormalizeL2>( octave, layer_tex );
 
 /*************************************************************
  * descriptor extraction
@@ -42,34 +38,21 @@ using namespace std;
  *       device-side octave structure that contains an array of
  *       levels on the device side.
  *************************************************************/
-__host__
 void Pyramid::descriptors( const Config& conf )
 {
-   readDescCountersFromDevice( _octaves[0].getStream() );
-   cudaStreamSynchronize( _octaves[0].getStream() );
-
     for( int octave=_num_octaves-1; octave>=0; octave-- )
-    // for( int octave=0; octave<_num_octaves; octave++ )
     {
         if( hct.ori_ct[octave] != 0 ) {
             Octave& oct_obj = _octaves[octave];
 
-            if( conf.getDescMode() == Config::Loop ) {
-                start_ext_desc_loop(  octave, oct_obj );
-            } else if( conf.getDescMode() == Config::VLFeat_Desc ) {
-                start_ext_desc_vlfeat( octave, oct_obj );
-            } else {
-                POP_FATAL( "not yet" );
-            }
-            cuda::event_record( oct_obj.getEventDescDone(), oct_obj.getStream(), __FILE__, __LINE__ );
-            cuda::event_wait(   oct_obj.getEventDescDone(), _download_stream,    __FILE__, __LINE__ );
+            start_ext_desc_vlfeat( octave, oct_obj );
         }
     }
 
     if( hct.ori_total == 0 )
     {
         cerr << "Warning: no descriptors extracted" << endl;
-	return;
+        return;
     }
 
     dim3 block;
@@ -81,10 +64,8 @@ void Pyramid::descriptors( const Config& conf )
 
     if( conf.getUseRootSift() ) {
         normalize_histogram<NormalizeRootSift> <<<grid,block,0,_download_stream>>> ( );
-        POP_SYNC_CHK;
     } else {
         normalize_histogram<NormalizeL2> <<<grid,block,0,_download_stream>>> ( );
-        POP_SYNC_CHK;
     }
 
     cudaDeviceSynchronize( );

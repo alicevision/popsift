@@ -185,10 +185,7 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
 
     GaussTableChoice gaussTableChoice;
 
-    if( conf.getGaussMode() == Config::VLFeat_Relative )
-        gaussTableChoice = Interpolated_FromPrevious;
-    else
-        gaussTableChoice = NotInterpolated_FromPrevious;
+    gaussTableChoice = NotInterpolated_FromPrevious;
 
     for( uint32_t octave=0; octave<_num_octaves; octave++ )
     {

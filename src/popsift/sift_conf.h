@@ -29,17 +29,6 @@ struct Config
     Config();
 
     /**
-     * @brief The way the gaussian mode is compute.
-     *
-     * Each setting allows to mimic and reproduce the behaviour of other Sift implementations.
-     */
-    enum GaussMode
-    {
-        VLFeat_Compute,
-        VLFeat_Relative
-    };
-
-    /**
      * @brief General setting to reproduce the results of other Sift implementations.
      */
     enum SiftMode
@@ -61,19 +50,6 @@ struct Config
     {
         None,
         All
-    };
-
-    /**
-     * @brief Modes for descriptor extraction.
-     */
-    enum DescMode
-    {
-        /// scan horizontal, extract valid points - weight goes into 2 histogram bins
-        Loop,
-        /** extraction code according to VLFeat, similar to loop, weight goes into
-         *  up to 8 histogram bins
-         */
-        VLFeat_Desc
     };
 
     /**
@@ -116,18 +92,6 @@ struct Config
     };
 
     /**
-     * @brief Set the Gaussian mode from string.
-     * @param[in] m The string version of the GaussMode
-     * @see GaussMode
-     */
-    void setGaussMode( const std::string& m );
-    /**
-     * @brief Set the Gaussian mode.
-     * @param[in] m The Gaussian mode to use.
-     */
-    void setGaussMode( GaussMode m );
-
-    /**
      * @brief Set the Sift mode.
      * @param[in] m The Sift mode
      * @see SiftMode
@@ -146,25 +110,6 @@ struct Config
      * @param[in] on Whether to display additional information .
      */
     void setVerbose( bool on = true );
-
-    /**
-     * @brief Set the descriptor mode by string.
-     * @param[in] byname The string containing the descriptor mode.
-     * @see DescMode
-     */
-    void setDescMode( const std::string& byname );
-
-    /**
-    * @brief Set the descriptor mode.
-    * @param[in] mode The descriptor mode.
-    * @see DescMode
-    */
-    void setDescMode( DescMode mode = Loop );
-
-    /**
-     * @brief Helper functions for the main program's usage string.
-     */
-    static const char* getDescModeUsage( );
 
 //    void setGaussGroup( int groupsize );
 //    int  getGaussGroup( ) const;
@@ -193,20 +138,6 @@ struct Config
 
     /// print Gauss spans and tables?
     bool ifPrintGaussTables() const;
-
-    /// What Gauss filter scan is desired?
-    GaussMode getGaussMode( ) const;
-
-    /// Call this from the constructor.
-    static GaussMode getGaussModeDefault( );
-
-
-    // Helper functions for the main program's usage string.
-    /**
-     * @brief Get a message with the strings to use for setting the values of \p GaussMode
-     * @return  A message with the list of strings
-     */
-    static const char* getGaussModeUsage( );
 
     /**
      * @brief Get the SIFT mode for more detailed sub-modes
@@ -303,13 +234,6 @@ struct Config
      */
     GridFilterMode getFilterSorting() const { return _grid_filter_mode; }
 
-    /**
-     * @brief Get the descriptor extraction mode
-     * @return the descriptor extraction mode
-     * @see DescMode
-     */
-    inline DescMode getDescMode() const { return _desc_mode; }
-
     bool equal( const Config& other ) const;
 
 private:
@@ -328,9 +252,6 @@ private:
 
     /// default LogMode::None
     LogMode  _log_mode;
-
-    /// default: DescMode::Loop
-    DescMode    _desc_mode;
 
     /// default: RandomScale
     GridFilterMode _grid_filter_mode;
@@ -352,10 +273,6 @@ private:
     /// i.e. the grid is actually _grid_size X _grid_size tiles.
     /// default: 1
     int  _filter_grid_size;
-
-    /// Modes are computation according to VLFeat or OpenCV,
-    /// or fixed size. Default is VLFeat mode.
-    GaussMode _gauss_mode;
 
     /// Modes are PopSift, OpenCV and VLFeat.
     /// Default is currently identical to PopSift.

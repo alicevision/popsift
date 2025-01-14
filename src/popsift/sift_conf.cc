@@ -22,10 +22,9 @@ Config::Config( )
     , sigma( 1.6f )
     , _edge_limit( 10.0f )
     , _threshold( 0.04 ) // ( 10.0f / 256.0f )
-    , _gauss_mode( getGaussModeDefault() )
     , _sift_mode( Config::RefineInOctave )
     , _log_mode( Config::None )
-    , _desc_mode( Config::Loop )
+    , _desc_mode( Config::VLFeat_Desc )
     , _grid_filter_mode( Config::RandomScale )
     , verbose( false )
     // , _max_extrema( 20000 )
@@ -54,16 +53,9 @@ void Config::setMode( Config::SiftMode m )
     _sift_mode = m;
 }
 
-void Config::setGaussMode( Config::GaussMode m )
-{
-    _gauss_mode = m;
-}
-
 void Config::setDescMode( const std::string& text )
 {
-    if( text == "loop" )
-        setDescMode( Config::Loop );
-    else if( text == "vlfeat" )
+    if( text == "vlfeat" )
         setDescMode( Config::VLFeat_Desc );
     else
         POP_FATAL( "specified descriptor extraction mode must be one of loop, grid or igrid" );
@@ -77,41 +69,10 @@ void Config::setDescMode( Config::DescMode m )
 const char* Config::getDescModeUsage( )
 {
     return "Choice of descriptor extraction modes:\n"
-           "loop, vlfeat\n"
-	       "Default is loop\n"
-           "  loop is OpenCV-like horizontal scanning, sampling every pixel in a radius around the "
-           "  centers or the 16 tiles arond the keypoint. Each sampled point contributes to two "
-           "  histogram bins."
+           "vlfeat\n"
            "vlfeat is VLFeat-like horizontal scanning, sampling every pixel in a radius around "
            "  keypoint itself, using the 16 tile centers only for weighting. Every sampled point "
            "  contributes to up to eight historgram bins.";
-}
-
-void Config::setGaussMode( const std::string& m )
-{
-    if( m == "vlfeat" )
-        setGaussMode( Config::VLFeat_Compute );
-    else if( m == "vlfeat-hw-interpolated" )
-        setGaussMode( Config::VLFeat_Relative );
-    else if( m == "relative" )
-        setGaussMode( Config::VLFeat_Relative );
-    else
-        POP_FATAL( string("Bad Gauss mode.\n") + getGaussModeUsage() );
-}
-
-Config::GaussMode Config::getGaussModeDefault( )
-{
-    return Config::VLFeat_Compute;
-}
-
-const char* Config::getGaussModeUsage( )
-{
-    return
-        "Choice of Gauss filter method. "
-        "Options are: "
-        "vlfeat (default), "
-        "vlfeat-hw-interpolated, "
-        "relative (synonym for vlfeat-hw-interpolated)";
 }
 
 bool Config::getCanFilterExtrema() const
@@ -188,7 +149,7 @@ void Config::setNormMode( const std::string& m )
     if( m == "RootSift" ) setNormMode( Config::RootSift );
     else if( m == "classic" ) setNormMode( Config::Classic );
     else
-        POP_FATAL( string("Bad Normalization mode.\n") + getGaussModeUsage() );
+        POP_FATAL( string("Bad Normalization mode.\n");
 }
 
 Config::NormMode Config::getNormModeDefault( )
@@ -240,11 +201,6 @@ void Config::setInitialBlur( float blur )
         _assume_initial_blur = true;
         _initial_blur        = blur;
     }
-}
-
-Config::GaussMode Config::getGaussMode( ) const
-{
-    return _gauss_mode;
 }
 
 Config::SiftMode Config::getSiftMode() const

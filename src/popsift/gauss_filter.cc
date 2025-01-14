@@ -206,37 +206,10 @@ void GaussInfo::setSpanMode( Config::GaussMode m )
 __host__
 int GaussInfo::getSpan( float sigma ) const
 {
-    switch( _span_mode )
-    {
-    case Config::VLFeat_Compute :
-        return GaussInfo::vlFeatSpan( sigma );
-    case Config::VLFeat_Relative :
-        return GaussInfo::vlFeatRelativeSpan( sigma );
-    default :
-        stringstream ss;
-        ss << "ERROR: The mode for computing Gauss filter scan is invalid";
-        POP_FATAL(ss.str());
-    }
-}
-
-__host__
-int GaussInfo::vlFeatSpan( float sigma )
-{
     /* This is the VLFeat computation for choosing the Gaussian filter width.
      * In our case, we look at the half-sided filter including the center value.
      */
     return std::min<int>( ceilf( 4.0f * sigma ) + 1, GAUSS_ALIGN - 1 );
-}
-
-__host__
-int GaussInfo::vlFeatRelativeSpan( float sigma )
-{
-    /* We want the width of the VLFeat computation, but always the next equal
-     * or larger odd span, because we need pairs of weights.
-     */
-    int spn = vlFeatSpan( sigma );
-    if( ( spn & 1 ) == 0 ) spn += 1;
-    return spn;
 }
 
 template<int LEVELS>

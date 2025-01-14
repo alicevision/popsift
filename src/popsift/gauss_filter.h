@@ -79,12 +79,6 @@ public:
 
 private:
     Config::GaussMode _span_mode;
-
-    __host__
-    static int vlFeatSpan( float sigma );
-
-    __host__
-    static int vlFeatRelativeSpan( float sigma );
 };
 
 extern __device__ __constant__ GaussInfo d_gauss;
