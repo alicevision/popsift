@@ -12,8 +12,6 @@
 #define MAX_OCTAVES   20
 #define MAX_LEVELS    10
 
-#undef USE_DOG_TEX_LINEAR
-
 #ifdef _MSC_VER
 #define DEPRECATED(func) __declspec(deprecated) func
 #elif defined(__GNUC__) || defined(__clang__)
@@ -38,11 +36,7 @@ struct Config
     enum GaussMode
     {
         VLFeat_Compute,
-        VLFeat_Relative,
-        VLFeat_Relative_All,
-        OpenCV_Compute,
-        Fixed9,
-        Fixed15
+        VLFeat_Relative
     };
 
     /**
@@ -50,14 +44,14 @@ struct Config
      */
     enum SiftMode
     {
-        /// Popsift implementation
-        PopSift,
-        /// OpenCV implementation
-        OpenCV,
-        /// VLFeat implementation
-        VLFeat,
-        /// Default implementation is PopSift
-        Default = PopSift
+        /// refining an initial extremum stays in the same level of an octave
+        RefineInLevel,
+        /// refining an initial extremum can change level but stays in the same octave
+        RefineInOctave,
+
+        // PopSift = RefineInOctave, ///< Popsift implementation
+        // VLFeat  = RefineInLevel,  ///< VLFeat implementation
+        Default = RefineInOctave
     };
 
     /**
@@ -67,16 +61,6 @@ struct Config
     {
         None,
         All
-    };
-
-    /**
-     * @brief The scaling mode.
-     */
-    enum ScalingMode
-    {
-        ScaleDirect,
-        /// Indirect - only working method
-        ScaleDefault
     };
 
     /**
@@ -160,7 +144,6 @@ struct Config
      * @see LogMode
      */
     void setLogMode( LogMode mode = All );
-    void setScalingMode( ScalingMode mode = ScaleDefault );
 
     /**
      * @brief Enable/desable verbose mode.
@@ -320,13 +303,6 @@ struct Config
     GridFilterMode getFilterSorting() const { return _grid_filter_mode; }
 
     /**
-     * @brief Get the scaling mode.
-     * @return the descriptor extraction mode.
-     * @see ScalingMode
-     */
-    inline ScalingMode getScalingMode() const { return _scaling_mode; }
-
-    /**
      * @brief Get the descriptor extraction mode
      * @return the descriptor extraction mode
      * @see DescMode
@@ -351,9 +327,6 @@ private:
 
     /// default LogMode::None
     LogMode  _log_mode;
-
-    /// default: ScalingMode::DownscaledOctaves
-    ScalingMode _scaling_mode;
 
     /// default: DescMode::Loop
     DescMode    _desc_mode;

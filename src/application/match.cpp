@@ -70,28 +70,16 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
     modes.add_options()
         ( "gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
           popsift::Config::getGaussModeUsage() )
-        ("desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
+        ( "desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
         "Choice of descriptor extraction modes:\n"
         "loop, iloop, grid, igrid, notile\n"
-	"Default is loop\n"
+        "Default is loop\n"
         "loop is OpenCV-like horizontal scanning, computing only valid points, grid extracts only useful points but rounds them, iloop uses linear texture and rotated gradiant fetching. igrid is grid with linear interpolation. notile is like igrid but avoids redundant gradiant fetching.")
-        ("popsift-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::PopSift); }),
-        "During the initial upscale, shift pixels by 1. In extrema refinement, steps up to 0.6, do not reject points when reaching max iterations, "
-        "first contrast threshold is .8 * peak thresh. Shift feature coords octave 0 back to original pos.")
-        ("vlfeat-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::VLFeat); }),
-        "During the initial upscale, shift pixels by 1. That creates a sharper upscaled image. "
-        "In extrema refinement, steps up to 0.6, levels remain unchanged, "
-        "do not reject points when reaching max iterations, "
-        "first contrast threshold is .8 * peak thresh.")
-        ("opencv-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::OpenCV); }),
-        "During the initial upscale, shift pixels by 0.5. "
-        "In extrema refinement, steps up to 0.5, "
-        "reject points when reaching max iterations, "
-        "first contrast threshold is floor(.5 * peak thresh). "
-        "Computed filter width are lower than VLFeat/PopSift")
-        ("direct-scaling", bool_switch()->notifier([&](bool b) { if(b) config.setScalingMode(popsift::Config::ScaleDirect); }),
-         "Direct each octave from upscaled orig instead of blurred level.")
-        ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
+        ( "popsift-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::RefineInOctave); }),
+        "In extrema refinement, it is possible to move extrema within a level but also between the levels of an octave.")
+        ( "vlfeat-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::RefineInLevel); }),
+        "In extrema refinement, it is possible to move extrema within a level only.")
+        ( "norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
         ( "norm-mode", value<std::string>()->notifier([&](const std::string& s) { config.setNormMode(s); }),
           popsift::Config::getNormModeUsage() )
         ( "root-sift", bool_switch()->notifier([&](bool b) { if(b) config.setNormMode(popsift::Config::RootSift); }),
