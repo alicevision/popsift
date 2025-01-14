@@ -20,7 +20,7 @@ __global__ static void horiz(cudaTextureObject_t src_linear_tex, cudaSurfaceObje
     const int    span      =  d_gauss.inc.i_span[dst_level];
     const float* filter    = &d_gauss.inc.i_filter[dst_level*GAUSS_ALIGN];
     const int    idx       = blockIdx.x * blockDim.x + threadIdx.x;
-    const int    idy       = blockIdx.x * blockDim.x + threadIdx.x;
+    const int    idy       = blockIdx.y * blockDim.y + threadIdx.y;
 
     float out = 0.0f;
 
