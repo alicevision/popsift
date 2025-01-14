@@ -71,10 +71,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
         ( "gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
           popsift::Config::getGaussModeUsage() )
         ( "desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
-        "Choice of descriptor extraction modes:\n"
-        "loop, iloop, grid, igrid, notile\n"
-        "Default is loop\n"
-        "loop is OpenCV-like horizontal scanning, computing only valid points, grid extracts only useful points but rounds them, iloop uses linear texture and rotated gradiant fetching. igrid is grid with linear interpolation. notile is like igrid but avoids redundant gradiant fetching.")
+         popsift::Config::getDescModeUsage() )
         ( "popsift-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::RefineInOctave); }),
         "In extrema refinement, it is possible to move extrema within a level but also between the levels of an octave.")
         ( "vlfeat-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::RefineInLevel); }),
