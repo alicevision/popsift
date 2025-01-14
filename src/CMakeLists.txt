@@ -20,10 +20,6 @@ add_library(popsift
         popsift/s_filtergrid.cu
         popsift/sift_desc.cu
         popsift/s_desc_loop.cu popsift/s_desc_loop.h
-        popsift/s_desc_iloop.cu popsift/s_desc_iloop.h
-        popsift/s_desc_grid.cu popsift/s_desc_grid.h
-        popsift/s_desc_igrid.cu popsift/s_desc_igrid.h
-        popsift/s_desc_notile.cu popsift/s_desc_notile.h
         popsift/s_desc_vlfeat.cu popsift/s_desc_vlfeat.h
         popsift/s_desc_norm_rs.h
         popsift/s_desc_norm_l2.h

@@ -7,13 +7,9 @@
  */
 #include "common/assist.h"
 #include "common/debug_macros.h"
-#include "s_desc_grid.h"
-#include "s_desc_igrid.h"
-#include "s_desc_iloop.h"
 #include "s_desc_loop.h"
-#include "s_desc_normalize.h"
-#include "s_desc_notile.h"
 #include "s_desc_vlfeat.h"
+#include "s_desc_normalize.h"
 #include "s_gradiant.h"
 #include "sift_config.h"
 #include "sift_constants.h"
@@ -60,14 +56,6 @@ void Pyramid::descriptors( const Config& conf )
 
             if( conf.getDescMode() == Config::Loop ) {
                 start_ext_desc_loop(  octave, oct_obj );
-            } else if( conf.getDescMode() == Config::ILoop ) {
-                start_ext_desc_iloop( octave, oct_obj );
-            } else if( conf.getDescMode() == Config::Grid ) {
-                start_ext_desc_grid(  octave, oct_obj );
-            } else if( conf.getDescMode() == Config::IGrid ) {
-                start_ext_desc_igrid( octave, oct_obj );
-            } else if( conf.getDescMode() == Config::NoTile ) {
-                start_ext_desc_notile( octave, oct_obj );
             } else if( conf.getDescMode() == Config::VLFeat_Desc ) {
                 start_ext_desc_vlfeat( octave, oct_obj );
             } else {
