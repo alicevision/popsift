@@ -1,36 +1,34 @@
 # Do not specify SHARED or STATIC in add_library. Let the variable BUILD_SHARED_LIBS determine this.
 
 add_library(popsift
-        popsift/popsift.cu popsift/popsift.h
-        popsift/features.cu popsift/features.h
-        popsift/sift_constants.cu popsift/sift_constants.h
-        popsift/sift_conf.cu popsift/sift_conf.h
-        popsift/gauss_filter.cu popsift/gauss_filter.h
-        popsift/s_image.cu popsift/s_image.h
-        popsift/sift_pyramid.cu popsift/sift_pyramid.h
-        popsift/sift_octave.cu popsift/sift_octave.h
-        popsift/s_pyramid_build.cu
-        popsift/s_pyramid_build_aa.cu
-        popsift/s_pyramid_build_ai.cu
-        popsift/s_pyramid_build_ra.cu
+        popsift/popsift.cc popsift/popsift.h
+        popsift/features.cc popsift/features.h
+        popsift/sift_constants.cc popsift/sift_constants.h
+        popsift/sift_conf.cc popsift/sift_conf.h
+        popsift/gauss_filter.cc popsift/gauss_filter.h
+        popsift/s_image.cc popsift/s_image.h
+        popsift/sift_pyramid.cc popsift/sift_pyramid.h
+        popsift/sift_octave.cc popsift/sift_octave.h
+        popsift/s_pyramid_build.cc
+        popsift/s_pyramid_build_aa.cc
+        popsift/s_pyramid_build_ra.cc
         popsift/sift_extremum.h
-        popsift/sift_extremum.cu popsift/s_extrema.cu
-        popsift/s_orientation.cu
-        popsift/s_filtergrid.cu
-        popsift/sift_desc.cu
-        popsift/s_desc_loop.cu popsift/s_desc_loop.h
-        popsift/s_desc_vlfeat.cu popsift/s_desc_vlfeat.h
+        popsift/sift_extremum.cc popsift/s_extrema.cc
+        popsift/s_orientation.cc
+        popsift/s_filtergrid.cc
+        popsift/sift_desc.cc
+        popsift/s_desc_vlfeat.cc popsift/s_desc_vlfeat.h
         popsift/s_desc_norm_rs.h
         popsift/s_desc_norm_l2.h
         popsift/s_desc_normalize.h
         popsift/s_gradiant.h
         popsift/s_solve.h
-        popsift/common/assist.cu popsift/common/assist.h
+        popsift/common/assist.cc popsift/common/assist.h
         popsift/common/clamp.h
-        popsift/common/plane_2d.cu popsift/common/plane_2d.h
-        popsift/common/write_plane_2d.cu popsift/common/write_plane_2d.h
-        popsift/common/debug_macros.cu popsift/common/debug_macros.h
-        popsift/common/device_prop.cu popsift/common/device_prop.h
+        popsift/common/plane_2d.cc popsift/common/plane_2d.h
+        popsift/common/write_plane_2d.cc popsift/common/write_plane_2d.h
+        popsift/common/debug_macros.cc popsift/common/debug_macros.h
+        popsift/common/device_prop.c.ccopsift/common/device_prop.h
         popsift/common/warp_bitonic_sort.h
         popsift/common/excl_blk_prefix_sum.h
         popsift/common/vec_macros.h
@@ -38,26 +36,22 @@ add_library(popsift
 
 target_link_libraries(popsift
                       PUBLIC
-		      CUDA::cudart
 		      Threads::Threads)
 
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
-set_target_properties(popsift PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # build directory containing the automatically generated files
 set(popsift_generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 # BUILD_INTERFACE allows to include the directory with source only when target is
 # built in the building tree (ie, not from an install location)
-# The CUDA install dir variable has changed from the old CUDA_INCLUDE_DIRS to the new CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES
 target_include_directories(popsift
             PUBLIC
             $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
             $<BUILD_INTERFACE:${popsift_generated_dir}>
             $<BUILD_INTERFACE:${popsift_generated_dir}/popsift>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>
-	    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
 	    )
 
 # EXPORTING THE LIBRARY
