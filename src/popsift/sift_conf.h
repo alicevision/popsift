@@ -70,14 +70,6 @@ struct Config
     {
         /// scan horizontal, extract valid points - weight goes into 2 histogram bins
         Loop,
-        /// loop-compatible; scan horizontal, extract valid points, interpolate with tex engine
-        ILoop,
-        /// loop-compatible; scan in rotated mode, round pixel address
-        Grid,
-        /// loop-compatible; scan in rotated mode, interpolate with tex engine
-        IGrid,
-        /// loop-compatible; variant of IGrid, no duplicate gradient fetching
-        NoTile,
         /** extraction code according to VLFeat, similar to loop, weight goes into
          *  up to 8 histogram bins
          */
