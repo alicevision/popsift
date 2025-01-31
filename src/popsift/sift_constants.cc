@@ -8,21 +8,16 @@
 #include "common/debug_macros.h"
 #include "sift_constants.h"
 
-#include <cuda_runtime.h>
-
 #include <iostream>
 
 using namespace std;
 
 namespace popsift {
 
-thread_local            ConstInfo h_consts;
-__device__ __constant__ ConstInfo d_consts;
+thread_local ConstInfo h_consts;
 
 void init_constants( float sigma0, int levels, float threshold, float edge_limit, int max_extrema, int normalization_multiplier )
 {
-    cudaError_t err;
-
     h_consts.sigma0           = sigma0;
     h_consts.sigma_k          = powf(2.0f, 1.0f / levels );
     h_consts.edge_limit       = edge_limit;
@@ -45,11 +40,6 @@ void init_constants( float sigma0, int levels, float threshold, float edge_limit
         const float nx = -1.0f + 1.0f/16.0f + i * 1.0f/8.0f;
         h_consts.desc_tile[i] = 1.0f - fabs(nx);
     }
-
-    err = cudaMemcpyToSymbol( d_consts, &h_consts,
-                              sizeof(ConstInfo), 0,
-                              cudaMemcpyHostToDevice );
-    POP_CUDA_FATAL_TEST( err, "Failed to upload h_consts to device: " );
 }
 
 } // namespace popsift

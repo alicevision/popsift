@@ -13,8 +13,6 @@
 #include "sift_config.h"
 #include "sift_extremum.h"
 
-#include <cuda_runtime.h>
-
 #include <exception>
 #include <future>
 #include <queue>
@@ -128,12 +126,7 @@ public:
      */
     enum AllocTest
     {
-        /// the image dimensions are supported by this device's CUDA texture engine.
         Ok,
-        /// the input image size exceeds the dimensions of the CUDA Texture used for loading.
-        ImageExceedsLinearTextureLimit,
-        /// the scaled input image exceeds the dimensions of the CUDA Surface used for the image pyramid.
-        ImageExceedsLayeredSurfaceLimit
     };
 
 public:
@@ -145,7 +138,7 @@ public:
      * @brief We support more than 1 streams, but we support only one sigma and one
      * level parameters.
      */
-    explicit PopSift( ImageMode imode = ByteImages, int device = 0 );
+    explicit PopSift( ImageMode imode = ByteImages );
 
     /**
      * @brief
@@ -155,7 +148,7 @@ public:
      */
     explicit PopSift(const popsift::Config& config,
                      popsift::Config::ProcessingMode mode = popsift::Config::ExtractingMode,
-                     ImageMode imode = ByteImages, int device = 0);
+                     ImageMode imode = ByteImages );
 
     /**
      * @brief Release all the resources.
@@ -297,12 +290,8 @@ private:
     int             _last_init_w{}; /* to support deprecated interface */
     int             _last_init_h{}; /* to support deprecated interface */
     ImageMode       _image_mode;
-    int             _device;
 
     /// whether the object is initialized
     bool            _isInit{true};
-
-    // Device property collection runs when this object is created
-    popsift::cuda::device_prop_t   _device_properties;
 };
 

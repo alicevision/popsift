@@ -36,14 +36,11 @@ struct GaussTable
     /* Alternative spans for i_filter, which must always be odd */
     int   i_span  [ LEVELS ];
 
-    __host__
     void clearTables( );
 
-    __host__
     void computeBlurTable( const GaussInfo* info );
 
 private:
-    __host__
     void transformBlurTable( ); // const GaussInfo* info );
 };
 
@@ -67,22 +64,18 @@ struct GaussInfo
      */
     GaussTable<1> dd;
 
-    __host__
     void clearTables( );
 
 public:
-    __host__
     void setSpanMode( Config::GaussMode m );
 
-    __host__
     int getSpan( float sigma ) const;
 
 private:
     Config::GaussMode _span_mode;
 };
 
-extern __device__ __constant__ GaussInfo d_gauss;
-extern thread_local            GaussInfo h_gauss;
+extern thread_local GaussInfo h_gauss;
 
 /* init_filter must be called early to initialize the Gauss tables.
  */

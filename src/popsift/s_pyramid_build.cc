@@ -26,8 +26,8 @@ namespace popsift {
 
 namespace gauss {
 
-__global__
-void get_by_2_pick_every_second( cudaTextureObject_t src_data,
+void get_by_2_pick_every_second( Grid& g,
+                                 cudaTextureObject_t src_data,
                                  const int           src_w,
                                  const int           src_h,
                                  const int           src_level,
@@ -35,8 +35,8 @@ void get_by_2_pick_every_second( cudaTextureObject_t src_data,
                                  const int           dst_w,
                                  const int           dst_h )
 {
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
+    const int idx = g.blockIdx.x * g.blockDim.x + g.threadIdx.x;
+    const int idy = g.blockIdx.y * g.blockDim.y + g.threadIdx.y;
 
     if( idx >= dst_w ) return;
     if( idy >= dst_h ) return;
@@ -44,36 +44,39 @@ void get_by_2_pick_every_second( cudaTextureObject_t src_data,
     const int read_x = clamp( idx << 1, 0, src_w );
     const int read_y = clamp( idy << 1, 0, src_h );
 
-    const float val = readTex( src_data, read_x, read_y, src_level );
+    // const float val = readTex( src_data, read_x, read_y, src_level );
+    const float val = src_data[src_local].ptr(read_y)[read_x] = val;
 
-    surf2DLayeredwrite( val, dst_data, idx*4, idy, 0, cudaBoundaryModeZero ); // dst_data.ptr(idy)[idx] = val;
+    // surf2DLayeredwrite( val, dst_data, idx*4, idy, 0, cudaBoundaryModeZero );
+    dst_data[0].ptr(idy)[idx] = val;
 }
 
 
-__global__
-void make_dog( cudaTextureObject_t src_data,
+void make_dog( Grid& g,
+               cudaTextureObject_t src_data,
                cudaSurfaceObject_t dog_data,
                const int           w,
                const int           h,
                const int           max_level )
 {
-    const int idx   = blockIdx.x * blockDim.x + threadIdx.x;
-    const int idy   = blockIdx.y * blockDim.y + threadIdx.y;
+    const int idx   = g.blockIdx.x * g.blockDim.x + g.threadIdx.x;
+    const int idy   = g.blockIdx.y * g.blockDim.y + g.threadIdx.y;
 
     float a = readTex( src_data, idx, idy, 0 );
     for( int level=0; level<max_level-1; level++ )
     {
-        const float b = readTex( src_data, idx, idy, level+1 );
+        // const float b = readTex( src_data, idx, idy, level+1 );
+        const float b = src_data[level+1].ptr(idy)[idx];
 
-        surf2DLayeredwrite( b-a, dog_data, idx*4, idy, level, cudaBoundaryModeZero );
+        // surf2DLayeredwrite( b-a, dog_data, idx*4, idy, level, cudaBoundaryModeZero );
+        dst_data[level].ptr(idy)[idx] = val;
         a = b;
     }
 }
 
 } // namespace gauss
 
-__host__
-inline void Pyramid::downscale_from_prev_octave( int octave, cudaStream_t stream )
+inline void Pyramid::downscale_from_prev_octave( int octave )
 {
     Octave&      oct_obj = _octaves[octave];
     Octave& prev_oct_obj = _octaves[octave-1];
@@ -81,34 +84,34 @@ inline void Pyramid::downscale_from_prev_octave( int octave, cudaStream_t stream
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    dim3 h_block( 64, 2 );
-    dim3 h_grid;
-    h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
-    h_grid.y = (unsigned int)grid_divide( height, h_block.y );
+    Grid g;
+    g.setBlock( 64, 2 );
+    g.setGrid( grid_divide( width,  64 ),
+               grid_divide( height, 2 ) );
 
-    gauss::get_by_2_pick_every_second
-        <<<h_grid,h_block,0,stream>>>
-        ( prev_oct_obj.getDataTexPoint( ),
-          prev_oct_obj.getWidth(),
-          prev_oct_obj.getHeight(),
-          _levels-PREV_LEVEL,
-          oct_obj.getDataSurface( ),
-          oct_obj.getWidth(),
-          oct_obj.getHeight() );
-
-    POP_SYNC_CHK;
+    g.reset();
+    do {
+        gauss::get_by_2_pick_every_second
+            ( g,
+              prev_oct_obj.getDataTexPoint( ),
+              prev_oct_obj.getWidth(),
+              prev_oct_obj.getHeight(),
+              _levels-PREV_LEVEL,
+              oct_obj.getDataSurface( ),
+              oct_obj.getWidth(),
+              oct_obj.getHeight() );
+    } while( g.next() );
 }
 
-__host__
-inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss )
+inline void Pyramid::horiz_from_prev_level( int octave, int level, GaussTableChoice useInterpolatedGauss )
 {
     switch( useInterpolatedGauss )
     {
     case Interpolated_FromPrevious :
-        horiz_from_prev_level_pairs( octave, level, stream );
+        horiz_from_prev_level_pairs( octave, level );
         break;
     case NotInterpolated_FromPrevious :
-        horiz_from_prev_level_basic( octave, level, stream );
+        horiz_from_prev_level_basic( octave, level );
         break;
     default :
         POP_FATAL( "Missing case in horizontal Gauss filter from previous level" );
@@ -117,7 +120,7 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t 
 }
 
 __host__
-inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss )
+inline void Pyramid::vert_from_interm( int octave, int level, GaussTableChoice useInterpolatedGauss )
 {
     Octave& oct_obj = _octaves[octave];
 
@@ -127,10 +130,10 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
     switch( useInterpolatedGauss )
     {
     case Interpolated_FromPrevious :
-        vert_from_interm_pairs( octave, level, stream );
+        vert_from_interm_pairs( octave, level );
         break;
     case NotInterpolated_FromPrevious :
-        vert_from_interm_basic( octave, level, stream );
+        vert_from_interm_basic( octave, level );
         break;
     default :
         {
@@ -142,27 +145,29 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
 }
 
 __host__
-inline void Pyramid::dogs_from_blurred( int octave, int max_level, cudaStream_t stream )
+inline void Pyramid::dogs_from_blurred( int octave, int max_level )
 {
     Octave&      oct_obj = _octaves[octave];
 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    dim3 block( 1024, 1 );
-    dim3 grid;
-    grid.x = grid_divide( width,  block.x );
-    grid.y = grid_divide( height, block.y );
-    grid.z = 1;
+    Grid g;
+    g.setBlock( 1024, 1, 1 );
+    g.setGrid( grid_divide( width,  1024 ), height, 1 );
 
-    gauss::make_dog
-        <<<grid,block,0,stream>>>
-        ( oct_obj.getDataTexPoint( ),
-          oct_obj.getDogSurface( ),
-          oct_obj.getWidth(),
-          oct_obj.getHeight(),
-          max_level );
-    POP_SYNC_CHK;
+    g.reset();
+    do
+    {
+        gauss::make_dog
+            ( g,
+              oct_obj.getDataTexPoint( ),
+              oct_obj.getDogSurface( ),
+              oct_obj.getWidth(),
+              oct_obj.getHeight(),
+              max_level );
+    }
+    while( g.next() );
 }
 
 /*************************************************************
@@ -181,8 +186,6 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
          << "    original pix size : " << base->u_width/base->type_size << "x" << base->u_height << endl;
 #endif // (PYRAMID_PRINT_DEBUG==1)
 
-    cudaDeviceSynchronize();
-
     GaussTableChoice gaussTableChoice;
 
     gaussTableChoice = NotInterpolated_FromPrevious;
@@ -190,7 +193,6 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
     for( uint32_t octave=0; octave<_num_octaves; octave++ )
     {
         Octave&      oct_obj = _octaves[octave];
-        cudaStream_t stream  = oct_obj.getStream();
 
         for( int level=0; level<_levels; level++ )
         {
@@ -198,24 +200,19 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
             {
                 if( octave == 0 )
                 {
-                    horiz_from_input_image( conf, base, stream );
-                    vert_from_interm( octave, 0, stream, gaussTableChoice );
+                    horiz_from_input_image( conf, base );
+                    vert_from_interm( octave, 0, gaussTableChoice );
                 }
                 else
                 {
                     Octave& prev_oct_obj = _octaves[octave-1];
-                    cuda::event_wait( prev_oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
-                    downscale_from_prev_octave( octave, stream );
+                    downscale_from_prev_octave( octave );
                 }
             }
             else
             {
-                horiz_from_prev_level( octave, level, stream, gaussTableChoice );
-                vert_from_interm( octave, level, stream, gaussTableChoice );
-                if( level == _levels - PREV_LEVEL )
-                {
-                    cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
-                }
+                horiz_from_prev_level( octave, level, gaussTableChoice );
+                vert_from_interm( octave, level, gaussTableChoice );
             }
         }
     }
@@ -223,15 +220,7 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
     for( int octave=0; octave<_num_octaves; octave++ )
     {
         Octave&      oct_obj = _octaves[octave];
-        cudaStream_t stream  = oct_obj.getStream();
-        dogs_from_blurred( octave, _levels, stream );
-    }
-
-    for( int octave=0; octave<_num_octaves; octave++ )
-    {
-        Octave&      oct_obj = _octaves[octave];
-        cudaStream_t stream  = oct_obj.getStream();
-        cudaStreamSynchronize( stream );
+        dogs_from_blurred( octave, _levels );
     }
 }
 

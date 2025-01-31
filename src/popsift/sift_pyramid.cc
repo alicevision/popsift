@@ -31,18 +31,11 @@ using namespace std;
 
 namespace popsift {
 
-__device__ ExtremaCounters   dct;
-thread_local ExtremaCounters hct;
+thread_local ExtremaCounters dct;
+thread_local ExtremaBuffers dbuf;
+thread_local DevBuffers     dobuf;
 
-__device__ ExtremaBuffers   dbuf;
-thread_local ExtremaBuffers dbuf_shadow; // just for managing memories
-thread_local ExtremaBuffers hbuf;
-
-__device__ DevBuffers       dobuf;
-thread_local DevBuffers     dobuf_shadow; // just for managing memories
-
-__global__
-    void py_print_corner_float(float* img, uint32_t pitch, uint32_t height, uint32_t level)
+void py_print_corner_float( Grid& g, float* img, uint32_t pitch, uint32_t height, uint32_t level)
 {
     const int xbase = 0;
     const int ybase = level * height + 0;
@@ -55,8 +48,7 @@ __global__
     printf("\n");
 }
 
-__global__
-    void py_print_corner_float_transposed(float* img, uint32_t pitch, uint32_t height, uint32_t level)
+void py_print_corner_float_transposed( Grid& g, float* img, uint32_t pitch, uint32_t height, uint32_t level)
 {
     const int xbase = 0;
     const int ybase = level * height + 0;
@@ -111,13 +103,11 @@ Pyramid::Pyramid( const Config& config,
     int w = width;
     int h = height;
 
-    memset( &hct,         0, sizeof(ExtremaCounters) );
-    cudaMemcpyToSymbol( dct, &hct, sizeof(ExtremaCounters), 0, cudaMemcpyHostToDevice );
+    memset( &dct,  0, sizeof(ExtremaCounters) );
+    memset( &dbuf, 0, sizeof(ExtremaBuffers) );
+    memset( &dbuf, 0, sizeof(ExtremaBuffers) );
 
-    memset( &hbuf,        0, sizeof(ExtremaBuffers) );
-    memset( &dbuf_shadow, 0, sizeof(ExtremaBuffers) );
-
-    _d_extrema_num_blocks = popsift::cuda::malloc_devT<int>( _num_octaves, __FILE__, __LINE__ );
+    _d_extrema_num_blocks = new int[_num_octaves];
 
     for (int o = 0; o<_num_octaves; o++) {
         _octaves[o].debugSetOctave(o);
@@ -127,34 +117,26 @@ Pyramid::Pyramid( const Config& config,
     }
 
     int sz = _num_octaves * h_consts.max_extrema;
-    dobuf_shadow.i_ext_dat[0] = popsift::cuda::malloc_devT<InitialExtremum>( sz, __FILE__, __LINE__);
-    dobuf_shadow.i_ext_off[0] = popsift::cuda::malloc_devT<int>( sz, __FILE__, __LINE__);
+    dobuf.i_ext_dat[0] = new InitialExtremum[sz];
+    dobuf.i_ext_off[0] = new int[sz];
     for (int o = 1; o<_num_octaves; o++) {
-        dobuf_shadow.i_ext_dat[o] = dobuf_shadow.i_ext_dat[0] + (o*h_consts.max_extrema);
-        dobuf_shadow.i_ext_off[o] = dobuf_shadow.i_ext_off[0] + (o*h_consts.max_extrema);
+        dobuf.i_ext_dat[o] = dobuf.i_ext_dat[0] + (o*h_consts.max_extrema);
+        dobuf.i_ext_off[o] = dobuf.i_ext_off[0] + (o*h_consts.max_extrema);
     }
     for (int o = _num_octaves; o<MAX_OCTAVES; o++) {
-        dobuf_shadow.i_ext_dat[o] = nullptr;
-        dobuf_shadow.i_ext_off[o] = nullptr;
+        dobuf.i_ext_dat[o] = nullptr;
+        dobuf.i_ext_off[o] = nullptr;
     }
 
     sz = h_consts.max_extrema;
-    dobuf_shadow.extrema      = popsift::cuda::malloc_devT<Extremum>( sz, __FILE__, __LINE__);
-    dobuf_shadow.features     = popsift::cuda::malloc_devT<Feature>( sz, __FILE__, __LINE__);
-    hbuf       .ext_allocated = sz;
-    dbuf_shadow.ext_allocated = sz;
+    dobuf.extrema  = new Extremum[sz];
+    dobuf.features = new Feature[sz];
+    dbuf.ext_allocated = sz;
 
     sz = max( 2 * h_consts.max_extrema, h_consts.max_orientations );
-    hbuf       .desc               = popsift::cuda::malloc_hstT<Descriptor>( sz, __FILE__, __LINE__);
-    dbuf_shadow.desc               = popsift::cuda::malloc_devT<Descriptor>( sz, __FILE__, __LINE__);
-    dobuf_shadow.feat_to_ext_map   = popsift::cuda::malloc_devT<int>( sz, __FILE__, __LINE__);
-    hbuf       .ori_allocated = sz;
-    dbuf_shadow.ori_allocated = sz;
-
-    cudaMemcpyToSymbol( dbuf,  &dbuf_shadow,  sizeof(ExtremaBuffers), 0, cudaMemcpyHostToDevice );
-    cudaMemcpyToSymbol( dobuf, &dobuf_shadow, sizeof(DevBuffers),     0, cudaMemcpyHostToDevice );
-
-    cudaStreamCreate( &_download_stream );
+    dbuf.desc             = new Descriptor[sz];
+    dobuf.feat_to_ext_map = new int[sz];
+    dbuf.ori_allocated    = sz;
 }
 
 void Pyramid::resetDimensions( const Config& conf, int width, int height )
@@ -173,31 +155,24 @@ void Pyramid::reallocExtrema( int numExtrema )
 {
     if( numExtrema > hbuf.ext_allocated ) {
         numExtrema = ( ( numExtrema + 1024 ) & ( ~(1024-1) ) );
-        cudaFree( dobuf_shadow.extrema );
-        cudaFree( dobuf_shadow.features );
+        delete [] dobuf.extrema;
+        delete [] dobuf.features;
 
         int sz = numExtrema;
-        dobuf_shadow.extrema  = popsift::cuda::malloc_devT<Extremum>( sz, __FILE__, __LINE__);
-        dobuf_shadow.features = popsift::cuda::malloc_devT<Feature>( sz, __FILE__, __LINE__);
-        hbuf       .ext_allocated = sz;
-        dbuf_shadow.ext_allocated = sz;
+        dobuf.extrema  = new Extremum[sz];
+        dobuf.features = new Feature[sz];
+        dbuf.ext_allocated = sz;
 
         numExtrema *= 2;
-        if( numExtrema > hbuf.ori_allocated ) {
-            cudaFreeHost( hbuf       .desc );
-            cudaFree(     dbuf_shadow.desc );
-            cudaFree(     dobuf_shadow.feat_to_ext_map );
+        if( numExtrema > dbuf.ori_allocated ) {
+            delete [] dbuf.desc;
+            delete [] dobuf.feat_to_ext_map;
 
             sz = numExtrema;
-            hbuf       .desc             = popsift::cuda::malloc_hstT<Descriptor>( sz, __FILE__, __LINE__);
-            dbuf_shadow.desc             = popsift::cuda::malloc_devT<Descriptor>( sz, __FILE__, __LINE__);
-            dobuf_shadow.feat_to_ext_map = popsift::cuda::malloc_devT<int>( sz, __FILE__, __LINE__);
-            hbuf       .ori_allocated = sz;
-            dbuf_shadow.ori_allocated = sz;
+            dbuf.desc             = new Descriptor[sz];
+            dobuf.feat_to_ext_map = new int[sz];
+            dbuf.ori_allocated = sz;
         }
-
-        cudaMemcpyToSymbol( dbuf,  &dbuf_shadow,  sizeof(ExtremaBuffers), 0, cudaMemcpyHostToDevice );
-        cudaMemcpyToSymbol( dobuf, &dobuf_shadow, sizeof(DevBuffers),     0, cudaMemcpyHostToDevice );
     }
 }
 
@@ -205,14 +180,14 @@ Pyramid::~Pyramid()
 {
     cudaStreamDestroy( _download_stream );
 
-    cudaFree(     _d_extrema_num_blocks );
-    cudaFree(     dobuf_shadow.i_ext_dat[0] );
-    cudaFree(     dobuf_shadow.i_ext_off[0] );
-    cudaFree(     dobuf_shadow.features );
-    cudaFree(     dobuf_shadow.extrema );
-    cudaFreeHost( hbuf        .desc );
-    cudaFree(     dbuf_shadow .desc );
-    cudaFree(     dobuf_shadow.feat_to_ext_map );
+    delete [] _d_extrema_num_blocks;
+
+    delete [] dobuf.i_ext_dat[0];
+    delete [] dobuf.i_ext_off[0];
+    delete [] dobuf.features;
+    delete [] dobuf.extrema;
+    delete [] dbuf.desc;
+    delete [] dobuf.feat_to_ext_map;
 
     delete[] _octaves;
 }
@@ -240,35 +215,41 @@ void Pyramid::step2( const Config& conf )
  * This is possible because pointer arithmetic between Intel hosts and NVidia
  * GPUs are compatible.
  */
-__global__
-void prep_features( Descriptor* descriptor_base, int up_fac )
+void prep_features( Grid& g, Descriptor* descriptor_base, int up_fac )
 {
-    int offset = blockIdx.x * 32 + threadIdx.x;
-    if( offset >= dct.ext_total ) return;
-    const Extremum& ext = dobuf.extrema [offset];
-    Feature&        fet = dobuf.features[offset];
+    g.reset();
+    while( g.nextBlock() )
+    {
+        while( g.nextX() )
+        {
+            int offset = g.blockIdx.x * 32 + g.threadIdx.x;
+            if( offset >= dct.ext_total ) return;
+            const Extremum& ext = dobuf.extrema [offset];
+            Feature&        fet = dobuf.features[offset];
 
-    const int   octave  = ext.octave;
-    const float xpos    = ext.xpos  * powf(2.0f, float(octave - up_fac));
-    const float ypos    = ext.ypos  * powf(2.0f, float(octave - up_fac));
-    const float sigma   = ext.sigma * powf(2.0f, float(octave - up_fac));
-    const int   num_ori = ext.num_ori;
+            const int   octave  = ext.octave;
+            const float xpos    = ext.xpos  * powf(2.0f, float(octave - up_fac));
+            const float ypos    = ext.ypos  * powf(2.0f, float(octave - up_fac));
+            const float sigma   = ext.sigma * powf(2.0f, float(octave - up_fac));
+            const int   num_ori = ext.num_ori;
 
-    fet.xpos    = xpos;
-    fet.ypos    = ypos;
-    fet.sigma   = sigma;
-    fet.num_ori = num_ori;
+            fet.xpos    = xpos;
+            fet.ypos    = ypos;
+            fet.sigma   = sigma;
+            fet.num_ori = num_ori;
 
-    fet.debug_octave = octave;
+            fet.debug_octave = octave;
 
-    int ori;
-    for( ori = 0; ori<num_ori; ori++ ) {
-        fet.desc[ori]        = descriptor_base + ( ext.idx_ori + ori );
-        fet.orientation[ori] = ext.orientation[ori];
-    }
-    for( ; ori<ORIENTATION_MAX_COUNT; ori++ ) {
-        fet.desc[ori]        = nullptr;
-        fet.orientation[ori] = 0;
+            int ori;
+            for( ori = 0; ori<num_ori; ori++ ) {
+                fet.desc[ori]        = descriptor_base + ( ext.idx_ori + ori );
+                fet.orientation[ori] = ext.orientation[ori];
+            }
+            for( ; ori<ORIENTATION_MAX_COUNT; ori++ ) {
+                fet.desc[ori]        = nullptr;
+                fet.orientation[ori] = 0;
+            }
+        }
     }
 }
 
@@ -276,32 +257,27 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
 {
     const float up_fac = conf.getUpscaleFactor();
 
-    readDescCountersFromDevice();
+    FeaturesHost* features = new FeaturesHost( dct.ext_total, dct.ori_total );
 
-    FeaturesHost* features = new FeaturesHost( hct.ext_total, hct.ori_total );
-
-    if( hct.ext_total == 0 || hct.ori_total == 0 )
+    if( dct.ext_total == 0 || dct.ori_total == 0 )
     {
         return features;
     }
 
-    dim3 grid( grid_divide( hct.ext_total, 32 ) );
-    prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
-    POP_SYNC_CHK;
+    Grid g;
+    g.setGridDim( grid_divide( dct.ext_total, 32 ) );
+    g.setBlockDim( 32 );
+
+    prep_features( g, features->getDescriptors(), up_fac );
 
     features->pin( );
-    popcuda_memcpy_async( features->getFeatures(),
-                          dobuf_shadow.features,
-                          hct.ext_total * sizeof(Feature),
-                          cudaMemcpyDeviceToHost,
-                          _download_stream );
+    memcpy( features->getFeatures(),
+            dobuf.features,
+            dct.ext_total * sizeof(Feature) );
 
-    popcuda_memcpy_async( features->getDescriptors(),
-                          dbuf_shadow.desc,
-                          hct.ori_total * sizeof(Descriptor),
-                          cudaMemcpyDeviceToHost,
-                          _download_stream );
-    cudaStreamSynchronize( _download_stream );
+    memcpy( features->getDescriptors(),
+            dbuf.desc,
+            dct.ori_total * sizeof(Descriptor) );
     features->unpin( );
 
     return features;
@@ -311,69 +287,39 @@ void Pyramid::clone_device_descriptors_sub( const Config& conf, FeaturesDev* fea
 {
     const float up_fac = conf.getUpscaleFactor();
 
-    dim3 grid( grid_divide( hct.ext_total, 32 ) );
-    prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
-    POP_SYNC_CHK;
+    Grid g;
+    g.setGridDim( grid_divide( dct.ext_total, 32 ) );
+    g.setBlockDim( 32 );
 
-    popcuda_memcpy_async( features->getFeatures(),
-                          dobuf_shadow.features,
-                          hct.ext_total * sizeof(Feature),
-                          cudaMemcpyDeviceToDevice,
-                          _download_stream );
+    prep_features( g, features->getDescriptors(), up_fac );
 
-    popcuda_memcpy_async( features->getDescriptors(),
-                          dbuf_shadow.desc,
-                          hct.ori_total * sizeof(Descriptor),
-                          cudaMemcpyDeviceToDevice,
-                          _download_stream );
+    memcpy( features->getFeatures(),
+            dobuf.features,
+            dct.ext_total * sizeof(Feature) );
 
-    popcuda_memcpy_async( features->getReverseMap(),
-                          dobuf_shadow.feat_to_ext_map,
-                          hct.ori_total * sizeof(int),
-                          cudaMemcpyDeviceToDevice,
-                          _download_stream );
+    memcpy( features->getDescriptors(),
+            dbuf.desc,
+            dct.ori_total * sizeof(Descriptor) );
+
+    memcpy( features->getReverseMap(),
+            dobuf.feat_to_ext_map,
+            dct.ori_total * sizeof(int) );
 }
 
 FeaturesDev* Pyramid::clone_device_descriptors( const Config& conf )
 {
-    readDescCountersFromDevice();
-
-    FeaturesDev* features = new FeaturesDev( hct.ext_total, hct.ori_total );
+    FeaturesDev* features = new FeaturesDev( dct.ext_total, dct.ori_total );
 
     clone_device_descriptors_sub( conf, features );
-
-    cudaStreamSynchronize( _download_stream );
 
     return features;
 }
 
 void Pyramid::reset_extrema_mgmt()
 {
-    memset( &hct,         0, sizeof(ExtremaCounters) );
-    cudaMemcpyToSymbol( dct, &hct, sizeof(ExtremaCounters), 0, cudaMemcpyHostToDevice );
+    memset( &dct, 0, sizeof(ExtremaCounters) );
+    memset( _d_extrema_num_blocks, 0, _num_octaves * sizeof(int) );
 
-    popcuda_memset_sync( _d_extrema_num_blocks, 0, _num_octaves * sizeof(int) );
-
-}
-
-void Pyramid::readDescCountersFromDevice( )
-{
-    cudaMemcpyFromSymbol( &hct, dct, sizeof(ExtremaCounters), 0, cudaMemcpyDeviceToHost );
-}
-
-void Pyramid::readDescCountersFromDevice( cudaStream_t s )
-{
-    cudaMemcpyFromSymbolAsync( &hct, dct, sizeof(ExtremaCounters), 0, cudaMemcpyDeviceToHost, s );
-}
-
-void Pyramid::writeDescCountersToDevice( )
-{
-    cudaMemcpyToSymbol( dct, &hct, sizeof(ExtremaCounters), 0, cudaMemcpyHostToDevice );
-}
-
-void Pyramid::writeDescCountersToDevice( cudaStream_t s )
-{
-    cudaMemcpyToSymbolAsync( dct, &hct, sizeof(ExtremaCounters), 0, cudaMemcpyHostToDevice, s );
 }
 
 int* Pyramid::getNumberOfBlocks( int octave )
@@ -390,7 +336,7 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* 
 
     const float up_fac = conf.getUpscaleFactor();
 
-    for( int ext_idx = 0; ext_idx<hct.ext_total; ext_idx++ ) {
+    for( int ext_idx = 0; ext_idx<dct.ext_total; ext_idx++ ) {
         const Feature& ext = features->getFeatures()[ext_idx];
         const int   octave  = ext.debug_octave;
         const float xpos    = ext.xpos  * pow(2.0f, octave - up_fac);

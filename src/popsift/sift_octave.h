@@ -34,12 +34,8 @@ class Octave
     int   _levels{};
     int   _gauss_group{};
 
-    cudaArray_t           _data{};
+    float*                _data{};
     cudaChannelFormatDesc _data_desc{};
-    cudaExtent            _data_ext{};
-    cudaSurfaceObject_t   _data_surf{};
-    cudaTextureObject_t   _data_tex_point{};
-    LinearTexture         _data_tex_linear{};
 
     cudaArray_t           _intm{};
     cudaChannelFormatDesc _intm_desc{};
@@ -150,22 +146,12 @@ public:
 
 private:
     void alloc_data_planes( );
-    void alloc_data_tex( );
     void alloc_interm_array( );
-    void alloc_interm_tex( );
     void alloc_dog_array( );
-    void alloc_dog_tex( );
-    void alloc_streams( );
-    void alloc_events( );
 
-    void free_events( );
-    void free_streams( );
-    void free_dog_tex( );
-    void free_dog_array( );
-    void free_interm_tex( );
-    void free_interm_array( );
-    void free_data_tex( );
     void free_data_planes( );
+    void free_interm_array( );
+    void free_dog_array( );
 };
 
 } // namespace popsift

@@ -22,11 +22,9 @@
 
 using namespace std;
 
-PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode, ImageMode imode, int device )
+PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode mode, ImageMode imode )
     : _image_mode( imode )
-    , _device(device)
 {
-    cudaSetDevice(_device);
     configure(config);
 
     if( imode == ByteImages )
@@ -47,12 +45,9 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
         _pipe._thread_stage2.reset( new std::thread( &PopSift::matchPrepareLoop, this ));
 }
 
-PopSift::PopSift( ImageMode imode, int device )
+PopSift::PopSift( ImageMode imode )
     : _image_mode( imode )
-    , _device(device)
 {
-    cudaSetDevice(_device);
-
     if( imode == ByteImages )
     {
         _pipe._unused.push( new popsift::Image);
@@ -167,75 +162,13 @@ void PopSift::uninit( )
 
 PopSift::AllocTest PopSift::testTextureFit( int width, int height )
 {
-    const bool warn = popsift::cuda::device_prop_t::dont_warn;
-    bool retval = _device_properties.checkLimit_2DtexLinear( width,
-                                                        height,
-                                                        warn );
-    if( !retval )
-    {
-        return AllocTest::ImageExceedsLinearTextureLimit;
-    }
-
-
-    /* Scale the width and height - we need that size for the largest
-     * octave. */
-    private_apply_scale_factor( width, height );
-
-    /* _config.level does not contain the 3 blur levels beyond the first
-     * that is required for downscaling to the following octave.
-     * We need all layers to check if we can support enough layers.
-     */
-    int depth = _config.levels + 3;
-
-    retval = _device_properties.checkLimit_2DsurfLayered( width,
-                                                          height,
-                                                          depth,
-                                                          warn );
-
-    return (retval ? AllocTest::Ok : AllocTest::ImageExceedsLayeredSurfaceLimit);
+    return AllocTest::Ok;
 }
 
 std::string PopSift::testTextureFitErrorString( AllocTest err, int width, int height )
 {
     ostringstream ostr;
-
-    switch( err )
-    {
-        case AllocTest::Ok :
-            ostr << "?    No error." << endl;
-            break;
-        case AllocTest::ImageExceedsLinearTextureLimit :
-            _device_properties.checkLimit_2DtexLinear( width, height, false );
-            ostr << "E    Cannot load unscaled image. " << endl
-                 << "E    It exceeds the max CUDA linear texture size. " << endl
-                 << "E    Max is (" << width << "," << height << ")" << endl;
-            break;
-        case AllocTest::ImageExceedsLayeredSurfaceLimit :
-            {
-                const float upscaleFactor = _config.getUpscaleFactor();
-                const float scaleFactor = 1.0f / powf( 2.0f, -upscaleFactor );
-                int w = ceilf( width  * scaleFactor );
-                int h = ceilf( height * scaleFactor );
-                int d = _config.levels + 3;
-
-                _device_properties.checkLimit_2DsurfLayered( w, h, d, false );
-
-                w = w / scaleFactor;
-                h = h / scaleFactor;
-                ostr << "E    Cannot use"
-                     << (upscaleFactor==1 ? " default " : " ")
-                     << "downscaling factor " << -upscaleFactor
-                     << " (i.e. upscaling by " << pow(2,upscaleFactor) << "). "
-                     << endl
-                     << "E    It exceeds the max CUDA layered surface size. " << endl
-                     << "E    Change downscaling to fit into (" << w << "," << h
-                     << ") with " << (d-3) << " levels per octave." << endl;
-            }
-            break;
-        default:
-            ostr << "E    Programming error, please report." << endl;
-            break;
-    }
+    ostr << "?    No error." << endl;
     return ostr.str();
 }
 
@@ -292,8 +225,6 @@ SiftJob* PopSift::enqueue( int          w,
 
 void PopSift::uploadImages( )
 {
-    cudaSetDevice(_device);
-
     SiftJob* job;
     while( ( job = _pipe._queue_stage1.pull() ) != nullptr ) {
         popsift::ImageBase* img = _pipe._unused.pull();
@@ -305,7 +236,6 @@ void PopSift::uploadImages( )
 
 void PopSift::extractDownloadLoop( )
 {
-    cudaSetDevice(_device);
     applyConfiguration(true);
 
     Pipe& p = _pipe;
@@ -325,8 +255,6 @@ void PopSift::extractDownloadLoop( )
 
         popsift::FeaturesHost* features = p._pyramid->get_descriptors( _config );
 
-        cudaDeviceSynchronize();
-
         bool log_to_file = ( _config.getLogMode() == popsift::Config::All );
         if( log_to_file ) {
             // int octaves = p._pyramid->getNumOctaves();
@@ -345,7 +273,6 @@ void PopSift::extractDownloadLoop( )
 
 void PopSift::matchPrepareLoop( )
 {
-    cudaSetDevice(_device);
     applyConfiguration(true);
 
     Pipe& p = _pipe;
@@ -367,7 +294,6 @@ void PopSift::matchPrepareLoop( )
             p._pyramid->step2(_config);
 
             features = p._pyramid->clone_device_descriptors(_config);
-            cudaDeviceSynchronize();
         }
         catch(const std::exception& e)
         {

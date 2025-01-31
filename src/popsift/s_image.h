@@ -57,11 +57,6 @@ protected:
     int _h;     // height of current image
     int _max_w; // allocated width  of image
     int _max_h; // allocated height of image
-
-    /* Texture information for input image on device */
-    cudaTextureObject_t _input_image_tex{};
-    cudaTextureDesc     _input_image_texDesc{};
-    cudaResourceDesc    _input_image_resDesc{};
 };
 
 /*************************************************************
@@ -92,14 +87,8 @@ struct Image : public ImageBase
 
 private:
     void allocate( int w, int h ) override;
-    void createTexture( ) override;
-    void destroyTexture( ) override;
 
 private:
-    /* 2D plane holding input image on host for uploading
-     * to device. */
-    Plane2D_uint8 _input_image_h;
-
     /* 2D plane holding input image on device for upscaling */
     Plane2D_uint8 _input_image_d;
 };
@@ -132,14 +121,8 @@ struct ImageFloat : public ImageBase
 
 private:
     void allocate( int w, int h ) override;
-    void createTexture( ) override;
-    void destroyTexture( ) override;
 
 private:
-    /* 2D plane holding input image on host for uploading
-     * to device. */
-    Plane2D_float _input_image_h;
-
     /* 2D plane holding input image on device for upscaling */
     Plane2D_float _input_image_d;
 };

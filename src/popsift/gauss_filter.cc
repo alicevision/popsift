@@ -15,13 +15,8 @@ using namespace std;
 
 namespace popsift {
 
-__device__ __constant__
-GaussInfo d_gauss;
-
 __align__(128) thread_local GaussInfo h_gauss;
 
-
-__global__
 void print_gauss_filter_symbol( int columns )
 {
     printf( "\n"
@@ -29,16 +24,16 @@ void print_gauss_filter_symbol( int columns )
             "      level span sigma : center value -> edge value\n"
             "    relative sigma\n" );
 
-    for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
-        int span = d_gauss.inc.span[lvl] + d_gauss.inc.span[lvl] - 1;
+    for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
+        int span = h_gauss.inc.span[lvl] + h_gauss.inc.span[lvl] - 1;
 
         printf("      %d %d ", lvl, span );
-        printf("%2.6f: ", d_gauss.inc.sigma[lvl] );
-        int m = min( d_gauss.inc.span[lvl], columns );
+        printf("%2.6f: ", h_gauss.inc.sigma[lvl] );
+        int m = min( h_gauss.inc.span[lvl], columns );
         for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.inc.filter[lvl*GAUSS_ALIGN+x] );
+            printf("%0.8f ", h_gauss.inc.filter[lvl*GAUSS_ALIGN+x] );
         }
-        if( m < d_gauss.inc.span[lvl] )
+        if( m < h_gauss.inc.span[lvl] )
             printf("...\n");
         else
             printf("\n");
@@ -49,16 +44,16 @@ void print_gauss_filter_symbol( int columns )
             "Gauss tables for hardware interpolation\n"
             "      level span sigma : center value -> ( interpolation value, multiplier ) [one edge value] \n" );
 
-    for( int lvl=0; lvl<d_gauss.required_filter_stages; lvl++ ) {
-        int span = d_gauss.inc.i_span[lvl] + d_gauss.inc.i_span[lvl] - 1;
+    for( int lvl=0; lvl<h_gauss.required_filter_stages; lvl++ ) {
+        int span = h_gauss.inc.i_span[lvl] + h_gauss.inc.i_span[lvl] - 1;
 
         printf("      %d %d ", lvl, span );
-        printf("%2.6f: ", d_gauss.inc.sigma[lvl] );
-        int m = min( d_gauss.inc.i_span[lvl], columns );
+        printf("%2.6f: ", h_gauss.inc.sigma[lvl] );
+        int m = min( h_gauss.inc.i_span[lvl], columns );
         for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.inc.i_filter[lvl*GAUSS_ALIGN+x] );
+            printf("%0.8f ", h_gauss.inc.i_filter[lvl*GAUSS_ALIGN+x] );
         }
-        if( m < d_gauss.inc.i_span[lvl] )
+        if( m < h_gauss.inc.i_span[lvl] )
             printf("...\n");
         else
             printf("\n");
@@ -70,14 +65,14 @@ void print_gauss_filter_symbol( int columns )
             "    level 0-filters for direct downscaling\n");
 
     for( int lvl=0; lvl<MAX_OCTAVES; lvl++ ) {
-        int span = d_gauss.dd.span[lvl] + d_gauss.dd.span[lvl] - 1;
+        int span = h_gauss.dd.span[lvl] + h_gauss.dd.span[lvl] - 1;
 
-        printf("      %d %d %2.6f: ", lvl, span, d_gauss.dd.sigma[lvl] );
-        int m = min( d_gauss.dd.span[lvl], columns );
+        printf("      %d %d %2.6f: ", lvl, span, h_gauss.dd.sigma[lvl] );
+        int m = min( h_gauss.dd.span[lvl], columns );
         for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.dd.filter[lvl*GAUSS_ALIGN+x] );
+            printf("%0.8f ", h_gauss.dd.filter[lvl*GAUSS_ALIGN+x] );
         }
-        if( m < d_gauss.dd.span[lvl] )
+        if( m < h_gauss.dd.span[lvl] )
             printf("...\n");
         else
             printf("\n");
@@ -170,40 +165,23 @@ void init_filter( const Config& conf,
     h_gauss.dd.sigma[0] = b;
     h_gauss.dd.computeBlurTable( &h_gauss );
 
-    cudaError_t err;
-    err = cudaMemcpyToSymbol( d_gauss,
-                              &h_gauss,
-                              sizeof(GaussInfo),
-                              0,
-                              cudaMemcpyHostToDevice );
-    POP_CUDA_FATAL_TEST( err, "cudaMemcpyToSymbol failed for Gauss kernel initialization: " );
-
-    if( conf.ifPrintGaussTables() ) {
-        print_gauss_filter_symbol
-            <<<1,1>>>
-            ( 10 );
-
-        POP_SYNC_CHK;
-
-        err = cudaGetLastError();
-        POP_CUDA_FATAL_TEST( err, "Gauss Symbol info failed: " );
+    if( conf.ifPrintGaussTables() )
+    {
+        print_gauss_filter_symbol( 10 );
     }
 }
 
-__host__
 void GaussInfo::clearTables( )
 {
-    inc            .clearTables();
-    dd             .clearTables();
+    inc.clearTables();
+    dd .clearTables();
 }
 
-__host__
 void GaussInfo::setSpanMode( Config::GaussMode m )
 {
     _span_mode = m;
 }
 
-__host__
 int GaussInfo::getSpan( float sigma ) const
 {
     /* This is the VLFeat computation for choosing the Gaussian filter width.
@@ -213,7 +191,6 @@ int GaussInfo::getSpan( float sigma ) const
 }
 
 template<int LEVELS>
-__host__
 void GaussTable<LEVELS>::clearTables( )
 {
     for( int i=0; i<GAUSS_ALIGN * LEVELS; i++ ) {
@@ -223,7 +200,6 @@ void GaussTable<LEVELS>::clearTables( )
 }
 
 template<int LEVELS>
-__host__
 void GaussTable<LEVELS>::computeBlurTable( const GaussInfo* info )
 {
     for( int level=0; level<LEVELS; level++ ) {
@@ -257,7 +233,6 @@ void GaussTable<LEVELS>::computeBlurTable( const GaussInfo* info )
 }
 
 template<int LEVELS>
-__host__
 void GaussTable<LEVELS>::transformBlurTable( )
 {
     for( int level=0; level<LEVELS; level++ ) {

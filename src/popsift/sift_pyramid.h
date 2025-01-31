@@ -50,13 +50,9 @@ struct DevBuffers
     Feature*         features;
 };
 
-extern thread_local ExtremaCounters hct;
-extern __device__   ExtremaCounters dct;
-extern thread_local ExtremaBuffers  hbuf;
-extern __device__   ExtremaBuffers  dbuf;
-extern thread_local ExtremaBuffers  dbuf_shadow; // just for managing memories
-extern __device__   DevBuffers      dobuf;
-extern thread_local DevBuffers      dobuf_shadow; // just for managing memories
+extern thread_local ExtremaCounters dct;
+extern thread_local ExtremaBuffers  dbuf;
+extern thread_local DevBuffers      dobuf;
 
 class Pyramid
 {
@@ -72,9 +68,6 @@ class Pyramid
 
     /* used to implement a global barrier per octave */
     int*         _d_extrema_num_blocks;
-
-    /* the download of converted descriptors should be asynchronous */
-    cudaStream_t _download_stream;
 
 public:
     enum GaussTableChoice {
@@ -113,18 +106,17 @@ public:
 
 private:
     void horiz_from_input_image( const Config&    conf,
-                                 ImageBase*       base,
-					             cudaStream_t     stream );
-    inline void downscale_from_prev_octave( int octave, cudaStream_t stream );
+                                 ImageBase*       base );
+    inline void downscale_from_prev_octave( int octave );
 
-    void        horiz_from_prev_level_basic( int octave, int level, cudaStream_t stream );
-    void        horiz_from_prev_level_pairs( int octave, int level, cudaStream_t stream );
-    inline void horiz_from_prev_level( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss );
-    void        vert_from_interm_basic( int octave, int level, cudaStream_t stream );
-    void        vert_from_interm_pairs( int octave, int level, cudaStream_t stream );
-    inline void vert_from_interm( int octave, int level, cudaStream_t stream, GaussTableChoice useInterpolatedGauss );
+    void        horiz_from_prev_level_basic( int octave, int level );
+    void        horiz_from_prev_level_pairs( int octave, int level );
+    inline void horiz_from_prev_level( int octave, int level, GaussTableChoice useInterpolatedGauss );
+    void        vert_from_interm_basic( int octave, int level );
+    void        vert_from_interm_pairs( int octave, int level );
+    inline void vert_from_interm( int octave, int level, GaussTableChoice useInterpolatedGauss );
 
-    inline void dogs_from_blurred( int octave, int max_level, cudaStream_t stream );
+    inline void dogs_from_blurred( int octave, int max_level );
 
     void reset_extrema_mgmt( );
     void build_pyramid( const Config& conf, ImageBase* base );
@@ -136,10 +128,6 @@ private:
 
     void descriptors( const Config& conf );
 
-    void readDescCountersFromDevice( );
-    void readDescCountersFromDevice( cudaStream_t s );
-    void writeDescCountersToDevice( );
-    void writeDescCountersToDevice( cudaStream_t s );
     int* getNumberOfBlocks( int octave );
     void writeDescriptor( const Config& conf, std::ostream& ostr, FeaturesHost* features, bool really, bool with_orientation );
 

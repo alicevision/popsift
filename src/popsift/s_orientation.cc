@@ -29,7 +29,6 @@ using namespace std;
 namespace popsift
 {
 
-__device__
 inline float compute_angle( int bin, float hc, float hn, float hp )
 {
     /* interpolate */

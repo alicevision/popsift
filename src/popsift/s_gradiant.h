@@ -31,7 +31,7 @@ namespace popsift
  * every first level of every octave ... which is not compatible
  * behaviour.
  */
-__device__ static inline
+static inline
 void get_gradiant( float& grad,
                    float& theta,
                    int    x,
@@ -48,11 +48,12 @@ void get_gradiant( float& grad,
     }
 }
 
+#if 0
 /* get_gradiant() works for both point texture and linear interpolation
  * textures. The reason is that readTex must add 0.5 for coordinates in
  * both cases to access the expected pixel.
  */
-__device__ static inline
+static inline
 void get_gradiant( float&              grad,
                    float&              theta,
                    const int           x,
@@ -60,46 +61,42 @@ void get_gradiant( float&              grad,
                    cudaTextureObject_t layer,
                    const int           level )
 {
-    float dx = readTex( layer, x+1.0f, y, level )
-             - readTex( layer, x-1.0f, y, level );
-    float dy = readTex( layer, x, y+1.0f, level )
-             - readTex( layer, x, y-1.0f, level );
+    float dx = layer[level].ptr(y)[x+1]
+             - layer[level].ptr(y)[x-1];
+    float dy = layer[level].ptr(y+1)[x]
+             - layer[level].ptr(y-1)[x];
     grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
     theta    = atan2f(dy, dx);
 }
+#endif
 
 /* A version of get_gradiant that works for a (32,1,1) threadblock
  * and pulls data to shared memory before computing. Data is pulled
  * less frequently, meaning that we do not rely on the L1 cache.
  */
-__device__ static inline
-void get_gradiant32( float&              grad,
+static inline
+void get_gradiant32( Grid& g,
+                     float&              grad,
                      float&              theta,
                      const int           x,
                      const int           y,
                      cudaTextureObject_t layer,
                      const int           level )
 {
-    const int idx = threadIdx.x;
+    const int idx = g.threadIdx.x;
 
-    __shared__ float x_array[34];
+    const float dx = layer[level].ptr(y)[x+idx+1]
+                   - layer[level].ptr(y)[x+idx-1];
 
-    for( int i=idx; i<34; i += blockDim.x )
-    {
-        x_array[i] = readTex( layer, x+i-1.0f, y, level );
-    }
-    __syncthreads();
-
-    const float dx = x_array[idx+2]  - x_array[idx];
-
-    const float dy = readTex( layer, x+idx, y+1.0f, level )
-                   - readTex( layer, x+idx, y-1.0f, level );
+    const float dy = layer[level].ptr(y+1)[x+idx]
+                   - layer[level].ptr(y-1)[x+idx];
 
     grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
     theta    = atan2f(dy, dx);
 }
 
-__device__ static inline
+#if 0
+static inline
 void get_gradiant( float&              grad,
                    float&              theta,
                    float               x,
@@ -116,6 +113,7 @@ void get_gradiant( float&              grad,
     grad     = hypotf( dx, dy );
     theta    = atan2f( dy, dx );
 }
+#endif
 
 }; // namespace popsift
 

@@ -7,28 +7,36 @@
  */
 #pragma once
 
+#include "common/grid.h"
 #include "s_desc_norm_l2.h"
 #include "s_desc_norm_rs.h"
 #include "sift_extremum.h"
 
 template<class T>
-__global__
-void normalize_histogram( )
+void normalize_histogram( Grid g )
 {
-    Descriptor* descs            = dbuf.desc;
-    const int   num_orientations = dct.ori_total;
+    g.resetBlock();
+    while( g.nextBlock() )
+    {
+        Descriptor* descs            = dbuf.desc;
+        const int   num_orientations = dct.ori_total;
 
-    int offset = blockIdx.x * 32 + threadIdx.y;
+        int offset = g.blockIdx.x * 32 + g.threadIdx.y;
 
-    // all of these threads are useless
-    if( blockIdx.x * 32 >= num_orientations ) return;
+        // all of these threads are useless
+        if( g.blockIdx.x * 32 >= num_orientations ) return;
 
-    offset = ( offset < num_orientations ) ? offset
-                                           : num_orientations-1;
-    Descriptor* desc = &descs[offset];
+        offset = ( offset < num_orientations ) ? offset
+                                               : num_orientations-1;
+        Descriptor* desc = &descs[offset];
 
-    bool ignoreme = ( offset >= num_orientations );
+        bool ignoreme = ( offset >= num_orientations );
 
-    T::normalize( desc->features, ignoreme );
+        g.resetThreadYZ();
+        while( g.nextThreadYZ() )
+        {
+            T::normalize( desc->features, ignoreme );
+        }
+    }
 }
 

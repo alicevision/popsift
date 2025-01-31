@@ -15,64 +15,56 @@ using namespace std;
 class NormalizeRootSift
 {
 public:
-    __device__ static inline
-    void normalize( float* features, bool ignoreme );
+    static inline
+    void normalize( Grid& g, float* features, bool ignoreme );
 
-    __device__ static inline
-    void normalize_restrict( const float* __restrict__ src_desc,
-                             float* __restrict__       dest_desc );
-
-    __device__ static inline void normalize(const float* src_desc, float* dest_desc, bool ignoreme);
+    static inline
+    void normalize( Grid& g, const float* src_desc, float* dest_desc, bool ignoreme);
 };
 
-__device__ inline
-void NormalizeRootSift::normalize( float* features, bool ignoreme )
+inline
+void NormalizeRootSift::normalize( Grid& g, float* features, bool ignoreme )
 {
-    normalize( features, features, ignoreme );
+    normalize( g, features, features, ignoreme );
 }
 
-__device__ inline
-void NormalizeRootSift::normalize_restrict( const float* __restrict__ src_desc,
-                                            float* __restrict__       dst_desc )
+inline
+void NormalizeRootSift::normalize( Grid& g, const float* src_desc, float* dst_desc, bool ignoreme )
 {
-    normalize( src_desc, dst_desc, false );
-}
+  float sum = 0;
 
-__device__ inline
-void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, bool ignoreme )
-{
+  g.resetThreadX();
+  while( g.nextThreadX() )
+  {
     const float4* ptr4 = (const float4*)src_desc;
 
     float4 descr;
-    descr = ptr4[threadIdx.x];
+    descr = ptr4[g.threadIdx.x];
 
-    float sum = descr.x + descr.y + descr.z + descr.w;
+    sum += descr.x + descr.y + descr.z + descr.w;
+  }
 
-    sum += popsift::shuffle_down( sum, 16 );
-    sum += popsift::shuffle_down( sum,  8 );
-    sum += popsift::shuffle_down( sum,  4 );
-    sum += popsift::shuffle_down( sum,  2 );
-    sum += popsift::shuffle_down( sum,  1 );
-
-    sum = popsift::shuffle( sum,  0 );
-
+  g.resetThreadX();
+  while( g.nextThreadX() )
+  {
     float val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.x, sum ) ),
+    val = scalbnf( sqrtf( descr.x / sum ),
                    d_consts.norm_multi );
     descr.x = val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.y, sum ) ),
+    val = scalbnf( sqrtf( descr.y / sum ),
                    d_consts.norm_multi );
     descr.y = val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.z, sum ) ),
+    val = scalbnf( sqrtf( descr.z / sum ),
                    d_consts.norm_multi );
     descr.z = val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.w, sum ) ),
+    val = scalbnf( sqrtf( descr.w / sum ),
                    d_consts.norm_multi );
     descr.w = val;
 
     if( ! ignoreme ) {
         float4* out4 = (float4*)dst_desc;
-        out4[threadIdx.x] = descr;
+        out4[g.threadIdx.x] = descr;
     }
+  }
 }
 

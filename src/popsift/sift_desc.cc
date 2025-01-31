@@ -7,6 +7,7 @@
  */
 #include "common/assist.h"
 #include "common/debug_macros.h"
+#include "common/grid.h"
 #include "s_desc_vlfeat.h"
 #include "s_desc_normalize.h"
 #include "s_gradiant.h"
@@ -55,19 +56,14 @@ void Pyramid::descriptors( const Config& conf )
         return;
     }
 
-    dim3 block;
-    dim3 grid;
-    grid.x  = grid_divide( hct.ori_total, 32 );
-    block.x = 32;
-    block.y = 32;
-    block.z = 1;
+    Grid g;
+    g.setGridDim( grid_divide( hct.ori_total, 32 ) );
+    g.setBlockDim( 32, 32, 1 );
 
     if( conf.getUseRootSift() ) {
-        normalize_histogram<NormalizeRootSift> <<<grid,block,0,_download_stream>>> ( );
+        normalize_histogram<NormalizeRootSift>( g );
     } else {
-        normalize_histogram<NormalizeL2> <<<grid,block,0,_download_stream>>> ( );
+        normalize_histogram<NormalizeL2>( g );
     }
-
-    cudaDeviceSynchronize( );
 }
 

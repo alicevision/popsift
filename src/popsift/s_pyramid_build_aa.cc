@@ -14,15 +14,18 @@
 namespace popsift {
 namespace absoluteSource {
 
-__global__ static void horiz(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
+static void horiz( Grid& g,
+                   cudaTextureObject_t src_data,
+                   cudaSurfaceObject_t dst_data,
+                   int dst_level)
 {
     const int    src_level = dst_level - 1;
     const int    span      =  d_gauss.inc.span[dst_level];
     const float* filter    = &d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
-    const int    block_x   = blockIdx.x * blockDim.x;
-    const int    block_y   = blockIdx.y * blockDim.y;
-    const int    xpos      = block_x + threadIdx.x;
-    const int    ypos      = block_y + threadIdx.y;
+    const int    block_x   = g.blockIdx.x * g.blockDim.x;
+    const int    block_y   = g.blockIdx.y * g.blockDim.y;
+    const int    xpos      = block_x + g.threadIdx.x;
+    const int    ypos      = block_y + g.threadIdx.y;
 
     int   idx;
     float g;
@@ -33,29 +36,32 @@ __global__ static void horiz(cudaTextureObject_t src_point_texture, cudaSurfaceO
         g  = filter[offset];
 
         idx = xpos - offset;
-        val = readTex( src_point_texture, idx, ypos, src_level );
+        val = src_data[src_level].ptr(ypos)[idx];
         out += ( val * g );
 
         idx = xpos + offset;
-        val = readTex( src_point_texture, idx, ypos, src_level );
+        val = src_data[src_level].ptr(ypos)[idx];
         out += ( val * g );
     }
 
     g  = filter[0];
-    val = readTex( src_point_texture, xpos, ypos, src_level );
+    val = src_data[src_level].ptr(ypos)[xpos];
     out += ( val * g );
 
-    surf2DLayeredwrite( out, dst_data, xpos*4, ypos, dst_level, cudaBoundaryModeZero );
+    dst_data[dst_level].ptr(ypos)[xpos] = out;
 }
 
-__global__ static void vert(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
+static void vert( Grid& g,
+                  cudaTextureObject_t src_point_texture,
+                  cudaSurfaceObject_t dst_data,
+                  int dst_level)
 {
     const int    span    =  d_gauss.inc.span[dst_level];
     const float* filter  = &d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
-    const int    block_x = blockIdx.x * blockDim.x;
-    const int    block_y = blockIdx.y * blockDim.y;
-    const int    xpos    = block_x + threadIdx.x;
-    const int    ypos    = block_y + threadIdx.y;
+    const int    block_x = g.blockIdx.x * g.blockDim.x;
+    const int    block_y = g.blockIdx.y * g.blockDim.y;
+    const int    xpos    = block_x + g.threadIdx.x;
+    const int    ypos    = block_y + g.threadIdx.y;
 
     int   idy;
     float g;
@@ -66,19 +72,19 @@ __global__ static void vert(cudaTextureObject_t src_point_texture, cudaSurfaceOb
         g  = filter[offset];
 
         idy = ypos - offset;
-        val = readTex( src_point_texture, xpos, idy, dst_level );
+        val = src_data[dst_level].ptr(idy)[xpos];
         out += ( val * g );
 
         idy = ypos + offset;
-        val = readTex( src_point_texture, xpos, idy, dst_level );
+        val = src_data[dst_level].ptr(idy)[xpos];
         out += ( val * g );
     }
 
     g  = filter[0];
-    val = readTex( src_point_texture, xpos, ypos, dst_level );
+    val = src_data[dst_level].ptr(ypos)[xpos];
     out += ( val * g );
 
-    surf2DLayeredwrite( out, dst_data, xpos*4, ypos, dst_level, cudaBoundaryModeZero );
+    dst_data[dst_level].ptr(ypos)[xpos] = out;
 }
 
 } // namespace absoluteSource
@@ -91,18 +97,20 @@ void Pyramid::horiz_from_prev_level_basic( int octave, int level, cudaStream_t s
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    // similar speed: dim3 block( 32,  4 ); dim3 block( 32,  3 ); dim3 block( 32,  2 );
-    dim3 block( 32,  8 ); // most stable good perf on GTX 980 TI
-    dim3 grid;
-    grid.x  = grid_divide( width,  32 );
-    grid.y  = grid_divide( height, block.y );
+    Grid g;
+    g.setBlock( 32, 8, 1 );
+    g.setGrid( grid_divide( width,  32 ),
+               grid_divide( height, 8 ),
+               1 );
 
-    absoluteSource::horiz
-        <<<grid,block,0,stream>>>
-        ( oct_obj.getDataTexPoint( ),
-          oct_obj.getIntermediateSurface( ),
-          level );
-    POP_SYNC_CHK;
+    g.reset();
+    do {
+        absoluteSource::horiz
+            ( g,
+              oct_obj.getDataTexPoint( ),
+              oct_obj.getIntermediateSurface( ),
+              level );
+    } while( g.next() );
 }
 
 __host__
@@ -113,17 +121,20 @@ void Pyramid::vert_from_interm_basic( int octave, int level, cudaStream_t stream
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    dim3 block( 64, 2 );
-    dim3 grid;
-    grid.x = (unsigned int)grid_divide( width,  block.x );
-    grid.y = (unsigned int)grid_divide( height, block.y );
+    Grid g;
+    g.setBlock( 64, 2, 1 ).
+    g.setGrid( grid_divide( width,  64 ),
+               grid_divide( height, 2 ),
+               1 );
 
-    absoluteSource::vert
-        <<<grid,block,0,stream>>>
-        ( oct_obj.getIntermDataTexPoint( ),
-          oct_obj.getDataSurface( ),
-          level );
-    POP_SYNC_CHK;
+    g.reset();
+    do {
+        absoluteSource::vert
+            ( g,
+              oct_obj.getIntermDataTexPoint( ),
+              oct_obj.getDataSurface( ),
+              level );
+    } while( g.next() );
 }
 
 } // namespace popsift

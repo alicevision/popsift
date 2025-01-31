@@ -7,8 +7,6 @@
  */
 #pragma once
 
-#include <cuda_runtime.h>
-
 #ifndef INF
 #define INF               (1<<29)
 #endif
@@ -52,13 +50,7 @@
 
 // Lowe wants at most 3 orientations at every extremum,
 // VLFeat uses at most 4
-#undef  LOWE_ORIENTATION_MAX
-
-#ifdef LOWE_ORIENTATION_MAX
-#define ORIENTATION_MAX_COUNT 3
-#else
 #define ORIENTATION_MAX_COUNT 4
-#endif
 
 namespace popsift {
 
@@ -76,7 +68,6 @@ struct ConstInfo
 };
 
 extern thread_local            ConstInfo h_consts;
-extern __device__ __constant__ ConstInfo d_consts;
 
 
 void init_constants( float sigma0, int levels, float threshold, float edge_limit, int max_extrema, int normalization_multiplier );
