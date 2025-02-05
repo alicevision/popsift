@@ -47,14 +47,14 @@ Image::Image( )
 Image::Image( int w, int h )
     : ImageBase( w, h )
 {
-    allocate( w, h );
+    _input_image_d.alloc( w, h );
 }
 
 Image::~Image( )
 {
     if( _max_w == 0 ) return;
 
-    _input_image_d.freeDev( );
+    _input_image_d.dealloc( );
 }
 
 void Image::load( void* input )
@@ -62,38 +62,17 @@ void Image::load( void* input )
     /* We copy the input because it would be necessary for CUDA.
      * Eliminate eventually.
      */
-    memcpy( _input_image_d.data, input, _w*_h );
+    _input_image_d.copyToPlane( input );
 }
 
 void Image::resetDimensions( int w, int h )
 {
-    if( _max_w == 0 && _max_h == 0 ) {
-        _max_w = _w = w;
-        _max_h = _h = h;
-        allocate( w, h );
-        return;
-    }
-
-    if( w == _w && h == _h ) return;
-        /* everything OK, nothing to do */
-
-    _w = w;
-    _h = h;
-
-    if( w <= _max_w && h <= _max_h ) {
-        _input_image_d.resetDimensionsDev( w, h );
-    } else {
-        _max_w = max( w, _max_w );
-        _max_h = max( h, _max_h );
-        _input_image_d.freeDev( );
-        _input_image_d.allocDev(  _max_w, _max_h );
-        _input_image_d.resetDimensionsDev( w, h );
-    }
+    _input_image_d.resetDimensions( w, h );
 }
 
 void Image::allocate( int w, int h )
 {
-    _input_image_d.allocDev( w, h );
+    _input_image_d.alloc( w, h );
 }
 
 /*************************************************************
@@ -108,51 +87,29 @@ ImageFloat::ImageFloat( )
 ImageFloat::ImageFloat( int w, int h )
     : ImageBase( w, h )
 {
-    allocate( w, h );
+    _input_image_d.alloc( w, h );
 }
 
 ImageFloat::~ImageFloat( )
 {
     if( _max_w == 0 ) return;
 
-    destroyTexture( );
-    _input_image_d.freeDev( );
+    _input_image_d.dealloc( );
 }
 
 void ImageFloat::load( void* input )
 {
-    memcpy( _input_image_d.data, input, _w*_h*sizeof(float) );
+    _input_image_d.copyToPlane( input );
 }
 
 void ImageFloat::resetDimensions( int w, int h )
 {
-    if( _max_w == 0 && _max_h == 0 ) {
-        _max_w = _w = w;
-        _max_h = _h = h;
-        allocate( w, h );
-        return;
-    }
-
-    if( w == _w && h == _h ) return;
-        /* everything OK, nothing to do */
-
-    _w = w;
-    _h = h;
-
-    if( w <= _max_w && h <= _max_h ) {
-        _input_image_d.resetDimensionsDev( w, h );
-    } else {
-        _max_w = max( w, _max_w );
-        _max_h = max( h, _max_h );
-        _input_image_d.freeDev( );
-        _input_image_d.allocDev(  _max_w, _max_h );
-        _input_image_d.resetDimensionsDev( w, h );
-    }
+    _input_image_d.resetDimensions( w, h );
 }
 
 void ImageFloat::allocate( int w, int h )
 {
-    _input_image_d.allocDev( w, h );
+    _input_image_d.alloc( w, h );
 }
 
 } // namespace popsift

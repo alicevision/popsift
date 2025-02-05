@@ -15,60 +15,62 @@
 namespace popsift {
 namespace normalizedSource {
 
-__global__ static void horiz( cudaTextureObject_t src_linear_tex,
-                              cudaSurfaceObject_t dst_data,
-                              int                 dst_w,
-                              int                 dst_h,
-                              float               shift )
+static void horiz( Grid g,
+                   PlaneD<float>& src,
+                   PlaneD<float>& dst,
+                   float          shift )
 {
-    // Create octave-0 - level-0 from the input image.
-    const int    write_x = blockIdx.x * blockDim.x + threadIdx.x;
-    const int    write_y = blockIdx.y;
+    while( g.next() )
+    {
+        // Create octave-0 - level-0 from the input image.
+        const int write_x = g.blockIdx.x * g.blockDim.x + g.threadIdx.x;
+        const int write_y = g.blockIdx.y;
+        const int write_z = 0;
 
-    if( write_x >= dst_w ) return;
+        if( write_x >= dst_w ) return;
 
-    const int    span    =  d_gauss.dd.span[0];
-    const float* filter  = &d_gauss.dd.filter[0];
-    const float  read_x  = ( blockIdx.x * blockDim.x + threadIdx.x + shift ) / dst_w;
-    const float  read_y  = ( blockIdx.y + shift ) / dst_h;
+        const int    span    =  d_gauss.dd.span[0];
+        const float* filter  = &d_gauss.dd.filter[0];
+        const float  read_x  = ( g.blockIdx.x * g.blockDim.x + g.threadIdx.x + shift ) / dst_w;
+        const float  read_y  = ( g.blockIdx.y + shift ) / dst_h;
 
-    float out = 0.0f;
+        float out = 0.0f;
 
-    #pragma unroll
-    for( int offset = span; offset>0; offset-- ) {
-        const float& g  = filter[offset];
-        const float  offrel = float(offset) / dst_w;
-        const float  v1 = tex2D<float>( src_linear_tex, read_x - offrel, read_y );
-        const float  v2 = tex2D<float>( src_linear_tex, read_x + offrel, read_y );
-        out += ( ( v1 + v2 ) * g );
+        #pragma unroll
+        for( int offset = span; offset>0; offset-- ) {
+            const float& g  = filter[offset];
+            const float  offrel = float(offset) / dst_w;
+            const float  v1 = src.get( PlaneD<float>::NormalLinear, read_y, read_x - offrel );
+            const float  v2 = src.get( PlaneD<float>::NormalLinear, read_y, read_x + offrel );
+            out += ( ( v1 + v2 ) * g );
+        }
+        const float& g  = filter[0];
+        const float v3 = src.get( PlaneD<float>::NormalLinear, read_y, read_x );
+        out += ( v3 * g );
+
+        dst[write_z,write_y,write_x] = out * 255.0f;
     }
-    const float& g  = filter[0];
-    const float v3 = tex2D<float>( src_linear_tex, read_x, read_y );
-    out += ( v3 * g );
-
-    surf2DLayeredwrite( out * 255.0f, dst_data, write_x*4, write_y, 0, cudaBoundaryModeZero );
 }
 
 } // namespace normalizedSource
 
-__host__
-void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base, cudaStream_t stream )
+void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base )
 {
     Octave&   oct_obj = _octaves[0];
 
     const int width   = oct_obj.getWidth();
     const int height  = oct_obj.getHeight();
 
-    dim3 block( 128, 1 );
-    dim3 grid;
-    grid.x  = grid_divide( width,  128 );
-    grid.y  = height;
+    Grid g;
+    get.setGrid( grid_divide( width, 128 ),
+                 height );
+    get.setBlock( 128, 1, 1 );
 
     float shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() );
 
     normalizedSource::horiz
-        <<<grid,block,0,stream>>>
-        ( base->getInputTexture(),
+        ( G,
+          base,
           oct_obj.getIntermediateSurface(),
           width,
           height,

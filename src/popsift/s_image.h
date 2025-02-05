@@ -40,23 +40,11 @@ struct ImageBase
      */
     virtual void load( void* input ) = 0;
 
-    inline cudaTextureObject_t& getInputTexture() {
-        return _input_image_tex;
-    }
-
     inline int getWidth()  const { return _w; }
     inline int getHeight() const { return _h; }
 
 private:
     virtual void allocate( int w, int h ) = 0;
-    virtual void createTexture( ) = 0;
-    virtual void destroyTexture( ) = 0;
-
-protected:
-    int _w;     // width  of current image
-    int _h;     // height of current image
-    int _max_w; // allocated width  of image
-    int _max_h; // allocated height of image
 };
 
 /*************************************************************
