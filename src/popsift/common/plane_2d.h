@@ -15,7 +15,7 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
-#include <shared_ptr>
+#include <memory> // for shared pointer
 
 #include "debug_macros.h"
 #include "plane_base.h"
@@ -102,8 +102,6 @@ public:
 typedef PlaneD<uint8_t>      Plane2D_uint8;
 typedef PlaneD<uint16_t>     Plane2D_uint16;
 typedef PlaneD<float>        Plane2D_float;
-typedef PlaneD<uchar2>       Plane2D_uchar_2;
-typedef PlaneD<float4>       Plane2D_float_4;
 
 } // namespace popsift
 

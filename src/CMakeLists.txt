@@ -25,11 +25,10 @@ add_library(popsift
         popsift/s_solve.h
         popsift/common/assist.cc popsift/common/assist.h
         popsift/common/clamp.h
-        popsift/common/plane_base.c popsift/common/plane_base.h
+        popsift/common/plane_base.cc popsift/common/plane_base.h
         popsift/common/plane_2d.h
         popsift/common/write_plane_2d.cc popsift/common/write_plane_2d.h
         popsift/common/debug_macros.cc popsift/common/debug_macros.h
-        popsift/common/device_prop.c.ccopsift/common/device_prop.h
         popsift/common/warp_bitonic_sort.h
         popsift/common/excl_blk_prefix_sum.h
         popsift/common/vec_macros.h

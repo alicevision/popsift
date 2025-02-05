@@ -133,8 +133,6 @@ bool PopSift::private_init( int w, int h )
 
     p._pyramid = new popsift::Pyramid( _config, w, h );
 
-    cudaDeviceSynchronize();
-
     return true;
 }
 

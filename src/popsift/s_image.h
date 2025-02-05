@@ -35,8 +35,8 @@ struct ImageBase
      */
     virtual void load( void* input ) = 0;
 
-    inline int getWidth()  const { return _w; }
-    inline int getHeight() const { return _h; }
+    virtual int getWidth()  const = 0;
+    virtual int getHeight() const = 0;
 };
 
 /*************************************************************
@@ -63,6 +63,9 @@ struct Image : public ImageBase
      * an image in pinned memory.
      */
     virtual void load( void* input ) override;
+
+    virtual int getWidth()  const override { return _input_image_d.getDimX(); }
+    virtual int getHeight() const override { return _input_image_d.getDimY(); }
 
 private:
     void allocate( int w, int h );
@@ -96,6 +99,9 @@ struct ImageFloat : public ImageBase
      * an image in pinned memory.
      */
     virtual void load( void* input ) override;
+
+    virtual int getWidth()  const override { return _input_image_d.getDimX(); }
+    virtual int getHeight() const override { return _input_image_d.getDimY(); }
 
 private:
     void allocate( int w, int h );
