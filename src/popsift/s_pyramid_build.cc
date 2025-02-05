@@ -176,16 +176,6 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level )
 __host__
 void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
 {
-#if (PYRAMID_PRINT_DEBUG==1)
-    cerr << "Entering " << __FUNCTION__ << " with base image "  << endl
-         << "    type size         : " << base->type_size << endl
-         << "    aligned byte size : " << base->a_width << "x" << base->a_height << endl
-         << "    pitch size        : " << base->pitch << "x" << base->a_height << endl
-         << "    original byte size: " << base->u_width << "x" << base->u_height << endl
-         << "    aligned pix size  : " << base->a_width/base->type_size << "x" << base->a_height << endl
-         << "    original pix size : " << base->u_width/base->type_size << "x" << base->u_height << endl;
-#endif // (PYRAMID_PRINT_DEBUG==1)
-
     GaussTableChoice gaussTableChoice;
 
     gaussTableChoice = NotInterpolated_FromPrevious;
