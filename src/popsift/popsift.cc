@@ -185,14 +185,6 @@ SiftJob* PopSift::enqueue( int                  w,
         POP_FATAL(ss.str());
     }
 
-    AllocTest a = testTextureFit( w, h );
-    if( a != AllocTest::Ok )
-    {
-        cerr << __FILE__ << ":" << __LINE__ << " Image too large" << endl
-             << testTextureFitErrorString( a,w,h );
-        return nullptr;
-    }
-
     SiftJob* job = new SiftJob( w, h, imageData );
     _pipe._queue_stage1.push( job );
     return job;
@@ -208,14 +200,6 @@ SiftJob* PopSift::enqueue( int          w,
         ss << "Image mode error" << endl
            << "E    Cannot load float images into a PopSift pipeline configured for byte images";
         POP_FATAL(ss.str());
-    }
-
-    AllocTest a = testTextureFit( w, h );
-    if( a != AllocTest::Ok )
-    {
-        cerr << __FILE__ << ":" << __LINE__ << " Image too large" << endl
-             << testTextureFitErrorString( a,w,h );
-        return nullptr;
     }
 
     SiftJob* job = new SiftJob( w, h, imageData );
