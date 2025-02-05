@@ -25,7 +25,8 @@ add_library(popsift
         popsift/s_solve.h
         popsift/common/assist.cc popsift/common/assist.h
         popsift/common/clamp.h
-        popsift/common/plane_2d.cc popsift/common/plane_2d.h
+        popsift/common/plane_base.c popsift/common/plane_base.h
+        popsift/common/plane_2d.h
         popsift/common/write_plane_2d.cc popsift/common/write_plane_2d.h
         popsift/common/debug_macros.cc popsift/common/debug_macros.h
         popsift/common/device_prop.c.ccopsift/common/device_prop.h
