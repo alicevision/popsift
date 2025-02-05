@@ -29,8 +29,8 @@ PopSift::PopSift( const popsift::Config& config, popsift::Config::ProcessingMode
 
     if( imode == ByteImages )
     {
-        _pipe._unused.push( new popsift::Image);
-        _pipe._unused.push( new popsift::Image);
+        _pipe._unused.push( new popsift::Image );
+        _pipe._unused.push( new popsift::Image );
     }
     else
     {

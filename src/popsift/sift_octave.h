@@ -11,116 +11,42 @@
 #include "sift_conf.h"
 #include "sift_constants.h"
 #include "sift_extremum.h"
+#include "common/plane_2d.h"
 
 #include <iostream>
 #include <vector>
 
 namespace popsift {
 
-struct LinearTexture
-{
-    cudaSurfaceObject_t tex;
-};
-
 class Octave
 {
     int   _w{};
     int   _h{};
-    int   _max_w{};
-    int   _max_h{};
+    int   _levels{};
+
     float _w_grid_divider{};
     float _h_grid_divider{};
     int   _debug_octave_id{};
-    int   _levels{};
-    int   _gauss_group{};
 
-    float*                _data{};
-    cudaChannelFormatDesc _data_desc{};
-
-    cudaArray_t           _intm{};
-    cudaChannelFormatDesc _intm_desc{};
-    cudaExtent            _intm_ext{};
-    cudaSurfaceObject_t   _intm_surf{};
-    cudaTextureObject_t   _intm_tex_point{};
-    LinearTexture         _intm_tex_linear{};
-
-    cudaArray_t           _dog_3d{};
-    cudaChannelFormatDesc _dog_3d_desc{};
-    cudaExtent            _dog_3d_ext{};
-    cudaSurfaceObject_t   _dog_3d_surf{};
-    cudaTextureObject_t   _dog_3d_tex_point{};
-
-    // one CUDA stream per level
-    // consider whether some of them can be removed
-    cudaStream_t _stream{};
-    cudaEvent_t  _scale_done{};
-    cudaEvent_t  _extrema_done{};
-    cudaEvent_t  _ori_done{};
-    cudaEvent_t  _desc_done{};
+    Plane2D_float _data;
+    Plane2D_float _intm;
+    Plane2D_float _dog_3d;
 
 public:
     Octave( );
     ~Octave( ) { this->free(); }
 
-    void resetDimensions( const Config& conf, int w, int h );
-
     inline void debugSetOctave( uint32_t o ) { _debug_octave_id = o; }
 
     inline int getLevels() const { return _levels; }
-    inline int getWidth() const  {
-        return _w;
-    }
-    inline int getHeight() const {
-        return _h;
-    }
+    inline int getWidth()  const { return _w; }
+    inline int getHeight() const { return _h; }
 
     inline float getWGridDivider() const  {
         return _w_grid_divider;
     }
     inline float getHGridDivider() const {
         return _h_grid_divider;
-    }
-
-    inline cudaStream_t getStream( ) {
-        return _stream;
-    }
-    inline cudaEvent_t getEventScaleDone( ) {
-        return _scale_done;
-    }
-    inline cudaEvent_t getEventExtremaDone( ) {
-        return _extrema_done;
-    }
-    inline cudaEvent_t getEventOriDone( ) {
-        return _ori_done;
-    }
-    inline cudaEvent_t getEventDescDone( ) {
-        return _desc_done;
-    }
-
-    inline LinearTexture getIntermDataTexLinear( ) {
-        return _intm_tex_linear;
-    }
-    inline cudaTextureObject_t getIntermDataTexPoint( ) const {
-        return _intm_tex_point;
-    }
-    inline LinearTexture getDataTexLinear( ) {
-        return _data_tex_linear;
-    }
-    inline cudaTextureObject_t getDataTexPoint( ) const {
-        return _data_tex_point;
-    }
-    inline cudaSurfaceObject_t getDataSurface( ) const {
-        return _data_surf;
-    }
-    inline cudaSurfaceObject_t getIntermediateSurface( ) const {
-        return _intm_surf;
-    }
-        
-    inline cudaSurfaceObject_t& getDogSurface( ) {
-        return _dog_3d_surf;
-    }
-    inline cudaTextureObject_t& getDogTexturePoint( ) {
-        return _dog_3d_tex_point;
     }
 
      /**
@@ -138,20 +64,13 @@ public:
                 int           gauss_group );
     void free();
 
+    void resetDimensions( const Config& conf, int w, int h );
+
     /**
      * debug:
      * download a level and write to disk
      */
     void download_and_save_array( const char* basename, int octave );
-
-private:
-    void alloc_data_planes( );
-    void alloc_interm_array( );
-    void alloc_dog_array( );
-
-    void free_data_planes( );
-    void free_interm_array( );
-    void free_dog_array( );
 };
 
 } // namespace popsift

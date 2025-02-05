@@ -30,18 +30,18 @@ namespace popsift {
 Octave::Octave()
 { }
 
-void Octave::alloc( const Config& conf, int width, int height, int levels, int gauss_group )
+void Octave::alloc( const Config& conf, int width, int height, int levels )
 {
-    _max_w = _w = width;
-    _max_h = _h = height;
+    _w = w;
+    _h = h;
     _levels = levels;
 
     _w_grid_divider = float(_w) / conf.getFilterGridSize();
     _h_grid_divider = float(_h) / conf.getFilterGridSize();
 
-    alloc_data_planes();
-    alloc_interm_array();
-    alloc_dog_array();
+    _data  .alloc( width, height, levels );
+    _intm  .alloc( width, height, levels );
+    _dog_3d.alloc( width, height, levels-1 );
 }
 
 void Octave::resetDimensions( const Config& conf, int w, int h )
@@ -56,25 +56,16 @@ void Octave::resetDimensions( const Config& conf, int w, int h )
     _w_grid_divider = float(_w) / conf.getFilterGridSize();
     _h_grid_divider = float(_h) / conf.getFilterGridSize();
 
-    if( _w > _max_w || _h > _max_h ) {
-        _max_w = max( _w, _max_w );
-        _max_h = max( _h, _max_h );
-    }
-
-    free_data_planes();
-    free_interm_array();
-    free_dog_array();
-
-    alloc_data_planes();
-    alloc_interm_array();
-    alloc_dog_array();
+    _data  .resetDimensions( width, height, _levels );
+    _intm  .resetDimensions( width, height, _levels );
+    _dog_3d.resetDimensions( width, height, _levels-1 );
 }
 
 void Octave::free()
 {
-    free_dog_array();
-    free_interm_array();
-    free_data_planes();
+    _data  .dealloc();
+    _intm  .dealloc();
+    _dog_3d.dealloc();
 }
 
 /*************************************************************
@@ -137,46 +128,5 @@ void Octave::download_and_save_array( const char* basename, int octave )
     }
 }
 
-void Octave::alloc_data_planes()
-{
-    _data_ext.width  = _w; // for cudaMalloc3DArray, width in elements
-    _data_ext.height = _h;
-    _data_ext.depth  = _levels;
-
-    _data = new float[_levels * _h * _w];
-}
-
-void Octave::free_data_planes()
-{
-    delete [] _data;
-}
-
-void Octave::alloc_interm_array()
-{
-    _intm_ext.width  = _w;
-    _intm_ext.height = _h;
-    _intm_ext.depth  = _levels;
-
-    _intm = new float[_levels * _h * _w];
-}
-
-void Octave::free_interm_array()
-{
-    delete [] _intm;
-}
-
-void Octave::alloc_dog_array()
-{
-    _dog_3d_ext.width = _w; // for cudaMalloc3DArray, width in elements
-    _dog_3d_ext.height = _h;
-    _dog_3d_ext.depth = _levels - 1;
-
-    _dog_3d = new float[ (_levels-1) * _h * _w ];
-}
-
-void Octave::free_dog_array()
-{
-    delete [] _dog_3d;
-}
-
 } // namespace popsift
+

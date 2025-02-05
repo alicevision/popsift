@@ -20,11 +20,6 @@ namespace popsift {
 
 struct ImageBase
 {
-    ImageBase( );
-
-    /** Create a device-sided buffer of the given dimensions */
-    ImageBase( int w, int h );
-
     virtual ~ImageBase( ) = default;
 
     /** Reallocation that takes care of pitch when new dimensions
@@ -42,9 +37,6 @@ struct ImageBase
 
     inline int getWidth()  const { return _w; }
     inline int getHeight() const { return _h; }
-
-private:
-    virtual void allocate( int w, int h ) = 0;
 };
 
 /*************************************************************
@@ -55,7 +47,6 @@ struct Image : public ImageBase
 {
     Image( );
 
-    /** Create a device-sided buffer of the given dimensions */
     Image( int w, int h );
 
     ~Image( ) override;
@@ -63,7 +54,7 @@ struct Image : public ImageBase
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
-    void resetDimensions( int w, int h ) override;
+    virtual void resetDimensions( int w, int h ) override;
 
     /* This loading function copies all image data to a local
      * buffer that is pinned in memory. We should offer two
@@ -71,10 +62,10 @@ struct Image : public ImageBase
      * if the image is already uploaded, and one that takes
      * an image in pinned memory.
      */
-    void load( void* input ) override;
+    virtual void load( void* input ) override;
 
 private:
-    void allocate( int w, int h ) override;
+    void allocate( int w, int h );
 
 private:
     /* 2D plane holding input image on device for upscaling */
@@ -89,7 +80,6 @@ struct ImageFloat : public ImageBase
 {
     ImageFloat( );
 
-    /** Create a device-sided buffer of the given dimensions */
     ImageFloat( int w, int h );
 
     ~ImageFloat( ) override;
@@ -97,7 +87,7 @@ struct ImageFloat : public ImageBase
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
-    void resetDimensions( int w, int h ) override;
+    virtual void resetDimensions( int w, int h ) override;
 
     /* This loading function copies all image data to a local
      * buffer that is pinned in memory. We should offer two
@@ -105,10 +95,10 @@ struct ImageFloat : public ImageBase
      * if the image is already uploaded, and one that takes
      * an image in pinned memory.
      */
-    void load( void* input ) override;
+    virtual void load( void* input ) override;
 
 private:
-    void allocate( int w, int h ) override;
+    void allocate( int w, int h );
 
 private:
     /* 2D plane holding input image on device for upscaling */
@@ -116,3 +106,4 @@ private:
 };
 
 } // namespace popsift
+

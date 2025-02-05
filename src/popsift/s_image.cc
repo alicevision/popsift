@@ -20,40 +20,19 @@ using namespace std;
 namespace popsift {
 
 /*************************************************************
- * ImageBase
- *************************************************************/
-
-ImageBase::ImageBase( )
-    : _w(0), _h(0)
-    , _max_w(0), _max_h(0)
-{
-}
-
-ImageBase::ImageBase( int w, int h )
-    : _w(w), _h(h)
-    , _max_w(w), _max_h(h)
-{
-}
-
-/*************************************************************
  * Image
  *************************************************************/
 
 Image::Image( )
-    : ImageBase( 0, 0 )
-{
-}
+{ }
 
 Image::Image( int w, int h )
-    : ImageBase( w, h )
 {
-    _input_image_d.alloc( w, h );
+    allocate( w, h );
 }
 
 Image::~Image( )
 {
-    if( _max_w == 0 ) return;
-
     _input_image_d.dealloc( );
 }
 
@@ -80,20 +59,15 @@ void Image::allocate( int w, int h )
  *************************************************************/
 
 ImageFloat::ImageFloat( )
-    : ImageBase( 0, 0 )
-{
-}
+{ }
 
 ImageFloat::ImageFloat( int w, int h )
-    : ImageBase( w, h )
 {
-    _input_image_d.alloc( w, h );
+    allocate( w, h );
 }
 
 ImageFloat::~ImageFloat( )
 {
-    if( _max_w == 0 ) return;
-
     _input_image_d.dealloc( );
 }
 
