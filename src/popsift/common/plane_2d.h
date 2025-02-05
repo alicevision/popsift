@@ -1,5 +1,6 @@
 /*
  * Copyright 2016, Simula Research Laboratory
+ *           2025, University of Oslo
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -14,116 +15,44 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <shared_ptr>
 
 #include "debug_macros.h"
+#include "plane_base.h"
 
 namespace popsift {
 
-enum PlaneMapMode
-{
-    AlignmentUndefined = 0,
-    Unaligned          = 2,
-    PageAligned        = 3
-};
-
 /*************************************************************
- * PlaneBase
- * Non-templated base class for plane allocations. Implements
- * CUDA and system calls in a separate C++ file.
+ * PlaneD
  *************************************************************/
-
-struct PlaneBase
+template <typename T> class PlaneD
 {
-    void* allocHost2D( int w, int h, int elemSize );
-
-    void freeHost2D( void* data );
-};
-
-/*************************************************************
- * PlaneT
- * Templated class containing the correctly typed pointer to
- * allocated data, and exposed the element size.
- *************************************************************/
-
-template <typename T> struct PlaneT : public PlaneBase
-{
-    typedef T elem_type;
-
-    enum { elem_size = sizeof(elem_type) };
-
-    T* data;
-
-    PlaneT( )      : data(0) { }
-    explicit PlaneT( T* d ) : data(d) { }
-
-    inline size_t elemSize() const { return elem_size; }
-};
-
-/*************************************************************
- * PitchPlane2D
- * Templated class containing the step size (CUDA terminology:
- * pitch) for a 2D plane. Able to return every rows of the
- * plane as pointer to elements (ie. array in the C sense).
- *************************************************************/
-
-template <typename T> struct PitchPlane2D : public PlaneT<T>
-{
-    PitchPlane2D( ) : _pitchInBytes(0) { }
-
-    PitchPlane2D( T* d, int s ) : PlaneT<T>(d) , _pitchInBytes(s) { }
-
-    inline const T* ptr( int y ) const {
-        return (const T*)( (const char*)this->data + y * _pitchInBytes );
-    }
-    inline       T* ptr( int y )       {
-        return (T*)( (char*)this->data + y * _pitchInBytes );
-    }
-
-    inline void allocHost( int w, int h ) {
-        this->data = (T*)PlaneBase::allocHost2D( w, h, this->elemSize(), mode );
-        this->_pitchInBytes = w * this->elemSize();
-    }
-
-    inline void freeHost( PlaneMapMode mode ) {
-        PlaneBase::freeHost2D( this->data, mode );
-    }
-    inline size_t getPitchInBytes( ) const { return _pitchInBytes; }
-
-protected:
-    size_t _pitchInBytes; // pitch width in bytes
-};
-
-/*************************************************************
- * Plane2D
- * Templated class containing the width and height (cols and
- * rows) of a 2D plane. Width is stored in terms of elements.
- *************************************************************/
-template <typename T> class Plane2D : public PitchPlane2D<T>
-{
-    short _cols;
-    short _rows;
+    std::shared_ptr<PlaneT<T> > _ptr {};
 
 public:
-    Plane2D( )
-        : _cols(0), _rows(0) { }
+    PlaneD( ) { }
 
-    Plane2D( int w, int h, T* d, int s )
-        : PitchPlane2D<T>(d,s), _cols(w), _rows(h) { }
-
-    Plane2D( int w, int h, const PitchPlane2D<T>& plane )
-        : PitchPlane2D<T>(plane)
-        , _cols(w)
-        , _rows(h) { }
-
-    template <typename U>
-    explicit Plane2D( const Plane2D<U>& orig )
-        : PitchPlane2D<T>( (T*)orig.data, orig._pitchInBytes )
-        , _rows( orig.getRows() )
+    PlaneD( int w )
     {
-        // careful computation: cols is a short
-        int width = orig.getCols() * orig.elemSize();
-        width /= this->elemSize();
-        _cols = width;
+        _ptr = new PlaneT<T>;
+        _ptr->alloc( w );
+    }
+
+    PlaneD( int w, int h )
+    {
+        _ptr = new PlaneT<T>;
+        _ptr->alloc( w, h );
+    }
+
+    PlaneD( int w, int h, int d )
+    {
+        _ptr = new PlaneT<T>;
+        _ptr->alloc( w, h, d );
+    }
+
+    PlaneD( const PlaneD<T>& plane )
+    {
+        _ptr = plane._ptr;
     }
 
     /** Overwrite the width and height information. Useful if smaller
@@ -131,53 +60,50 @@ public:
      *  without actually allocating again, but dangerous.
      *  @warning: pitch is updated (host side)
      */
-    void resetDimensionsHost( int w, int h );
-
-    inline short getCols( ) const { return _cols; }
-    inline short getWidth( ) const { return _cols; }
-    inline short getRows( ) const { return _rows; }
-    inline short getHeight( ) const { return _rows; }
-    inline size_t getByteSize( ) const { return this->_pitchInBytes * _rows; }
-
-    inline void allocHost( int w, int h, PlaneMapMode mode ) {
-        _cols = w;
-        _rows = h;
-        PitchPlane2D<T>::allocHost( w, h, mode );
+    inline void resetDimensions( int w = 1, int h = 1, int d = 1 ) {
+        ptr->resize( w, h, d );
     }
+
+    inline int getDimX( ) const     { return _ptr->getDimX(); }
+    inline int getDimY( ) const     { return _ptr->getDimY(); }
+    inline int getDimZ( ) const     { return _ptr->getDimZ(); }
+    inline int getByteSize( ) const { return _ptr->getByteSize(); }
+
+    inline void alloc( int w = 1, int h = 1, int d = 1 ) {
+        _ptr = new PlaneT<T>;
+        _ptr->alloc( w, h, d );
+    }
+
+    inline void dealloc( ) {
+        _ptr->dealloc();
+    }
+
+    inline void copyToPlane( T* src ) {
+        memcpy( _ptr->base(), src,  _ptr->getByteSize() );
+    }
+
+    inline       T& operator[]( int x )                     { return _ptr->deref( x ); }
+    inline const T& operator[]( int x ) const               { return _ptr->deref( x ); }
+    inline       T& operator[]( int y, int x )              { return _ptr->deref( y, x ); }
+    inline const T& operator[]( int y, int x ) const        { return _ptr->deref( y, x ); }
+    inline       T& operator[]( int z, int y, int x )       { return _ptr->deref( z, y, x ); }
+    inline const T& operator[]( int z, int y, int x ) const { return _ptr->deref( z, y, x ); }
+
+    inline T operator[]( PlaneMode m, float x ) const                   { return _ptr->get( m, x ); }
+    inline T operator[]( PlaneMode m, float y, float x ) const          { return _ptr->get( m, y, x ); }
+    inline T operator[]( PlaneMode m, float z, float y, float x ) const { return _ptr->get( m, z, y, x ); }
 };
 
 /*************************************************************
- * Plane2D - functions
- * member functions for PitchPlane2D that have been extracted
- * for readability.
- *************************************************************/
-
-template <typename T>
-__host__
-void Plane2D<T>::resetDimensionsHost( int w, int h )
-{
-    this->_cols = w;
-    this->_rows = h;
-    // on the host side, memory is contiguous (no padding) => pitch must be updated to match data
-    this->_pitchInBytes  = w * this->elemSize();
-}
-
-/*************************************************************
- * Plane2D_#type
+ * PlaneD#type
  * Typedefs for various template instances
  *************************************************************/
 
-typedef PitchPlane2D<uint8_t>  PitchPlane2D_uint8;
-typedef PitchPlane2D<uint16_t> PitchPlane2D_uint16;
-typedef PitchPlane2D<float>    PitchPlane2D_float;
-typedef PitchPlane2D<uchar2>   PitchPlane2D_uchar_2;
-typedef PitchPlane2D<float4>   PitchPlane2D_float_4;
-
-typedef Plane2D<uint8_t>      Plane2D_uint8;
-typedef Plane2D<uint16_t>     Plane2D_uint16;
-typedef Plane2D<float>        Plane2D_float;
-typedef Plane2D<uchar2>       Plane2D_uchar_2;
-typedef Plane2D<float4>       Plane2D_float_4;
+typedef PlaneD<uint8_t>      Plane2D_uint8;
+typedef PlaneD<uint16_t>     Plane2D_uint16;
+typedef PlaneD<float>        Plane2D_float;
+typedef PlaneD<uchar2>       Plane2D_uchar_2;
+typedef PlaneD<float4>       Plane2D_float_4;
 
 } // namespace popsift
 

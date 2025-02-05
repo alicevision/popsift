@@ -35,39 +35,32 @@ void* PlaneBase::allocHost2D( int w, int h, int elemSize, PlaneMapMode m )
 {
     int sz = w * h * elemSize;
 
-    if( m == Unaligned ) {
+    if( m == Unaligned )
+    {
         void* ptr = malloc( sz );
 
-        if( ptr != 0 ) return ptr;
+        if( ptr ) return ptr;
         
-#ifdef _GNU_SOURCE
-        char b[100];
-        const char* buf = strerror_r( errno, b, 100 );
-#else
-        const char *buf = strerror(errno);
-#endif
         stringstream ss;
         ss << "Failed to allocate " << sz << " bytes of unaligned host memory." << endl
-           << "Cause: " << buf;
+           << "Cause: " << strerror(errno);
         POP_FATAL(ss.str());
-    } else if(m == PageAligned) {
+    }
+    else if(m == PageAligned)
+    {
         void* ptr = memalign(getPageSize(), sz);
-        if(ptr)
-            return ptr;
 
-#ifdef _GNU_SOURCE
-        char b[100];
-        const char* buf = strerror_r( errno, b, 100 );
-#else
-		const char* buf = strerror(errno);
-#endif
+        if(ptr) return ptr;
+
         cerr << __FILE__ << ":" << __LINE__ << endl
              << "    Failed to allocate " << sz << " bytes of page-aligned host memory." << endl
-             << "    Cause: " << buf << endl
+             << "    Cause: " << strerror(errno) << endl
              << "    Trying to allocate unaligned instead." << endl;
 
         return allocHost2D( w, h, elemSize, Unaligned );
-    } else {
+    }
+    else
+    {
         POP_FATAL("Alignment not correctly specified in host plane allocation");
     }
 }
