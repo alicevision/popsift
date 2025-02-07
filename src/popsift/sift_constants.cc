@@ -9,6 +9,7 @@
 #include "sift_constants.h"
 
 #include <iostream>
+#include <cmath>
 
 using namespace std;
 
@@ -19,7 +20,7 @@ thread_local ConstInfo h_consts;
 void init_constants( float sigma0, int levels, float threshold, float edge_limit, int max_extrema, int normalization_multiplier )
 {
     h_consts.sigma0           = sigma0;
-    h_consts.sigma_k          = powf(2.0f, 1.0f / levels );
+    h_consts.sigma_k          = std::pow(2.0f, 1.0f / levels );
     h_consts.edge_limit       = edge_limit;
     h_consts.threshold        = threshold;
     h_consts.max_extrema      = max_extrema;
@@ -32,13 +33,13 @@ void init_constants( float sigma0, int levels, float threshold, float edge_limit
         for( int x=0; x<40; x++ ) {
             float dnx = dn_base + x * dn_step;
             float dny = dn_base + y * dn_step;
-            h_consts.desc_gauss[y][x] = expf( -scalbnf(dnx*dnx + dny*dny, -3));
+            h_consts.desc_gauss[y][x] = std::exp( -scalbnf(dnx*dnx + dny*dny, -3));
         }
     }
 
     for( int i=0; i<16; i++ ) {
         const float nx = -1.0f + 1.0f/16.0f + i * 1.0f/8.0f;
-        h_consts.desc_tile[i] = 1.0f - fabs(nx);
+        h_consts.desc_tile[i] = 1.0f - std::abs(nx);
     }
 }
 

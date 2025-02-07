@@ -38,9 +38,9 @@ public:
 
     inline void debugSetOctave( uint32_t o ) { _debug_octave_id = o; }
 
-    inline int getLevels() const { return _levels; }
     inline int getWidth()  const { return _w; }
     inline int getHeight() const { return _h; }
+    inline int getLevels() const { return _levels; }
 
     inline float getWGridDivider() const  {
         return _w_grid_divider;
@@ -49,19 +49,21 @@ public:
         return _h_grid_divider;
     }
 
+    inline Plane2D_float& getData()  { return _data; }
+    inline Plane2D_float& getIntm()  { return _intm; }
+    inline Plane2D_float& getDog()   { return _dog_3d; }
+
      /**
       * @brief Allocates all GPU memories for one octave.
       * @param conf
       * @param width in floats
       * @param height
       * @param levels
-      * @param gauss_group
       */
     void alloc( const Config& conf,
                 int           width,
                 int           height,
-                int           levels,
-                int           gauss_group );
+                int           levels );
     void free();
 
     void resetDimensions( const Config& conf, int w, int h );
@@ -74,3 +76,4 @@ public:
 };
 
 } // namespace popsift
+

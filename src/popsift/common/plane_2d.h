@@ -12,6 +12,7 @@
 #include <cerrno>
 #include <cinttypes>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -34,23 +35,23 @@ public:
 
     PlaneD( int w )
     {
-        _ptr = new PlaneT<T>;
+        _ptr.reset( new PlaneT<T> );
         _ptr->alloc( w );
     }
 
     PlaneD( int w, int h )
     {
-        _ptr = new PlaneT<T>;
+        _ptr.reset( new PlaneT<T> );
         _ptr->alloc( w, h );
     }
 
     PlaneD( int w, int h, int d )
     {
-        _ptr = new PlaneT<T>;
+        _ptr.reset( new PlaneT<T> );
         _ptr->alloc( w, h, d );
     }
 
-    PlaneD( const PlaneD<T>& plane )
+    PlaneD( PlaneD<T>& plane )
     {
         _ptr = plane._ptr;
     }
@@ -61,7 +62,7 @@ public:
      *  @warning: pitch is updated (host side)
      */
     inline void resetDimensions( int w = 1, int h = 1, int d = 1 ) {
-        ptr->resize( w, h, d );
+        _ptr->resize( w, h, d );
     }
 
     inline int getDimX( ) const     { return _ptr->getDimX(); }
@@ -70,7 +71,7 @@ public:
     inline int getByteSize( ) const { return _ptr->getByteSize(); }
 
     inline void alloc( int w = 1, int h = 1, int d = 1 ) {
-        _ptr = new PlaneT<T>;
+        _ptr.reset( new PlaneT<T> );
         _ptr->alloc( w, h, d );
     }
 
@@ -78,20 +79,58 @@ public:
         _ptr->dealloc();
     }
 
-    inline void copyToPlane( T* src ) {
-        memcpy( _ptr->base(), src,  _ptr->getByteSize() );
+    inline void memcpyFromBuffer( void* ptr ) {
+        std::memcpy( _ptr->base(), ptr,  _ptr->getByteSize() );
     }
 
-    inline       T& operator[]( int x )                     { return _ptr->deref( x ); }
-    inline const T& operator[]( int x ) const               { return _ptr->deref( x ); }
-    inline       T& operator[]( int y, int x )              { return _ptr->deref( y, x ); }
-    inline const T& operator[]( int y, int x ) const        { return _ptr->deref( y, x ); }
-    inline       T& operator[]( int z, int y, int x )       { return _ptr->deref( z, y, x ); }
-    inline const T& operator[]( int z, int y, int x ) const { return _ptr->deref( z, y, x ); }
+    inline void copyFrom( const PlaneD<T>& src ) {
 
-    inline T operator[]( PlaneMode m, float x ) const                   { return _ptr->get( m, x ); }
-    inline T operator[]( PlaneMode m, float y, float x ) const          { return _ptr->get( m, y, x ); }
-    inline T operator[]( PlaneMode m, float z, float y, float x ) const { return _ptr->get( m, z, y, x ); }
+        int w = src._ptr->getDimX();
+        int h = src._ptr->getDimY();
+        int d = src._ptr->getDimZ();
+        int p = src._ptr->getPitch();
+        resetDimensions( w, h, d );
+
+        if( _ptr->getPitch() != p ) {
+            std::cerr << "E     Alignment trouble, different pitches" << std::endl;
+        }
+
+        std::memcpy( _ptr->base(), src._ptr->base(),  _ptr->getByteSize() );
+    }
+
+    inline void copyFromPlane( const PlaneD<T>& src, int zLevel ) {
+        int w = src._ptr->getDimX();
+        int h = src._ptr->getDimY();
+        int d = 1;
+        int p = src._ptr->getPitch();
+        resetDimensions( w, h, d );
+
+        if( _ptr->getPitch() != p ) {
+            std::cerr << "E     Alignment trouble, different pitches" << std::endl;
+        }
+
+        std::memcpy( _ptr->base(), src._ptr->plane(zLevel),  p * h );
+    }
+
+    inline       T& get( int x )                     { return _ptr->deref( x ); }
+    inline       T& get( int y, int x )              { return _ptr->deref( y, x ); }
+    inline       T& get( int z, int y, int x )       { return _ptr->deref( z, y, x ); }
+    inline const T& get( int x ) const               { return _ptr->deref( x ); }
+    inline const T& get( int y, int x ) const        { return _ptr->deref( y, x ); }
+    inline const T& get( int z, int y, int x ) const { return _ptr->deref( z, y, x ); }
+
+    inline void set( int x, const T& v )               { _ptr->deref( x )       = v; }
+    inline void set( int y, int x, const T& v )        { _ptr->deref( y, x )    = v; }
+    inline void set( int z, int y, int x, const T& v ) { _ptr->deref( z, y, x ) = v; }
+
+    template <class M>
+    inline T get( M m, const float& x ) const                                 { return _ptr->get( m, x ); }
+
+    template <class M>
+    inline T get( M m, const float& y, const float& x ) const                 { return _ptr->get( m, y, x ); }
+
+    template <class M>
+    inline T get( M m, const float& z, const float& y, const float& x ) const { return _ptr->get( m, z, y, x ); }
 };
 
 /*************************************************************

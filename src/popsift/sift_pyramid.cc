@@ -7,6 +7,7 @@
 */
 
 #include "common/assist.h"
+#include "common/grid.h"
 #include "common/debug_macros.h"
 #include "sift_config.h"
 #include "sift_extremum.h"
@@ -15,6 +16,7 @@
 #include <sys/stat.h>
 
 #include <cstdio>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -111,7 +113,7 @@ Pyramid::Pyramid( const Config& config,
 
     for (int o = 0; o<_num_octaves; o++) {
         _octaves[o].debugSetOctave(o);
-        _octaves[o].alloc( config, w, h, _levels, _gauss_group );
+        _octaves[o].alloc( config, w, h, _levels );
         w = ceilf(w / 2.0f);
         h = ceilf(h / 2.0f);
     }
@@ -153,7 +155,7 @@ void Pyramid::resetDimensions( const Config& conf, int width, int height )
 
 void Pyramid::reallocExtrema( int numExtrema )
 {
-    if( numExtrema > hbuf.ext_allocated ) {
+    if( numExtrema > dbuf.ext_allocated ) {
         numExtrema = ( ( numExtrema + 1024 ) & ( ~(1024-1) ) );
         delete [] dobuf.extrema;
         delete [] dobuf.features;
@@ -178,8 +180,6 @@ void Pyramid::reallocExtrema( int numExtrema )
 
 Pyramid::~Pyramid()
 {
-    cudaStreamDestroy( _download_stream );
-
     delete [] _d_extrema_num_blocks;
 
     delete [] dobuf.i_ext_dat[0];

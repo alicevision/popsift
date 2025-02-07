@@ -19,11 +19,11 @@
   #ifdef M_PI
     #undef M_PI
   #endif
-  __device__ static const float M_PI = 3.14159265358979323846f;
+  static const float M_PI = 3.14159265358979323846f;
   #ifdef M_PI2
     #undef M_PI2
   #endif
-  __device__ static const float M_PI2 = 2.0f * 3.14159265358979323846f;
+  static const float M_PI2 = 2.0f * 3.14159265358979323846f;
   #define M_4RPI               (4.0f / M_PI)
 #else
   #ifndef M_PI

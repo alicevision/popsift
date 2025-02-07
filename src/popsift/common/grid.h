@@ -1,21 +1,6 @@
 #pragma once
 
-struct int3
-{
-    int x = 0;
-    int y = 0;
-    int z = 0;
-
-    int3( )       = default;
-
-    int3( int3& ) = default;
-
-    int3( int x_, int y_, int z_ )
-        : x(x_)
-        : y(y_)
-        : z(z_)
-    { }
-};
+#include "simd_types.h"
 
 struct Grid
 {
@@ -57,7 +42,9 @@ struct Grid
         blockIdx.x = blockIdx.y = blockIdx.z = 0;
     }
 
-    bool nextBlock( )
+    inline bool nextBlock( ) { return nextBlockXYZ(); }
+
+    bool nextBlockXYZ( )
     {
         if( blockIdx.x < gridDim.x )
         {
@@ -65,22 +52,39 @@ struct Grid
             if( blockIdx.x != gridDim.x ) return true;
 
             blockIdx.x = 0;
-            if( blockIdx.y < gridDim.y )
-            {
-                blockIdx.y++;
-                if( blockIdx.y != gridDim.y ) return true;
-
-                blockIdx.y = 0;
-                if( blockIdx.z < gridDim.z )
-                {
-                    blockIdx.z++;
-                    if( blockIdx.z != gridDim.z ) return true;
-
-                    blockIdx.z = 0;
-                }
-            }
+            return nextBlockYZ();
         }
         return false;
+    }
+
+    bool nextBlockYZ( )
+    {
+        if( blockIdx.y < gridDim.y )
+        {
+            blockIdx.y++;
+            if( blockIdx.y != gridDim.y ) return true;
+
+            blockIdx.y = 0;
+            return nextBlockZ();
+        }
+        return false;
+    }
+
+    bool nextBlockZ( )
+    {
+        if( blockIdx.z < gridDim.z )
+        {
+            blockIdx.z++;
+            if( blockIdx.z != gridDim.z ) return true;
+
+            blockIdx.z = 0;
+        }
+        return false;
+    }
+
+    void resetThreadXYZ( )
+    {
+        threadIdx.x = threadIdx.y = threadIdx.z = 0;
     }
 
     void resetThreadYZ( )
@@ -88,23 +92,9 @@ struct Grid
         threadIdx.y = threadIdx.z = 0;
     }
 
-    bool nextYZ( )
+    void resetThreadXY( )
     {
-        if( threadIdx.y < blockIdx.y )
-        {
-            threadIdx.y++;
-            if( threadIdx.y != blockDim.y ) return true;
-
-            threadIdx.y = 0;
-            if( threadIdx.z < blockDim.z )
-            {
-                threadIdx.z++;
-                if( threadIdx.z != blockDim.z ) return true;
-
-                threadIdx.z = 0;
-            }
-        }
-        return false;
+        threadIdx.x = threadIdx.y = 0;
     }
 
     void resetThreadX( )
@@ -112,16 +102,69 @@ struct Grid
         threadIdx.x = 0;
     }
 
+    bool nextXYZ( )
+    {
+        if( threadIdx.x >= blockIdx.x ) return false;
+
+        threadIdx.x++;
+        if( threadIdx.x != blockDim.x ) return true;
+
+        threadIdx.x = 0;
+        return nextYZ();
+    }
+
+    bool nextYZ( )
+    {
+        if( threadIdx.y >= blockIdx.y ) return false;
+
+        threadIdx.y++;
+        if( threadIdx.y != blockDim.y ) return true;
+
+        threadIdx.y = 0;
+        return nextZ();
+    }
+
+    bool nextZ( )
+    {
+        if( threadIdx.z >= blockDim.z ) return false;
+
+        threadIdx.z++;
+        if( threadIdx.z != blockDim.z ) return true;
+
+        threadIdx.z = 0;
+        return false;
+    }
+
+    bool nextY( )
+    {
+        if( threadIdx.y >= blockDim.y ) return false;
+
+        threadIdx.y++;
+        if( threadIdx.y != blockDim.y ) return true;
+
+        threadIdx.y = 0;
+        return false;
+    }
+
     bool nextX( )
     {
-        if( threadIdx.x < blockDim.x )
-        {
-            threadIdx.x++;
-            if( threadIdx.x != blockDim.x ) return true;
+        if( threadIdx.x >= blockDim.x ) return false;
 
-            threadIdx.x = 0;
-        }
+        threadIdx.x++;
+        if( threadIdx.x != blockDim.x ) return true;
+
+        threadIdx.x = 0;
         return false;
+    }
+
+    bool next( )
+    {
+        if( nextXYZ() ) return true;
+
+        if( nextBlockXYZ() )
+            return nextXYZ();
+        else
+            return false;
     }
 };
 

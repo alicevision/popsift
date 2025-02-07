@@ -7,6 +7,7 @@
  */
 #pragma once
 
+#include "common/simd_types.h"
 #include "sift_constants.h"
 
 #include <iostream>

@@ -32,16 +32,16 @@ enum MemMode
     CUDA3D             = 12   // cudaMalloc3D
 };
 
-/* Mode is used whenever we try to read from the plane with a float
+/* PlaneMode is used whenever we try to read from the plane with a float
  * index. The mode determines the interpolation mode and allows also
  * normalized access (relative to plane dimensions).
  */
-enum PlaneMode
+namespace PlaneMode
 {
-    Point,
-    Linear,
-    NormalPoint,
-    NormalLinear
+class Point { };
+class Linear { };
+class NormalPoint { };
+class NormalLinear { };
 };
 
 /*************************************************************
@@ -57,15 +57,15 @@ struct PlaneBase
         dealloc();
     }
 
-    bool alloc( int elemSize, int w, int h = 1, void d = 1 );
+    bool alloc( int elemSize, int w, int h = 1, int d = 1 );
     /*
      * when this is used for CUDA, add:
-     * bool alloc( int elemSize, MemMode m, int w, int h = 1, void d = 1 );
+     * bool alloc( int elemSize, MemMode m, int w, int h = 1, int d = 1 );
      */
 
-    void resize( int elemSize, int w, int h = 1, void d = 1 );
+    void resize( int elemSize, int w, int h = 1, int d = 1 );
 
-    void adopt( void* ptr, int elemSize, int w, int h = 1, void d = 1 );
+    void adopt( void* ptr, int elemSize, int w, int h = 1, int d = 1 );
 
     void dealloc( );
 
@@ -73,17 +73,38 @@ struct PlaneBase
         return _plane;
     }
 
+    inline const void* base() const {
+        return _plane;
+    }
+
     inline void* row( const int& y ) {
-        return _plane + ( y * _pitch );
+        return reinterpret_cast<char*>(_plane) + ( y * _pitch );
+    }
+
+    inline const void* row( const int& y ) const {
+        return reinterpret_cast<char*>(_plane) + ( y * _pitch );
     }
 
     inline void* row( const int& y, const int& z ) {
         return row( y + z * _y );
     }
 
-    inline int getDimX() const { return _x; }
-    inline int getDimY() const { return _y; }
-    inline int getDimZ() const { return _z; }
+    inline const void* row( const int& y, const int& z ) const {
+        return row( y + z * _y );
+    }
+
+    inline void* plane( const int& z ) {
+        return row( z * _y );
+    }
+
+    inline const void* plane( const int& z ) const {
+        return row( z * _y );
+    }
+
+    inline int getDimX()  const { return _x; }
+    inline int getDimY()  const { return _y; }
+    inline int getDimZ()  const { return _z; }
+    inline int getPitch() const { return _pitch; }
     inline int getByteSize() const { return _pitch * _y * _z; }
 
     inline int capX( const int& x ) const { return std::clamp( x, 0, _x-1 ); }
@@ -113,12 +134,12 @@ template <typename T> struct PlaneT : public PlaneBase
     PlaneT( ) { }
     // explicit PlaneT( T* d ) : PlaneBase(d) { }
 
-    inline void alloc( int w, int h = 1, void d = 1 )
+    inline void alloc( int w, int h = 1, int d = 1 )
     {
         PlaneBase::alloc( elemSize(), w, h, d );
     }
 
-    inline void adopt( T* ptr, int w, int h = 1, void d = 1 )
+    inline void adopt( T* ptr, int w, int h = 1, int d = 1 )
     {
         PlaneBase::adopt( ptr, elemSize(), w, h, d );
     }
@@ -154,11 +175,40 @@ template <typename T> struct PlaneT : public PlaneBase
         return ptr[x];
     }
 
+    inline const T& deref( int x ) const
+    {
+        x = capY( x );
+        T* ptr = (T*)PlaneBase::base();
+        return ptr[x];
+    }
+
+    inline const T& deref( int y, int x ) const
+    {
+        y = capX( y );
+        x = capY( x );
+        T* ptr = (T*)PlaneBase::row(y);
+        return ptr[x];
+    }
+
+    inline const T& deref( int z, int y, int x ) const
+    {
+        z = capZ( z );
+        y = capX( y );
+        x = capY( x );
+        T* ptr = (T*)PlaneBase::row(y,z);
+        return ptr[x];
+    }
+
     inline T interpolate( const float& frac, T a, T b ) const;
 
-    inline T get( PlaneMode m, const float& x ) const;
-    inline T get( PlaneMode m, const float& y, const float& x ) const;
-    inline T get( PlaneMode m, const float& z, const float& y, const float& x ) const;
+    template <class M>
+    inline T get( M m, const float& x ) const;
+
+    template <class M>
+    inline T get( M m, const float& y, const float& x ) const;
+
+    template <class M>
+    inline T get( M m, const float& z, const float& y, const float& x ) const;
 
     inline T getPoint( const float& x ) const;
     inline T getPoint( const float& y, const float& x ) const;
@@ -174,48 +224,47 @@ template <typename T> struct PlaneT : public PlaneBase
     inline T getNormalLinear( const float& z, const float& y, const float& x ) const;
 };
 
-inline T PlaneD<T>::get( Mode m, const float& x ) const
+template <typename T>
+template <class M>
+inline T PlaneT<T>::get( M m, const float& x ) const
 {
-    switch( m )
-    {
-    default :
-    case Point        : return getPoint( x );
-    case Linear       : return getLinear( x );
-    case NormalPoint  : return getNormalPoint( x );
-    case NormalLinear : return getNormalLinear( x );
-    }
+    if     ( typeid(m) == typeid(PlaneMode::Point) )        return getPoint( x );
+    else if( typeid(m) == typeid(PlaneMode::Linear) )       return getLinear( x );
+    else if( typeid(m) == typeid(PlaneMode::NormalPoint) )  return getNormalPoint( x );
+    else if( typeid(m) == typeid(PlaneMode::NormalLinear) ) return getNormalLinear( x );
+    else return getPoint( x );
 } 
 
-inline T PlaneD<T>::get( Mode m, const float& y, const float& x ) const
+template <typename T>
+template <class M>
+inline T PlaneT<T>::get( M m, const float& y, const float& x ) const
 {
-    switch( m )
-    {
-    default :
-    case Point        : return getPoint( y, x );
-    case Linear       : return getLinear( y, x );
-    case NormalPoint  : return getNormalPoint( y, x );
-    case NormalLinear : return getNormalLinear( y, x );
-    }
+    if     ( typeid(m) == typeid(PlaneMode::Point) )        return getPoint( y, x );
+    else if( typeid(m) == typeid(PlaneMode::Linear) )       return getLinear( y, x );
+    else if( typeid(m) == typeid(PlaneMode::NormalPoint) )  return getNormalPoint( y, x );
+    else if( typeid(m) == typeid(PlaneMode::NormalLinear) ) return getNormalLinear( y, x );
+    else return getPoint( y, x );
 } 
 
-inline T PlaneD<T>::get( Mode m, const float& z, const float& y, const float& x ) const
+template <typename T>
+template <class M>
+inline T PlaneT<T>::get( M m, const float& z, const float& y, const float& x ) const
 {
-    switch( m )
-    {
-    default :
-    case Point        : return getPoint( z, y, x );
-    case Linear       : return getLinear( z, y, x );
-    case NormalPoint  : return getNormalPoint( z, y, x );
-    case NormalLinear : return getNormalLinear( z, y, x );
-    }
+    if     ( typeid(m) == typeid(PlaneMode::Point) )        return getPoint( z, y, x );
+    else if( typeid(m) == typeid(PlaneMode::Linear) )       return getLinear( z, y, x );
+    else if( typeid(m) == typeid(PlaneMode::NormalPoint) )  return getNormalPoint( z, y, x );
+    else if( typeid(m) == typeid(PlaneMode::NormalLinear) ) return getNormalLinear( z, y, x );
+    else return getPoint( z, y, x );
 } 
 
-inline T PlaneD<T>::interpolate( const float& frac, T a, T b ) const
+template <typename T>
+inline T PlaneT<T>::interpolate( const float& frac, T a, T b ) const
 {
     return frac * b + (1.0f-frac) * a;
 }
 
-inline T PlaneD<T>::getLinear( const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getLinear( const float& x ) const
 {
     const int   x0 = (int)x; // quick floor computation
     const float xf = x - x0;
@@ -223,7 +272,8 @@ inline T PlaneD<T>::getLinear( const float& x ) const
                             deref( x0+1 ) );
 }
 
-inline T PlaneD<T>::getLinear( const float& y, const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getLinear( const float& y, const float& x ) const
 {
     const int   x0 = (int)x;
     const int   y0 = (int)y;
@@ -235,7 +285,8 @@ inline T PlaneD<T>::getLinear( const float& y, const float& x ) const
                                              deref( y0+1, x0+1 ) ) );
 }
 
-inline T PlaneD<T>::getLinear( const float& z, const float& y, const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getLinear( const float& z, const float& y, const float& x ) const
 {
     const int   x0 = (int)x;
     const int   y0 = (int)y;
@@ -253,55 +304,64 @@ inline T PlaneD<T>::getLinear( const float& z, const float& y, const float& x ) 
                                                               deref( z0+1, y0+1, x0+1 ) ) ) );
 }
 
-inline T PlaneD<T>getPoint( const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getPoint( const float& x ) const
 {
     // (int)(x+0.5f) is faster than roundf(x)
     return deref( (int)(x + 0.5f ) );
 }
 
-inline T PlaneD<T>getPoint( const float& y, const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getPoint( const float& y, const float& x ) const
 {
     return deref( (int)(y + 0.5f ),
                   (int)(x + 0.5f ) );
 }
 
-inline T PlaneD<T>getPoint( const float& z, const float& y, const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getPoint( const float& z, const float& y, const float& x ) const
 {
     return deref( (int)(z + 0.5f ),
                   (int)(y + 0.5f ),
                   (int)(x + 0.5f ) );
 }
 
-inline T PlaneD<T>::getNormalPoint( const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getNormalPoint( const float& x ) const
 {
     return getPoint( x * getDimX() );
 }
 
-inline T PlaneD<T>::getNormalPoint( const float& y, const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getNormalPoint( const float& y, const float& x ) const
 {
     return getPoint( y * getDimY(),
                      x * getDimX() );
 }
 
-inline T PlaneD<T>::getNormalPoint( const float& z, const float& y, const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getNormalPoint( const float& z, const float& y, const float& x ) const
 {
     return getPoint( z * getDimZ(),
                      y * getDimY(),
                      x * getDimX() );
 }
 
-inline T PlaneD<T>::getNormalLinear( const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getNormalLinear( const float& x ) const
 {
     return getLinear( x * getDimX() );
 }
 
-inline T PlaneD<T>::getNormalLinear( const float& y, const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getNormalLinear( const float& y, const float& x ) const
 {
     return getLinear( y * getDimY(),
                       x * getDimX() );
 }
 
-inline T PlaneD<T>::getNormalLinear( const float& z, const float& y, const float& x ) const
+template <typename T>
+inline T PlaneT<T>::getNormalLinear( const float& z, const float& y, const float& x ) const
 {
     return getLinear( z * getDimZ(),
                       y * getDimY(),

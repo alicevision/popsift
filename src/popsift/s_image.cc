@@ -41,7 +41,7 @@ void Image::load( void* input )
     /* We copy the input because it would be necessary for CUDA.
      * Eliminate eventually.
      */
-    _input_image_d.copyToPlane( input );
+    _input_image_d.memcpyFromBuffer( reinterpret_cast<uint8_t*>(input) );
 }
 
 void Image::resetDimensions( int w, int h )
@@ -73,7 +73,7 @@ ImageFloat::~ImageFloat( )
 
 void ImageFloat::load( void* input )
 {
-    _input_image_d.copyToPlane( input );
+    _input_image_d.memcpyFromBuffer( reinterpret_cast<float*>(input) );
 }
 
 void ImageFloat::resetDimensions( int w, int h )

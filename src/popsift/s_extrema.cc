@@ -12,7 +12,6 @@
 #include "sift_constants.h"
 #include "sift_pyramid.h"
 
-#include <cuda_runtime.h>
 #include <texture_fetch_functions.h>
 
 #include <cstdio>
@@ -20,7 +19,7 @@
 namespace popsift{
 
 template<int HEIGHT>
-__device__ static inline
+static inline
 uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
 {
     uint32_t mask = popsift::ballot( indicator ); // bitfield of warps with results
@@ -43,7 +42,6 @@ uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
     return write_index;
 }
 
-__device__
 static
 inline void extremum_cmp( float val, float f, uint32_t& gt, uint32_t& lt, uint32_t mask )
 {
@@ -53,7 +51,6 @@ inline void extremum_cmp( float val, float f, uint32_t& gt, uint32_t& lt, uint32
 
 #define TX(dx,dy,dz) readTex( obj, x+dx, y+dy, z+dz )
 
-__device__
 static
 inline bool is_extremum( cudaTextureObject_t obj,
                          int x, int y, int z )
@@ -127,7 +124,7 @@ public:
      * returns 0 : continue looping
      *         1 : break loop and succeed
      */
-    inline __device__
+    inline 
     int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it );
 };
 
@@ -135,7 +132,7 @@ template<>
 class ModeFunctions<Config::RefineInLevel>
 {
 public:
-    inline __device__
+    inline 
     int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         if( last_it ) return 0;
@@ -165,7 +162,7 @@ template<>
 class ModeFunctions<Config::RefineInOctave>
 {
 public:
-    inline __device__
+    inline 
     int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         if( last_it ) return 0;
@@ -194,7 +191,7 @@ public:
     }
 };
 
-__device__ inline static
+inline static
 bool first_contrast_ok( const float val )
 {
     return ( fabsf( val ) >= 1.6f * d_consts.threshold );
@@ -205,7 +202,7 @@ bool first_contrast_ok( const float val )
  *  returns true  : values after refine make sense
  *          false : they do not
  */
-__device__ inline static
+inline static
 bool verify( float xn, float yn, float sn, int width, int height, int maxlevel )
 {
     // reject if outside of image bounds or far outside DoG bounds
@@ -219,7 +216,7 @@ bool verify( float xn, float yn, float sn, int width, int height, int maxlevel )
 }
 
 template<int sift_mode>
-__device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
+inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
                                                int debug_octave,
                                                int width,
                                                int height,

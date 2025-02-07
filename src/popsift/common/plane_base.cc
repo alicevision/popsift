@@ -49,7 +49,7 @@ bool PlaneBase::alloc( int elemSize, int w, int h, int d )
     POP_FATAL(ss.str());
 }
 
-void PlaneBase::resize( int elemSize, int w, int h = 1, void d = 1 )
+void PlaneBase::resize( int elemSize, int w, int h = 1, int d = 1 )
 {
     int new_sz = w * h * d * elemSize;
     int old_sz = _pitch * _y * _z;
@@ -69,7 +69,7 @@ void PlaneBase::resize( int elemSize, int w, int h = 1, void d = 1 )
     }
 }
 
-void PlaneBase::adopt( void* ptr, int elemSize, int w, int h = 1, void d = 1 )
+void PlaneBase::adopt( void* ptr, int elemSize, int w, int h = 1, int d = 1 )
 {
     _e     = elemSize;
     _pitch = w * elemSize;

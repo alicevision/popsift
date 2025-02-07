@@ -62,7 +62,7 @@ endif()
 # Require threads because of std::thread.
 find_package(Threads REQUIRED)
 
-set(PopSift_CXX_STANDARD 17)
+set(PopSift_CXX_STANDARD 20)
 
 if(NOT MSVC)
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++${PopSift_CXX_STANDARD}")

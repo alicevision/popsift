@@ -7,30 +7,36 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include "common/assist.h"
+#include "common/grid.h"
 #include "common/plane_2d.h"
 #include "gauss_filter.h"
 #include "sift_pyramid.h"
 #include "sift_constants.h"
 
+#include <cmath>
+
 namespace popsift {
 namespace normalizedSource {
 
-static void horiz( Grid g,
+static void horiz( Grid& g,
                    PlaneD<float>& src,
                    PlaneD<float>& dst,
                    float          shift )
 {
-    while( g.next() )
+    do
     {
         // Create octave-0 - level-0 from the input image.
         const int write_x = g.blockIdx.x * g.blockDim.x + g.threadIdx.x;
         const int write_y = g.blockIdx.y;
         const int write_z = 0;
 
-        if( write_x >= dst_w ) return;
+        const int dst_w = dst.getDimX();
+        const int dst_h = dst.getDimY();
 
-        const int    span    =  d_gauss.dd.span[0];
-        const float* filter  = &d_gauss.dd.filter[0];
+        if( write_x >= dst_w ) continue;
+
+        const int    span    =  h_gauss.dd.span[0];
+        const float* filter  = &h_gauss.dd.filter[0];
         const float  read_x  = ( g.blockIdx.x * g.blockDim.x + g.threadIdx.x + shift ) / dst_w;
         const float  read_y  = ( g.blockIdx.y + shift ) / dst_h;
 
@@ -38,18 +44,19 @@ static void horiz( Grid g,
 
         #pragma unroll
         for( int offset = span; offset>0; offset-- ) {
-            const float& g  = filter[offset];
+            const float& weight  = filter[offset];
             const float  offrel = float(offset) / dst_w;
-            const float  v1 = src.get( PlaneD<float>::NormalLinear, read_y, read_x - offrel );
-            const float  v2 = src.get( PlaneD<float>::NormalLinear, read_y, read_x + offrel );
-            out += ( ( v1 + v2 ) * g );
+            const float  v1 = src.get( PlaneMode::NormalLinear{}, read_y, read_x - offrel );
+            const float  v2 = src.get( PlaneMode::NormalLinear{}, read_y, read_x + offrel );
+            out += ( ( v1 + v2 ) * weight );
         }
-        const float& g  = filter[0];
-        const float v3 = src.get( PlaneD<float>::NormalLinear, read_y, read_x );
-        out += ( v3 * g );
+        const float& weight  = filter[0];
+        const float v3 = src.get( PlaneMode::NormalLinear{}, read_y, read_x );
+        out += ( v3 * weight );
 
-        dst[write_z,write_y,write_x] = out * 255.0f;
+        dst.set( write_z, write_y, write_x, out * 255.0f);
     }
+    while( g.next() );
 }
 
 } // namespace normalizedSource
@@ -62,21 +69,16 @@ void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base )
     const int height  = oct_obj.getHeight();
 
     Grid g;
-    get.setGrid( grid_divide( width, 128 ),
-                 height );
-    get.setBlock( 128, 1, 1 );
+    g.setGridDim( grid_divide( width, 128 ), height );
+    g.setBlockDim( 128, 1, 1 );
 
-    float shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() );
+    float shift  = 0.5f * std::pow( 2.0f, conf.getUpscaleFactor() );
 
     normalizedSource::horiz
-        ( G,
-          base,
-          oct_obj.getIntermediateSurface(),
-          width,
-          height,
+        ( g,
+          base->getFloatPlane(),
+          oct_obj.getIntm(),
           shift );
-
-    POP_SYNC_CHK;
 }
 
 } // namespace popsift

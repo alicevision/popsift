@@ -67,12 +67,7 @@ struct GaussInfo
     void clearTables( );
 
 public:
-    void setSpanMode( Config::GaussMode m );
-
     int getSpan( float sigma ) const;
-
-private:
-    Config::GaussMode _span_mode;
 };
 
 extern thread_local GaussInfo h_gauss;

@@ -32,8 +32,8 @@ Octave::Octave()
 
 void Octave::alloc( const Config& conf, int width, int height, int levels )
 {
-    _w = w;
-    _h = h;
+    _w = width;
+    _h = height;
     _levels = levels;
 
     _w_grid_divider = float(_w) / conf.getFilterGridSize();
@@ -44,14 +44,14 @@ void Octave::alloc( const Config& conf, int width, int height, int levels )
     _dog_3d.alloc( width, height, levels-1 );
 }
 
-void Octave::resetDimensions( const Config& conf, int w, int h )
+void Octave::resetDimensions( const Config& conf, int width, int height )
 {
-    if( w == _w && h == _h ) {
+    if( width == _w && height == _h ) {
         return;
     }
 
-    _w = w;
-    _h = h;
+    _w = width;
+    _h = height;
 
     _w_grid_divider = float(_w) / conf.getFilterGridSize();
     _h_grid_divider = float(_h) / conf.getFilterGridSize();
@@ -76,8 +76,8 @@ void Octave::download_and_save_array( const char* basename, int octave )
 {
     struct stat st = { 0 };
 
-    int width  = getWidth();
-    int height = getHeight();
+    // int width  = getWidth();
+    // int height = getHeight();
 
     if (stat("dir-octave", &st) == -1) {
         mkdir("dir-octave", 0700);
@@ -100,7 +100,8 @@ void Octave::download_and_save_array( const char* basename, int octave )
     }
 
     for( int l = 0; l<_levels; l++ ) {
-        Plane2D_float p(width, height, &_data[l*width*height], width * sizeof(float));
+        Plane2D_float p;
+        p.copyFromPlane( _data, l );
 
         ostringstream ostr;
         ostr << "dir-octave/" << basename << "-o-" << octave << "-l-" << l << ".pgm";
@@ -112,7 +113,8 @@ void Octave::download_and_save_array( const char* basename, int octave )
     }
 
     for (int l = 0; l<_levels - 1; l++) {
-        Plane2D_float p(width, height, &_dog_3d[l*width*height], width * sizeof(float));
+        Plane2D_float p;
+        p.copyFromPlane( _dog_3d, l );
 
         ostringstream ostr;
         ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".pgm";

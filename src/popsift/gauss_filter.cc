@@ -10,12 +10,13 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cmath>
 
 using namespace std;
 
 namespace popsift {
 
-__align__(128) thread_local GaussInfo h_gauss;
+thread_local GaussInfo h_gauss;
 
 void print_gauss_filter_symbol( int columns )
 {
@@ -112,22 +113,20 @@ void init_filter( const Config& conf,
                 "    Input blurriness is assumed to be %f (scaled to %f)\n"
                 ,
                 conf.getUpscaleFactor(),
-                pow( 2.0f, conf.getUpscaleFactor() ),
+                std::pow( 2.0f, conf.getUpscaleFactor() ),
                 sigma0,
                 conf.getInitialBlur(),
-                conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() )
+                conf.getInitialBlur() * std::pow( 2.0f, conf.getUpscaleFactor() )
                 );
         // printf("sigma is initially sigma0, afterwards the difference between previous 2 sigmas\n");
     }
-
-    h_gauss.setSpanMode( conf.getGaussMode() );
 
     h_gauss.clearTables();
 
     h_gauss.required_filter_stages = levels + 3;
 
     const float initial_blur = conf.hasInitialBlur()
-                             ? conf.getInitialBlur() * pow( 2.0f, conf.getUpscaleFactor() )
+                             ? conf.getInitialBlur() * std::pow( 2.0f, conf.getUpscaleFactor() )
                              : 0.0f;
 
     /* inc :
@@ -135,14 +134,14 @@ void init_filter( const Config& conf,
      * These do not rely on hardware interpolation.
      */
     h_gauss.inc.sigma[0] = conf.hasInitialBlur()
-                         ? sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) )
+                         ? std::sqrt( fabsf( sigma0 * sigma0 - initial_blur * initial_blur ) )
                          : sigma0;
 
     for( int lvl=1; lvl<h_gauss.required_filter_stages; lvl++ ) {
-        const float sigmaP = sigma0 * pow( 2.0f, (float)(lvl-1)/(float)levels );
-        const float sigmaS = sigma0 * pow( 2.0f, (float)(lvl  )/(float)levels );
+        const float sigmaP = sigma0 * std::pow( 2.0f, (float)(lvl-1)/(float)levels );
+        const float sigmaS = sigma0 * std::pow( 2.0f, (float)(lvl  )/(float)levels );
 
-        h_gauss.inc.sigma[lvl] = sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
+        h_gauss.inc.sigma[lvl] = std::sqrt( sigmaS * sigmaS - sigmaP * sigmaP );
     }
 
     h_gauss.inc.computeBlurTable( &h_gauss );
@@ -159,7 +158,7 @@ void init_filter( const Config& conf,
      */
 
     // subtract initial blur
-    const float b = sqrt( fabs( sigma0 * sigma0 - initial_blur * initial_blur ) );
+    const float b = std::sqrt( fabs( sigma0 * sigma0 - initial_blur * initial_blur ) );
 
     // sigma / 2^i
     h_gauss.dd.sigma[0] = b;
@@ -177,17 +176,12 @@ void GaussInfo::clearTables( )
     dd .clearTables();
 }
 
-void GaussInfo::setSpanMode( Config::GaussMode m )
-{
-    _span_mode = m;
-}
-
 int GaussInfo::getSpan( float sigma ) const
 {
     /* This is the VLFeat computation for choosing the Gaussian filter width.
      * In our case, we look at the half-sided filter including the center value.
      */
-    return std::min<int>( ceilf( 4.0f * sigma ) + 1, GAUSS_ALIGN - 1 );
+    return std::min<int>( std::ceil( 4.0f * sigma ) + 1, GAUSS_ALIGN - 1 );
 }
 
 template<int LEVELS>
@@ -208,8 +202,8 @@ void GaussTable<LEVELS>::computeBlurTable( const GaussInfo* info )
 
     for( int level=0; level<LEVELS; level++ ) {
         /* Should be:
-         * kernel[x] = exp( -0.5 * (pow((x-mean)/sigma, 2.0) ) )
-         *           / sqrt(2 * M_PI * sigma * sigma);
+         * kernel[x] = std::exp( -0.5 * (std::pow((x-mean)/sigma, 2.0) ) )
+         *           / std::sqrt(2 * M_PI * sigma * sigma);
          * but the denominator is constant and we divide by sum anyway
          */
         const float sig = sigma[level];
@@ -217,7 +211,7 @@ void GaussTable<LEVELS>::computeBlurTable( const GaussInfo* info )
         double sum = 1.0;
         filter[level*GAUSS_ALIGN + 0] = 1.0;
         for( int x = 1; x < spn; x++ ) {
-            const float val = exp( -0.5 * (pow( double(x)/sig, 2.0) ) );
+            const float val = std::exp( -0.5 * (std::pow( double(x)/sig, 2.0) ) );
             filter[level*GAUSS_ALIGN + x] = val;
             sum += 2.0f * val;
         }

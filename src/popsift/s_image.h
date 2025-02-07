@@ -37,6 +37,8 @@ struct ImageBase
 
     virtual int getWidth()  const = 0;
     virtual int getHeight() const = 0;
+
+    virtual Plane2D_float& getFloatPlane() = 0;
 };
 
 /*************************************************************
@@ -67,6 +69,14 @@ struct Image : public ImageBase
     virtual int getWidth()  const override { return _input_image_d.getDimX(); }
     virtual int getHeight() const override { return _input_image_d.getDimY(); }
 
+    static Plane2D_float _dummy;
+
+    virtual Plane2D_float& getFloatPlane() {
+        /*
+         * CONVERSION TODO
+         */
+        return _dummy;
+    }
 private:
     void allocate( int w, int h );
 
@@ -102,6 +112,10 @@ struct ImageFloat : public ImageBase
 
     virtual int getWidth()  const override { return _input_image_d.getDimX(); }
     virtual int getHeight() const override { return _input_image_d.getDimY(); }
+
+    virtual Plane2D_float& getFloatPlane() {
+        return _input_image_d;
+    }
 
 private:
     void allocate( int w, int h );

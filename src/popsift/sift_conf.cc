@@ -24,7 +24,6 @@ Config::Config( )
     , _threshold( 0.04 ) // ( 10.0f / 256.0f )
     , _sift_mode( Config::RefineInOctave )
     , _log_mode( Config::None )
-    , _desc_mode( Config::VLFeat_Desc )
     , _grid_filter_mode( Config::RandomScale )
     , verbose( false )
     // , _max_extrema( 20000 )
@@ -37,42 +36,11 @@ Config::Config( )
     , _normalization_multiplier( 0 )
     , _print_gauss_tables( false )
 {
-    int            currentDev;
-    cudaDeviceProp currentProp;
-    cudaError_t    err;
-
-    err = cudaGetDevice( &currentDev );
-    POP_CUDA_FATAL_TEST( err, "Could not get current device ID" );
-
-    err = cudaGetDeviceProperties( &currentProp, currentDev );
-    POP_CUDA_FATAL_TEST( err, "Could not get current device properties" );
 }
 
 void Config::setMode( Config::SiftMode m )
 {
     _sift_mode = m;
-}
-
-void Config::setDescMode( const std::string& text )
-{
-    if( text == "vlfeat" )
-        setDescMode( Config::VLFeat_Desc );
-    else
-        POP_FATAL( "specified descriptor extraction mode must be one of loop, grid or igrid" );
-}
-
-void Config::setDescMode( Config::DescMode m )
-{
-    _desc_mode = m;
-}
-
-const char* Config::getDescModeUsage( )
-{
-    return "Choice of descriptor extraction modes:\n"
-           "vlfeat\n"
-           "vlfeat is VLFeat-like horizontal scanning, sampling every pixel in a radius around "
-           "  keypoint itself, using the 16 tile centers only for weighting. Every sampled point "
-           "  contributes to up to eight historgram bins.";
 }
 
 bool Config::getCanFilterExtrema() const
@@ -93,7 +61,7 @@ void Config::setFilterSorting( const std::string& text )
     else if( text == "random" )
         _grid_filter_mode = Config::RandomScale;
     else
-        POP_FATAL( "filter sorting mode must be one of up, down or random" );
+        POP_FATAL( string("filter sorting mode must be one of up, down or random") );
 }
 
 void Config::setFilterSorting( Config::GridFilterMode m )
@@ -149,7 +117,7 @@ void Config::setNormMode( const std::string& m )
     if( m == "RootSift" ) setNormMode( Config::RootSift );
     else if( m == "classic" ) setNormMode( Config::Classic );
     else
-        POP_FATAL( string("Bad Normalization mode.\n");
+        POP_FATAL( string("Bad Normalization mode.\n") );
 }
 
 Config::NormMode Config::getNormModeDefault( )
@@ -238,7 +206,6 @@ bool Config::equal( const Config& other ) const
         COMPARE( _threshold ) ||
         COMPARE( _upscale_factor ) ||
         COMPARE( _max_extrema ) ||
-        COMPARE( _gauss_mode ) ||
         COMPARE( _sift_mode ) ||
         COMPARE( _assume_initial_blur ) ||
         COMPARE( _initial_blur ) ||

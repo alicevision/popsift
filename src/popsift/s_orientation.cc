@@ -48,7 +48,6 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
  * Histogram smoothing helper
  */
 template<int D>
-__device__
 inline static float smoothe( const float* const src, const int bin )
 {
     const int prev = (bin == 0) ? ORI_NBINS-1 : bin-1;
@@ -256,10 +255,10 @@ class ExtremaRead
 {
     const Extremum* const _oris;
 public:
-    inline __device__
+    inline 
     explicit ExtremaRead( const Extremum* const d_oris ) : _oris( d_oris ) { }
 
-    inline __device__
+    inline 
     int get( int n ) const { return _oris[n].num_ori; }
 };
 
@@ -267,10 +266,10 @@ class ExtremaWrt
 {
     Extremum* _oris;
 public:
-    inline __device__
+    inline 
     explicit ExtremaWrt( Extremum* d_oris ) : _oris( d_oris ) { }
 
-    inline __device__
+    inline 
     void set( int n, int value ) { _oris[n].idx_ori = value; }
 };
 
@@ -278,10 +277,10 @@ class ExtremaTot
 {
     int& _extrema_counter;
 public:
-    inline __device__
+    inline 
     explicit ExtremaTot( int& extrema_counter ) : _extrema_counter( extrema_counter ) { }
 
-    inline __device__
+    inline 
     void set( int value ) { _extrema_counter = value; }
 };
 
@@ -290,13 +289,13 @@ class ExtremaWrtMap
     int* _featvec_to_extrema_mapper;
     int  _max_feat;
 public:
-    inline __device__
+    inline 
     ExtremaWrtMap( int* featvec_to_extrema_mapper, int max_feat )
         : _featvec_to_extrema_mapper( featvec_to_extrema_mapper )
         , _max_feat( max_feat )
     { }
 
-    inline __device__
+    inline 
     void set( int base, int num, int value )
     {
         int* baseptr = &_featvec_to_extrema_mapper[base];

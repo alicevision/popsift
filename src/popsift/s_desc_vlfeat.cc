@@ -20,7 +20,7 @@
 
 using namespace popsift;
 
-__device__ static inline
+static inline
 void ext_desc_vlfeat_sub( int                 blockIdx_x,
                           int3                block,
                           const float         ang,

@@ -7,6 +7,7 @@
  */
 #include "common/assist.h"
 #include "common/clamp.h"
+#include "common/grid.h"
 #include "common/debug_macros.h"
 #include "gauss_filter.h"
 #include "sift_constants.h"
@@ -26,52 +27,58 @@ namespace popsift {
 
 namespace gauss {
 
-void get_by_2_pick_every_second( Grid& g,
-                                 cudaTextureObject_t src_data,
-                                 const int           src_w,
-                                 const int           src_h,
-                                 const int           src_level,
-                                 cudaSurfaceObject_t dst_data,
-                                 const int           dst_w,
-                                 const int           dst_h )
+inline void get_by_2_pick_every_second( Grid&          g,
+                                        const int      src_level,
+                                        PlaneD<float>& src,
+                                        PlaneD<float>& dst )
 {
-    const int idx = g.blockIdx.x * g.blockDim.x + g.threadIdx.x;
-    const int idy = g.blockIdx.y * g.blockDim.y + g.threadIdx.y;
+    const int src_w = src.getDimX();
+    const int src_h = src.getDimY();
+    const int dst_w = dst.getDimX();
+    const int dst_h = dst.getDimY();
 
-    if( idx >= dst_w ) return;
-    if( idy >= dst_h ) return;
+    g.reset();
 
-    const int read_x = clamp( idx << 1, 0, src_w );
-    const int read_y = clamp( idy << 1, 0, src_h );
+    do {
+        const int idx = g.blockIdx.x * g.blockDim.x + g.threadIdx.x;
+        const int idy = g.blockIdx.y * g.blockDim.y + g.threadIdx.y;
 
-    // const float val = readTex( src_data, read_x, read_y, src_level );
-    const float val = src_data[src_local].ptr(read_y)[read_x] = val;
+        if( idx >= dst_w ) return;
+        if( idy >= dst_h ) return;
 
-    // surf2DLayeredwrite( val, dst_data, idx*4, idy, 0, cudaBoundaryModeZero );
-    dst_data[0].ptr(idy)[idx] = val;
+        const int read_x = std::clamp( idx << 1, 0, src_w-1 );
+        const int read_y = std::clamp( idy << 1, 0, src_h-1 );
+
+        const float val = src.get( src_level, read_y, read_x );
+
+        dst.set( 0, idy, idx, val );
+    } while( g.next() );
 }
 
 
-void make_dog( Grid& g,
-               cudaTextureObject_t src_data,
-               cudaSurfaceObject_t dog_data,
-               const int           w,
-               const int           h,
-               const int           max_level )
+void make_dog( Grid&          g,
+               PlaneD<float>& src,
+               PlaneD<float>& dog,
+               const int      w,
+               const int      h,
+               const int      max_level )
 {
-    const int idx   = g.blockIdx.x * g.blockDim.x + g.threadIdx.x;
-    const int idy   = g.blockIdx.y * g.blockDim.y + g.threadIdx.y;
+    g.reset();
 
-    float a = readTex( src_data, idx, idy, 0 );
-    for( int level=0; level<max_level-1; level++ )
-    {
-        // const float b = readTex( src_data, idx, idy, level+1 );
-        const float b = src_data[level+1].ptr(idy)[idx];
+    do {
+        const int idx   = g.blockIdx.x * g.blockDim.x + g.threadIdx.x;
+        const int idy   = g.blockIdx.y * g.blockDim.y + g.threadIdx.y;
 
-        // surf2DLayeredwrite( b-a, dog_data, idx*4, idy, level, cudaBoundaryModeZero );
-        dst_data[level].ptr(idy)[idx] = val;
-        a = b;
-    }
+        // float a = readTex( src_data, idx, idy, 0 );
+        float a = src.get( 0, idy, idx );
+        for( int level=0; level<max_level-1; level++ )
+        {
+            const float b = src.get( level+1, idy, idx );
+
+            dog.set( level, idy, idx, b-a );
+            a = b;
+        }
+    } while( g.next() );
 }
 
 } // namespace gauss
@@ -85,21 +92,17 @@ inline void Pyramid::downscale_from_prev_octave( int octave )
     const int height = oct_obj.getHeight();
 
     Grid g;
-    g.setBlock( 64, 2 );
-    g.setGrid( grid_divide( width,  64 ),
-               grid_divide( height, 2 ) );
+    g.setBlockDim( 64, 2 );
+    g.setGridDim( grid_divide( width,  64 ),
+                  grid_divide( height, 2 ) );
 
     g.reset();
     do {
         gauss::get_by_2_pick_every_second
             ( g,
-              prev_oct_obj.getDataTexPoint( ),
-              prev_oct_obj.getWidth(),
-              prev_oct_obj.getHeight(),
               _levels-PREV_LEVEL,
-              oct_obj.getDataSurface( ),
-              oct_obj.getWidth(),
-              oct_obj.getHeight() );
+              prev_oct_obj.getData( ),
+              oct_obj.getData( ) );
     } while( g.next() );
 }
 
@@ -119,13 +122,12 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, GaussTableCho
     }
 }
 
-__host__
 inline void Pyramid::vert_from_interm( int octave, int level, GaussTableChoice useInterpolatedGauss )
 {
-    Octave& oct_obj = _octaves[octave];
+    // Octave& oct_obj = _octaves[octave];
 
-    const int width  = oct_obj.getWidth();
-    const int height = oct_obj.getHeight();
+    // const int width  = oct_obj.getWidth();
+    // const int height = oct_obj.getHeight();
 
     switch( useInterpolatedGauss )
     {
@@ -141,10 +143,8 @@ inline void Pyramid::vert_from_interm( int octave, int level, GaussTableChoice u
         }
         break;
     }
-    POP_SYNC_CHK;
 }
 
-__host__
 inline void Pyramid::dogs_from_blurred( int octave, int max_level )
 {
     Octave&      oct_obj = _octaves[octave];
@@ -153,16 +153,16 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level )
     const int height = oct_obj.getHeight();
 
     Grid g;
-    g.setBlock( 1024, 1, 1 );
-    g.setGrid( grid_divide( width,  1024 ), height, 1 );
+    g.setBlockDim( 1024, 1, 1 );
+    g.setGridDim( grid_divide( width,  1024 ), height, 1 );
 
     g.reset();
     do
     {
         gauss::make_dog
             ( g,
-              oct_obj.getDataTexPoint( ),
-              oct_obj.getDogSurface( ),
+              oct_obj.getData( ),
+              oct_obj.getDog( ),
               oct_obj.getWidth(),
               oct_obj.getHeight(),
               max_level );
@@ -173,7 +173,6 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level )
 /*************************************************************
  * V11: host side
  *************************************************************/
-__host__
 void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
 {
     GaussTableChoice gaussTableChoice;

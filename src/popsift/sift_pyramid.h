@@ -59,7 +59,6 @@ class Pyramid
     int          _num_octaves;
     int          _levels;
     Octave*      _octaves;
-    int          _gauss_group;
 
     /* initial blur variables are used for Gauss table computation,
      * not needed on device */
