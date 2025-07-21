@@ -111,6 +111,8 @@ struct Config
      */
     void setVerbose( bool on = true );
 
+    inline bool silent() const { return (verbose == false); }
+
 //    void setGaussGroup( int groupsize );
 //    int  getGaussGroup( ) const;
 

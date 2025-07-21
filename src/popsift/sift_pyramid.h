@@ -94,7 +94,7 @@ public:
     /** step 3 (alternative): make copy of descriptors on device side */
     FeaturesDev* clone_device_descriptors( const Config& conf );
 
-    void download_and_save_array( const char* basename );
+    void download_and_save_array( const Config& conf, const char* basename );
 
     void save_descriptors( const Config& conf, FeaturesHost* features, const char* basename );
 
@@ -106,16 +106,12 @@ public:
 private:
     void horiz_from_input_image( const Config&    conf,
                                  ImageBase*       base );
-    inline void downscale_from_prev_octave( int octave );
+    void downscale_from_prev_octave( int octave );
 
-    void        horiz_from_prev_level_basic( int octave, int level );
-    void        horiz_from_prev_level_pairs( int octave, int level );
-    inline void horiz_from_prev_level( int octave, int level, GaussTableChoice useInterpolatedGauss );
-    void        vert_from_interm_basic( int octave, int level );
-    void        vert_from_interm_pairs( int octave, int level );
-    inline void vert_from_interm( int octave, int level, GaussTableChoice useInterpolatedGauss );
+    void horiz_from_prev_level( int octave, int level );
+    void vert_from_interm( int octave, int level );
 
-    inline void dogs_from_blurred( int octave, int max_level );
+    void dogs_from_blurred( int octave, int max_level );
 
     void reset_extrema_mgmt( );
     void build_pyramid( const Config& conf, ImageBase* base );

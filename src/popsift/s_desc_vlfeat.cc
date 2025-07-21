@@ -26,14 +26,10 @@ void ext_desc_vlfeat_sub( int                 blockIdx_x,
                           const float         ang,
                           const Extremum*     ext,
                           float* __restrict__ features,
-                          cudaTextureObject_t layer_tex,
+                          Plane2D_float&      layer_tex,
                           const int           width,
                           const int           height )
 {
-  float dpt[128];
-
-  for( int threadIdx_x=0; threadIdx_x<block.x; threadIdx_x++ )
-  {
     const float x     = ext->xpos;
     const float y     = ext->ypos;
     const int   level = ext->lpos; // old_level;
@@ -46,7 +42,7 @@ void ext_desc_vlfeat_sub( int                 blockIdx_x,
 
     float cos_t;
     float sin_t;
-    __sincosf( ang, &sin_t, &cos_t );
+    sincosf( ang, &sin_t, &cos_t );
 
     const float csbp  = cos_t * SBP;
     const float ssbp  = sin_t * SBP;
@@ -66,16 +62,12 @@ void ext_desc_vlfeat_sub( int                 blockIdx_x,
 
     const float bsz = 2.0f * ( fabsf(csbp) + fabsf(ssbp) );
 
-    const int   xmin = max(1,          (int)floorf(x - ptx - bsz));
-    const int   ymin = max(1,          (int)floorf(y - pty - bsz));
-    const int   xmax = min(width - 2,  (int)floorf(x + ptx + bsz));
-    const int   ymax = min(height - 2, (int)floorf(y + pty + bsz));
-  }
+    const int   xmin = std::max(1,          (int)floorf(x - ptx - bsz));
+    const int   ymin = std::max(1,          (int)floorf(y - pty - bsz));
+    const int   xmax = std::min(width - 2,  (int)floorf(x + ptx + bsz));
+    const int   ymax = std::min(height - 2, (int)floorf(y + pty + bsz));
 
-  for( int i=0; i<128; i++ =
-  {
-    dpt[i] = 0.0f;
-  }
+    float dpt[128] = { 0 };
 
   for( int threadIdx_x=0; threadIdx_x<block.x; threadIdx_x++ )
   {
@@ -94,7 +86,7 @@ void ext_desc_vlfeat_sub( int                 blockIdx_x,
             while( th > M_PI2 ) th -= M_PI2;
             while( th < 0.0f  ) th += M_PI2;
 
-            const int pix_x = base_x + threadIdx.x;
+            const int pix_x = base_x + threadIdx_x;
 
             if( ( pix_y <= ymax ) && ( pix_x <= xmax ) )
             {
@@ -105,7 +97,7 @@ void ext_desc_vlfeat_sub( int                 blockIdx_x,
                 const float2 n = make_float2( ::fmaf( crsbp, d.x,  srsbp * d.y ),
                                               ::fmaf( crsbp, d.y, -srsbp * d.x ) ); 
 
-                const float  ww = __expf( -scalbnf(n.x*n.x + n.y*n.y, -3));
+                const float  ww = expf( -scalbnf(n.x*n.x + n.y*n.y, -3));
 
                 const float nt = 8.0f * th / M_PI2;
 
@@ -164,7 +156,7 @@ void ext_desc_vlfeat_sub( int                 blockIdx_x,
   }
 }
 
-void ext_desc_vlfeat( int3 grid, int3 block, int octave, cudaTextureObject_t layer_tex, int w, int h)
+void ext_desc_vlfeat( int3 grid, int3 block, int octave, Plane2D_float& layer_tex, int w, int h)
 {
   for( int blockIdx_x=0; blockIdx_x<grid.x; blockIdx_x++ )
   {
@@ -193,11 +185,11 @@ namespace popsift
 
 bool start_ext_desc_vlfeat( const int octave, Octave& oct_obj )
 {
-    if( hct.ori_ct[octave] == ) return false;
+    if( dct.ori_ct[octave] == 0 ) return false;
 
     int3 block, grid;
 
-    grid.x = hct.ori_ct[octave];
+    grid.x = dct.ori_ct[octave];
     grid.y = 1;
     grid.z = 1;
 
@@ -209,7 +201,7 @@ bool start_ext_desc_vlfeat( const int octave, Octave& oct_obj )
         ( grid,
           block,
           octave,
-          oct_obj.getDataTexPoint( ),
+          oct_obj.getData( ),
           oct_obj.getWidth(),
           oct_obj.getHeight() );
 

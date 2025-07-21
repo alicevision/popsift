@@ -37,7 +37,7 @@ class SiftJob
     std::future <popsift::FeaturesBase*> _f;
     int                 _w;
     int                 _h;
-    unsigned char*      _imageData;
+    // unsigned char*      _imageData;
     popsift::ImageBase* _img;
     std::exception_ptr _err;
 
@@ -77,7 +77,6 @@ public:
     popsift::FeaturesHost* getHost();
     popsift::FeaturesDev*  getDev();
 
-    void setImg( popsift::ImageBase* img );
     popsift::ImageBase* getImg();
 
     /** fulfill the promise */

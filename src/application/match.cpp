@@ -67,10 +67,6 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
     options_description modes("Modes");
     {
     modes.add_options()
-        ( "gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
-          popsift::Config::getGaussModeUsage() )
-        ( "desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
-         popsift::Config::getDescModeUsage() )
         ( "popsift-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::RefineInOctave); }),
         "In extrema refinement, it is possible to move extrema within a level but also between the levels of an octave.")
         ( "vlfeat-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::RefineInLevel); }),
@@ -235,7 +231,6 @@ int main(int argc, char **argv)
 
     int3* matches = lFeatures->matchAndReturn( rFeatures );
     // lFeatures->match( rFeatures );
-    cudaDeviceSynchronize();
 
     for( int i=0; i<lFeatures->getDescriptorCount(); i++ )
     {

@@ -56,12 +56,18 @@ public:
         _ptr = plane._ptr;
     }
 
+    inline bool isNull() const
+    {
+        return ( _ptr == nullptr );
+    }
+
     /** Overwrite the width and height information. Useful if smaller
      *  planes should be loaded into larger preallocated host planes
      *  without actually allocating again, but dangerous.
      *  @warning: pitch is updated (host side)
      */
     inline void resetDimensions( int w = 1, int h = 1, int d = 1 ) {
+        if( isNull() ) alloc( w, h, d );
         _ptr->resize( w, h, d );
     }
 
@@ -79,7 +85,7 @@ public:
         _ptr->dealloc();
     }
 
-    inline void memcpyFromBuffer( void* ptr ) {
+    inline void memcpyFromBuffer( const void* ptr ) {
         std::memcpy( _ptr->base(), ptr,  _ptr->getByteSize() );
     }
 

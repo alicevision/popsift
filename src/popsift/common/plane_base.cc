@@ -10,8 +10,6 @@
 #include "debug_macros.h"
 #include "plane_base.h"
 
-#include <cuda_runtime.h>
-
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -31,7 +29,7 @@ namespace popsift {
 
 bool PlaneBase::alloc( int elemSize, int w, int h, int d )
 {
-    _e     = elemSize;
+    // _e     = elemSize;
     _pitch = w * elemSize;
     _x     = w;
     _y     = h;
@@ -49,14 +47,14 @@ bool PlaneBase::alloc( int elemSize, int w, int h, int d )
     POP_FATAL(ss.str());
 }
 
-void PlaneBase::resize( int elemSize, int w, int h = 1, int d = 1 )
+void PlaneBase::resize( int elemSize, int w, int h, int d )
 {
     int new_sz = w * h * d * elemSize;
     int old_sz = _pitch * _y * _z;
 
     if( old_sz >= new_sz )
     {
-        _e     = elemSize;
+        // _e     = elemSize;
         _pitch = w * elemSize;
         _x     = w;
         _y     = h;
@@ -64,14 +62,14 @@ void PlaneBase::resize( int elemSize, int w, int h = 1, int d = 1 )
     }
     else
     {
-        this->free();
+        dealloc();
         alloc( elemSize, w, h, d );
     }
 }
 
-void PlaneBase::adopt( void* ptr, int elemSize, int w, int h = 1, int d = 1 )
+void PlaneBase::adopt( void* ptr, int elemSize, int w, int h, int d )
 {
-    _e     = elemSize;
+    // _e     = elemSize;
     _pitch = w * elemSize;
     _x     = w;
     _y     = h;

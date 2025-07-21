@@ -83,7 +83,7 @@ void make_dog( Grid&          g,
 
 } // namespace gauss
 
-inline void Pyramid::downscale_from_prev_octave( int octave )
+void Pyramid::downscale_from_prev_octave( int octave )
 {
     Octave&      oct_obj = _octaves[octave];
     Octave& prev_oct_obj = _octaves[octave-1];
@@ -96,56 +96,13 @@ inline void Pyramid::downscale_from_prev_octave( int octave )
     g.setGridDim( grid_divide( width,  64 ),
                   grid_divide( height, 2 ) );
 
-    g.reset();
-    do {
-        gauss::get_by_2_pick_every_second
-            ( g,
-              _levels-PREV_LEVEL,
-              prev_oct_obj.getData( ),
-              oct_obj.getData( ) );
-    } while( g.next() );
+   gauss::get_by_2_pick_every_second( g,
+                                      _levels-PREV_LEVEL,
+                                      prev_oct_obj.getData( ),
+                                      oct_obj.getData( ) );
 }
 
-inline void Pyramid::horiz_from_prev_level( int octave, int level, GaussTableChoice useInterpolatedGauss )
-{
-    switch( useInterpolatedGauss )
-    {
-    case Interpolated_FromPrevious :
-        horiz_from_prev_level_pairs( octave, level );
-        break;
-    case NotInterpolated_FromPrevious :
-        horiz_from_prev_level_basic( octave, level );
-        break;
-    default :
-        POP_FATAL( "Missing case in horizontal Gauss filter from previous level" );
-        break;
-    }
-}
-
-inline void Pyramid::vert_from_interm( int octave, int level, GaussTableChoice useInterpolatedGauss )
-{
-    // Octave& oct_obj = _octaves[octave];
-
-    // const int width  = oct_obj.getWidth();
-    // const int height = oct_obj.getHeight();
-
-    switch( useInterpolatedGauss )
-    {
-    case Interpolated_FromPrevious :
-        vert_from_interm_pairs( octave, level );
-        break;
-    case NotInterpolated_FromPrevious :
-        vert_from_interm_basic( octave, level );
-        break;
-    default :
-        {
-            POP_FATAL( "Missing case in vertical Gauss filter from intermediate buffer" );
-        }
-        break;
-    }
-}
-
-inline void Pyramid::dogs_from_blurred( int octave, int max_level )
+void Pyramid::dogs_from_blurred( int octave, int max_level )
 {
     Octave&      oct_obj = _octaves[octave];
 
@@ -156,18 +113,12 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level )
     g.setBlockDim( 1024, 1, 1 );
     g.setGridDim( grid_divide( width,  1024 ), height, 1 );
 
-    g.reset();
-    do
-    {
-        gauss::make_dog
-            ( g,
-              oct_obj.getData( ),
-              oct_obj.getDog( ),
-              oct_obj.getWidth(),
-              oct_obj.getHeight(),
-              max_level );
-    }
-    while( g.next() );
+    gauss::make_dog( g,
+                     oct_obj.getData( ),
+                     oct_obj.getDog( ),
+                     oct_obj.getWidth(),
+                     oct_obj.getHeight(),
+                     max_level );
 }
 
 /*************************************************************
@@ -175,9 +126,8 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level )
  *************************************************************/
 void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
 {
-    GaussTableChoice gaussTableChoice;
-
-    gaussTableChoice = NotInterpolated_FromPrevious;
+    POP_INFO2( conf.silent(), "enter " << __PRETTY_FUNCTION__ );
+    POP_INFO2( conf.silent(), "is image NULL? " << (base->isNull() ? "yes" : "no") );
 
     for( uint32_t octave=0; octave<_num_octaves; octave++ )
     {
@@ -189,19 +139,26 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
             {
                 if( octave == 0 )
                 {
+                    POP_INFO2( conf.silent(), "call horiz_from_input_image" );
                     horiz_from_input_image( conf, base );
-                    vert_from_interm( octave, 0, gaussTableChoice );
+
+                    POP_INFO2( conf.silent(), "call vert_from_interm" );
+                    vert_from_interm( octave, 0 );
                 }
                 else
                 {
                     Octave& prev_oct_obj = _octaves[octave-1];
+                    POP_INFO2( conf.silent(), "call downscale_from_prev_octave" );
                     downscale_from_prev_octave( octave );
                 }
             }
             else
             {
-                horiz_from_prev_level( octave, level, gaussTableChoice );
-                vert_from_interm( octave, level, gaussTableChoice );
+                POP_INFO2( conf.silent(), "call horiz_from_prev_level" );
+                horiz_from_prev_level( octave, level );
+
+                POP_INFO2( conf.silent(), "call vert_from_interm" );
+                vert_from_interm( octave, level );
             }
         }
     }
@@ -209,6 +166,7 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
     for( int octave=0; octave<_num_octaves; octave++ )
     {
         Octave&      oct_obj = _octaves[octave];
+        POP_INFO2( conf.silent(), "call dogs_from_blurred" );
         dogs_from_blurred( octave, _levels );
     }
 }

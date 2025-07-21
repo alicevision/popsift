@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include "common/simd_types.h"
+
 #include <cstdio>
 
 /*
@@ -50,8 +52,8 @@ inline bool solve( float i[3][3], float3& b )
         return false;
     }
 
-    // float rsd = 1.0 / det;
-    float rsd = __frcp_rn( det );
+    float rsd = 1.0 / det;
+    // float rsd = __frcp_rn( det );
 
     i[0][0] = det0 * rsd;
     i[1][0] = det1 * rsd;

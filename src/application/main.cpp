@@ -67,12 +67,6 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
     options_description modes("Modes");
     {
     modes.add_options()
-        ( "gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
-          popsift::Config::getGaussModeUsage() )
-        // "Choice of span (1-sided) for Gauss filters. Default is VLFeat-like computation depending on sigma. "
-        // "Options are: vlfeat, relative, relative-all, opencv"
-        ("desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
-         popsift::Config::getDescModeUsage())
         ("popsift-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::RefineInOctave); }),
         "During the initial upscale, shift pixels by 1. In extrema refinement, steps up to 0.6, do not reject points when reaching max iterations, "
         "first contrast threshold is .8 * peak thresh. Shift feature coords octave 0 back to original pos.")

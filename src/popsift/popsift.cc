@@ -175,6 +175,8 @@ SiftJob* PopSift::enqueue( int                  w,
                            int                  h,
                            const unsigned char* imageData )
 {
+    std::cerr << __FILE__ << ":" << __LINE__ << " uploading byte image (" << w << "x" << h << " pixels)" << endl;
+
     if( _image_mode != ByteImages )
     {
         stringstream ss;
@@ -192,6 +194,8 @@ SiftJob* PopSift::enqueue( int          w,
                            int          h,
                            const float* imageData )
 {
+    std::cerr << __FILE__ << ":" << __LINE__ << " uploading float image (" << w << "x" << h << " pixels)" << endl;
+
     if( _image_mode != FloatImages )
     {
         stringstream ss;
@@ -209,8 +213,6 @@ void PopSift::uploadImages( )
 {
     SiftJob* job;
     while( ( job = _pipe._queue_stage1.pull() ) != nullptr ) {
-        popsift::ImageBase* img = _pipe._unused.pull();
-        job->setImg( img );
         _pipe._queue_stage2.push( job );
     }
     _pipe._queue_stage2.push( nullptr );
@@ -223,14 +225,33 @@ void PopSift::extractDownloadLoop( )
     Pipe& p = _pipe;
 
     SiftJob* job;
-    while( ( job = p._queue_stage2.pull() ) != nullptr ) {
+    while( ( job = p._queue_stage2.pull() ) != nullptr )
+    {
         applyConfiguration();
 
         popsift::ImageBase* img = job->getImg();
 
+        if( img == NULL )
+        {
+            std::cerr << __FUNCTION__ << ":" << __LINE__ << " read a job that contains no image" << std::endl;
+            exit( -1 );
+        }
+        if( img->isNull() )
+        {
+            std::cerr << __FUNCTION__ << ":" << __LINE__ << " read a job that contains a NULL image" << std::endl;
+            exit( -1 );
+        }
+
         private_init( img->getWidth(), img->getHeight() );
 
         p._pyramid->step1( _config, img );
+
+        if( !_config.silent() )
+        {
+            POP_INFO2( _config.silent(), "Downloading all pyramid images" );
+            p._pyramid->download_and_save_array( _config, "pyramid" );
+        }
+
         p._unused.push( img ); // uploaded input image no longer needed, release for reuse
 
         p._pyramid->step2( _config );
@@ -243,7 +264,7 @@ void PopSift::extractDownloadLoop( )
             // for( int o=0; o<octaves; o++ ) { p._pyramid->download_descriptors( _config, o ); }
             // int levels  = p._pyramid->getNumLevels();
 
-            p._pyramid->download_and_save_array( "pyramid" );
+            // p._pyramid->download_and_save_array( "pyramid" );
             p._pyramid->save_descriptors( _config, features, "pyramid" );
         }
 
@@ -293,59 +314,37 @@ void PopSift::matchPrepareLoop( )
 SiftJob::SiftJob( int w, int h, const unsigned char* imageData )
     : _w(w)
     , _h(h)
-    , _img(nullptr)
+    , _img( new popsift::Image(w,h) )
 {
+    std::cerr << __FILE__ << ":" << __LINE__ << ": enter " << __PRETTY_FUNCTION__ << std::endl;
     _f = _p.get_future();
 
-    _imageData = (unsigned char*)malloc( w*h );
-    if( _imageData != nullptr )
-    {
-        memcpy( _imageData, imageData, w*h );
-    }
-    else
-    {
-        stringstream ss;
-        ss << "Memory limitation" << endl
-           << "E    Failed to allocate memory for SiftJob";
-        POP_FATAL(ss.str());
-    }
+    std::cerr << __FILE__ << ":" << __LINE__ << ": load image data" << std::endl;
+    _img->load( imageData );
+    std::cerr << __FILE__ << ":" << __LINE__ << ": is image NULL? " << (_img->isNull() ? "yes" : "no") << std::endl;
 }
 
 SiftJob::SiftJob( int w, int h, const float* imageData )
     : _w(w)
     , _h(h)
-    , _img(nullptr)
+    , _img( new popsift::ImageFloat(w,h) )
 {
+    std::cerr << __FILE__ << ":" << __LINE__ << ": enter " << __PRETTY_FUNCTION__ << std::endl;
     _f = _p.get_future();
 
-    _imageData = (unsigned char*)malloc( w*h*sizeof(float) );
-    if( _imageData != nullptr )
-    {
-        memcpy( _imageData, imageData, w*h*sizeof(float) );
-    }
-    else
-    {
-        stringstream ss;
-        ss << "Memory limitation" << endl
-           << "E    Failed to allocate memory for SiftJob";
-        POP_FATAL(ss.str());
-    }
+    std::cerr << __FILE__ << ":" << __LINE__ << ": load image data" << std::endl;
+    _img->load( imageData );
+    std::cerr << __FILE__ << ":" << __LINE__ << ": is image NULL? " << (_img->isNull() ? "yes" : "no") << std::endl;
 }
 
 SiftJob::~SiftJob( )
 {
-    free( _imageData );
-}
-
-void SiftJob::setImg( popsift::ImageBase* img )
-{
-    img->resetDimensions( _w, _h );
-    img->load( _imageData );
-    _img = img;
 }
 
 popsift::ImageBase* SiftJob::getImg()
 {
+    std::cerr << __FILE__ << ":" << __LINE__ << ": enter " << __PRETTY_FUNCTION__ << std::endl;
+    std::cerr << __FILE__ << ":" << __LINE__ << ": is image NULL? " << (_img->isNull() ? "yes" : "no") << std::endl;
     return _img;
 }
 

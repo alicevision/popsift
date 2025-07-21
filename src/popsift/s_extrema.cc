@@ -8,39 +8,15 @@
 #include "common/assist.h"
 #include "common/clamp.h"
 #include "common/debug_macros.h"
+#include "common/grid.h"
 #include "s_solve.h"
 #include "sift_constants.h"
 #include "sift_pyramid.h"
 
-#include <texture_fetch_functions.h>
-
 #include <cstdio>
+#include <cmath>
 
 namespace popsift{
-
-template<int HEIGHT>
-static inline
-uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
-{
-    uint32_t mask = popsift::ballot( indicator ); // bitfield of warps with results
-
-    int ct = __popc( mask );          // horizontal reduce
-
-    int write_index;
-    if( threadIdx.x == 0 ) {
-        // atomicAdd returns the old value, we consider this the based
-        // index for this thread's write operation
-        write_index = atomicAdd( extrema_counter, ct );
-    }
-    // broadcast from thread 0 to all threads in warp
-    write_index = popsift::shuffle( write_index, 0 );
-
-    // this thread's offset: count only bits below the bit of the own
-    // thread index; this provides the 0 result and every result up to ct
-    write_index += __popc( mask & ((1 << threadIdx.x) - 1) );
-
-    return write_index;
-}
 
 static
 inline void extremum_cmp( float val, float f, uint32_t& gt, uint32_t& lt, uint32_t mask )
@@ -49,10 +25,10 @@ inline void extremum_cmp( float val, float f, uint32_t& gt, uint32_t& lt, uint32
     lt |= ( ( val < f ) ? mask : 0 );
 }
 
-#define TX(dx,dy,dz) readTex( obj, x+dx, y+dy, z+dz )
+#define TX(dx,dy,dz) obj.get( z+dz, y+dy, x+dx )
 
 static
-inline bool is_extremum( cudaTextureObject_t obj,
+inline bool is_extremum( Plane2D_float& obj,
                          int x, int y, int z )
 {
     uint32_t gt = 0;
@@ -194,7 +170,7 @@ public:
 inline static
 bool first_contrast_ok( const float val )
 {
-    return ( fabsf( val ) >= 1.6f * d_consts.threshold );
+    return ( fabsf( val ) >= 1.6f * h_consts.threshold );
 }
 
 /** verify() checks whether a refine position is outside the image boundaries or
@@ -216,15 +192,16 @@ bool verify( float xn, float yn, float sn, int width, int height, int maxlevel )
 }
 
 template<int sift_mode>
-inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
-                                               int debug_octave,
-                                               int width,
-                                               int height,
-                                               uint32_t maxlevel,
-                                               float w_grid_divider,
-                                               float h_grid_divider,
-                                               int grid_width,
-                                               InitialExtremum& ec)
+inline bool find_extrema_in_dog_sub( Grid&          g,
+                                     Plane2D_float& dog,
+                                     int            debug_octave,
+                                     int            width,
+                                     int            height,
+                                     uint32_t       maxlevel,
+                                     float          w_grid_divider,
+                                     float          h_grid_divider,
+                                     int            grid_width,
+                                     InitialExtremum& ec)
 {
     ec.xpos    = 0.0f;
     ec.ypos    = 0.0f;
@@ -243,14 +220,14 @@ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
      * a 1x3x3 area. If the rightmost 2 threads of a warp (x==30 and 3==31)
      * are not extreme w.r.t. to the left slice, 8 fetch operations.
      */
-    const int block_x = blockIdx.x * 32;
-    const int block_y = blockIdx.y * blockDim.y;
-    const int block_z = blockIdx.z;
-    const int y       = block_y + threadIdx.y + 1;
-    const int x       = block_x + threadIdx.x + 1;
+    const int block_x = g.blockIdx.x * 32;
+    const int block_y = g.blockIdx.y * g.blockDim.y;
+    const int block_z = g.blockIdx.z;
+    const int y       = block_y + g.threadIdx.y + 1;
+    const int x       = block_x + g.threadIdx.x + 1;
     const int level   = block_z + 1;
 
-    const float val = readTex( dog, x, y, level );
+    const float val = dog.get( level, y, x );
 
     ModeFunctions<sift_mode> f;
     if( ! first_contrast_ok( val ) ) return false;
@@ -278,12 +255,12 @@ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
 
         // const int z = level - 1;
         /* compute gradient */
-        const float x2y1z1 = readTex( dog, n.x+1, n.y  , n.z   );
-        const float x0y1z1 = readTex( dog, n.x-1, n.y  , n.z   );
-        const float x1y2z1 = readTex( dog, n.x  , n.y+1, n.z   );
-        const float x1y0z1 = readTex( dog, n.x  , n.y-1, n.z   );
-        const float x1y1z2 = readTex( dog, n.x  , n.y  , n.z+1 );
-        const float x1y1z0 = readTex( dog, n.x  , n.y  , n.z-1 );
+        const float x2y1z1 = dog.get( n.z,   n.y  , n.x+1 );
+        const float x0y1z1 = dog.get( n.z,   n.y  , n.x-1 );
+        const float x1y2z1 = dog.get( n.z,   n.y+1, n.x   );
+        const float x1y0z1 = dog.get( n.z,   n.y-1, n.x   );
+        const float x1y1z2 = dog.get( n.z+1, n.y  , n.x   );
+        const float x1y1z0 = dog.get( n.z-1, n.y  , n.x   );
         // D.x = 0.5f * ( x2y1z1 - x0y1z1 );
         // D.y = 0.5f * ( x1y2z1 - x1y0z1 );
         // D.z = 0.5f * ( x1y1z2 - x1y1z0 );
@@ -292,7 +269,7 @@ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
         D.z = scalbnf( x1y1z2 - x1y1z0, -1 );
 
         /* compute Hessian */
-        const float x1y1z1 = readTex( dog, n.x  , n.y  , n.z   );
+        const float x1y1z1 = dog.get( n.z, n.y, n.x );
         // DD.x = x2y1z1 + x0y1z1 - 2.0f * x1y1z1;
         // DD.y = x1y2z1 + x1y0z1 - 2.0f * x1y1z1;
         // DD.z = x1y1z2 + x1y1z0 - 2.0f * x1y1z1;
@@ -300,18 +277,18 @@ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
         DD.y = x1y2z1 + x1y0z1 - scalbnf( x1y1z1, 1 );
         DD.z = x1y1z2 + x1y1z0 - scalbnf( x1y1z1, 1 );
 
-        const float x0y0z1 = readTex( dog, n.x-1, n.y-1, n.z   );
-        const float x0y1z0 = readTex( dog, n.x-1, n.y  , n.z-1 );
-        const float x0y1z2 = readTex( dog, n.x-1, n.y  , n.z+1 );
-        const float x0y2z1 = readTex( dog, n.x-1, n.y+1, n.z   );
-        const float x1y0z0 = readTex( dog, n.x  , n.y-1, n.z-1 );
-        const float x1y0z2 = readTex( dog, n.x  , n.y-1, n.z+1 );
-        const float x1y2z0 = readTex( dog, n.x  , n.y+1, n.z-1 );
-        const float x1y2z2 = readTex( dog, n.x  , n.y+1, n.z+1 );
-        const float x2y0z1 = readTex( dog, n.x+1, n.y-1, n.z   );
-        const float x2y1z0 = readTex( dog, n.x+1, n.y  , n.z-1 );
-        const float x2y1z2 = readTex( dog, n.x+1, n.y  , n.z+1 );
-        const float x2y2z1 = readTex( dog, n.x+1, n.y+1, n.z   );
+        const float x0y0z1 = dog.get( n.z  , n.y-1, n.x-1 );
+        const float x0y1z0 = dog.get( n.z-1, n.y  , n.x-1 );
+        const float x0y1z2 = dog.get( n.z+1, n.y  , n.x-1 );
+        const float x0y2z1 = dog.get( n.z  , n.y+1, n.x-1 );
+        const float x1y0z0 = dog.get( n.z-1, n.y-1, n.x   );
+        const float x1y0z2 = dog.get( n.z+1, n.y-1, n.x   );
+        const float x1y2z0 = dog.get( n.z-1, n.y+1, n.x   );
+        const float x1y2z2 = dog.get( n.z+1, n.y+1, n.x   );
+        const float x2y0z1 = dog.get( n.z  , n.y-1, n.x+1 );
+        const float x2y1z0 = dog.get( n.z-1, n.y  , n.x+1 );
+        const float x2y1z2 = dog.get( n.z+1, n.y  , n.x+1 );
+        const float x2y2z1 = dog.get( n.z  , n.y+1, n.x+1 );
         // DX.x = 0.25f * ( x2y2z1 + x0y0z1 - x0y2z1 - x2y0z1 );
         // DX.y = 0.25f * ( x2y1z2 + x0y1z0 - x0y1z2 - x2y1z0 );
         // DX.z = 0.25f * ( x1y2z2 + x1y0z0 - x1y2z0 - x1y0z2 );
@@ -379,21 +356,21 @@ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
     }
 
     /* accept-reject extremum */
-    // if( fabsf(contr) < (d_consts.threshold*2.0f) )
-    if( fabsf(contr) < scalbnf( d_consts.threshold, 1 ) )
+    // if( fabsf(contr) < (h_consts.threshold*2.0f) )
+    if( fabsf(contr) < scalbnf( h_consts.threshold, 1 ) )
     {
         return false;
     }
 
     /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
-    if( edgeval >= (d_consts.edge_limit+1.0f)*(d_consts.edge_limit+1.0f)/d_consts.edge_limit ) {
+    if( edgeval >= (h_consts.edge_limit+1.0f)*(h_consts.edge_limit+1.0f)/h_consts.edge_limit ) {
         return false;
     }
 
     ec.xpos      = xn;
     ec.ypos      = yn;
     ec.lpos      = (int)roundf(sn);
-    ec.sigma     = d_consts.sigma0 * pow(d_consts.sigma_k, sn); // * 2;
+    ec.sigma     = h_consts.sigma0 * pow(h_consts.sigma_k, sn); // * 2;
     ec.cell      = floorf( yn / h_grid_divider ) * grid_width + floorf( xn / w_grid_divider );
         // const float sigma_k = powf(2.0f, 1.0f / levels );
 
@@ -402,60 +379,52 @@ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
 
 
 template<int HEIGHT, int sift_mode>
-__global__
-void find_extrema_in_dog( cudaTextureObject_t dog,
-                          int                 octave,
-                          int                 width,
-                          int                 height,
-                          const uint32_t      maxlevel,
-                          int*                d_number_of_blocks,
-                          int                 number_of_blocks,
-                          const float         w_grid_divider,
-                          const float         h_grid_divider,
-                          const int           grid_width )
+void find_extrema_in_dog( Grid&          g,
+                          Plane2D_float& dog,
+                          int            octave,
+                          int            width,
+                          int            height,
+                          const uint32_t maxlevel,
+                          const float    w_grid_divider,
+                          const float    h_grid_divider,
+                          const int      grid_width )
 {
-    InitialExtremum ec;
-    ec.ignore = false;
-
-    bool indicator = find_extrema_in_dog_sub<sift_mode>( dog,
-                                                         octave,
-                                                         width,
-                                                         height,
-                                                         maxlevel,
-                                                         w_grid_divider,
-                                                         h_grid_divider,
-                                                         grid_width,
-                                                         ec );
-
-    uint32_t write_index = extrema_count<HEIGHT>( indicator, &dct.ext_ct[octave] );
+    uint32_t write_index = 0;
 
     InitialExtremum* d_extrema = dobuf.i_ext_dat[octave];
     int*             d_ext_off = dobuf.i_ext_off[octave];
 
-    if( indicator && write_index < d_consts.max_extrema ) {
-        ec.write_index = write_index;
-        // store the initial extremum in an array
-        d_extrema[write_index] = ec;
+    InitialExtremum ec;
+    ec.ignore = false;
 
-        // index for indirect access to d_extrema, to enable
-        // access after filtering some initial extrema
-        d_ext_off[write_index] = write_index;
-    }
+    g.reset();
+    do {
+        bool indicator = find_extrema_in_dog_sub<sift_mode>( g,
+                                                             dog,
+                                                             octave,
+                                                             width,
+                                                             height,
+                                                             maxlevel,
+                                                             w_grid_divider,
+                                                             h_grid_divider,
+                                                             grid_width,
+                                                             ec );
 
-    // without syncthreads, (0,0) threads may precede some calls to extrema_count()
-    // in non-(0,0) threads and increase barrier count too early
-    __syncthreads();
+        if( indicator && write_index < h_consts.max_extrema )
+        {
+            ec.write_index = write_index;
+            // store the initial extremum in an array
+            d_extrema[write_index] = ec;
 
-    if( threadIdx.x == 0 && threadIdx.y == 0 ) {
-        int ct = atomicAdd( d_number_of_blocks, 1 );
-        if( ct >= number_of_blocks-1 ) {
-            int num_ext = atomicMin( &dct.ext_ct[octave], d_consts.max_extrema );
-            // printf( "Block %d,%d,%d num ext %d\n", blockIdx.x, blockIdx.y, blockIdx.z, dct.ext_ct[octave] );
+            // index for indirect access to d_extrema, to enable
+            // access after filtering some initial extrema
+            d_ext_off[write_index] = write_index;
+
+            write_index++;
         }
-    }
+    } while( g.next() );
 }
 
-__host__
 void Pyramid::find_extrema( const Config& conf )
 {
     static const int HEIGHT = 4;
@@ -468,13 +437,11 @@ void Pyramid::find_extrema( const Config& conf )
         int cols = oct_obj.getWidth();
         int rows = oct_obj.getHeight();
 
-        dim3 block( 32, HEIGHT );
-        dim3 grid;
-        grid.x  = grid_divide( cols, block.x );
-        grid.y  = grid_divide( rows, block.y );
-        grid.z  = _levels - 3;
-
-        cudaStream_t oct_str = oct_obj.getStream();
+        Grid g;
+        g.setBlockDim( 32, HEIGHT );
+        g.setGridDim( grid_divide( cols, g.blockDim.x ),
+                      grid_divide( rows, g.blockDim.y ),
+                      _levels - 3 );
 
         int*  num_blocks      = extrema_num_blocks;
 
@@ -482,37 +449,29 @@ void Pyramid::find_extrema( const Config& conf )
         {
         case Config::RefineInLevel :
                 find_extrema_in_dog<HEIGHT,Config::RefineInLevel>
-                    <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexturePoint( ),
+                    ( g,
+                      oct_obj.getDog( ),
                       octave,
                       cols,
                       rows,
                       _levels-1,
-                      num_blocks,
-                      grid.x * grid.y,
                       oct_obj.getWGridDivider(),
                       oct_obj.getHGridDivider(),
                       conf.getFilterGridSize() );
-                POP_SYNC_CHK;
                 break;
         default :
                 find_extrema_in_dog<HEIGHT,Config::RefineInOctave>
-                    <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexturePoint( ),
+                    ( g,
+                      oct_obj.getDog( ),
                       octave,
                       cols,
                       rows,
                       _levels-1,
-                      num_blocks,
-                      grid.x * grid.y,
                       oct_obj.getWGridDivider(),
                       oct_obj.getHGridDivider(),
                       conf.getFilterGridSize() );
-                POP_SYNC_CHK;
                 break;
         }
-
-        cuda::event_record( oct_obj.getEventExtremaDone(), oct_str, __FILE__, __LINE__ );
     }
 }
 

@@ -9,10 +9,12 @@
 
 #include "common/assist.h"
 #include "common/plane_2d.h"
+#include "common/grid.h"
 #include "sift_constants.h"
 
 #include <cinttypes>
 #include <cstdio>
+#include <cmath>
 
 namespace popsift
 {
@@ -32,88 +34,43 @@ namespace popsift
  * behaviour.
  */
 static inline
-void get_gradiant( float& grad,
-                   float& theta,
-                   int    x,
-                   int    y,
-                   popsift::Plane2D_float& layer )
+void get_gradiant( float&                        grad,
+                   float&                        theta,
+                   int                           x,
+                   int                           y,
+                   const popsift::Plane2D_float& layer )
 {
     grad  = 0.0f;
     theta = 0.0f;
-    if( x > 0 && x < layer.getCols()-1 && y > 0 && y < layer.getRows()-1 ) {
-        float dx = layer.ptr(y)[x+1] - layer.ptr(y)[x-1];
-        float dy = layer.ptr(y+1)[x] - layer.ptr(y-1)[x];
+    if( x > 0 && x < layer.getDimX()-1 && y > 0 && y < layer.getDimY()-1 ) {
+        float dx = layer.get(y  ,x+1) - layer.get(y  ,x-1);
+        float dy = layer.get(y+1,x  ) - layer.get(y-1,x  );
         grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
         theta    = atan2f(dy, dx);
     }
 }
-
-#if 0
-/* get_gradiant() works for both point texture and linear interpolation
- * textures. The reason is that readTex must add 0.5 for coordinates in
- * both cases to access the expected pixel.
- */
-static inline
-void get_gradiant( float&              grad,
-                   float&              theta,
-                   const int           x,
-                   const int           y,
-                   cudaTextureObject_t layer,
-                   const int           level )
-{
-    float dx = layer[level].ptr(y)[x+1]
-             - layer[level].ptr(y)[x-1];
-    float dy = layer[level].ptr(y+1)[x]
-             - layer[level].ptr(y-1)[x];
-    grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
-    theta    = atan2f(dy, dx);
-}
-#endif
 
 /* A version of get_gradiant that works for a (32,1,1) threadblock
  * and pulls data to shared memory before computing. Data is pulled
  * less frequently, meaning that we do not rely on the L1 cache.
  */
 static inline
-void get_gradiant32( Grid& g,
-                     float&              grad,
-                     float&              theta,
-                     const int           x,
-                     const int           y,
-                     cudaTextureObject_t layer,
-                     const int           level )
+void get_gradiant32( float&               grad,
+                     float&               theta,
+                     const int            x,
+                     const int            y,
+                     const Plane2D_float& layer,
+                     const int            level )
 {
-    const int idx = g.threadIdx.x;
+    const float dx = layer.get( level, y  , x+1 );
+                   - layer.get( level, y  , x-1 );
 
-    const float dx = layer[level].ptr(y)[x+idx+1]
-                   - layer[level].ptr(y)[x+idx-1];
-
-    const float dy = layer[level].ptr(y+1)[x+idx]
-                   - layer[level].ptr(y-1)[x+idx];
+    const float dy = layer.get( level, y+1, x   );
+                   - layer.get( level, y-1, x   );
 
     grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
     theta    = atan2f(dy, dx);
 }
-
-#if 0
-static inline
-void get_gradiant( float&              grad,
-                   float&              theta,
-                   float               x,
-                   float               y,
-                   float               cos_t,
-                   float               sin_t,
-                   cudaTextureObject_t texLinear,
-                   int                 level )
-{
-    float dx = readTex( texLinear, x+cos_t, y+sin_t, level )
-             - readTex( texLinear, x-cos_t, y-sin_t, level );
-    float dy = readTex( texLinear, x-sin_t, y+cos_t, level )
-             - readTex( texLinear, x+sin_t, y-cos_t, level );
-    grad     = hypotf( dx, dy );
-    theta    = atan2f( dy, dx );
-}
-#endif
 
 }; // namespace popsift
 

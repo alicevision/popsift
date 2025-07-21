@@ -7,9 +7,11 @@
  */
 #pragma once
 
+#include "simd_types.h"
+
 #include <cmath>
 
-__device__ static inline
+static inline
 float2 operator+( float2 l, const float2& r )
 {
     l.x += r.x;
@@ -17,7 +19,7 @@ float2 operator+( float2 l, const float2& r )
     return l;
 }
 
-__device__ static inline
+static inline
 float2 operator-( float2 l, const float2& r )
 {
     l.x -= r.x;
@@ -25,7 +27,7 @@ float2 operator-( float2 l, const float2& r )
     return l;
 }
 
-__device__ static inline
+static inline
 float2 operator*( float2 l, float r )
 {
     l.x *= r;
@@ -33,7 +35,7 @@ float2 operator*( float2 l, float r )
     return l;
 }
 
-__device__ static inline
+static inline
 float2 operator*( float l, float2 r )
 {
     r.x *= l;
@@ -41,7 +43,7 @@ float2 operator*( float l, float2 r )
     return r;
 }
 
-__device__ static inline
+static inline
 float2 operator/( float2 l, float r )
 {
     l.x /= r;
@@ -49,7 +51,7 @@ float2 operator/( float2 l, float r )
     return l;
 }
 
-__device__ static inline
+static inline
 float2 round( float2 l )
 {
     l.x = roundf( l.x );
@@ -57,7 +59,7 @@ float2 round( float2 l )
     return l;
 }
 
-__device__ static inline
+static inline
 float2 abs( float2 l )
 {
     l.x = fabsf( l.x );

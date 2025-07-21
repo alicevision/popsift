@@ -23,10 +23,8 @@ static void horiz( Grid& g,
     const int    src_level = dst_level - 1;
     const int    span      =  h_gauss.inc.span[dst_level];
     const float* filter    = &h_gauss.inc.filter[dst_level*GAUSS_ALIGN];
-    const int    block_x   = g.blockIdx.x * g.blockDim.x;
-    const int    block_y   = g.blockIdx.y * g.blockDim.y;
-    const int    xpos      = block_x + g.threadIdx.x;
-    const int    ypos      = block_y + g.threadIdx.y;
+    const int    xpos      = g.threadIdx.x;
+    const int    ypos      = g.threadIdx.y;
 
     float weight;
     float val;
@@ -56,10 +54,8 @@ static void vert( Grid& g,
 {
     const int    span    =  h_gauss.inc.span[dst_level];
     const float* filter  = &h_gauss.inc.filter[dst_level*GAUSS_ALIGN];
-    const int    block_x = g.blockIdx.x * g.blockDim.x;
-    const int    block_y = g.blockIdx.y * g.blockDim.y;
-    const int    xpos    = block_x + g.threadIdx.x;
-    const int    ypos    = block_y + g.threadIdx.y;
+    const int    xpos    = g.threadIdx.x;
+    const int    ypos    = g.threadIdx.y;
 
     int   idy;
     float weight;
@@ -85,7 +81,7 @@ static void vert( Grid& g,
 
 } // namespace absoluteSource
 
-void Pyramid::horiz_from_prev_level_basic( int octave, int level )
+void Pyramid::horiz_from_prev_level( int octave, int level )
 {
     Octave&      oct_obj = _octaves[octave];
 
@@ -93,10 +89,8 @@ void Pyramid::horiz_from_prev_level_basic( int octave, int level )
     const int height = oct_obj.getHeight();
 
     Grid g;
-    g.setBlockDim( 32, 8, 1 );
-    g.setGridDim( grid_divide( width,  32 ),
-                  grid_divide( height, 8 ),
-                  1 );
+    g.setBlockDim( width, height, 1 );
+    g.setGridDim( 1, 1, 1 );
 
     g.reset();
     do {
@@ -108,7 +102,7 @@ void Pyramid::horiz_from_prev_level_basic( int octave, int level )
     } while( g.next() );
 }
 
-void Pyramid::vert_from_interm_basic( int octave, int level )
+void Pyramid::vert_from_interm( int octave, int level )
 {
     Octave& oct_obj = _octaves[octave];
 
@@ -116,10 +110,8 @@ void Pyramid::vert_from_interm_basic( int octave, int level )
     const int height = oct_obj.getHeight();
 
     Grid g;
-    g.setBlockDim( 64, 2, 1 );
-    g.setGridDim( grid_divide( width,  64 ),
-                  grid_divide( height, 2 ),
-                  1 );
+    g.setBlockDim( width, height, 1 );
+    g.setGridDim( 1, 1, 1 );
 
     g.reset();
     do {

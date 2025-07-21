@@ -72,7 +72,7 @@ public:
      * debug:
      * download a level and write to disk
      */
-    void download_and_save_array( const char* basename, int octave );
+    void download_and_save_array( const Config& conf, const char* basename, int octave );
 };
 
 } // namespace popsift

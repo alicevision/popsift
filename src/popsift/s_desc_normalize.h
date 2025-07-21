@@ -13,30 +13,16 @@
 #include "sift_extremum.h"
 
 template<class T>
-void normalize_histogram( Grid g )
+void normalize_histogram( )
 {
-    g.resetBlock();
-    while( g.nextBlock() )
+    Descriptor* descs            = dbuf.desc;
+    const int   num_orientations = dct.ori_total;
+
+    for( int i=0; i<num_orientations; i++ )
     {
-        Descriptor* descs            = dbuf.desc;
-        const int   num_orientations = dct.ori_total;
+        Descriptor* desc = &descs[i];
 
-        int offset = g.blockIdx.x * 32 + g.threadIdx.y;
-
-        // all of these threads are useless
-        if( g.blockIdx.x * 32 >= num_orientations ) return;
-
-        offset = ( offset < num_orientations ) ? offset
-                                               : num_orientations-1;
-        Descriptor* desc = &descs[offset];
-
-        bool ignoreme = ( offset >= num_orientations );
-
-        g.resetThreadYZ();
-        while( g.nextThreadYZ() )
-        {
-            T::normalize( desc->features, ignoreme );
-        }
+        T::normalize( desc->features );
     }
 }
 

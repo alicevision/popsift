@@ -14,6 +14,7 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <algorithm>
 
 #include "debug_macros.h"
 
@@ -153,15 +154,15 @@ template <typename T> struct PlaneT : public PlaneBase
 
     inline T& deref( int x )
     {
-        x = capY( x );
+        x = capX( x );
         T* ptr = (T*)PlaneBase::base();
         return ptr[x];
     }
 
     inline T& deref( int y, int x )
     {
-        y = capX( y );
-        x = capY( x );
+        y = capY( y );
+        x = capX( x );
         T* ptr = (T*)PlaneBase::row(y);
         return ptr[x];
     }
@@ -169,23 +170,23 @@ template <typename T> struct PlaneT : public PlaneBase
     inline T& deref( int z, int y, int x )
     {
         z = capZ( z );
-        y = capX( y );
-        x = capY( x );
+        y = capY( y );
+        x = capX( x );
         T* ptr = (T*)PlaneBase::row(y,z);
         return ptr[x];
     }
 
     inline const T& deref( int x ) const
     {
-        x = capY( x );
+        x = capX( x );
         T* ptr = (T*)PlaneBase::base();
         return ptr[x];
     }
 
     inline const T& deref( int y, int x ) const
     {
-        y = capX( y );
-        x = capY( x );
+        y = capY( y );
+        x = capX( x );
         T* ptr = (T*)PlaneBase::row(y);
         return ptr[x];
     }
@@ -193,8 +194,8 @@ template <typename T> struct PlaneT : public PlaneBase
     inline const T& deref( int z, int y, int x ) const
     {
         z = capZ( z );
-        y = capX( y );
-        x = capY( x );
+        y = capY( y );
+        x = capX( x );
         T* ptr = (T*)PlaneBase::row(y,z);
         return ptr[x];
     }
@@ -279,10 +280,24 @@ inline T PlaneT<T>::getLinear( const float& y, const float& x ) const
     const int   y0 = (int)y;
     const float xf = x - x0;
     const float yf = y - y0;
+#if 1
+    return deref( y0,   x0   );
+    /*
+    return interpolate( xf, deref( y0,   x0   ),
+                            deref( y0,   x0+1 ) );
+     */
+#elif 0
+    auto h1 = interpolate( xf, deref( y0,   x0   ),
+                               deref( y0,   x0+1 ) );
+    auto h2 = interpolate( xf, deref( y0+1, x0   ),
+                               deref( y0+1, x0+1 ) );
+    return interpolate( yf, h1, h2 );
+#else
     return interpolate( yf, interpolate( xf, deref( y0,   x0   ),
                                              deref( y0,   x0+1 ) ),
                             interpolate( xf, deref( y0+1, x0   ),
                                              deref( y0+1, x0+1 ) ) );
+#endif
 }
 
 template <typename T>

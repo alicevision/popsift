@@ -104,34 +104,39 @@ struct Grid
 
     bool nextXYZ( )
     {
-        if( threadIdx.x >= blockIdx.x ) return false;
+        if( threadIdx.x < blockDim.x )
+        {
+            threadIdx.x++;
+            if( threadIdx.x != blockDim.x ) return true;
 
-        threadIdx.x++;
-        if( threadIdx.x != blockDim.x ) return true;
-
-        threadIdx.x = 0;
-        return nextYZ();
+            threadIdx.x = 0;
+            return nextYZ();
+        }
+        return false;
     }
 
     bool nextYZ( )
     {
-        if( threadIdx.y >= blockIdx.y ) return false;
+        if( threadIdx.y < blockDim.y )
+        {
+            threadIdx.y++;
+            if( threadIdx.y != blockDim.y ) return true;
 
-        threadIdx.y++;
-        if( threadIdx.y != blockDim.y ) return true;
-
-        threadIdx.y = 0;
-        return nextZ();
+            threadIdx.y = 0;
+            return nextZ();
+        }
+        return false;
     }
 
     bool nextZ( )
     {
-        if( threadIdx.z >= blockDim.z ) return false;
+        if( threadIdx.z < blockDim.z )
+        {
+            threadIdx.z++;
+            if( threadIdx.z != blockDim.z ) return true;
 
-        threadIdx.z++;
-        if( threadIdx.z != blockDim.z ) return true;
-
-        threadIdx.z = 0;
+            threadIdx.z = 0;
+        }
         return false;
     }
 

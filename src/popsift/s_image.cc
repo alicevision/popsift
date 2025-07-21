@@ -34,14 +34,19 @@ Image::Image( int w, int h )
 Image::~Image( )
 {
     _input_image_d.dealloc( );
+    _hidden_conversion.dealloc( );
 }
 
-void Image::load( void* input )
+void Image::load( const void* input )
 {
     /* We copy the input because it would be necessary for CUDA.
      * Eliminate eventually.
      */
-    _input_image_d.memcpyFromBuffer( reinterpret_cast<uint8_t*>(input) );
+    _input_image_d.memcpyFromBuffer( reinterpret_cast<const uint8_t*>(input) );
+
+#if 1   // DEBUG PGM LOADING
+    popsift::write_plane2D( "input-in-bytes.pgm", _input_image_d );
+#endif
 }
 
 void Image::resetDimensions( int w, int h )
@@ -52,6 +57,24 @@ void Image::resetDimensions( int w, int h )
 void Image::allocate( int w, int h )
 {
     _input_image_d.alloc( w, h );
+}
+
+Plane2D_float& Image::getFloatPlane()
+{
+    if( _hidden_conversion.isNull() )
+    {
+        _hidden_conversion.alloc( getWidth(), getHeight() );
+
+        for( int y=0; y<getHeight(); y++ )
+        {
+            for( int x=0; x<getWidth(); x++ )
+            {
+                const float f = _input_image_d.get( y, x ) / 255.0f;
+                _hidden_conversion.set( y, x, f );
+            }
+        }
+    }
+    return _hidden_conversion;
 }
 
 /*************************************************************
@@ -71,9 +94,9 @@ ImageFloat::~ImageFloat( )
     _input_image_d.dealloc( );
 }
 
-void ImageFloat::load( void* input )
+void ImageFloat::load( const void* input )
 {
-    _input_image_d.memcpyFromBuffer( reinterpret_cast<float*>(input) );
+    _input_image_d.memcpyFromBuffer( reinterpret_cast<const float*>(input) );
 }
 
 void ImageFloat::resetDimensions( int w, int h )
@@ -84,6 +107,11 @@ void ImageFloat::resetDimensions( int w, int h )
 void ImageFloat::allocate( int w, int h )
 {
     _input_image_d.alloc( w, h );
+}
+
+Plane2D_float& ImageFloat::getFloatPlane()
+{
+    return _input_image_d;
 }
 
 } // namespace popsift

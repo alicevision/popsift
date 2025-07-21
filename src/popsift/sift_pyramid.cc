@@ -63,10 +63,11 @@ void py_print_corner_float_transposed( Grid& g, float* img, uint32_t pitch, uint
     printf("\n");
 }
 
-void Pyramid::download_and_save_array( const char* basename )
+void Pyramid::download_and_save_array( const Config& conf, const char* basename )
 {
+    POP_INFO2( conf.silent(), "enter " << __PRETTY_FUNCTION__ );
     for( int o=0; o<_num_octaves; o++ )
-        _octaves[o].download_and_save_array( basename, o );
+        _octaves[o].download_and_save_array( conf, basename, o );
 }
 
 /*
@@ -194,7 +195,12 @@ Pyramid::~Pyramid()
 
 void Pyramid::step1( const Config& conf, popsift::ImageBase* img )
 {
+    POP_INFO2( conf.silent(), "enter " << __PRETTY_FUNCTION__ );
+
     reset_extrema_mgmt( );
+
+    POP_INFO2( conf.silent(), "is image NULL? " << (img->isNull() ? "yes" : "no") );
+
     build_pyramid( conf, img );
 }
 

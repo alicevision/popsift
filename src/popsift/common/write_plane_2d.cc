@@ -16,43 +16,22 @@ using namespace std;
 
 namespace popsift {
 
-__host__
-void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
+void write_plane2D( const char* filename, bool , Plane2D_float& f )
 {
-    if( onDevice ) {
-        // cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
-        Plane2D_float g;
-        g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
-        g.memcpyFromDevice( f );
-        write_plane2D( filename, g );
-        g.freeHost( CudaAllocated );
-    } else {
-        write_plane2D( filename, f );
-    }
+    write_plane2D( filename, f );
 }
 
-__host__
-void write_plane2Dunscaled( const char* filename, bool onDevice, Plane2D_float& f, int offset )
+void write_plane2Dunscaled( const char* filename, bool , Plane2D_float& f, int offset )
 {
-    if( onDevice ) {
-        // cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
-        Plane2D_float g;
-        g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
-        g.memcpyFromDevice( f );
-        write_plane2Dunscaled( filename, g, offset );
-        g.freeHost( CudaAllocated );
-    } else {
-        write_plane2Dunscaled( filename, f, offset );
-    }
+    write_plane2Dunscaled( filename, f, offset );
 }
 
-__host__
 void write_plane2D( const char* filename, Plane2D_float& f )
 {
     // cerr << "Enter " << __FUNCTION__ << endl;
 
-    int rows = f.getRows();
-    int cols = f.getCols();
+    int rows = f.getDimY();
+    int cols = f.getDimX();
     // cerr << "    size: " << cols << "x" << rows << endl;
 
     unsigned char* c = new unsigned char[rows * cols];
@@ -60,7 +39,7 @@ void write_plane2D( const char* filename, Plane2D_float& f )
     float maxval = std::numeric_limits<float>::min();
     for( int y=0; y<rows; y++ ) {
         for( int x=0; x<cols; x++ ) {
-            float v = f.ptr(y)[x];
+            float v = f.get(y,x);
             // cerr << " " << v;
             minval = min( minval, v );
             maxval = max( maxval, v );
@@ -74,7 +53,7 @@ void write_plane2D( const char* filename, Plane2D_float& f )
     float fmaxval = 255.0f / ( maxval - minval );
     for( int y=0; y<rows; y++ ) {
         for( int x=0; x<cols; x++ ) {
-            float v = f.ptr(y)[x];
+            float v = f.get(y,x);
             v = ( v - minval ) * fmaxval;
             c[y*cols+x] = (unsigned char)v;
         }
@@ -106,16 +85,15 @@ void write_plane2D( const char* filename, Plane2D_float& f )
     // cerr << "Leave " << __FUNCTION__ << endl;
 }
 
-__host__
 void write_plane2Dunscaled( const char* filename, Plane2D_float& f, int offset )
 {
-    int rows = f.getRows();
-    int cols = f.getCols();
+    int rows = f.getDimY();
+    int cols = f.getDimX();
 
     int* c = new int[rows * cols];
     for( int y=0; y<rows; y++ ) {
         for( int x=0; x<cols; x++ ) {
-            float v = f.ptr(y)[x];
+            float v = f.get(y,x);
             c[y*cols+x] = v;
         }
     }
@@ -138,31 +116,20 @@ void write_plane2Dunscaled( const char* filename, Plane2D_float& f, int offset )
     // cerr << "Leave " << __FUNCTION__ << endl;
 }
 
-__host__
-void dump_plane2Dfloat( const char* filename, bool onDevice, Plane2D_float& f )
+void dump_plane2Dfloat( const char* filename, bool , Plane2D_float& f )
 {
-    if( onDevice ) {
-        // cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
-        Plane2D_float g;
-        g.allocHost( f.getCols(), f.getRows(), CudaAllocated );
-        g.memcpyFromDevice( f );
-        dump_plane2Dfloat( filename, g );
-        g.freeHost( CudaAllocated );
-    } else {
-        dump_plane2Dfloat( filename, f );
-    }
+    dump_plane2Dfloat( filename, f );
 }
 
-__host__
 void dump_plane2Dfloat( const char* filename, Plane2D_float& f )
 {
-    int rows = f.getRows();
-    int cols = f.getCols();
+    int rows = f.getDimY();
+    int cols = f.getDimX();
 
     float* c = new float[rows * cols];
     for( int y=0; y<rows; y++ ) {
         for( int x=0; x<cols; x++ ) {
-            float v = f.ptr(y)[x];
+            float v = f.get(y,x);
             c[y*cols+x] = v;
         }
     }
@@ -174,5 +141,44 @@ void dump_plane2Dfloat( const char* filename, Plane2D_float& f )
     delete [] c;
 }
 
+void write_plane2D( const char* filename, Plane2D_uint8& f )
+{
+    int rows = f.getDimY();
+    int cols = f.getDimX();
+
+    unsigned char* c = new unsigned char[rows * cols];
+
+    for( int y=0; y<rows; y++ ) {
+        for( int x=0; x<cols; x++ ) {
+            uint8_t v = f.get(y,x);
+            c[y*cols+x] = (unsigned char)v;
+        }
+    }
+#if 1
+    ofstream of( filename, ios::binary );
+    of << "P2" << endl 
+       << cols << " " << rows << endl
+       << "255" << endl;
+    unsigned char* cx = c;
+    for( int row=0; row<rows; row++ ) {
+        for( int col=0; col<cols; col++ ) {
+            int val = *cx;
+            cx++;
+            of << val << " ";
+        }
+        of << endl;
+    }
+    delete [] c;
+#else
+    ofstream of( filename, ios::binary );
+    of << "P5" << endl
+       << cols << " " << rows << endl
+       << "255" << endl;
+    of.write( (char*)c, cols * rows );
+    delete [] c;
+#endif
+
+    // cerr << "Leave " << __FUNCTION__ << endl;
+}
 } // namespace popsift
 

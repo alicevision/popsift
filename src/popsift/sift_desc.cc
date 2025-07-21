@@ -43,27 +43,27 @@ void Pyramid::descriptors( const Config& conf )
 {
     for( int octave=_num_octaves-1; octave>=0; octave-- )
     {
-        if( hct.ori_ct[octave] != 0 ) {
+        if( dct.ori_ct[octave] != 0 ) {
             Octave& oct_obj = _octaves[octave];
 
             start_ext_desc_vlfeat( octave, oct_obj );
         }
     }
 
-    if( hct.ori_total == 0 )
+    if( dct.ori_total == 0 )
     {
         cerr << "Warning: no descriptors extracted" << endl;
         return;
     }
 
     Grid g;
-    g.setGridDim( grid_divide( hct.ori_total, 32 ) );
+    g.setGridDim( grid_divide( dct.ori_total, 32 ) );
     g.setBlockDim( 32, 32, 1 );
 
     if( conf.getUseRootSift() ) {
-        normalize_histogram<NormalizeRootSift>( g );
+        normalize_histogram<NormalizeRootSift>( );
     } else {
-        normalize_histogram<NormalizeL2>( g );
+        normalize_histogram<NormalizeL2>( );
     }
 }
 

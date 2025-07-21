@@ -10,6 +10,8 @@
 #include "common/plane_2d.h"
 #include "sift_conf.h"
 
+#include "common/write_plane_2d.h" // debug only
+
 #include <cstdint>
 
 namespace popsift {
@@ -22,6 +24,8 @@ struct ImageBase
 {
     virtual ~ImageBase( ) = default;
 
+    virtual bool isNull() = 0;
+
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
@@ -33,7 +37,7 @@ struct ImageBase
      * if the image is already uploaded, and one that takes
      * an image in pinned memory.
      */
-    virtual void load( void* input ) = 0;
+    virtual void load( const void* input ) = 0;
 
     virtual int getWidth()  const = 0;
     virtual int getHeight() const = 0;
@@ -53,6 +57,10 @@ struct Image : public ImageBase
 
     ~Image( ) override;
 
+    virtual bool isNull() override {
+        return _input_image_d.isNull();
+    }
+
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
@@ -64,25 +72,20 @@ struct Image : public ImageBase
      * if the image is already uploaded, and one that takes
      * an image in pinned memory.
      */
-    virtual void load( void* input ) override;
+    virtual void load( const void* input ) override;
 
     virtual int getWidth()  const override { return _input_image_d.getDimX(); }
     virtual int getHeight() const override { return _input_image_d.getDimY(); }
 
-    static Plane2D_float _dummy;
-
-    virtual Plane2D_float& getFloatPlane() {
-        /*
-         * CONVERSION TODO
-         */
-        return _dummy;
-    }
+    virtual Plane2D_float& getFloatPlane() override;
 private:
     void allocate( int w, int h );
 
 private:
     /* 2D plane holding input image on device for upscaling */
     Plane2D_uint8 _input_image_d;
+
+    Plane2D_float _hidden_conversion;
 };
 
 /*************************************************************
@@ -97,6 +100,10 @@ struct ImageFloat : public ImageBase
 
     ~ImageFloat( ) override;
 
+    virtual bool isNull() override {
+        return _input_image_d.isNull();
+    }
+
     /** Reallocation that takes care of pitch when new dimensions
      *  are smaller and actually reallocation when they are bigger.
      */
@@ -108,14 +115,12 @@ struct ImageFloat : public ImageBase
      * if the image is already uploaded, and one that takes
      * an image in pinned memory.
      */
-    virtual void load( void* input ) override;
+    virtual void load( const void* input ) override;
 
     virtual int getWidth()  const override { return _input_image_d.getDimX(); }
     virtual int getHeight() const override { return _input_image_d.getDimY(); }
 
-    virtual Plane2D_float& getFloatPlane() {
-        return _input_image_d;
-    }
+    virtual Plane2D_float& getFloatPlane() override;
 
 private:
     void allocate( int w, int h );

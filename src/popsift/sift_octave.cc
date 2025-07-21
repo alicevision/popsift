@@ -72,8 +72,10 @@ void Octave::free()
  * Debug output: write an octave/level to disk as PGM
  *************************************************************/
 
-void Octave::download_and_save_array( const char* basename, int octave )
+void Octave::download_and_save_array( const Config& conf, const char* basename, int octave )
 {
+    POP_INFO2( conf.silent(), " enter " << __PRETTY_FUNCTION__ );
+
     struct stat st = { 0 };
 
     // int width  = getWidth();

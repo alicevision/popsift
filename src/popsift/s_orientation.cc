@@ -17,6 +17,7 @@
 #include <cinttypes>
 #include <cmath>
 #include <cstdio>
+#include <numeric>
 
 using namespace popsift;
 using namespace std;
@@ -39,16 +40,16 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
             (di + ORI_NBINS) : 
             ((di >= ORI_NBINS) ? (di - ORI_NBINS) : (di));
 
-    float th = __fdividef( M_PI2 * di, ORI_NBINS ) - M_PI;
-    // float th = ((M_PI2 * di) / ORI_NBINS);
+    // float th = __fdividef( M_PI2 * di, ORI_NBINS ) - M_PI;
+    float th = ((M_PI2 * di) / ORI_NBINS) - M_PI;
     return th;
 }
 
 /*
  * Histogram smoothing helper
  */
-template<int D>
-inline static float smoothe( const float* const src, const int bin )
+inline static
+float smoothe( const float* const src, const int bin )
 {
     const int prev = (bin == 0) ? ORI_NBINS-1 : bin-1;
     const int next = (bin == ORI_NBINS-1) ? 0 : bin+1;
@@ -59,31 +60,26 @@ inline static float smoothe( const float* const src, const int bin )
 }
 
 /*
- * Compute the keypoint orientations for each extremum
- * using 16 threads for each of them.
- * direct curve fitting approach
+ * Compute the keypoint orientations for each extremum.
+ * Direct curve fitting approach.
  */
-__global__
-void ori_par( const int           octave,
-              const int           ext_ct_prefix_sum,
-              cudaTextureObject_t layer,
-              const int           w,
-              const int           h )
+void ori_par( Grid&                g,
+              const int            octave,
+              const int            ext_ct_prefix_sum,
+              const Plane2D_float& layer,
+              const int            w,
+              const int            h )
 {
-    const int extremum_index  = blockIdx.x * blockDim.y;
+  g.reset();
+  do {
+    const int extremum_index  = g.blockIdx.x;
 
-    if( popsift::all( extremum_index >= dct.ext_ct[octave] ) ) return; // a few trailing warps
+    if( extremum_index >= dct.ext_ct[octave] ) continue; // a few trailing warps
 
     const int              iext_off =  dobuf.i_ext_off[octave][extremum_index];
     const InitialExtremum* iext     = &dobuf.i_ext_dat[octave][iext_off];
 
-    __shared__ float hist         [64];
-    __shared__ float sm_hist      [64];
-    __shared__ float refined_angle[64];
-    __shared__ float yval         [64];
-
-    hist[threadIdx.x+ 0] = 0.0f;
-    hist[threadIdx.x+32] = 0.0f;
+    float hist[64] = { 0 };
 
     /* keypoint fractional geometry */
     const float x     = iext->xpos;
@@ -95,24 +91,24 @@ void ori_par( const int           octave,
     const float  sigw = ORI_WINFACTOR * sig;
     const int32_t rad  = (int)roundf((3.0f * sigw));
 
-    const float factor = __fdividef( -0.5f, (sigw * sigw) );
+    // const float factor = __fdividef( -0.5f, (sigw * sigw) );
+    const float factor = -0.5f / (sigw * sigw);
     const int sq_thres  = rad * rad;
 
     // int xmin = max(1,     (int)floor(x - rad));
     // int xmax = min(w - 2, (int)floor(x + rad));
     // int ymin = max(1,     (int)floor(y - rad));
     // int ymax = min(h - 2, (int)floor(y + rad));
-    int xmin = max(1,     (int)roundf(x) - rad);
-    int xmax = min(w - 2, (int)roundf(x) + rad);
-    int ymin = max(1,     (int)roundf(y) - rad);
-    int ymax = min(h - 2, (int)roundf(y) + rad);
+    int xmin = std::max(1,     (int)roundf(x) - rad);
+    int xmax = std::min(w - 2, (int)roundf(x) + rad);
+    int ymin = std::max(1,     (int)roundf(y) - rad);
+    int ymax = std::min(h - 2, (int)roundf(y) + rad);
 
     int wx = xmax - xmin + 1;
     int hy = ymax - ymin + 1;
     int loops = wx * hy;
 
-    __syncthreads();
-    for( int i = threadIdx.x; popsift::any(i < loops); i += blockDim.x )
+    for( int i = 0; i < loops; i += g.blockDim.x )
     {
         if( i < loops ) {
             int yy = i / wx + ymin;
@@ -120,12 +116,12 @@ void ori_par( const int           octave,
 
             float grad;
             float theta;
-            get_gradiant( grad,
-                          theta,
-                          xx,
-                          yy,
-                          layer,
-                          level );
+            get_gradiant32( grad,
+                            theta,
+                            xx,
+                            yy,
+                            layer,
+                            level );
 
             float dx = xx - x;
             float dy = yy - y;
@@ -136,7 +132,8 @@ void ori_par( const int           octave,
                 float weight = grad * expf(sq_dist * factor);
 
                 // int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
-                int bidx = (int)roundf( __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) );
+                // int bidx = (int)roundf( __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) );
+                int bidx = (int)roundf( float(ORI_NBINS) * (theta + M_PI) / M_PI2 );
 
                 if( bidx > ORI_NBINS ) {
                     printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
@@ -147,28 +144,29 @@ void ori_par( const int           octave,
 
                 bidx = (bidx == ORI_NBINS) ? 0 : bidx;
 
-                atomicAdd( &hist[bidx], weight );
+                hist[bidx] += weight;
             }
         }
     }
-    __syncthreads();
+
+    float sm_hist[64];
 
 #ifdef WITH_VLFEAT_SMOOTHING
-    for( int i=0; i<3 ; i++ )
-    {
-        sm_hist[threadIdx.x+ 0] = smoothe<0>( hist, threadIdx.x+ 0 );
-        sm_hist[threadIdx.x+32] = smoothe<1>( hist, threadIdx.x+32 );
-        __syncthreads();
-        hist[threadIdx.x+ 0]    = smoothe<2>( sm_hist, threadIdx.x+ 0 );
-        hist[threadIdx.x+32]    = smoothe<3>( sm_hist, threadIdx.x+32 );
-        __syncthreads();
+    for( int i=0; i<3 ; i++ ) {
+        for( int j=0; j<64; j++ ) {
+            sm_hist[j] = smoothe( hist, j );
+        }
+        for( int j=0; j<64; j++ ) {
+            hist[j] = smoothe( sm_hist, j );
+        }
     }
 
-    sm_hist[threadIdx.x+ 0] = hist[threadIdx.x+ 0];
-    sm_hist[threadIdx.x+32] = hist[threadIdx.x+32];
-    __syncthreads();
+    for( int i=0; i<64; i++ ) {
+        sm_hist[i] = hist[i];
+    }
 #else // not WITH_VLFEAT_SMOOTHING
-    for( int bin = threadIdx.x; bin < ORI_NBINS; bin += blockDim.x ) {
+    for( int bin = 0; bin < ORI_NBINS; bin += 32 )
+    {
         int prev2 = bin - 2;
         int prev1 = bin - 1;
         int next1 = bin + 1;
@@ -181,13 +179,16 @@ void ori_par( const int           octave,
                          + ( hist[prev1] + hist[next1] ) * 4.0f
                          +   hist[bin] * 6.0f ) / 16.0f;
     }
-    __syncthreads();
 #endif // not WITH_VLFEAT_SMOOTHING
+
+    float yval[64];
+    float refined_angle[64];
 
     // sub-cell refinement of the histogram cell index, yielding the angle
     // not necessary to initialize, every cell is computed
 
-    for( int bin = threadIdx.x; popsift::any( bin < ORI_NBINS ); bin += blockDim.x ) {
+    for( int bin = 0; bin < ORI_NBINS; bin ++ )
+    {
         const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
         const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
 
@@ -203,50 +204,57 @@ void ori_par( const int           octave,
         //                              : 0.0f;
         const float denB = predicate ? 2.0f * ( sm_hist[prev] - 2.0f * sm_hist[bin] + sm_hist[next] ) : 1.0f;
 
-        const float newbin = __fdividef( num, denB ); // verified: accuracy OK
+        // const float newbin = __fdividef( num, denB ); // verified: accuracy OK
+        const float newbin = num / denB;
 
         predicate   = ( predicate && newbin >= 0.0f && newbin <= 2.0f );
 
         refined_angle[bin] = predicate ? prev + newbin : -1;
         yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
     }
-    __syncthreads();
 
-    int2 best_index = make_int2( threadIdx.x, threadIdx.x + 32 );
 
-    BitonicSort::Warp32<float> sorter( yval );
-    sorter.sort64( best_index );
-    __syncthreads();
+    int best_index[64];
 
-    // All threads retrieve the yval of thread 0, the largest
-    // of all yvals.
-    const float best_val = yval[best_index.x];
-    const float yval_ref = 0.8f * popsift::shuffle( best_val, 0 );
-    const bool  valid    = ( best_val >= yval_ref );
-    bool        written  = false;
+    /* initialize array best_index with the indices of array yval */
+    std::iota( best_index, best_index+64, 0 );
+
+    /* sort array best_index contain yval indices in order of _decreasing_ yval values */
+    std::sort( best_index, best_index+64, [&]( int l, int r ) {
+                                              return ( yval[best_index[l]] > yval[best_index[r]] );
+                                          } );
 
     Extremum* ext = &dobuf.extrema[ext_ct_prefix_sum + extremum_index];
 
-    if( threadIdx.x < ORIENTATION_MAX_COUNT ) {
-        if( valid ) {
-            float chosen_bin = refined_angle[best_index.x];
+    int angles = 0;
+
+    // All threads retrieve the yval of thread 0, the largest
+    // of all yvals.
+    for( int i=0; i<ORIENTATION_MAX_COUNT; i++ )
+    {
+        const float best_val = yval[best_index[i]];
+        const float yval_ref = 0.8f * yval[best_index[0]];
+        const bool  valid    = ( best_val >= yval_ref );
+
+        if( valid )
+        {
+            float chosen_bin = refined_angle[best_index[i]];
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             // float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
-            float th = ::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
-            ext->orientation[threadIdx.x] = th;
-            written = true;
+            float th = std::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
+            ext->orientation[i] = th;
+
+            angles += 1;
         }
     }
 
-    int angles = __popc( popsift::ballot( written ) );
-    if( threadIdx.x == 0 ) {
-        ext->xpos    = iext->xpos;
-        ext->ypos    = iext->ypos;
-        ext->lpos    = iext->lpos;
-        ext->sigma   = iext->sigma;
-        ext->octave  = octave;
-        ext->num_ori = angles;
-    }
+    ext->xpos    = iext->xpos;
+    ext->ypos    = iext->ypos;
+    ext->lpos    = iext->lpos;
+    ext->sigma   = iext->sigma;
+    ext->octave  = octave;
+    ext->num_ori = angles;
+  } while( g.next() );
 }
 
 }; // namespace popsift
@@ -308,57 +316,94 @@ public:
     }
 };
 
-__global__
 void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
 {
-    int       total_ori       = 0;
-    Extremum* extremum        = dobuf.extrema;
-    int*      feat_to_ext_map = dobuf.feat_to_ext_map;
+    Extremum* extremum = dobuf.extrema;
 
-    ExtremaRead r( extremum );
-    ExtremaWrt  w( extremum );
-    ExtremaTot  t( total_ori );
-    ExtremaWrtMap wrtm( feat_to_ext_map, max( d_consts.max_orientations, dbuf.ori_allocated ) );
-    ExclusivePrefixSum::Block<ExtremaRead,ExtremaWrt,ExtremaTot,ExtremaWrtMap>( total_ext_ct, r, w, t, wrtm );
+    int* ori_count  = new int[total_ext_ct];
+    int* ori_offset = new int[total_ext_ct+1];
 
-    __syncthreads();
-
-    if( threadIdx.x == 0 && threadIdx.y == 0 ) {
-        dct.ext_ps[0] = 0;
-        for( int o=1; o<MAX_OCTAVES; o++ ) {
-            dct.ext_ps[o] = dct.ext_ps[o-1] + dct.ext_ct[o-1];
-        }
-
-        for( int o=0; o<MAX_OCTAVES; o++ ) {
-            if( dct.ext_ct[o] == 0 ) {
-                dct.ori_ct[o] = 0;
-            } else {
-                int fe = dct.ext_ps[o  ];   /* first extremum for this octave */
-                int le = dct.ext_ps[o+1]-1; /* last  extremum for this octave */
-                int lo_ori_index = dobuf.extrema[fe].idx_ori;
-                int num_ori      = dobuf.extrema[le].num_ori;
-                int hi_ori_index = dobuf.extrema[le].idx_ori + num_ori;
-                dct.ori_ct[o] = hi_ori_index - lo_ori_index;
-            }
-        }
-
-        dct.ori_ps[0] = 0;
-        for( int o=1; o<MAX_OCTAVES; o++ ) {
-            dct.ori_ps[o] = dct.ori_ps[o-1] + dct.ori_ct[o-1];
-        }
-
-        dct.ori_total = dct.ori_ps[MAX_OCTAVES-1] + dct.ori_ct[MAX_OCTAVES-1];
-        dct.ext_total = dct.ext_ps[MAX_OCTAVES-1] + dct.ext_ct[MAX_OCTAVES-1];
+    /* collect the numbers of orientation for every extremum in ori_count */
+    for( int i=0; i<total_ext_ct; i++ )
+    {
+        ori_count[i] = extremum->num_ori;
     }
+
+    /* set ori_offset[0] to 0,
+     * then compute an inclusive prefix sum for the values in ori_count into
+     * the target array ori_offset, but starting at offset 1 instead of 0.
+     * The last entry of ori_offset is the total number of orientations, which
+     * we also want to keep. */
+    ori_offset[0] = 0;
+    std::inclusive_scan( &ori_count[0],
+                         &ori_count[total_ext_ct-1],
+                         &ori_offset[1] );
+    const int total_ori = ori_offset[total_ext_ct];
+
+    for( int i=0; i<total_ext_ct; i++ )
+    {
+        extremum->idx_ori = ori_offset[i];
+    }
+
+    /* For every orientation (there are total_ori of them), store the extremum
+     * to which they belong in the array feat_to_ext_map. */
+    int* feat_to_ext_map = dobuf.feat_to_ext_map;
+
+    int ftem = 0;
+    for( int extr=0; extr<total_ext_ct; extr++ )
+    {
+        for( int ori=0; ori<ori_offset[extr+1]; ori++ )
+        {
+            feat_to_ext_map[ftem++] = extr;
+        }
+    }
+
+    /* Copy the extreme count for every octave from the (already initialized)
+     * array ext_ct to the (uninitialized) array ext_ps. */
+    std::copy( &dct.ext_ct[0],
+               &dct.ext_ct[MAX_OCTAVES],
+               &dct.ext_ps[0] );
+    /* Compute the exclusive prefix sum on the array ext_ps. */
+    std::exclusive_scan( &dct.ext_ps[0],
+                         &dct.ext_ps[MAX_OCTAVES],
+                         &dct.ext_ps[0],
+                         0 );
+
+    /* Fill the array ori_ct with the number of orientations that belong
+     * the octave given by the index. */
+    for( int o=0; o<MAX_OCTAVES; o++ ) {
+        if( dct.ext_ct[o] == 0 ) {
+            dct.ori_ct[o] = 0;
+        } else {
+            int fe = dct.ext_ps[o  ];   /* first extremum for this octave */
+            int le = dct.ext_ps[o+1]-1; /* last  extremum for this octave */
+            int lo_ori_index = dobuf.extrema[fe].idx_ori;
+            int num_ori      = dobuf.extrema[le].num_ori;
+            int hi_ori_index = dobuf.extrema[le].idx_ori + num_ori;
+            dct.ori_ct[o] = hi_ori_index - lo_ori_index;
+        }
+    }
+
+    /* Like above, compute the exclusive prefix sum of all orientations
+     * in ori_ps. */
+    std::copy( &dct.ori_ct[0],
+               &dct.ori_ct[MAX_OCTAVES],
+               &dct.ori_ps[0] );
+    std::exclusive_scan( &dct.ori_ps[0],
+                         &dct.ori_ps[MAX_OCTAVES],
+                         &dct.ori_ps[0],
+                         0 );
+
+    /* Store the total number of orientations and the total number of
+     * extrema as well. */
+    dct.ori_total = dct.ori_ps[MAX_OCTAVES-1] + dct.ori_ct[MAX_OCTAVES-1];
+    dct.ext_total = dct.ext_ps[MAX_OCTAVES-1] + dct.ext_ct[MAX_OCTAVES-1];
 }
 
-__host__
 void Pyramid::orientation( const Config& conf )
 {
-    readDescCountersFromDevice( );
-
     int ext_total = 0;
-    for(int o : hct.ext_ct)
+    for(int o : dct.ext_ct)
     {
         if( o > 0 )
         {
@@ -377,57 +422,34 @@ void Pyramid::orientation( const Config& conf )
 
     int ext_ct_prefix_sum = 0;
     for( int octave=0; octave<_num_octaves; octave++ ) {
-        hct.ext_ps[octave] = ext_ct_prefix_sum;
-        ext_ct_prefix_sum += hct.ext_ct[octave];
+        dct.ext_ps[octave] = ext_ct_prefix_sum;
+        ext_ct_prefix_sum += dct.ext_ct[octave];
     }
-    hct.ext_total = ext_ct_prefix_sum;
-
-    cudaStream_t oct_0_str = _octaves[0].getStream();
+    dct.ext_total = ext_ct_prefix_sum;
 
     // for( int octave=0; octave<_num_octaves; octave++ )
     for( int octave=_num_octaves-1; octave>=0; octave-- )
     {
         Octave&      oct_obj = _octaves[octave];
 
-        cudaStream_t oct_str = oct_obj.getStream();
-
-        int num = hct.ext_ct[octave];
+        int num = dct.ext_ct[octave];
 
         if( num > 0 ) {
-            dim3 block;
-            dim3 grid;
+            Grid g;
+            g.setGridDim( num );
+            g.setBlockDim( 1 );
 
-            block.x = 32;
-            block.y = 1;
-            grid.x  = num;
-
-            ori_par
-                <<<grid,block,4*64*sizeof(float),oct_str>>>
-                ( octave,
-                  hct.ext_ps[octave],
-                  oct_obj.getDataTexPoint( ),
-                  oct_obj.getWidth( ),
-                  oct_obj.getHeight( ) );
-            POP_SYNC_CHK;
-
-            if( octave != 0 ) {
-                cuda::event_record( oct_obj.getEventOriDone(), oct_str,   __FILE__, __LINE__ );
-                cuda::event_wait  ( oct_obj.getEventOriDone(), oct_0_str, __FILE__, __LINE__ );
-            }
+            ori_par( g,
+                     octave,
+                     dct.ext_ps[octave],
+                     oct_obj.getData( ),
+                     oct_obj.getWidth( ),
+                     oct_obj.getHeight( ) );
         }
     }
 
     /* Compute and set the orientation prefixes on the device */
-    dim3 block;
-    dim3 grid;
-    block.x = 32;
-    block.y = 32;
-    grid.x  = 1;
-    ori_prefix_sum
-        <<<grid,block,0,oct_0_str>>>
-        ( ext_ct_prefix_sum, _num_octaves );
-    POP_SYNC_CHK;
-
-    cudaDeviceSynchronize();
+    ori_prefix_sum( ext_ct_prefix_sum,
+                    _num_octaves );
 }
 

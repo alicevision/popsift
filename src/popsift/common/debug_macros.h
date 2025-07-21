@@ -38,7 +38,15 @@
 
 #define POP_INFO2(silent,s) \
     if (! silent) { \
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl << "    " << s << std::endl; \
+        std::stringstream ss; \
+        std::string       filename; \
+        ss << __FILE__; \
+        size_t pos = ss.str().find_last_of("/"); \
+        if( pos == std::string::npos ) \
+            filename = ss.str(); \
+        else \
+            filename = ss.str().substr( pos+1 ); \
+        std::cerr << filename << ":" << __LINE__ << ": " << s << std::endl; \
     }
 
 #define POP_WARN(s) { \
