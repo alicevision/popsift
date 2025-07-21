@@ -25,11 +25,11 @@
 #include <stdexcept>
 #include <string>
 
-#ifdef USE_DEVIL
-#include <devil_cpp_wrapper.hpp>
-#endif
+#include <OpenImageIO/imageio.h>
+
 #include "pgmread.h"
 
+using namespace OIIO;
 using namespace std;
 
 static bool print_dev_info  = false;
@@ -156,33 +156,56 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     SiftJob* job;
     unsigned char* image_data;
 
-#ifdef USE_DEVIL
+#ifdef USE_OIIO
     if( ! pgmread_loading )
     {
-        if( float_mode )
+        auto inp = ImageInput::open( inputFile.c_str() );
+        if( !inp )
         {
-            cerr << "Cannot combine float-mode test with DevIL image reader" << endl;
-            exit( -1 );
-        }
-
-        ilImage img;
-        if( img.Load( inputFile.c_str() ) == false ) {
             cerr << "Could not load image " << inputFile << endl;
             return 0;
         }
-        if( img.Convert( IL_LUMINANCE ) == false ) {
-            cerr << "Failed converting image " << inputFile << " to unsigned greyscale image" << endl;
-            exit( -1 );
+
+        const ImageSpec& spec = inp->spec();
+        int w = spec.width;
+        int h = spec.height;
+        int nchannels = spec.nchannels;
+
+        if( nchannels == 3 )
+        {
+            cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
+
+            uint8_t* load_data  = new unsigned char[w * h * nchannels];
+            image_data = new unsigned char[w * h];
+
+            inp->read_image( 0, 0, 0, nchannels, TypeDesc::UINT8, load_data );
+            inp->close();
+
+            for( int i=0; i<w*h; i++ )
+            {
+                image_data[i] = (uint8_t)( 0.299f * load_data[3*i]
+                                         + 0.587f * load_data[3*i+1]
+                                         + 0.114f * load_data[3*i+2] );
+            }
+
+            job = PopSift.enqueue( w, h, image_data );
         }
-        const auto w = img.Width();
-        const auto h = img.Height();
-        cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
+        else if( nchannels == 1 )
+        {
+            cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
 
-        image_data = img.GetData();
+            image_data = new unsigned char[w * h];
 
-        job = PopSift.enqueue( w, h, image_data );
+            inp->read_image( 0, 0, 0, 1, TypeDesc::UINT8, image_data );
+            inp->close();
 
-        img.Clear();
+            job = PopSift.enqueue( w, h, image_data );
+        }
+        else
+        {
+            cerr << "Cannot read images that don't have 1 or 3 channels, " << inputFile << endl;
+            return 0;
+        }
     }
     else
 #endif

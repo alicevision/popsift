@@ -37,8 +37,6 @@ else()
   message(STATUS "Found PopSift, version: ${PopSift_VERSION}")
 endif()
 
-find_package(DevIL COMPONENTS IL ILU) # yields IL_FOUND, IL_LIBRARIES, IL_INCLUDE_DIR
-
 # for newer CMake versions and Boost 1.70 pr newer must use Boost's make file
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.30)
   cmake_policy(SET CMP0167 NEW)
@@ -54,13 +52,13 @@ endif(WIN32)
 set(PD_INCLUDE_DIRS    ${Boost_INCLUDE_DIRS})
 set(PD_LINK_LIBS       ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
 
-if(IL_FOUND OR DevIL_FOUND)
-  message(STATUS "DevIL found")
-  set(PD_COMPILE_OPTIONS "-DUSE_DEVIL")
-  list(APPEND PD_INCLUDE_DIRS ${IL_INCLUDE_DIR})
-  list(APPEND PD_LINK_LIBS    ${IL_LIBRARIES} ${ILU_LIBRARIES})
+find_package(OpenImageIO)
+
+if(OpenImageIO_FOUND)
+  message(STATUS "OpenImageIO found")
+  set(PD_COMPILE_OPTIONS "-DUSE_OIIO")
 else()
-  message(WARNING "DevIL not found -- Falling back to pgmread")
+  message(WARNING "OpenImageIO not found -- Falling back to pgmread")
   set(PD_COMPILE_OPTIONS "" )
 endif()
 
@@ -73,9 +71,11 @@ add_executable(popsift-demo  main.cpp pgmread.cpp pgmread.h)
 set_property(TARGET popsift-demo PROPERTY CXX_STANDARD 11)
 
 target_compile_options(popsift-demo PRIVATE ${PD_COMPILE_OPTIONS} )
-target_include_directories(popsift-demo PUBLIC PopSift::popsift ${PD_INCLUDE_DIRS})
+target_include_directories(popsift-demo PUBLIC PopSift::popsift
+	                                       OpenImageIO::OpenImageIO ${PD_INCLUDE_DIRS})
 target_compile_definitions(popsift-demo PRIVATE ${Boost_DEFINITIONS})
-target_link_libraries(popsift-demo PUBLIC PopSift::popsift ${PD_LINK_LIBS})
+target_link_libraries(popsift-demo PUBLIC PopSift::popsift
+	                                  OpenImageIO::OpenImageIO ${PD_LINK_LIBS})
 
 
 #############################################################
@@ -87,9 +87,11 @@ add_executable(popsift-match match.cpp pgmread.cpp pgmread.h)
 set_property(TARGET popsift-match PROPERTY CXX_STANDARD 11)
 
 target_compile_options(popsift-match PRIVATE ${PD_COMPILE_OPTIONS} )
-target_include_directories(popsift-match PUBLIC PopSift::popsift ${PD_INCLUDE_DIRS})
+target_include_directories(popsift-match PUBLIC PopSift::popsift
+	                                        OpenImageIO::OpenImageIO ${PD_INCLUDE_DIRS})
 target_compile_definitions(popsift-match PRIVATE ${Boost_DEFINITIONS})
-target_link_libraries(popsift-match PUBLIC PopSift::popsift ${PD_LINK_LIBS})
+target_link_libraries(popsift-match PUBLIC PopSift::popsift
+	                                   OpenImageIO::OpenImageIO ${PD_LINK_LIBS})
 
 #############################################################
 # installation
