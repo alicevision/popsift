@@ -192,17 +192,20 @@ bool verify( float xn, float yn, float sn, int width, int height, int maxlevel )
 }
 
 template<int sift_mode>
-inline bool find_extrema_in_dog_sub( Grid&          g,
-                                     Plane2D_float& dog,
-                                     int            debug_octave,
-                                     int            width,
-                                     int            height,
-                                     uint32_t       maxlevel,
-                                     float          w_grid_divider,
-                                     float          h_grid_divider,
-                                     int            grid_width,
-                                     InitialExtremum& ec)
+static inline
+bool find_extrema_in_dog_sub( const int3&      g,
+                              Plane2D_float&   dog,
+                              int              this_octave,
+                              int              width,
+                              int              height,
+                              uint32_t         maxlevel,
+                              float            w_grid_divider,
+                              float            h_grid_divider,
+                              int              grid_width,
+                              InitialExtremum& ec)
 {
+    const bool no_extrema_reporting = false;
+
     ec.xpos    = 0.0f;
     ec.ypos    = 0.0f;
     ec.lpos    = 0;
@@ -214,18 +217,21 @@ inline bool find_extrema_in_dog_sub( Grid&          g,
      * Also, the upper and lower DoG layer will never qualify. So there is
      * no reason for selecting any of those pixel for the center of a 3x3x3
      * region.
-     * Instead, I use groups of 32xHEIGHT threads that read from a 34x34x3 area,
-     * but implicitly, they fetch * 64xHEIGHT+2x3 floats (bad luck).
+     * Instead, I use groups of 32x4 threads that read from a 34x34x3 area,
+     * but implicitly, they fetch * 64x4+2x3 floats (bad luck).
      * To find maxima, compare first on the left edge of the 3x3x3 cube, ie.
      * a 1x3x3 area. If the rightmost 2 threads of a warp (x==30 and 3==31)
      * are not extreme w.r.t. to the left slice, 8 fetch operations.
      */
-    const int block_x = g.blockIdx.x * 32;
-    const int block_y = g.blockIdx.y * g.blockDim.y;
-    const int block_z = g.blockIdx.z;
-    const int y       = block_y + g.threadIdx.y + 1;
-    const int x       = block_x + g.threadIdx.x + 1;
-    const int level   = block_z + 1;
+    // const int block_x = g.blockIdx.x * 32;
+    // const int block_y = g.blockIdx.y * g.blockDim.y;
+    // const int block_z = g.blockIdx.z;
+    // const int y       = block_y + g.threadIdx.y + 1;
+    // const int x       = block_x + g.threadIdx.x + 1;
+    // const int level   = block_z + 1;
+    const int x     = g.x + 1;
+    const int y     = g.y + 1;
+    const int level = g.z + 1;
 
     const float val = dog.get( level, y, x );
 
@@ -233,8 +239,10 @@ inline bool find_extrema_in_dog_sub( Grid&          g,
     if( ! first_contrast_ok( val ) ) return false;
 
     if( ! is_extremum( dog, x-1, y-1, level-1 ) ) {
-        // if( debug_octave==0 && level==2 && x==14 && y==73 ) printf("But I fail\n");
+        // if( this_octave==0 && level==2 && x==14 && y==73 ) printf("But I fail\n");
         return false;
+    } else {
+        POP_INFO2( no_extrema_reporting, "Found an extremum in octave " << this_octave << " at (" << x << ", " << y << ", " << level << ")" );
     }
 
     float3 D; // Dx Dy Ds
@@ -333,6 +341,7 @@ inline bool find_extrema_in_dog_sub( Grid&          g,
 
     if( d.x >= 1.5f || d.y >= 1.5f || d.z >= 1.5f ) {
         // excessive pixel movement in at least dimension, reject
+        POP_INFO2( no_extrema_reporting, "Failed due to excessive repositioning" );
         return false;
     }
 
@@ -341,6 +350,7 @@ inline bool find_extrema_in_dog_sub( Grid&          g,
     const float sn      = n.z + d.z;
 
     if( ! verify( xn, yn, sn, width, height, maxlevel ) ) {
+        POP_INFO2( no_extrema_reporting, "Failed due to optimum outside image plane" );
         return false;
     }
 
@@ -352,6 +362,7 @@ inline bool find_extrema_in_dog_sub( Grid&          g,
 
     /* negative determinant => curvatures have different signs -> reject it */
     if (det <= 0.0f) {
+        POP_INFO2( no_extrema_reporting, "Failed due to saddle-shaped optimum" );
         return false;
     }
 
@@ -359,11 +370,13 @@ inline bool find_extrema_in_dog_sub( Grid&          g,
     // if( fabsf(contr) < (h_consts.threshold*2.0f) )
     if( fabsf(contr) < scalbnf( h_consts.threshold, 1 ) )
     {
+        POP_INFO2( no_extrema_reporting, "Failed because contrast threshold exceeded" );
         return false;
     }
 
     /* reject condition: tr(H)^2/det(H) < (r+1)^2/r */
     if( edgeval >= (h_consts.edge_limit+1.0f)*(h_consts.edge_limit+1.0f)/h_consts.edge_limit ) {
+        POP_INFO2( no_extrema_reporting, "Failed because edge threshold exceeded" );
         return false;
     }
 
@@ -374,12 +387,14 @@ inline bool find_extrema_in_dog_sub( Grid&          g,
     ec.cell      = floorf( yn / h_grid_divider ) * grid_width + floorf( xn / w_grid_divider );
         // const float sigma_k = powf(2.0f, 1.0f / levels );
 
+    POP_INFO2( no_extrema_reporting, "Succeeded" );
     return true;
 }
 
 
-template<int HEIGHT, int sift_mode>
-void find_extrema_in_dog( Grid&          g,
+template<int sift_mode>
+static
+void find_extrema_in_dog( const int3&    g,
                           Plane2D_float& dog,
                           int            octave,
                           int            width,
@@ -397,38 +412,45 @@ void find_extrema_in_dog( Grid&          g,
     InitialExtremum ec;
     ec.ignore = false;
 
-    g.reset();
-    do {
-        bool indicator = find_extrema_in_dog_sub<sift_mode>( g,
-                                                             dog,
-                                                             octave,
-                                                             width,
-                                                             height,
-                                                             maxlevel,
-                                                             w_grid_divider,
-                                                             h_grid_divider,
-                                                             grid_width,
-                                                             ec );
-
-        if( indicator && write_index < h_consts.max_extrema )
+    for( int z=0; z<g.z; z++ )
+    {
+        for( int y=0; y<g.y; y++ )
         {
-            ec.write_index = write_index;
-            // store the initial extremum in an array
-            d_extrema[write_index] = ec;
+            for( int x=0; x<g.x; x++ )
+            {
+                int3 gi( x, y, z );
 
-            // index for indirect access to d_extrema, to enable
-            // access after filtering some initial extrema
-            d_ext_off[write_index] = write_index;
+                bool indicator = find_extrema_in_dog_sub<sift_mode>( gi,
+                                                                     dog,
+                                                                     octave,
+                                                                     width,
+                                                                     height,
+                                                                     maxlevel,
+                                                                     w_grid_divider,
+                                                                     h_grid_divider,
+                                                                     grid_width,
+                                                                     ec );
 
-            write_index++;
+                if( indicator && write_index < h_consts.max_extrema )
+                {
+                    ec.write_index = write_index;
+
+                    // store the initial extremum in an array
+                    d_extrema[write_index] = ec;
+
+                    // index for indirect access to d_extrema, to enable
+                    // access after filtering some initial extrema
+                    d_ext_off[write_index] = write_index;
+
+                    write_index++;
+                }
+            }
         }
-    } while( g.next() );
+    }
 }
 
 void Pyramid::find_extrema( const Config& conf )
 {
-    static const int HEIGHT = 4;
-
     for( int octave=0; octave<_num_octaves; octave++ )
     {
         Octave&      oct_obj = _octaves[octave];
@@ -438,18 +460,17 @@ void Pyramid::find_extrema( const Config& conf )
         int cols = oct_obj.getWidth();
         int rows = oct_obj.getHeight();
 
-        Grid g;
-        g.setBlockDim( 32, HEIGHT );
-        g.setGridDim( grid_divide( cols, g.blockDim.x ),
-                      grid_divide( rows, g.blockDim.y ),
-                      _levels - 3 );
+        int3 g( cols, rows, _levels-3 );
+        // Grid g;
+        // g.setBlockDim( 32, 4 );
+        // g.setGridDim( grid_divide( cols, g.blockDim.x ), grid_divide( rows, g.blockDim.y ), _levels - 3 );
 
         int*  num_blocks      = extrema_num_blocks;
 
         switch( conf.getSiftMode() )
         {
         case Config::RefineInLevel :
-                find_extrema_in_dog<HEIGHT,Config::RefineInLevel>
+                find_extrema_in_dog<Config::RefineInLevel>
                     ( g,
                       oct_obj.getDog( ),
                       octave,
@@ -461,7 +482,7 @@ void Pyramid::find_extrema( const Config& conf )
                       conf.getFilterGridSize() );
                 break;
         default :
-                find_extrema_in_dog<HEIGHT,Config::RefineInOctave>
+                find_extrema_in_dog<Config::RefineInOctave>
                     ( g,
                       oct_obj.getDog( ),
                       octave,
