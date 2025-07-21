@@ -5,7 +5,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <popsift/common/device_prop.h>
 #include <popsift/features.h>
 #include <popsift/popsift.h>
 #include <popsift/sift_conf.h>
@@ -192,8 +191,6 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 
 int main(int argc, char **argv)
 {
-    popsift::cuda::reset();
-
     popsift::Config config;
     string         lFile{};
     string         rFile{};
@@ -222,10 +219,6 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
     }
-
-    popsift::cuda::device_prop_t deviceInfo;
-    deviceInfo.set( 0, print_dev_info );
-    if( print_dev_info ) deviceInfo.print( );
 
     PopSift PopSift( config, popsift::Config::MatchingMode );
 
