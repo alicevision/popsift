@@ -318,6 +318,11 @@ public:
 
 void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
 {
+    if( total_ext_ct < 1 )
+    {
+        POP_FATAL("Calling " << __FUNCTION__ << " with " << total_ext_ct << " found extrema");
+    }
+
     Extremum* extremum = dobuf.extrema;
 
     int* ori_count  = new int[total_ext_ct];
@@ -402,14 +407,18 @@ void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
 
 void Pyramid::orientation( const Config& conf )
 {
+    POP_INFO2( conf.silent(), "enter " << __PRETTY_FUNCTION__ );
+
     int ext_total = 0;
     for(int o : dct.ext_ct)
     {
+        POP_INFO2( conf.silent(), "octave has " << o << " extrema" );
         if( o > 0 )
         {
             ext_total += o;
         }
     }
+    POP_INFO2( conf.silent(), "total number of extrema is " << ext_total );
 
     // Filter functions are only called if necessary. They are very expensive,
     // therefore add 10% slack.

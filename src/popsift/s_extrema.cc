@@ -429,7 +429,8 @@ void Pyramid::find_extrema( const Config& conf )
 {
     static const int HEIGHT = 4;
 
-    for( int octave=0; octave<_num_octaves; octave++ ) {
+    for( int octave=0; octave<_num_octaves; octave++ )
+    {
         Octave&      oct_obj = _octaves[octave];
 
         int*  extrema_num_blocks = getNumberOfBlocks( octave );

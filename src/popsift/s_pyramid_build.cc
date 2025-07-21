@@ -27,35 +27,50 @@ namespace popsift {
 
 namespace gauss {
 
-inline void get_by_2_pick_every_second( Grid&          g,
-                                        const int      src_level,
-                                        PlaneD<float>& src,
-                                        PlaneD<float>& dst )
+static inline
+void get_by_2_pick_every_second( const int      src_level,
+                                 PlaneD<float>& src,
+                                 PlaneD<float>& dst )
 {
+    const int dst_level = 0; // always writing to the first plane in the destination octave
+
     const int src_w = src.getDimX();
     const int src_h = src.getDimY();
     const int dst_w = dst.getDimX();
     const int dst_h = dst.getDimY();
 
-    g.reset();
+    for( int idy=0; idy<dst_h; idy++ )
+    {
+        for( int idx=0; idx<dst_w; idx++ )
+        {
+            const int read_x = std::clamp( idx << 1, 0, src_w-1 );
+            const int read_y = std::clamp( idy << 1, 0, src_h-1 );
 
-    do {
-        const int idx = g.blockIdx.x * g.blockDim.x + g.threadIdx.x;
-        const int idy = g.blockIdx.y * g.blockDim.y + g.threadIdx.y;
+            const float val = src.get( src_level, read_y, read_x );
 
-        if( idx >= dst_w ) return;
-        if( idy >= dst_h ) return;
-
-        const int read_x = std::clamp( idx << 1, 0, src_w-1 );
-        const int read_y = std::clamp( idy << 1, 0, src_h-1 );
-
-        const float val = src.get( src_level, read_y, read_x );
-
-        dst.set( 0, idy, idx, val );
-    } while( g.next() );
+            dst.set( dst_level, idy, idx, val );
+        }
+    }
 }
 
+}; // namespace gauss
 
+void Pyramid::downscale_from_prev_octave( int octave )
+{
+    Octave&      oct_obj = _octaves[octave];
+    Octave& prev_oct_obj = _octaves[octave-1];
+
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+   gauss::get_by_2_pick_every_second( _levels-PREV_LEVEL,
+                                      prev_oct_obj.getData( ),
+                                      oct_obj.getData( ) );
+}
+
+namespace gauss {
+
+static
 void make_dog( Grid&          g,
                PlaneD<float>& src,
                PlaneD<float>& dog,
@@ -82,25 +97,6 @@ void make_dog( Grid&          g,
 }
 
 } // namespace gauss
-
-void Pyramid::downscale_from_prev_octave( int octave )
-{
-    Octave&      oct_obj = _octaves[octave];
-    Octave& prev_oct_obj = _octaves[octave-1];
-
-    const int width  = oct_obj.getWidth();
-    const int height = oct_obj.getHeight();
-
-    Grid g;
-    g.setBlockDim( 64, 2 );
-    g.setGridDim( grid_divide( width,  64 ),
-                  grid_divide( height, 2 ) );
-
-   gauss::get_by_2_pick_every_second( g,
-                                      _levels-PREV_LEVEL,
-                                      prev_oct_obj.getData( ),
-                                      oct_obj.getData( ) );
-}
 
 void Pyramid::dogs_from_blurred( int octave, int max_level )
 {
