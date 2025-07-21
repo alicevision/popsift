@@ -15,6 +15,7 @@
 
 #include <cstdio>
 #include <cmath>
+#include <numeric>
 
 namespace popsift{
 
@@ -204,7 +205,7 @@ bool find_extrema_in_dog_sub( const int3&      g,
                               int              grid_width,
                               InitialExtremum& ec)
 {
-    const bool no_extrema_reporting = false;
+    const bool no_extrema_reporting = true;
 
     ec.xpos    = 0.0f;
     ec.ypos    = 0.0f;
@@ -404,14 +405,17 @@ void find_extrema_in_dog( const int3&    g,
                           const float    h_grid_divider,
                           const int      grid_width )
 {
+    const bool no_extrema_reporting = false;
+
     uint32_t write_index = 0;
 
-    InitialExtremum* d_extrema = dobuf.i_ext_dat[octave];
-    int*             d_ext_off = dobuf.i_ext_off[octave];
+    std::vector<InitialExtremum>& d_extrema = dct.i_ext_dat[octave];
+    std::vector<int>&             d_ext_off = dct.i_ext_off[octave];
 
     InitialExtremum ec;
     ec.ignore = false;
 
+    POP_INFO2( no_extrema_reporting, "initial extrema values for octave " << octave << ": " << write_index );
     for( int z=0; z<g.z; z++ )
     {
         for( int y=0; y<g.y; y++ )
@@ -436,17 +440,21 @@ void find_extrema_in_dog( const int3&    g,
                     ec.write_index = write_index;
 
                     // store the initial extremum in an array
-                    d_extrema[write_index] = ec;
+                    d_extrema.push_back( ec );
 
                     // index for indirect access to d_extrema, to enable
                     // access after filtering some initial extrema
-                    d_ext_off[write_index] = write_index;
+                    d_ext_off.push_back( write_index );
 
                     write_index++;
                 }
             }
         }
+        POP_INFO2( no_extrema_reporting, "extrema count after octave " << octave << ", level " << z << ": " << write_index );
     }
+
+    dct.ext_ct[octave] = write_index;
+    POP_INFO2( no_extrema_reporting, "final extrema count in octave " << octave << ": " << dct.ext_ct[octave] );
 }
 
 void Pyramid::find_extrema( const Config& conf )
@@ -495,6 +503,21 @@ void Pyramid::find_extrema( const Config& conf )
                 break;
         }
     }
+
+    /* Copy the extreme count for every octave from the (already initialized)
+     * array ext_ct to the (uninitialized) array ext_ps. */
+    std::copy( &dct.ext_ct[0],
+               &dct.ext_ct[MAX_OCTAVES],
+               &dct.ext_ps[0] );
+    /* Compute the exclusive prefix sum on the array ext_ps. */
+    std::exclusive_scan( &dct.ext_ps[0],
+                         &dct.ext_ps[MAX_OCTAVES],
+                         &dct.ext_ps[0],
+                         0 );
+
+    /* Store the total number of orientations and the total number of
+     * extrema as well. */
+    dct.ext_total = dct.ext_ps[MAX_OCTAVES-1] + dct.ext_ct[MAX_OCTAVES-1];
 }
 
 } // namespace popsift

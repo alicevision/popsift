@@ -20,17 +20,26 @@ namespace popsift {
 
 struct ExtremaCounters
 {
+    /* BEGIN filled in s_extrema.cc */
+
+    std::vector<InitialExtremum> i_ext_dat[MAX_OCTAVES];
+    std::vector<int>             i_ext_off[MAX_OCTAVES];
+
     /* The number of extrema found per octave */
     int ext_ct[MAX_OCTAVES];
+    /* Exclusive prefix sum of ext_ct, for later index computations */
+    int ext_ps[MAX_OCTAVES];
+    /* Number of all extrema found */
+    int ext_total;
+
+    /* END filled in s_extrema.cc */
+
     /* The number of orientation found per octave */
     int ori_ct[MAX_OCTAVES];
 
-    /* Exclusive prefix sum of ext_ct */
-    int ext_ps[MAX_OCTAVES];
     /* Exclusive prefix sum of ori_ct */
     int ori_ps[MAX_OCTAVES];
 
-    int ext_total;
     int ori_total;
 };
 
@@ -43,11 +52,9 @@ struct ExtremaBuffers
 
 struct DevBuffers
 {
-    InitialExtremum* i_ext_dat[MAX_OCTAVES];
-    int*             i_ext_off[MAX_OCTAVES];
-    int*             feat_to_ext_map;
-    Extremum*        extrema;
-    Feature*         features;
+    int*                  feat_to_ext_map;
+    std::vector<Extremum> extrema;
+    Feature*              features;
 };
 
 extern thread_local ExtremaCounters dct;

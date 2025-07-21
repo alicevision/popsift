@@ -63,21 +63,15 @@ float smoothe( const float* const src, const int bin )
  * Compute the keypoint orientations for each extremum.
  * Direct curve fitting approach.
  */
-void ori_par( Grid&                g,
+void ori_par( const int            extremum_index,
               const int            octave,
               const int            ext_ct_prefix_sum,
               const Plane2D_float& layer,
               const int            w,
               const int            h )
 {
-  g.reset();
-  do {
-    const int extremum_index  = g.blockIdx.x;
-
-    if( extremum_index >= dct.ext_ct[octave] ) continue; // a few trailing warps
-
-    const int              iext_off =  dobuf.i_ext_off[octave][extremum_index];
-    const InitialExtremum* iext     = &dobuf.i_ext_dat[octave][iext_off];
+    const int              iext_off =  dct.i_ext_off[octave][extremum_index];
+    const InitialExtremum* iext     = &dct.i_ext_dat[octave][iext_off];
 
     float hist[64] = { 0 };
 
@@ -108,7 +102,7 @@ void ori_par( Grid&                g,
     int hy = ymax - ymin + 1;
     int loops = wx * hy;
 
-    for( int i = 0; i < loops; i += g.blockDim.x )
+    for( int i = 0; i < loops; i++ )
     {
         if( i < loops ) {
             int yy = i / wx + ymin;
@@ -224,7 +218,8 @@ void ori_par( Grid&                g,
                                               return ( yval[best_index[l]] > yval[best_index[r]] );
                                           } );
 
-    Extremum* ext = &dobuf.extrema[ext_ct_prefix_sum + extremum_index];
+    // Extremum* ext = &dobuf.extrema[ext_ct_prefix_sum + extremum_index];
+    Extremum ext;
 
     int angles = 0;
 
@@ -242,19 +237,20 @@ void ori_par( Grid&                g,
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             // float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
             float th = std::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
-            ext->orientation[i] = th;
+            ext.orientation[i] = th;
 
             angles += 1;
         }
     }
 
-    ext->xpos    = iext->xpos;
-    ext->ypos    = iext->ypos;
-    ext->lpos    = iext->lpos;
-    ext->sigma   = iext->sigma;
-    ext->octave  = octave;
-    ext->num_ori = angles;
-  } while( g.next() );
+    ext.xpos    = iext->xpos;
+    ext.ypos    = iext->ypos;
+    ext.lpos    = iext->lpos;
+    ext.sigma   = iext->sigma;
+    ext.octave  = octave;
+    ext.num_ori = angles;
+
+    dobuf.extrema.emplace_back( ext );
 }
 
 }; // namespace popsift
@@ -316,23 +312,32 @@ public:
     }
 };
 
-void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
+void ori_prefix_sum( const int num_octaves )
 {
-    if( total_ext_ct < 1 )
+    if( dct.ext_total < 1 )
     {
-        POP_FATAL("Calling " << __FUNCTION__ << " with " << total_ext_ct << " found extrema");
+        POP_FATAL("Calling " << __FUNCTION__ << " with " << dct.ext_total << " found extrema");
     }
 
-    Extremum* extremum = dobuf.extrema;
+    std::vector<Extremum>& extremum = dobuf.extrema;
 
-    int* ori_count  = new int[total_ext_ct];
-    int* ori_offset = new int[total_ext_ct+1];
+    assert( extremum.size() == dct.ext_total );
+
+    // int* ori_count  = new int[dct.ext_total];
+    vector<int> ori_count;
+    int* ori_offset = new int[dct.ext_total+1];
 
     /* collect the numbers of orientation for every extremum in ori_count */
-    for( int i=0; i<total_ext_ct; i++ )
+    // for( int i=0; i<dct.ext_total; i++ )
+    // {
+        // ori_count[i] = extremum.num_ori;
+    // }
+    for( auto ext : extremum )
     {
-        ori_count[i] = extremum->num_ori;
+        ori_count.push_back( ext.num_ori );
     }
+
+    assert( ori_count.size() == dct.ext_total );
 
     /* set ori_offset[0] to 0,
      * then compute an inclusive prefix sum for the values in ori_count into
@@ -341,13 +346,13 @@ void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
      * we also want to keep. */
     ori_offset[0] = 0;
     std::inclusive_scan( &ori_count[0],
-                         &ori_count[total_ext_ct-1],
+                         &ori_count[dct.ext_total-1],
                          &ori_offset[1] );
-    const int total_ori = ori_offset[total_ext_ct];
+    const int total_ori = ori_offset[dct.ext_total];
 
-    for( int i=0; i<total_ext_ct; i++ )
+    for( int i=0; i<dct.ext_total; i++ )
     {
-        extremum->idx_ori = ori_offset[i];
+        extremum[i].idx_ori = ori_offset[i];
     }
 
     /* For every orientation (there are total_ori of them), store the extremum
@@ -355,24 +360,13 @@ void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
     int* feat_to_ext_map = dobuf.feat_to_ext_map;
 
     int ftem = 0;
-    for( int extr=0; extr<total_ext_ct; extr++ )
+    for( int extr=0; extr<dct.ext_total; extr++ )
     {
         for( int ori=0; ori<ori_offset[extr+1]; ori++ )
         {
             feat_to_ext_map[ftem++] = extr;
         }
     }
-
-    /* Copy the extreme count for every octave from the (already initialized)
-     * array ext_ct to the (uninitialized) array ext_ps. */
-    std::copy( &dct.ext_ct[0],
-               &dct.ext_ct[MAX_OCTAVES],
-               &dct.ext_ps[0] );
-    /* Compute the exclusive prefix sum on the array ext_ps. */
-    std::exclusive_scan( &dct.ext_ps[0],
-                         &dct.ext_ps[MAX_OCTAVES],
-                         &dct.ext_ps[0],
-                         0 );
 
     /* Fill the array ori_ct with the number of orientations that belong
      * the octave given by the index. */
@@ -402,21 +396,22 @@ void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
     /* Store the total number of orientations and the total number of
      * extrema as well. */
     dct.ori_total = dct.ori_ps[MAX_OCTAVES-1] + dct.ori_ct[MAX_OCTAVES-1];
-    dct.ext_total = dct.ext_ps[MAX_OCTAVES-1] + dct.ext_ct[MAX_OCTAVES-1];
 }
 
 void Pyramid::orientation( const Config& conf )
 {
     POP_INFO2( conf.silent(), "enter " << __PRETTY_FUNCTION__ );
 
+    int debug_octave = 0;
     int ext_total = 0;
     for(int o : dct.ext_ct)
     {
-        POP_INFO2( conf.silent(), "octave has " << o << " extrema" );
+        POP_INFO2( conf.silent(), "octave " << debug_octave << " has " << o << " extrema" );
         if( o > 0 )
         {
             ext_total += o;
         }
+        debug_octave++;
     }
     POP_INFO2( conf.silent(), "total number of extrema is " << ext_total );
 
@@ -429,12 +424,12 @@ void Pyramid::orientation( const Config& conf )
 
     reallocExtrema( ext_total );
 
-    int ext_ct_prefix_sum = 0;
-    for( int octave=0; octave<_num_octaves; octave++ ) {
-        dct.ext_ps[octave] = ext_ct_prefix_sum;
-        ext_ct_prefix_sum += dct.ext_ct[octave];
-    }
-    dct.ext_total = ext_ct_prefix_sum;
+    // int ext_ct_prefix_sum = 0;
+    // for( int octave=0; octave<_num_octaves; octave++ ) {
+        // dct.ext_ps[octave] = ext_ct_prefix_sum;
+        // ext_ct_prefix_sum += dct.ext_ct[octave];
+    // }
+    // dct.ext_total = ext_ct_prefix_sum;
 
     // for( int octave=0; octave<_num_octaves; octave++ )
     for( int octave=_num_octaves-1; octave>=0; octave-- )
@@ -443,12 +438,9 @@ void Pyramid::orientation( const Config& conf )
 
         int num = dct.ext_ct[octave];
 
-        if( num > 0 ) {
-            Grid g;
-            g.setGridDim( num );
-            g.setBlockDim( 1 );
-
-            ori_par( g,
+        if( num > 0 )
+        {
+            ori_par( num,
                      octave,
                      dct.ext_ps[octave],
                      oct_obj.getData( ),
@@ -458,7 +450,6 @@ void Pyramid::orientation( const Config& conf )
     }
 
     /* Compute and set the orientation prefixes on the device */
-    ori_prefix_sum( ext_ct_prefix_sum,
-                    _num_octaves );
+    ori_prefix_sum( _num_octaves );
 }
 

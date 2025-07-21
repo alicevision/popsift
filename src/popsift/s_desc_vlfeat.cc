@@ -163,7 +163,7 @@ void ext_desc_vlfeat( int3 grid, int3 block, int octave, Plane2D_float& layer_te
     const int   o_offset =  dct.ori_ps[octave] + blockIdx_x;
     Descriptor* desc     = &dbuf.desc           [o_offset];
     const int   ext_idx  =  dobuf.feat_to_ext_map[o_offset];
-    Extremum*   ext      =  dobuf.extrema + ext_idx;
+    Extremum*   ext      = &dobuf.extrema[ext_idx];
 
     const int   ext_base =  ext->idx_ori;
     const int   ori_num  =  o_offset - ext_base;

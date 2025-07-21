@@ -120,19 +120,21 @@ Pyramid::Pyramid( const Config& config,
     }
 
     int sz = _num_octaves * h_consts.max_extrema;
-    dobuf.i_ext_dat[0] = new InitialExtremum[sz];
-    dobuf.i_ext_off[0] = new int[sz];
-    for (int o = 1; o<_num_octaves; o++) {
-        dobuf.i_ext_dat[o] = dobuf.i_ext_dat[0] + (o*h_consts.max_extrema);
-        dobuf.i_ext_off[o] = dobuf.i_ext_off[0] + (o*h_consts.max_extrema);
-    }
-    for (int o = _num_octaves; o<MAX_OCTAVES; o++) {
-        dobuf.i_ext_dat[o] = nullptr;
-        dobuf.i_ext_off[o] = nullptr;
-    }
+
+    // dobuf.i_ext_dat[0] = new InitialExtremum[sz];
+    // dobuf.i_ext_off[0] = new int[sz];
+    //
+    // for (int o = 1; o<_num_octaves; o++) {
+        // dobuf.i_ext_dat[o] = dobuf.i_ext_dat[0] + (o*h_consts.max_extrema);
+        // dobuf.i_ext_off[o] = dobuf.i_ext_off[0] + (o*h_consts.max_extrema);
+    // }
+    // for (int o = _num_octaves; o<MAX_OCTAVES; o++) {
+        // dobuf.i_ext_dat[o] = nullptr;
+        // dobuf.i_ext_off[o] = nullptr;
+    // }
 
     sz = h_consts.max_extrema;
-    dobuf.extrema  = new Extremum[sz];
+    // dobuf.extrema  = new Extremum[sz];
     dobuf.features = new Feature[sz];
     dbuf.ext_allocated = sz;
 
@@ -158,11 +160,14 @@ void Pyramid::reallocExtrema( int numExtrema )
 {
     if( numExtrema > dbuf.ext_allocated ) {
         numExtrema = ( ( numExtrema + 1024 ) & ( ~(1024-1) ) );
-        delete [] dobuf.extrema;
+
+        // delete [] dobuf.extrema;
+        dobuf.extrema.clear();
+
         delete [] dobuf.features;
 
         int sz = numExtrema;
-        dobuf.extrema  = new Extremum[sz];
+        // dobuf.extrema  = new Extremum[sz];
         dobuf.features = new Feature[sz];
         dbuf.ext_allocated = sz;
 
@@ -183,10 +188,10 @@ Pyramid::~Pyramid()
 {
     delete [] _d_extrema_num_blocks;
 
-    delete [] dobuf.i_ext_dat[0];
-    delete [] dobuf.i_ext_off[0];
+    // delete [] dobuf.i_ext_dat[0];
+    // delete [] dobuf.i_ext_off[0];
     delete [] dobuf.features;
-    delete [] dobuf.extrema;
+    // delete [] dobuf.extrema;
     delete [] dbuf.desc;
     delete [] dobuf.feat_to_ext_map;
 
