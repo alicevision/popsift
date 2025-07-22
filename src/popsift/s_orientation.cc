@@ -63,12 +63,12 @@ float smoothe( const float* const src, const int bin )
  * Compute the keypoint orientations for each extremum.
  * Direct curve fitting approach.
  */
-void ori_par( const int            extremum_index,
-              const int            octave,
-              const int            ext_ct_prefix_sum,
-              const Plane2D_float& layer,
-              const int            w,
-              const int            h )
+static
+void compute_all_orientations( const int            extremum_index,
+                               const int            octave,
+                               const Plane2D_float& layer,
+                               const int            w,
+                               const int            h )
 {
     const int              iext_off =  dct.i_ext_off[octave][extremum_index];
     const InitialExtremum* iext     = &dct.i_ext_dat[octave][iext_off];
@@ -218,7 +218,6 @@ void ori_par( const int            extremum_index,
                                               return ( yval[best_index[l]] > yval[best_index[r]] );
                                           } );
 
-    // Extremum* ext = &dobuf.extrema[ext_ct_prefix_sum + extremum_index];
     Extremum ext;
 
     int angles = 0;
@@ -319,20 +318,19 @@ void ori_prefix_sum( const int num_octaves )
         POP_FATAL("Calling " << __FUNCTION__ << " with " << dct.ext_total << " found extrema");
     }
 
-    std::vector<Extremum>& extremum = dobuf.extrema;
+    std::vector<Extremum>& all_extrema = dobuf.extrema;
 
-    assert( extremum.size() == dct.ext_total );
+    assert( all_extrema.size() == dct.ext_total );
 
-    // int* ori_count  = new int[dct.ext_total];
-    vector<int> ori_count;
-    int* ori_offset = new int[dct.ext_total+1];
+    vector<int> ori_count ( dct.ext_total );
+    vector<int> ori_offset( dct.ext_total+1 );
 
     /* collect the numbers of orientation for every extremum in ori_count */
     // for( int i=0; i<dct.ext_total; i++ )
     // {
-        // ori_count[i] = extremum.num_ori;
+        // ori_count[i] = all_extrema.num_ori;
     // }
-    for( auto ext : extremum )
+    for( auto ext : all_extrema )
     {
         ori_count.push_back( ext.num_ori );
     }
@@ -352,7 +350,7 @@ void ori_prefix_sum( const int num_octaves )
 
     for( int i=0; i<dct.ext_total; i++ )
     {
-        extremum[i].idx_ori = ori_offset[i];
+        all_extrema[i].idx_ori = ori_offset[i];
     }
 
     /* For every orientation (there are total_ori of them), store the extremum
@@ -404,12 +402,12 @@ void Pyramid::orientation( const Config& conf )
 
     int debug_octave = 0;
     int ext_total = 0;
-    for(int o : dct.ext_ct)
+    for( int n : dct.ext_ct )
     {
-        POP_INFO2( conf.silent(), "octave " << debug_octave << " has " << o << " extrema" );
-        if( o > 0 )
+        POP_INFO2( conf.silent(), "octave " << debug_octave << " has " << n << " extrema" );
+        if( n > 0 )
         {
-            ext_total += o;
+            ext_total += n;
         }
         debug_octave++;
     }
@@ -424,32 +422,31 @@ void Pyramid::orientation( const Config& conf )
 
     reallocExtrema( ext_total );
 
-    // int ext_ct_prefix_sum = 0;
-    // for( int octave=0; octave<_num_octaves; octave++ ) {
-        // dct.ext_ps[octave] = ext_ct_prefix_sum;
-        // ext_ct_prefix_sum += dct.ext_ct[octave];
-    // }
-    // dct.ext_total = ext_ct_prefix_sum;
-
     // for( int octave=0; octave<_num_octaves; octave++ )
     for( int octave=_num_octaves-1; octave>=0; octave-- )
     {
         Octave&      oct_obj = _octaves[octave];
 
-        int num = dct.ext_ct[octave];
+        int extrema_count = dct.ext_ct[octave];
 
-        if( num > 0 )
+        if( extrema_count > 0 )
         {
-            ori_par( num,
-                     octave,
-                     dct.ext_ps[octave],
-                     oct_obj.getData( ),
-                     oct_obj.getWidth( ),
-                     oct_obj.getHeight( ) );
+            POP_INFO2( conf.silent(), "Octave " << octave << " has " << extrema_count << " extrema" );
+            for( int ext_idx=0; ext_idx<extrema_count; ext_idx++ )
+            {
+                compute_all_orientations( ext_idx,
+                                          octave,
+                                          oct_obj.getData( ),
+                                          oct_obj.getWidth( ),
+                                          oct_obj.getHeight( ) );
+            }
+            POP_INFO2( conf.silent(), "Found all orientations" );
         }
     }
 
+    POP_INFO2( conf.silent(), "Computing prefix sums for all orientations" );
     /* Compute and set the orientation prefixes on the device */
     ori_prefix_sum( _num_octaves );
+    POP_INFO2( conf.silent(), "Done" );
 }
 
