@@ -217,6 +217,11 @@ void compute_all_orientations( const int            extremum_index,
     std::sort( best_index, best_index+64, [&]( int l, int r ) {
                                               return ( yval[best_index[l]] > yval[best_index[r]] );
                                           } );
+    ostringstream ostr;
+    ostr << "best index array after sorting: ";
+    for( auto i=0; i<64; i++ )
+        ostr << best_index[i] << " ";
+    POP_INFO2( false, ostr.str() );
 
     Extremum ext;
 
@@ -322,7 +327,7 @@ void ori_prefix_sum( const int num_octaves )
 
     assert( all_extrema.size() == dct.ext_total );
 
-    vector<int> ori_count ( dct.ext_total );
+    vector<int> ori_count;
     vector<int> ori_offset( dct.ext_total+1 );
 
     /* collect the numbers of orientation for every extremum in ori_count */
@@ -330,12 +335,19 @@ void ori_prefix_sum( const int num_octaves )
     // {
         // ori_count[i] = all_extrema.num_ori;
     // }
+    std::ostringstream ostr;
+    ostr << "Number of orientations:";
     for( auto ext : all_extrema )
     {
+        ostr << ext.num_ori << " ";
         ori_count.push_back( ext.num_ori );
     }
+    POP_INFO2( false, ostr.str() );
 
-    assert( ori_count.size() == dct.ext_total );
+    if( ori_count.size() != dct.ext_total )
+    {
+        POP_FATAL( "Number of counted extrema: " << dct.ext_total << ", orientation counters pushed to ori_count: " << ori_count.size() );
+    }
 
     /* set ori_offset[0] to 0,
      * then compute an inclusive prefix sum for the values in ori_count into

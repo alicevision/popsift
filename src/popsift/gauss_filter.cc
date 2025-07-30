@@ -20,6 +20,12 @@ thread_local GaussInfo h_gauss;
 
 void print_gauss_filter_symbol( int columns )
 {
+    if( columns <= 0 )
+    {
+        printf( "No Gauss table printing, less than 1 column requested.\n" );
+        return;
+    }
+
     printf( "\n"
             "Gauss tables\n"
             "      level span sigma : center value -> edge value\n"
@@ -65,15 +71,20 @@ void print_gauss_filter_symbol( int columns )
             "Gauss tables\n"
             "    level 0-filters for direct downscaling\n");
 
-    for( int lvl=0; lvl<MAX_OCTAVES; lvl++ ) {
-        int span = h_gauss.dd.span[lvl] + h_gauss.dd.span[lvl] - 1;
+    for( int lvl=0; lvl<MAX_OCTAVES; lvl++ )
+    {
+        int odspan = h_gauss.dd.span[lvl] ; // one-directional span from the table
+
+        int span = odspan + odspan - 1;
 
         printf("      %d %d %2.6f: ", lvl, span, h_gauss.dd.sigma[lvl] );
-        int m = min( h_gauss.dd.span[lvl], columns );
-        for( int x=0; x<m; x++ ) {
+        int m = std::min<int>( odspan, columns );
+
+        for( int x=0; x<m; x++ )
+        {
             printf("%0.8f ", h_gauss.dd.filter[lvl*GAUSS_ALIGN+x] );
         }
-        if( m < h_gauss.dd.span[lvl] )
+        if( m < odspan )
             printf("...\n");
         else
             printf("\n");
