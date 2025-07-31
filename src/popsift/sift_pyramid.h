@@ -22,15 +22,18 @@ struct ExtremaCounters
 {
     /* BEGIN filled in s_extrema.cc */
 
-    std::vector<InitialExtremum> i_ext_dat[MAX_OCTAVES];
-    std::vector<int>             i_ext_off[MAX_OCTAVES];
+    std::vector<InitialExtremum> initial_extrema_in_octave[MAX_OCTAVES];
+    std::vector<int>             initial_extrema_offset   [MAX_OCTAVES];
 
-    /* The number of extrema found per octave */
-    int ext_ct[MAX_OCTAVES];
-    /* Exclusive prefix sum of ext_ct, for later index computations */
-    int ext_ps[MAX_OCTAVES];
+    /* The number of extrema found per octave.
+     * Length is initialized to MAX_OCTAVES in Pyramid::find_extrema() */
+    std::vector<int> extrema_count_per_octave;
+    /* Exclusive prefix sum of extrema_count_per_octave, for later index computations.
+     * Final element added for the total sum.
+     * Gets it's size during computation of the prefix sum. */
+    std::vector<int> extrema_count_prefix_sum;
     /* Number of all extrema found */
-    int ext_total;
+    int extrema_count_total;
 
     /* END filled in s_extrema.cc */
 

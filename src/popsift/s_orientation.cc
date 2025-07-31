@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstdio>
 #include <numeric>
+#include <iterator>
 
 using namespace popsift;
 using namespace std;
@@ -49,12 +50,12 @@ inline float compute_angle( int bin, float hc, float hn, float hp )
  * Histogram smoothing helper
  */
 inline static
-float smoothe( const float* const src, const int bin )
+float smoothe( const std::vector<float>& src, const int bin )
 {
-    const int prev = (bin == 0) ? ORI_NBINS-1 : bin-1;
-    const int next = (bin == ORI_NBINS-1) ? 0 : bin+1;
+    const int prev = (bin <= 0) ? ORI_NBINS-1 : bin-1;
+    const int next = (bin >= ORI_NBINS-1) ? 0 : bin+1;
 
-    const float f  = ( src[prev] + src[bin] + src[next] ) / 3.0f;
+    const float f  = ( src.at(prev) + src.at(bin) + src.at(next) ) / 3.0f;
 
     return f;
 }
@@ -70,16 +71,16 @@ void compute_all_orientations( const int            extremum_index,
                                const int            w,
                                const int            h )
 {
-    const int              iext_off =  dct.i_ext_off[octave][extremum_index];
-    const InitialExtremum* iext     = &dct.i_ext_dat[octave][iext_off];
+    const int              iext_off = dct.initial_extrema_offset   [octave][extremum_index];
+    const InitialExtremum& iext     = dct.initial_extrema_in_octave[octave][iext_off];
 
-    float hist[64] = { 0 };
+    std::vector<float> hist( ORI_NBINS, 0 );
 
     /* keypoint fractional geometry */
-    const float x     = iext->xpos;
-    const float y     = iext->ypos;
-    const int   level = iext->lpos; // old_level;
-    const float sig   = iext->sigma;
+    const float x     = iext.xpos;
+    const float y     = iext.ypos;
+    const int   level = iext.lpos; // old_level;
+    const float sig   = iext.sigma;
 
     /* orientation histogram radius */
     const float  sigw = ORI_WINFACTOR * sig;
@@ -138,28 +139,30 @@ void compute_all_orientations( const int            extremum_index,
 
                 bidx = (bidx == ORI_NBINS) ? 0 : bidx;
 
-                hist[bidx] += weight;
+                hist.at(bidx) += weight;
             }
         }
     }
 
-    float sm_hist[64];
+    std::vector<float> sm_hist(ORI_NBINS);
 
 #ifdef WITH_VLFEAT_SMOOTHING
-    for( int i=0; i<3 ; i++ ) {
-        for( int j=0; j<64; j++ ) {
+    // outer loop: smoothe 3 times
+    for( int i=0; i<3 ; i++ )
+    {
+        for( int j=0; j<ORI_NBINS; j++ ) {
             sm_hist[j] = smoothe( hist, j );
         }
-        for( int j=0; j<64; j++ ) {
+        for( int j=0; j<ORI_NBINS; j++ ) {
             hist[j] = smoothe( sm_hist, j );
         }
     }
 
-    for( int i=0; i<64; i++ ) {
+    for( int i=0; i<ORI_NBINS; i++ ) {
         sm_hist[i] = hist[i];
     }
 #else // not WITH_VLFEAT_SMOOTHING
-    for( int bin = 0; bin < ORI_NBINS; bin += 32 )
+    for( int bin = 0; bin < ORI_NBINS; bin++ )
     {
         int prev2 = bin - 2;
         int prev1 = bin - 1;
@@ -175,8 +178,18 @@ void compute_all_orientations( const int            extremum_index,
     }
 #endif // not WITH_VLFEAT_SMOOTHING
 
-    float yval[64];
-    float refined_angle[64];
+    // debug output block: smoothed histogram
+    {
+        std::ostringstream debug_ostr;
+        debug_ostr << "smoothed histogram: " << setprecision(4);
+        std::copy( sm_hist.begin(),
+                   sm_hist.end(),
+                   std::ostream_iterator<float>(debug_ostr, " ") );
+        POP_INFO2( false, debug_ostr.str() );
+    }
+
+    std::vector<float> yval         (ORI_NBINS);
+    std::vector<float> refined_angle(ORI_NBINS);
 
     // sub-cell refinement of the histogram cell index, yielding the angle
     // not necessary to initialize, every cell is computed
@@ -186,7 +199,7 @@ void compute_all_orientations( const int            extremum_index,
         const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
         const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
 
-        bool predicate = ( bin < ORI_NBINS ) && ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) );
+        bool predicate = ( sm_hist[bin] > max( sm_hist[prev], sm_hist[next] ) );
 
         const float num  = predicate ?   3.0f * sm_hist[prev]
                                        - 4.0f * sm_hist[bin]
@@ -207,21 +220,48 @@ void compute_all_orientations( const int            extremum_index,
         yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
     }
 
+    // debug output block: prev + newbin ???
+    {
+        std::ostringstream debug_ostr;
+        debug_ostr << "refined angles: " << setprecision(4);
+        std::copy( refined_angle.begin(),
+                   refined_angle.end(),
+                   std::ostream_iterator<float>(debug_ostr, " ") );
+        debug_ostr << std::endl
+                   << "refined peak value: " << setprecision(4);
+        std::copy( yval.begin(),
+                   yval.end(),
+                   std::ostream_iterator<float>(debug_ostr, " ") );
+        POP_INFO2( false, debug_ostr.str() );
+    }
 
-    int best_index[64];
+
+    std::vector<int> best_index(ORI_NBINS);
 
     /* initialize array best_index with the indices of array yval */
-    std::iota( best_index, best_index+64, 0 );
+    std::iota( best_index.begin(), best_index.end(), 0 );
 
-    /* sort array best_index contain yval indices in order of _decreasing_ yval values */
-    std::sort( best_index, best_index+64, [&]( int l, int r ) {
-                                              return ( yval[best_index[l]] > yval[best_index[r]] );
-                                          } );
-    ostringstream ostr;
-    ostr << "best index array after sorting: ";
-    for( auto i=0; i<64; i++ )
-        ostr << best_index[i] << " ";
-    POP_INFO2( false, ostr.str() );
+    /* Sort array best_index contain yval indices in order of _decreasing_ yval values.
+     * Change from sort to stable_sort to see more clearly if anything goes wrong. */
+    std::sort( best_index.begin(),
+               best_index.end(),
+               [&]( const int& l, const int& r ) {
+                   const int l_idx = l;
+                   const int r_idx = r;
+                   return ( yval[l_idx] > yval[r_idx] );
+               } );
+
+    // debug output block
+    {
+        std::ostringstream debug_ostr;
+        debug_ostr << "best index array after sorting: ";
+        std::copy( best_index.begin(),
+                   best_index.end(),
+                   std::ostream_iterator<int>(debug_ostr, " ") );
+        debug_ostr << std::endl;
+        POP_INFO2( false, debug_ostr.str() );
+    }
+
 
     Extremum ext;
 
@@ -231,26 +271,43 @@ void compute_all_orientations( const int            extremum_index,
     // of all yvals.
     for( int i=0; i<ORIENTATION_MAX_COUNT; i++ )
     {
-        const float best_val = yval[best_index[i]];
-        const float yval_ref = 0.8f * yval[best_index[0]];
-        const bool  valid    = ( best_val >= yval_ref );
+        /* An alternative orientation is only accepted if its smoothed
+         * value is greater or equal 80% of the best value. */
+        const int   this_idx = best_index[i];
+        const float this_val = yval[this_idx];
+        const float acceptance_threshold = 0.8f * yval[best_index[0]];
+        const bool  accepted    = ( this_val >= acceptance_threshold );
 
-        if( valid )
+        if( accepted )
         {
-            float chosen_bin = refined_angle[best_index[i]];
+            /* Convert the bin index (default 0..35) into a rotation expressed
+             * in a fraction of 2 PI. */
+            float chosen_bin = refined_angle[this_idx];
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             // float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
-            float th = std::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
+            // float th = std::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
+            float th = M_PI2 * chosen_bin / ORI_NBINS - M_PI;
             ext.orientation[i] = th;
 
+            /* Increase the number of accepted angles. */
             angles += 1;
         }
     }
 
-    ext.xpos    = iext->xpos;
-    ext.ypos    = iext->ypos;
-    ext.lpos    = iext->lpos;
-    ext.sigma   = iext->sigma;
+    // the selected angles
+    {
+        std::ostringstream debug_ostr;
+        debug_ostr << "Result for the pixel at ( " << iext.xpos << "," << iext.ypos << "," << iext.lpos << ") is : " << angles << " selected angles: ";
+        for( int i=0; i<angles; i++ )
+            debug_ostr << ext.orientation[i] / M_PI2 * 360.0f << " ";
+        debug_ostr << std::endl;
+        POP_INFO2( false, debug_ostr.str() );
+    }
+
+    ext.xpos    = iext.xpos;
+    ext.ypos    = iext.ypos;
+    ext.lpos    = iext.lpos;
+    ext.sigma   = iext.sigma;
     ext.octave  = octave;
     ext.num_ori = angles;
 
@@ -318,20 +375,20 @@ public:
 
 void ori_prefix_sum( const int num_octaves )
 {
-    if( dct.ext_total < 1 )
+    if( dct.extrema_count_total < 1 )
     {
-        POP_FATAL("Calling " << __FUNCTION__ << " with " << dct.ext_total << " found extrema");
+        POP_FATAL("Calling " << __FUNCTION__ << " with " << dct.extrema_count_total << " found extrema");
     }
 
     std::vector<Extremum>& all_extrema = dobuf.extrema;
 
-    assert( all_extrema.size() == dct.ext_total );
+    assert( all_extrema.size() == dct.extrema_count_total );
 
     vector<int> ori_count;
-    vector<int> ori_offset( dct.ext_total+1 );
+    vector<int> ori_offset( dct.extrema_count_total+1 );
 
     /* collect the numbers of orientation for every extremum in ori_count */
-    // for( int i=0; i<dct.ext_total; i++ )
+    // for( int i=0; i<dct.extrema_count_total; i++ )
     // {
         // ori_count[i] = all_extrema.num_ori;
     // }
@@ -344,9 +401,9 @@ void ori_prefix_sum( const int num_octaves )
     }
     POP_INFO2( false, ostr.str() );
 
-    if( ori_count.size() != dct.ext_total )
+    if( ori_count.size() != dct.extrema_count_total )
     {
-        POP_FATAL( "Number of counted extrema: " << dct.ext_total << ", orientation counters pushed to ori_count: " << ori_count.size() );
+        POP_FATAL( "Number of counted extrema: " << dct.extrema_count_total << ", orientation counters pushed to ori_count: " << ori_count.size() );
     }
 
     /* set ori_offset[0] to 0,
@@ -356,11 +413,11 @@ void ori_prefix_sum( const int num_octaves )
      * we also want to keep. */
     ori_offset[0] = 0;
     std::inclusive_scan( &ori_count[0],
-                         &ori_count[dct.ext_total-1],
+                         &ori_count[dct.extrema_count_total-1],
                          &ori_offset[1] );
-    const int total_ori = ori_offset[dct.ext_total];
+    const int total_ori = ori_offset[dct.extrema_count_total];
 
-    for( int i=0; i<dct.ext_total; i++ )
+    for( int i=0; i<dct.extrema_count_total; i++ )
     {
         all_extrema[i].idx_ori = ori_offset[i];
     }
@@ -370,7 +427,7 @@ void ori_prefix_sum( const int num_octaves )
     int* feat_to_ext_map = dobuf.feat_to_ext_map;
 
     int ftem = 0;
-    for( int extr=0; extr<dct.ext_total; extr++ )
+    for( int extr=0; extr<dct.extrema_count_total; extr++ )
     {
         for( int ori=0; ori<ori_offset[extr+1]; ori++ )
         {
@@ -381,11 +438,11 @@ void ori_prefix_sum( const int num_octaves )
     /* Fill the array ori_ct with the number of orientations that belong
      * the octave given by the index. */
     for( int o=0; o<MAX_OCTAVES; o++ ) {
-        if( dct.ext_ct[o] == 0 ) {
+        if( dct.extrema_count_per_octave[o] == 0 ) {
             dct.ori_ct[o] = 0;
         } else {
-            int fe = dct.ext_ps[o  ];   /* first extremum for this octave */
-            int le = dct.ext_ps[o+1]-1; /* last  extremum for this octave */
+            int fe = dct.extrema_count_prefix_sum[o  ];   /* first extremum for this octave */
+            int le = dct.extrema_count_prefix_sum[o+1]-1; /* last  extremum for this octave */
             int lo_ori_index = dobuf.extrema[fe].idx_ori;
             int num_ori      = dobuf.extrema[le].num_ori;
             int hi_ori_index = dobuf.extrema[le].idx_ori + num_ori;
@@ -414,7 +471,7 @@ void Pyramid::orientation( const Config& conf )
 
     int debug_octave = 0;
     int ext_total = 0;
-    for( int n : dct.ext_ct )
+    for( int n : dct.extrema_count_per_octave )
     {
         POP_INFO2( conf.silent(), "octave " << debug_octave << " has " << n << " extrema" );
         if( n > 0 )
@@ -434,12 +491,12 @@ void Pyramid::orientation( const Config& conf )
 
     reallocExtrema( ext_total );
 
-    // for( int octave=0; octave<_num_octaves; octave++ )
-    for( int octave=_num_octaves-1; octave>=0; octave-- )
+    for( int octave=0; octave<_num_octaves; octave++ )
+    // for( int octave=_num_octaves-1; octave>=0; octave-- )
     {
         Octave&      oct_obj = _octaves[octave];
 
-        int extrema_count = dct.ext_ct[octave];
+        int extrema_count = dct.extrema_count_per_octave[octave];
 
         if( extrema_count > 0 )
         {

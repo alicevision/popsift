@@ -16,6 +16,8 @@
 #include <cstdio>
 #include <cmath>
 #include <numeric>
+#include <sstream>
+#include <iterator>
 
 namespace popsift{
 
@@ -407,21 +409,18 @@ void find_extrema_in_dog( const int3&    g,
 {
     const bool no_extrema_reporting = false;
 
-    uint32_t write_index = 0;
+    std::vector<InitialExtremum>& i_extrema = dct.initial_extrema_in_octave[octave];
 
-    std::vector<InitialExtremum>& d_extrema = dct.i_ext_dat[octave];
-    std::vector<int>&             d_ext_off = dct.i_ext_off[octave];
-
-    InitialExtremum ec;
-    ec.ignore = false;
-
-    POP_INFO2( no_extrema_reporting, "initial extrema values for octave " << octave << ": " << write_index );
+    POP_INFO2( no_extrema_reporting, "initial extrema values for octave " << octave );
     for( int z=0; z<g.z; z++ )
     {
         for( int y=0; y<g.y; y++ )
         {
             for( int x=0; x<g.x; x++ )
             {
+                InitialExtremum ec;
+                ec.ignore = false;
+
                 int3 gi( x, y, z );
 
                 bool indicator = find_extrema_in_dog_sub<sift_mode>( gi,
@@ -435,30 +434,39 @@ void find_extrema_in_dog( const int3&    g,
                                                                      grid_width,
                                                                      ec );
 
-                if( indicator && write_index < h_consts.max_extrema )
+                if( indicator )
                 {
-                    ec.write_index = write_index;
-
                     // store the initial extremum in an array
-                    d_extrema.push_back( ec );
-
-                    // index for indirect access to d_extrema, to enable
-                    // access after filtering some initial extrema
-                    d_ext_off.push_back( write_index );
-
-                    write_index++;
+                    i_extrema.emplace_back( ec );
                 }
             }
         }
-        POP_INFO2( no_extrema_reporting, "extrema count after octave " << octave << ", level " << z << ": " << write_index );
+
+        std::vector<int>& i_ext_off = dct.initial_extrema_offset[octave];
+
+        i_ext_off.resize( i_extrema.size() );
+
+        for( int w_idx=0; w_idx<i_extrema.size(); w_idx++ )
+        {
+            i_extrema[w_idx].write_index = w_idx;
+            i_ext_off[w_idx]             = w_idx;
+        }
+
+
+        POP_INFO2( no_extrema_reporting, "Number of extrema in octave " << octave << " after level " << z << ": " << i_extrema.size() );
     }
 
-    dct.ext_ct[octave] = write_index;
-    POP_INFO2( no_extrema_reporting, "final extrema count in octave " << octave << ": " << dct.ext_ct[octave] );
+    dct.extrema_count_per_octave[octave] = i_extrema.size();
+
+    POP_INFO2( no_extrema_reporting, "final extrema count in octave " << octave << ": " << dct.extrema_count_per_octave[octave] );
 }
 
 void Pyramid::find_extrema( const Config& conf )
 {
+    POP_INFO2( false, "Enter " << __FUNCTION__ );
+
+    dct.extrema_count_per_octave.resize( MAX_OCTAVES );
+
     for( int octave=0; octave<_num_octaves; octave++ )
     {
         Octave&      oct_obj = _octaves[octave];
@@ -504,20 +512,41 @@ void Pyramid::find_extrema( const Config& conf )
         }
     }
 
+    POP_INFO2( false, "found extrema in all octaves" );
+
     /* Copy the extreme count for every octave from the (already initialized)
-     * array ext_ct to the (uninitialized) array ext_ps. */
-    std::copy( &dct.ext_ct[0],
-               &dct.ext_ct[MAX_OCTAVES],
-               &dct.ext_ps[0] );
-    /* Compute the exclusive prefix sum on the array ext_ps. */
-    std::exclusive_scan( &dct.ext_ps[0],
-                         &dct.ext_ps[MAX_OCTAVES],
-                         &dct.ext_ps[0],
-                         0 );
+     * array extrema_count_per_octave to the (uninitialized) array extrema_count_prefix_sum. */
+    dct.extrema_count_prefix_sum.resize( dct.extrema_count_per_octave.size() + 1 );
+
+    auto it = dct.extrema_count_prefix_sum.begin();
+    *it = 0;
+    it++;
+
+    /* Compute the exclusive prefix sum on the array extrema_count_prefix_sum, but add
+     * the total sum in the last element. Easier to achieve with an inclusive_scan. */
+    std::inclusive_scan( dct.extrema_count_per_octave.begin(),
+                         dct.extrema_count_per_octave.end(),
+                         it );
 
     /* Store the total number of orientations and the total number of
      * extrema as well. */
-    dct.ext_total = dct.ext_ps[MAX_OCTAVES-1] + dct.ext_ct[MAX_OCTAVES-1];
+    dct.extrema_count_total = dct.extrema_count_prefix_sum.back();
+
+    std::ostringstream debug_ostr;
+    debug_ostr << "Extrema per octave:" << std::endl;
+    std::copy( dct.extrema_count_per_octave.begin(),
+               dct.extrema_count_per_octave.end(),
+               std::ostream_iterator<int>(debug_ostr, " ") );
+    debug_ostr << std::endl
+          << "Extrema prefix sum per octave:" << std::endl;
+    std::copy( dct.extrema_count_prefix_sum.begin(),
+               dct.extrema_count_prefix_sum.end(),
+               std::ostream_iterator<int>(debug_ostr, " ") );
+    debug_ostr << std::endl
+          << "Extrema prefix sum per octave: "
+          << dct.extrema_count_total
+          << std::endl;
+    POP_INFO2( false, debug_ostr.str() );
 }
 
 } // namespace popsift

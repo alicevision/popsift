@@ -234,7 +234,7 @@ void prep_features( Grid& g, Descriptor* descriptor_base, int up_fac )
         while( g.nextX() )
         {
             int offset = g.blockIdx.x * 32 + g.threadIdx.x;
-            if( offset >= dct.ext_total ) return;
+            if( offset >= dct.extrema_count_total ) return;
             const Extremum& ext = dobuf.extrema [offset];
             Feature&        fet = dobuf.features[offset];
 
@@ -268,15 +268,15 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
 {
     const float up_fac = conf.getUpscaleFactor();
 
-    FeaturesHost* features = new FeaturesHost( dct.ext_total, dct.ori_total );
+    FeaturesHost* features = new FeaturesHost( dct.extrema_count_total, dct.ori_total );
 
-    if( dct.ext_total == 0 || dct.ori_total == 0 )
+    if( dct.extrema_count_total == 0 || dct.ori_total == 0 )
     {
         return features;
     }
 
     Grid g;
-    g.setGridDim( grid_divide( dct.ext_total, 32 ) );
+    g.setGridDim( grid_divide( dct.extrema_count_total, 32 ) );
     g.setBlockDim( 32 );
 
     prep_features( g, features->getDescriptors(), up_fac );
@@ -284,7 +284,7 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
     features->pin( );
     memcpy( features->getFeatures(),
             dobuf.features,
-            dct.ext_total * sizeof(Feature) );
+            dct.extrema_count_total * sizeof(Feature) );
 
     memcpy( features->getDescriptors(),
             dbuf.desc,
@@ -299,14 +299,14 @@ void Pyramid::clone_device_descriptors_sub( const Config& conf, FeaturesDev* fea
     const float up_fac = conf.getUpscaleFactor();
 
     Grid g;
-    g.setGridDim( grid_divide( dct.ext_total, 32 ) );
+    g.setGridDim( grid_divide( dct.extrema_count_total, 32 ) );
     g.setBlockDim( 32 );
 
     prep_features( g, features->getDescriptors(), up_fac );
 
     memcpy( features->getFeatures(),
             dobuf.features,
-            dct.ext_total * sizeof(Feature) );
+            dct.extrema_count_total * sizeof(Feature) );
 
     memcpy( features->getDescriptors(),
             dbuf.desc,
@@ -319,7 +319,7 @@ void Pyramid::clone_device_descriptors_sub( const Config& conf, FeaturesDev* fea
 
 FeaturesDev* Pyramid::clone_device_descriptors( const Config& conf )
 {
-    FeaturesDev* features = new FeaturesDev( dct.ext_total, dct.ori_total );
+    FeaturesDev* features = new FeaturesDev( dct.extrema_count_total, dct.ori_total );
 
     clone_device_descriptors_sub( conf, features );
 
@@ -347,7 +347,7 @@ void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* 
 
     const float up_fac = conf.getUpscaleFactor();
 
-    for( int ext_idx = 0; ext_idx<dct.ext_total; ext_idx++ ) {
+    for( int ext_idx = 0; ext_idx<dct.extrema_count_total; ext_idx++ ) {
         const Feature& ext = features->getFeatures()[ext_idx];
         const int   octave  = ext.debug_octave;
         const float xpos    = ext.xpos  * pow(2.0f, octave - up_fac);
