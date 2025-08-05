@@ -13,6 +13,8 @@
 #include "sift_constants.h"
 #include "sift_pyramid.h"
 
+#include <sys/stat.h>
+
 #include <cstdio>
 #include <cmath>
 #include <numeric>
@@ -510,10 +512,29 @@ void Pyramid::find_extrema( const Config& conf )
                       conf.getFilterGridSize() );
                 break;
         }
+
+        bool log_to_file = ( _config.getLogMode() == popsift::Config::All );
+        if( log_to_file ) {
+            struct stat st = { 0 };
+
+            if (stat("dir-extrema", &st) == -1) {
+                mkdir("dir-extrema", 0700);
+            }
+
+            std::vector<int2> red_pixel_list;
+            for( auto it : dct.initial_extrema_in_octave[octave] )
+            {
+                red_pixel_list.emplace_back( int2( roundf(it.xpos), roundf(it.ypos) ) );
+            }
+
+            std::ostringstream ostr;
+            ostr << "dir-extrema/" << "pyramid" << "-o-" << octave << "-red" << ".ppm";
+            popsift::write_plane2Dppm( ostr.str().c_str(), oct_obj.getData(), red_pixel_list );
+        }
     }
 
     POP_INFO2( false, "found extrema in all octaves" );
-
+ 
     /* Copy the extreme count for every octave from the (already initialized)
      * array extrema_count_per_octave to the (uninitialized) array extrema_count_prefix_sum. */
     dct.extrema_count_prefix_sum.resize( dct.extrema_count_per_octave.size() + 1 );
