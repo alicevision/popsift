@@ -513,7 +513,7 @@ void Pyramid::find_extrema( const Config& conf )
                 break;
         }
 
-        bool log_to_file = ( _config.getLogMode() == popsift::Config::All );
+        bool log_to_file = ( conf.getLogMode() == popsift::Config::All );
         if( log_to_file ) {
             struct stat st = { 0 };
 

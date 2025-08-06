@@ -88,7 +88,11 @@ void compute_all_orientations( const int            extremum_index,
 
     // const float factor = __fdividef( -0.5f, (sigw * sigw) );
     const float factor = -0.5f / (sigw * sigw);
+
+    // GRIFF: BUG?
+    // This is from the historical PopSift code. When I actually print the samples, this is no circle and it makes no sense
     const int sq_thres  = rad * rad;
+    // const int sq_thres  = rad;
 
     // int xmin = max(1,     (int)floor(x - rad));
     // int xmax = min(w - 2, (int)floor(x + rad));
@@ -99,36 +103,56 @@ void compute_all_orientations( const int            extremum_index,
     int ymin = std::max(1,     (int)roundf(y) - rad);
     int ymax = std::min(h - 2, (int)roundf(y) + rad);
 
-    int wx = xmax - xmin + 1;
-    int hy = ymax - ymin + 1;
-    int loops = wx * hy;
+    const int wx = xmax - xmin + 1;
+    const int hy = ymax - ymin + 1;
+    // int loops = wx * hy;
 
-    for( int i = 0; i < loops; i++ )
+    std::ostringstream debug_ostr;
+    std::ostringstream debug_ostr2;
+    std::ostringstream debug_ostr3;
+
+    debug_ostr << "Histogram around (" << x << ", " << y << "):" << std::endl;
+    // debug_ostr2 << "Gradiants:" << std::endl;
+    debug_ostr2 << "Weights:" << std::endl;
+    debug_ostr3 << "Bin:" << std::endl;
+
+    for( int y_idx = 0; y_idx < hy; y_idx++ )
     {
-        if( i < loops ) {
-            int yy = i / wx + ymin;
-            int xx = i % wx + xmin;
+        for( int x_idx = 0; x_idx < wx; x_idx++ )
+        // for( int i = 0; i < loops; i++ )
+        {
+            // int yy = i / wx + ymin;
+            // int xx = i % wx + xmin;
+            int yy = y_idx + ymin;
+            int xx = x_idx + xmin;
 
-            float grad;
-            float theta;
-            get_gradiant32( grad,
-                            theta,
-                            xx,
-                            yy,
-                            layer,
-                            level );
+            const float dx = xx - x;
+            const float dy = yy - y;
 
-            float dx = xx - x;
-            float dy = yy - y;
-
-            int sq_dist  = dx * dx + dy * dy;
+            const int sq_dist  = dx * dx + dy * dy;
             if (sq_dist <= sq_thres)
             {
+                debug_ostr << "(" << xx << ", " << yy << ") ";
+
+                float grad;
+                float theta;
+                get_gradiant32( grad,
+                                theta,
+                                xx,
+                                yy,
+                                layer,
+                                level );
+
+                debug_ostr2 << std::setprecision(3) << grad << " ";
+
                 float weight = grad * expf(sq_dist * factor);
 
                 // int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
                 // int bidx = (int)roundf( __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) );
                 int bidx = (int)roundf( float(ORI_NBINS) * (theta + M_PI) / M_PI2 );
+
+                // debug_ostr3 << std::setprecision(3) << theta << " ";
+                debug_ostr3 << std::setprecision(3) << theta << " (" << bidx << ") ";
 
                 if( bidx > ORI_NBINS ) {
                     printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
@@ -140,9 +164,17 @@ void compute_all_orientations( const int            extremum_index,
                 bidx = (bidx == ORI_NBINS) ? 0 : bidx;
 
                 hist.at(bidx) += weight;
+                // debug_ostr2 << std::setprecision(3) << (int)weight << " ";
             }
         }
+        debug_ostr << std::endl;
+        debug_ostr2 << std::endl;
+        debug_ostr3 << std::endl;
     }
+
+    POP_INFO2( false, debug_ostr.str() );
+    POP_INFO2( false, debug_ostr2.str() );
+    POP_INFO2( false, debug_ostr3.str() );
 
     std::vector<float> sm_hist(ORI_NBINS);
 
