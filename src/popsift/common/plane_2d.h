@@ -129,14 +129,9 @@ public:
     inline void set( int y, int x, const T& v )        { _ptr->deref( y, x )    = v; }
     inline void set( int z, int y, int x, const T& v ) { _ptr->deref( z, y, x ) = v; }
 
-    template <class M>
-    inline T get( M m, const float& x ) const                                 { return _ptr->get( m, x ); }
-
-    template <class M>
-    inline T get( M m, const float& y, const float& x ) const                 { return _ptr->get( m, y, x ); }
-
-    template <class M>
-    inline T get( M m, const float& z, const float& y, const float& x ) const { return _ptr->get( m, z, y, x ); }
+    inline T getM( PlaneMode::Mode m, const float& x ) const                                 { return _ptr->getM( m, x ); }
+    inline T getM( PlaneMode::Mode m, const float& y, const float& x ) const                 { return _ptr->getM( m, y, x ); }
+    inline T getM( PlaneMode::Mode m, const float& z, const float& y, const float& x ) const { return _ptr->getM( m, z, y, x ); }
 };
 
 /*************************************************************

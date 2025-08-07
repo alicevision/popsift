@@ -64,12 +64,12 @@ static void horiz( const Config& conf,
         for( int offset = span; offset>0; offset-- ) {
             const float& weight  = filter[offset];
             const float  offrel = float(offset) / dst_w;
-            const float  v1 = src.get( PlaneMode::NormalLinear{}, read_y, read_x - offrel );
-            const float  v2 = src.get( PlaneMode::NormalLinear{}, read_y, read_x + offrel );
+            const float  v1 = src.getM( PlaneMode::NormalLinear, read_y, read_x - offrel );
+            const float  v2 = src.getM( PlaneMode::NormalLinear, read_y, read_x + offrel );
             out += ( ( v1 + v2 ) * weight );
         }
         const float& weight  = filter[0];
-        const float v3 = src.get( PlaneMode::NormalLinear{}, read_y, read_x );
+        const float v3 = src.getM( PlaneMode::NormalLinear, read_y, read_x );
         out += ( v3 * weight );
 
         // POP_INFO2( conf.silent(), "span="<< span << " " << write_x << "," << write_y << "," << write_z << " is " << out * 255.f << " v3=" << v3 );

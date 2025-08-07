@@ -37,13 +37,15 @@ enum MemMode
  * index. The mode determines the interpolation mode and allows also
  * normalized access (relative to plane dimensions).
  */
-namespace PlaneMode
+namespace PlaneMode {
+enum Mode
 {
-class Point { };
-class Linear { };
-class NormalPoint { };
-class NormalLinear { };
-};
+    Point        = 0x1,
+    Linear       = 0x2,
+    NormalPoint  = 0x4,
+    NormalLinear = 0x8
+}; // enum PlaneMode
+}; // namespace PlaneMode
 
 /*************************************************************
  * PlaneBase
@@ -202,14 +204,9 @@ template <typename T> struct PlaneT : public PlaneBase
 
     inline T interpolate( const float& frac, T a, T b ) const;
 
-    template <class M>
-    inline T get( M m, const float& x ) const;
-
-    template <class M>
-    inline T get( M m, const float& y, const float& x ) const;
-
-    template <class M>
-    inline T get( M m, const float& z, const float& y, const float& x ) const;
+    inline T getM( PlaneMode::Mode m, const float& x ) const;
+    inline T getM( PlaneMode::Mode m, const float& y, const float& x ) const;
+    inline T getM( PlaneMode::Mode m, const float& z, const float& y, const float& x ) const;
 
     inline T getPoint( const float& x ) const;
     inline T getPoint( const float& y, const float& x ) const;
@@ -226,35 +223,32 @@ template <typename T> struct PlaneT : public PlaneBase
 };
 
 template <typename T>
-template <class M>
-inline T PlaneT<T>::get( M m, const float& x ) const
+inline T PlaneT<T>::getM( PlaneMode::Mode m, const float& x ) const
 {
-    if     ( typeid(m) == typeid(PlaneMode::Point) )        return getPoint( x );
-    else if( typeid(m) == typeid(PlaneMode::Linear) )       return getLinear( x );
-    else if( typeid(m) == typeid(PlaneMode::NormalPoint) )  return getNormalPoint( x );
-    else if( typeid(m) == typeid(PlaneMode::NormalLinear) ) return getNormalLinear( x );
+    if     ( m == PlaneMode::Point )        return getPoint( x );
+    else if( m == PlaneMode::Linear )       return getLinear( x );
+    else if( m == PlaneMode::NormalPoint )  return getNormalPoint( x );
+    else if( m == PlaneMode::NormalLinear ) return getNormalLinear( x );
     else return getPoint( x );
 } 
 
 template <typename T>
-template <class M>
-inline T PlaneT<T>::get( M m, const float& y, const float& x ) const
+inline T PlaneT<T>::getM( PlaneMode::Mode m, const float& y, const float& x ) const
 {
-    if     ( typeid(m) == typeid(PlaneMode::Point) )        return getPoint( y, x );
-    else if( typeid(m) == typeid(PlaneMode::Linear) )       return getLinear( y, x );
-    else if( typeid(m) == typeid(PlaneMode::NormalPoint) )  return getNormalPoint( y, x );
-    else if( typeid(m) == typeid(PlaneMode::NormalLinear) ) return getNormalLinear( y, x );
+    if     ( m == PlaneMode::Point)         return getPoint( y, x );
+    else if( m == PlaneMode::Linear)        return getLinear( y, x );
+    else if( m == PlaneMode::NormalPoint)   return getNormalPoint( y, x );
+    else if( m == PlaneMode::NormalLinear)  return getNormalLinear( y, x );
     else return getPoint( y, x );
 } 
 
 template <typename T>
-template <class M>
-inline T PlaneT<T>::get( M m, const float& z, const float& y, const float& x ) const
+inline T PlaneT<T>::getM( PlaneMode::Mode m, const float& z, const float& y, const float& x ) const
 {
-    if     ( typeid(m) == typeid(PlaneMode::Point) )        return getPoint( z, y, x );
-    else if( typeid(m) == typeid(PlaneMode::Linear) )       return getLinear( z, y, x );
-    else if( typeid(m) == typeid(PlaneMode::NormalPoint) )  return getNormalPoint( z, y, x );
-    else if( typeid(m) == typeid(PlaneMode::NormalLinear) ) return getNormalLinear( z, y, x );
+    if     ( m == PlaneMode::Point)         return getPoint( z, y, x );
+    else if( m == PlaneMode::Linear)        return getLinear( z, y, x );
+    else if( m == PlaneMode::NormalPoint )  return getNormalPoint( z, y, x );
+    else if( m == PlaneMode::NormalLinear ) return getNormalLinear( z, y, x );
     else return getPoint( z, y, x );
 } 
 
