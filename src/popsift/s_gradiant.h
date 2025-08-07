@@ -15,6 +15,7 @@
 #include <cinttypes>
 #include <cstdio>
 #include <cmath>
+#include <sstream>
 
 namespace popsift
 {
@@ -70,6 +71,32 @@ void get_gradiant32( float&               grad,
 
     grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
     theta    = atan2f(dy, dx);
+}
+
+static inline
+void get_gradiant32( float&               grad,
+                     float&               theta,
+                     const int            x,
+                     const int            y,
+                     const Plane2D_float& layer,
+                     const int            level,
+                     std::ostringstream&  debug_ostr )
+{
+    const float y_xp = layer.get( level, y  , x+1 );
+    const float y_xm = layer.get( level, y  , x-1 );
+    const float yp_x = layer.get( level, y+1, x   );
+    const float ym_x = layer.get( level, y-1, x   );
+
+    const float dx = y_xp - y_xm;
+    const float dy = yp_x - ym_x;
+
+    grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
+    theta    = atan2f(dy, dx);
+
+    debug_ostr << std::setprecision(3)
+               << "[" << ym_x << "..." << yp_x << ", " << y_xm << "..." << y_xp << "]->"
+               << "(" << dy << "," << dx << ")->"
+               << theta << " ";
 }
 
 }; // namespace popsift

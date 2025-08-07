@@ -110,11 +110,15 @@ void compute_all_orientations( const int            extremum_index,
     std::ostringstream debug_ostr;
     std::ostringstream debug_ostr2;
     std::ostringstream debug_ostr3;
+    std::ostringstream debug_ostr4;
+    std::ostringstream debug_ostr5;
 
     debug_ostr << "Histogram around (" << x << ", " << y << "):" << std::endl;
     // debug_ostr2 << "Gradiants:" << std::endl;
-    debug_ostr2 << "Weights:" << std::endl;
+    debug_ostr2 << "Gradients:" << std::endl;
     debug_ostr3 << "Bin:" << std::endl;
+    debug_ostr4 << "Delta to theta:" << std::endl;
+    debug_ostr5 << "Area:" << std::endl;
 
     for( int y_idx = 0; y_idx < hy; y_idx++ )
     {
@@ -129,6 +133,8 @@ void compute_all_orientations( const int            extremum_index,
             const float dx = xx - x;
             const float dy = yy - y;
 
+            debug_ostr5 << setprecision(3) << layer.get( level, yy, xx ) << " ";
+
             const int sq_dist  = dx * dx + dy * dy;
             if (sq_dist <= sq_thres)
             {
@@ -141,7 +147,8 @@ void compute_all_orientations( const int            extremum_index,
                                 xx,
                                 yy,
                                 layer,
-                                level );
+                                level,
+                                debug_ostr4 );
 
                 debug_ostr2 << std::setprecision(3) << grad << " ";
 
@@ -170,11 +177,15 @@ void compute_all_orientations( const int            extremum_index,
         debug_ostr << std::endl;
         debug_ostr2 << std::endl;
         debug_ostr3 << std::endl;
+        debug_ostr4 << std::endl;
+        debug_ostr5 << std::endl;
     }
 
     POP_INFO2( false, debug_ostr.str() );
     POP_INFO2( false, debug_ostr2.str() );
     POP_INFO2( false, debug_ostr3.str() );
+    POP_INFO2( false, debug_ostr4.str() );
+    POP_INFO2( false, debug_ostr5.str() );
 
     std::vector<float> sm_hist(ORI_NBINS);
 
@@ -225,6 +236,10 @@ void compute_all_orientations( const int            extremum_index,
 
     // sub-cell refinement of the histogram cell index, yielding the angle
     // not necessary to initialize, every cell is computed
+    //
+    // Note: without GPU or SIMD, it would be faster to initialize yval to all -INFINITY
+    //       and refined_angle to all -1, and use if() instead of the predicates.
+    //       With GPU or SIMD, probably slower.
 
     for( int bin = 0; bin < ORI_NBINS; bin ++ )
     {
