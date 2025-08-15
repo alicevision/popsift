@@ -23,9 +23,6 @@
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvtx3/nvToolsExtCuda.h>
-#else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
 #endif
 
 using namespace popsift;
@@ -55,11 +52,15 @@ using namespace std;
 __host__
 void Pyramid::descriptors( const Config& conf )
 {
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
    nvtxRangePushA("Reading orientation count");
+#endif
 
    readDescCountersFromDevice( _octaves[0].getStream() );
    cudaStreamSynchronize( _octaves[0].getStream() );
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
    nvtxRangePop( );
+#endif
 
     for( int octave=_num_octaves-1; octave>=0; octave-- )
     // for( int octave=0; octave<_num_octaves; octave++ )

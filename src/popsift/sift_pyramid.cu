@@ -27,9 +27,6 @@
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvtx3/nvToolsExtCuda.h>
-#else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
 #endif
 
 #define PYRAMID_PRINT_DEBUG 0
@@ -285,12 +282,18 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
 
     readDescCountersFromDevice();
 
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangePushA( "download descriptors" );
+#endif
+
     FeaturesHost* features = new FeaturesHost( hct.ext_total, hct.ori_total );
 
     if( hct.ext_total == 0 || hct.ori_total == 0 )
     {
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
         nvtxRangePop();
+#endif
+
         return features;
     }
 
@@ -298,9 +301,16 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
     prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
     POP_SYNC_CHK;
 
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangePushA( "register host memory" );
+#endif
+
     features->pin( );
+
+    #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangePop();
+#endif
+
     popcuda_memcpy_async( features->getFeatures(),
                           dobuf_shadow.features,
                           hct.ext_total * sizeof(Feature),
@@ -313,10 +323,14 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
                           cudaMemcpyDeviceToHost,
                           _download_stream );
     cudaStreamSynchronize( _download_stream );
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangePushA( "unregister host memory" );
+#endif
     features->unpin( );
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangePop();
     nvtxRangePop();
+#endif
 
     return features;
 }

@@ -17,9 +17,6 @@
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvtx3/nvToolsExtCuda.h>
-#else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
 #endif
 
 using namespace std;
@@ -98,7 +95,9 @@ void Image::resetDimensions( int w, int h )
         destroyTexture( );
         createTexture( );
     } else {
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
         nvtxRangePushA( "reallocating host-side image memory" );
+#endif
 
         _max_w = max( w, _max_w );
         _max_h = max( h, _max_h );
@@ -112,20 +111,26 @@ void Image::resetDimensions( int w, int h )
         destroyTexture( );
         createTexture( );
 
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
         nvtxRangePop(); // "reallocating host-side image memory"
+#endif
     }
 }
 
 void Image::allocate( int w, int h )
 {
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangePushA( "allocating host-side image memory" );
+#endif
 
     _input_image_h.allocHost( w, h, popsift::CudaAllocated );
     _input_image_d.allocDev( w, h );
 
     createTexture( );
 
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangePop(); // "allocating host-side image memory"
+#endif
 }
 
 void Image::destroyTexture( )
@@ -222,7 +227,9 @@ void ImageFloat::resetDimensions( int w, int h )
         destroyTexture( );
         createTexture( );
     } else {
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
         nvtxRangePushA( "reallocating host-side image memory" );
+#endif
 
         _max_w = max( w, _max_w );
         _max_h = max( h, _max_h );
@@ -236,20 +243,26 @@ void ImageFloat::resetDimensions( int w, int h )
         destroyTexture( );
         createTexture( );
 
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
         nvtxRangePop(); // "reallocating host-side image memory"
+#endif
     }
 }
 
 void ImageFloat::allocate( int w, int h )
 {
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangePushA( "allocating host-side image memory" );
+#endif
 
     _input_image_h.allocHost( w, h, popsift::CudaAllocated );
     _input_image_d.allocDev( w, h );
 
     createTexture( );
 
+#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
     nvtxRangePop(); // "allocating host-side image memory"
+#endif
 }
 
 void ImageFloat::destroyTexture( )
