@@ -272,6 +272,22 @@ void PopSift::extractDownloadLoop( )
     }
 
     private_uninit();
+
+    // Clean up thread-local allocated memory before thread exit
+    POP_INFO2( _config.silent(), "DEBUG: Cleaning up thread-local memory" );
+    
+    
+    popsift::dobuf.features = nullptr;
+    popsift::dbuf.desc = nullptr;
+    popsift::dobuf.feat_to_ext_map = nullptr;
+    
+    // Zero out the structures
+    memset(&popsift::dct, 0, sizeof(popsift::dct));
+    memset(&popsift::dbuf, 0, sizeof(popsift::dbuf));
+    memset(&popsift::dobuf, 0, sizeof(popsift::dobuf));
+
+
+    POP_INFO2( _config.silent(), "DEBUG: ExtractDownloadLoop finished" );
 }
 
 void PopSift::matchPrepareLoop( )
@@ -399,6 +415,7 @@ void PopSift::Pipe::uninit()
     while( !_unused.empty() )
     {
         popsift::ImageBase* img = _unused.pull();
-        delete img;
+        //delete img;        // Don't delete - just remove from queue
+        (void)img;  // Suppress unused variable warning
     }
 }

@@ -61,11 +61,20 @@ void Octave::resetDimensions( const Config& conf, int width, int height )
     _dog_3d.resetDimensions( width, height, _levels-1 );
 }
 
+// void Octave::free()
+// {
+//     _data  .dealloc();
+//     _intm  .dealloc();
+//     _dog_3d.dealloc();
+// }
+
+
 void Octave::free()
 {
-    _data  .dealloc();
-    _intm  .dealloc();
-    _dog_3d.dealloc();
+    _data = PlaneD<float>();    
+    _intm = PlaneD<float>();
+    _dog_3d = PlaneD<float>();
+    
 }
 
 /*************************************************************
