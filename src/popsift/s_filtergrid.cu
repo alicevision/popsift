@@ -11,9 +11,11 @@
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvtx3/nvToolsExtCuda.h>
+#define nvtxRangePushA_() nvtxRangePushA()
+#define nvtxRangePop_() nvtxRangePop()
 #else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
+#define nvtxRangePushA_(a)
+#define nvtxRangePop_()
 #endif
 
 #if ! POPSIFT_IS_DEFINED(POPSIFT_DISABLE_GRID_FILTER)
@@ -29,6 +31,7 @@
 #include <thrust/sort.h>
 #include <thrust/transform.h>
 #include <thrust/transform_scan.h>
+#include <thrust/version.h>
 
 namespace popsift
 {
@@ -292,7 +295,11 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 
         if( ocount > 0 ) {
             FunctionExtractIgnored fun_extract_ignore;
+#if THRUST_VERSION >= 300000
+            ::cuda::std::identity  fun_id;
+#else
             thrust::identity<int>  fun_id;
+#endif
 
             grid.resize( ocount );
 
@@ -317,9 +324,9 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
         }
     }
 
-    nvtxRangePushA( "writing back count" );
+    nvtxRangePushA_( "writing back count" );
     writeDescCountersToDevice( );
-    nvtxRangePop( );
+    nvtxRangePop_( );
 
     return ret_ext_total;
 }
