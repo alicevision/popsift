@@ -39,7 +39,7 @@ endif()
 
 find_package(DevIL COMPONENTS IL ILU) # yields IL_FOUND, IL_LIBRARIES, IL_INCLUDE_DIR
 
-# for newer CMake versions and Boost 1.70 pr newer must use Boost's make file
+# for newer CMake versions and Boost 1.70 or newer must use Boost's make file
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.30)
   cmake_policy(SET CMP0167 NEW)
 endif()
