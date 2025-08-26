@@ -73,7 +73,7 @@ jobs:
     strategy:
       matrix:
         build_type: ["Release", "Debug"]
-        cuda_version: ["12.5.1", "13.0.0"]
+        cuda_version: ["12.5.1", "12.9.0"]
 
     env:
       BUILD_TYPE: ${{ matrix.build_type }}
