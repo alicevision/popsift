@@ -99,7 +99,7 @@ const char* Config::getDescModeUsage( )
            "notile is like igrid but handles all 16 tiles at once.\n"
            "vlfeat is VLFeat-like horizontal scanning, sampling every pixel in a radius around "
            "keypoint itself, using the 16 tile centers only for weighting. Every sampled point "
-           "contributes to up to eight historgram bins.";
+           "contributes to up to eight histogram bins.";
 }
 
 void Config::setGaussMode( const std::string& m )
