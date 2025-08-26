@@ -11,11 +11,9 @@
 
 #if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
 #include <nvtx3/nvToolsExtCuda.h>
-#define nvtxRangePushA_() nvtxRangePushA()
-#define nvtxRangePop_() nvtxRangePop()
 #else
-#define nvtxRangePushA_(a)
-#define nvtxRangePop_()
+#define nvtxRangePushA(a)
+#define nvtxRangePop()
 #endif
 
 #if ! POPSIFT_IS_DEFINED(POPSIFT_DISABLE_GRID_FILTER)
@@ -324,9 +322,9 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
         }
     }
 
-    nvtxRangePushA_( "writing back count" );
+    nvtxRangePushA( "writing back count" );
     writeDescCountersToDevice( );
-    nvtxRangePop_( );
+    nvtxRangePop( );
 
     return ret_ext_total;
 }
