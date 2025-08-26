@@ -45,12 +45,6 @@ target_link_libraries(popsift
 		      CUDA::cudart
 		      Threads::Threads)
 
-if(PopSift_USE_NVTX_PROFILING)
-target_link_libraries(popsift
-                      PUBLIC
-		      CUDA::nvtx3)
-endif()
-
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 set_target_properties(popsift PROPERTIES CUDA_SEPARABLE_COMPILATION ON)

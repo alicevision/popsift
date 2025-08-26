@@ -23,13 +23,6 @@
 #include <thread>
 #include <vector>
 
-#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
-#include <nvtx3/nvToolsExtCuda.h>
-#else
-#define nvtxRangeStartA(a)
-#define nvtxRangeEnd(a)
-#endif
-
 /* user parameters */
 namespace popsift
 {
@@ -50,9 +43,6 @@ class SiftJob
     unsigned char*      _imageData;
     popsift::ImageBase* _img;
     std::exception_ptr _err;
-#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
-    nvtxRangeId_t       _nvtx_id;
-#endif
 
 public:
 

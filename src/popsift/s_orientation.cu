@@ -18,13 +18,6 @@
 #include <cmath>
 #include <cstdio>
 
-#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
-#include <nvtx3/nvToolsExtCuda.h>
-#else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
-#endif
-
 using namespace popsift;
 using namespace std;
 

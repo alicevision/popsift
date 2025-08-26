@@ -15,13 +15,6 @@
 #include <fstream>
 #include <iostream>
 
-#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
-#include <nvtx3/nvToolsExtCuda.h>
-#else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
-#endif
-
 using namespace std;
 
 namespace popsift {
@@ -98,8 +91,6 @@ void Image::resetDimensions( int w, int h )
         destroyTexture( );
         createTexture( );
     } else {
-        nvtxRangePushA( "reallocating host-side image memory" );
-
         _max_w = max( w, _max_w );
         _max_h = max( h, _max_h );
         _input_image_h.freeHost( popsift::CudaAllocated );
@@ -111,21 +102,15 @@ void Image::resetDimensions( int w, int h )
 
         destroyTexture( );
         createTexture( );
-
-        nvtxRangePop(); // "reallocating host-side image memory"
     }
 }
 
 void Image::allocate( int w, int h )
 {
-    nvtxRangePushA( "allocating host-side image memory" );
-
     _input_image_h.allocHost( w, h, popsift::CudaAllocated );
     _input_image_d.allocDev( w, h );
 
     createTexture( );
-
-    nvtxRangePop(); // "allocating host-side image memory"
 }
 
 void Image::destroyTexture( )
@@ -222,8 +207,6 @@ void ImageFloat::resetDimensions( int w, int h )
         destroyTexture( );
         createTexture( );
     } else {
-        nvtxRangePushA( "reallocating host-side image memory" );
-
         _max_w = max( w, _max_w );
         _max_h = max( h, _max_h );
         _input_image_h.freeHost( popsift::CudaAllocated );
@@ -235,21 +218,15 @@ void ImageFloat::resetDimensions( int w, int h )
 
         destroyTexture( );
         createTexture( );
-
-        nvtxRangePop(); // "reallocating host-side image memory"
     }
 }
 
 void ImageFloat::allocate( int w, int h )
 {
-    nvtxRangePushA( "allocating host-side image memory" );
-
     _input_image_h.allocHost( w, h, popsift::CudaAllocated );
     _input_image_d.allocDev( w, h );
 
     createTexture( );
-
-    nvtxRangePop(); // "allocating host-side image memory"
 }
 
 void ImageFloat::destroyTexture( )

@@ -4,14 +4,12 @@ echo Downloading CUDA toolkit 12 for Windows 10
 
 appveyor DownloadFile https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvcc/windows-x86_64/cuda_nvcc-windows-x86_64-12.5.82-archive.zip -Filename cuda_nvcc.zip
 appveyor DownloadFile https://developer.download.nvidia.com/compute/cuda/redist/cuda_cudart/windows-x86_64/cuda_cudart-windows-x86_64-12.5.82-archive.zip -Filename cuda_cudart.zip
-appveyor DownloadFile https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvtx/windows-x86_64/cuda_nvtx-windows-x86_64-12.5.82-archive.zip -Filename cuda_nvtx.zip
 appveyor DownloadFile https://developer.download.nvidia.com/compute/cuda/redist/visual_studio_integration/windows-x86_64/visual_studio_integration-windows-x86_64-12.5.82-archive.zip -Filename vs_integration.zip
 dir
 
 echo Unzipping CUDA toolkit 12
 tar -xf cuda_nvcc.zip
 tar -xf cuda_cudart.zip
-tar -xf cuda_nvtx.zip
 tar -xf vs_integration.zip
 dir
 
@@ -22,7 +20,6 @@ mkdir "%ProgramFiles%\NVIDIA GPU Computing Toolkit\CUDA\v12.5\extras"
 echo Copying toolkit files to install dir(s)
 xcopy cuda_cudart-windows-x86_64-12.5.82-archive "%ProgramFiles%\NVIDIA GPU Computing Toolkit\CUDA\v12.5" /s /e /i /y
 xcopy cuda_nvcc-windows-x86_64-12.5.82-archive "%ProgramFiles%\NVIDIA GPU Computing Toolkit\CUDA\v12.5" /s /e /i /y
-xcopy cuda_nvtx-windows-x86_64-12.5.82-archive "%ProgramFiles%\NVIDIA GPU Computing Toolkit\CUDA\v12.5" /s /e /i /y
 xcopy visual_studio_integration-windows-x86_64-12.5.82-archive "%ProgramFiles%\NVIDIA GPU Computing Toolkit\CUDA\v12.5\extras" /s /e /i /y
 
 
