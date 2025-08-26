@@ -17,7 +17,7 @@ on:
       - 'docs/**'
 
 jobs:
-  build:
+  build-linux:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -67,3 +67,66 @@ jobs:
            -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
            -DCMAKE_PREFIX_PATH:PATH="$PWD/../../popsift_install;${DEPS_INSTALL_DIR}"
           make -j$(nproc)
+
+  build-windows:
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        build_type: ["Release", "Debug"]
+        cuda_version: ["12.5.1"]
+
+    env:
+      BUILD_TYPE: ${{ matrix.build_type }}
+      CTEST_OUTPUT_ON_FAILURE: 1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CUDA
+        uses: Jimver/cuda-toolkit@v0.2.14
+        with:
+          cuda: ${{ matrix.cuda_version }}
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "nvtx", "visual_studio_integration"]'
+
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: '${{ runner.workspace }}/vcpkg'
+          vcpkgGitCommitId: 'f7423ee180c4b7f40d43402c2feb3859161ef625'
+
+      - name: Install vcpkg dependencies
+        run: |
+          ${{ runner.workspace }}/vcpkg/vcpkg.exe install boost-system boost-program-options boost-thread boost-filesystem --triplet x64-windows
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. -G "Visual Studio 17 2022" -A x64 `
+            -DBUILD_SHARED_LIBS:BOOL=ON `
+            -DPopSift_USE_NVTX_PROFILING:BOOL=OFF `
+            -DPopSift_USE_GRID_FILTER:BOOL=OFF `
+            -DPopSift_BUILD_DOCS:BOOL=OFF `
+            -DPopSift_USE_POSITION_INDEPENDENT_CODE:BOOL=ON `
+            -DPopSift_BUILD_EXAMPLES:BOOL=ON `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" `
+            -DCMAKE_TOOLCHAIN_FILE="${{ runner.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build and Install
+        run: |
+          cd build
+          cmake --build . --config ${{ matrix.build_type }} --parallel
+          cmake --build . --config ${{ matrix.build_type }} --target install
+
+      - name: Build As Third Party
+        run: |
+          mkdir build_as_3rdparty
+          cd build_as_3rdparty
+          cmake ../src/application -G "Visual Studio 17 2022" -A x64 `
+            -DBUILD_SHARED_LIBS:BOOL=ON `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install" `
+            -DCMAKE_TOOLCHAIN_FILE="${{ runner.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          cmake --build . --config ${{ matrix.build_type }} --parallel
