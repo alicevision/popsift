@@ -9,13 +9,6 @@
 #include "sift_extremum.h"
 #include "sift_pyramid.h"
 
-#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
-#include <nvtx3/nvToolsExtCuda.h>
-#else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
-#endif
-
 #if ! POPSIFT_IS_DEFINED(POPSIFT_DISABLE_GRID_FILTER)
 
 #include <thrust/copy.h>
@@ -317,9 +310,7 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
         }
     }
 
-    nvtxRangePushA( "writing back count" );
     writeDescCountersToDevice( );
-    nvtxRangePop( );
 
     return ret_ext_total;
 }

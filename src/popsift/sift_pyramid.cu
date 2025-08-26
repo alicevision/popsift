@@ -25,13 +25,6 @@
 #define mkdir(path, perm) _mkdir(path)
 #endif
 
-#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
-#include <nvtx3/nvToolsExtCuda.h>
-#else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
-#endif
-
 #define PYRAMID_PRINT_DEBUG 0
 
 using namespace std;
@@ -285,12 +278,10 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
 
     readDescCountersFromDevice();
 
-    nvtxRangePushA( "download descriptors" );
     FeaturesHost* features = new FeaturesHost( hct.ext_total, hct.ori_total );
 
     if( hct.ext_total == 0 || hct.ori_total == 0 )
     {
-        nvtxRangePop();
         return features;
     }
 
@@ -298,9 +289,7 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
     prep_features<<<grid,32,0,_download_stream>>>( features->getDescriptors(), up_fac );
     POP_SYNC_CHK;
 
-    nvtxRangePushA( "register host memory" );
     features->pin( );
-    nvtxRangePop();
     popcuda_memcpy_async( features->getFeatures(),
                           dobuf_shadow.features,
                           hct.ext_total * sizeof(Feature),
@@ -313,10 +302,7 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
                           cudaMemcpyDeviceToHost,
                           _download_stream );
     cudaStreamSynchronize( _download_stream );
-    nvtxRangePushA( "unregister host memory" );
     features->unpin( );
-    nvtxRangePop();
-    nvtxRangePop();
 
     return features;
 }
