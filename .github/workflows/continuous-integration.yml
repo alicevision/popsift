@@ -15,6 +15,8 @@ on:
       - '**.md'
       - '**.rst'
       - 'docs/**'
+  workflow_dispatch:
+    # Allows manual triggering from GitHub UI or CLI
 
 jobs:
   build-linux:
@@ -22,61 +24,42 @@ jobs:
     strategy:
       matrix:
         container: ["alicevision/popsift-deps:cuda11.8.0-ubuntu20.04", "alicevision/popsift-deps:cuda12.1.0-ubuntu22.04"]
-        build_tpe: ["Release", "Debug"]
-        exclude:
-        # excludes debug on this one as it has a segmentation fault during the compilation (!)
-        - container: "alicevision/popsift-deps:cuda11.8.0-ubuntu20.04"
-          build_tpe: "Debug"
 
     container:
       image: ${{ matrix.container }}
 
     env:
       DEPS_INSTALL_DIR: /opt/
-      BUILD_TYPE: ${{ matrix.build_tpe }}
       CTEST_OUTPUT_ON_FAILURE: 1
+
     steps:
       - uses: actions/checkout@v2
 
-      - name: Prepare File Tree
-        run: |
-          mkdir ./build
-          mkdir ./build_as_3rdparty
-          mkdir ../popsift_install
+      - name: Make scripts executable
+        run: chmod +x ./.github/scripts/*.sh
 
-      - name: Configure CMake
-        working-directory: ./build
-        run: |
-          cmake .. \
-           -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-           -DBUILD_SHARED_LIBS:BOOL=ON \
-           -DCMAKE_PREFIX_PATH="${DEPS_INSTALL_DIR}" \
-           -DPopSift_BUILD_DOCS:BOOL=OFF \
-           -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../../popsift_install
+      - name: Build Release Configuration
+        uses: ./.github/actions/build-config
+        with:
+          build-type: 'Release'
+          platform: 'linux'
+          deps-install-dir: ${{ env.DEPS_INSTALL_DIR }}
 
-      - name: Build
-        working-directory: ./build
-        run: |
-          make -j$(nproc) install
-
-      - name: Build As Third Party
-        working-directory: ./build_as_3rdparty
-        run: |
-          cmake ../src/application \
-           -DBUILD_SHARED_LIBS:BOOL=ON \
-           -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-           -DCMAKE_PREFIX_PATH:PATH="$PWD/../../popsift_install;${DEPS_INSTALL_DIR}"
-          make -j$(nproc)
+      - name: Build Debug Configuration
+        if: ${{ !contains(matrix.container, 'cuda11.8.0') }}
+        uses: ./.github/actions/build-config
+        with:
+          build-type: 'Debug'
+          platform: 'linux'
+          deps-install-dir: ${{ env.DEPS_INSTALL_DIR }}
 
   build-windows:
     runs-on: windows-latest
     strategy:
       matrix:
-        build_type: ["Release", "Debug"]
         cuda_version: ["12.5.1", "12.9.0"]
 
     env:
-      BUILD_TYPE: ${{ matrix.build_type }}
       CTEST_OUTPUT_ON_FAILURE: 1
 
     steps:
@@ -99,34 +82,18 @@ jobs:
         run: |
           ${{ runner.workspace }}/vcpkg/vcpkg.exe install boost-system boost-program-options boost-thread boost-filesystem --triplet x64-windows
 
-      - name: Configure CMake
-        run: |
-          mkdir build
-          cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64 `
-            -DBUILD_SHARED_LIBS:BOOL=ON `
-            -DPopSift_USE_NVTX_PROFILING:BOOL=OFF `
-            -DPopSift_USE_GRID_FILTER:BOOL=OFF `
-            -DPopSift_BUILD_DOCS:BOOL=OFF `
-            -DPopSift_USE_POSITION_INDEPENDENT_CODE:BOOL=ON `
-            -DPopSift_BUILD_EXAMPLES:BOOL=ON `
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
-            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" `
-            -DCMAKE_TOOLCHAIN_FILE="${{ runner.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      - name: Build Release Configuration
+        uses: ./.github/actions/build-config
+        with:
+          build-type: 'Release'
+          platform: 'windows'
+          vcpkg-root: '${{ runner.workspace }}/vcpkg'
+          workspace-dir: '${{ github.workspace }}'
 
-      - name: Build and Install
-        run: |
-          cd build
-          cmake --build . --config ${{ matrix.build_type }} --parallel
-          cmake --build . --config ${{ matrix.build_type }} --target install
-
-      - name: Build As Third Party
-        run: |
-          mkdir build_as_3rdparty
-          cd build_as_3rdparty
-          cmake ../src/application -G "Visual Studio 17 2022" -A x64 `
-            -DBUILD_SHARED_LIBS:BOOL=ON `
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
-            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install" `
-            -DCMAKE_TOOLCHAIN_FILE="${{ runner.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          cmake --build . --config ${{ matrix.build_type }} --parallel
+      - name: Build Debug Configuration
+        uses: ./.github/actions/build-config
+        with:
+          build-type: 'Debug'
+          platform: 'windows'
+          vcpkg-root: '${{ runner.workspace }}/vcpkg'
+          workspace-dir: '${{ github.workspace }}'
