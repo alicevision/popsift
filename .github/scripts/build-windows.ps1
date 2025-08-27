@@ -62,6 +62,7 @@ function Configure-CMake {
       -DPopSift_BUILD_EXAMPLES:BOOL=ON `
       -DCMAKE_BUILD_TYPE=$BuildType `
       -DCMAKE_INSTALL_PREFIX="$installDir" `
+      -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
       -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain"
     
     if ($LASTEXITCODE -ne 0) { 
@@ -132,10 +133,8 @@ function Build-AsThirdParty {
     $vcpkgToolchain = "$VcpkgRoot/scripts/buildsystems/vcpkg.cmake"
     
     # In vcpkg manifest mode, dependencies are installed locally in vcpkg_installed/
-    # Since src/application doesn't have vcpkg.json, we need to point to the main project's
-    # vcpkg_installed directory so the third-party build can find the dependencies
-    $mainBuildDir = "$WorkspaceDir/build_$($BuildType.ToLower())"
-    $mainProjectVcpkgInstalled = "$mainBuildDir/vcpkg_installed"
+    # Since src/application doesn't have vcpkg.json, we need to point to the main project's vcpkg_installed directory so the third-party build can find the dependencies
+    $mainProjectVcpkgInstalled = $env:VCPKG_INSTALLED_DIR
     Write-Host "Dependencies installed in $mainProjectVcpkgInstalled..."
     # print first level content of the folder mainProjectVcpkgInstalled
     Get-ChildItem -Path $mainProjectVcpkgInstalled -Directory | ForEach-Object { Write-Host " - $($_.Name)" }
@@ -146,6 +145,7 @@ function Build-AsThirdParty {
       -DCMAKE_BUILD_TYPE=$BuildType `
       -DCMAKE_PREFIX_PATH="$installDir;$mainProjectVcpkgInstalled/x64-windows" `
       -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain" `
+      -DVCPKG_INSTALLED_DIR="$mainProjectVcpkgInstalled" `
       -DVCPKG_TARGET_TRIPLET=x64-windows
     
     if ($LASTEXITCODE -ne 0) { 
