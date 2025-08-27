@@ -73,12 +73,22 @@ function Build-AsThirdParty {
     $installDir = "$WorkspaceDir/install_$($BuildType.ToLower())"
     $vcpkgToolchain = "$VcpkgRoot/scripts/buildsystems/vcpkg.cmake"
     
+    # In vcpkg manifest mode, dependencies are installed locally in vcpkg_installed/
+    # Since src/application doesn't have vcpkg.json, we need to point to the main project's
+    # vcpkg_installed directory so the third-party build can find the dependencies
+    $mainBuildDir = "$WorkspaceDir/build_$($BuildType.ToLower())"
+    $mainProjectVcpkgInstalled = "$mainBuildDir/vcpkg_installed"
+    Write-Host "Dependencies installed in $mainProjectVcpkgInstalled..."
+    # print first level content of the folder mainProjectVcpkgInstalled
+    Get-ChildItem -Path $mainProjectVcpkgInstalled -Directory | ForEach-Object { Write-Host " - $($_.Name)" }
+
     Set-Location $thirdPartyDir
     cmake ../src/application -G "Visual Studio 17 2022" -A x64 `
       -DBUILD_SHARED_LIBS:BOOL=ON `
       -DCMAKE_BUILD_TYPE=$BuildType `
-      -DCMAKE_PREFIX_PATH="$installDir" `
-      -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain"
+      -DCMAKE_PREFIX_PATH="$installDir;$mainProjectVcpkgInstalled/x64-windows" `
+      -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain" `
+      -DVCPKG_TARGET_TRIPLET=x64-windows
     
     if ($LASTEXITCODE -ne 0) { 
         throw "Third-party CMake configuration failed for $BuildType"
