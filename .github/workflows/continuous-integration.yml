@@ -61,7 +61,7 @@ jobs:
         cuda_version: ["12.5.1", "12.9.0"]
 
     env:
-      CTEST_OUTPUT_ON_FAILURE: 1
+      VCPKG_INSTALLED_DIR: ${{ github.workspace }}/vcpkg_installed
 
     steps:
       - uses: actions/checkout@v4
@@ -106,7 +106,7 @@ jobs:
         with:
           path: |
             ${{ runner.workspace }}/vcpkg
-            vcpkg_installed
+            $env:VCPKG_INSTALLED_DIR
           key: vcpkg-${{ hashFiles('**/vcpkg.json', '.github/workflows/continuous-integration.yml') }}-${{ runner.os }}
           restore-keys: |
             vcpkg-
