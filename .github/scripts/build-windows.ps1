@@ -55,12 +55,12 @@ function Configure-CMake {
     Set-Location $buildDir
     cmake .. -G "Visual Studio 17 2022" -A x64 `
       -DBUILD_SHARED_LIBS:BOOL=ON `
-      -DPopSift_USE_NVTX_PROFILING:BOOL=OFF `
+      -DCMAKE_GENERATOR_TOOLSET="cuda=$env:CUDA_PATH" `
       -DPopSift_USE_GRID_FILTER:BOOL=OFF `
       -DPopSift_BUILD_DOCS:BOOL=OFF `
       -DPopSift_USE_POSITION_INDEPENDENT_CODE:BOOL=ON `
       -DPopSift_BUILD_EXAMPLES:BOOL=ON `
-      -DCMAKE_BUILD_TYPE=$BuildType `
+      -DCMAKE_BUILD_TYPE="$BuildType" `
       -DCMAKE_INSTALL_PREFIX="$installDir" `
       -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
       -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain"
