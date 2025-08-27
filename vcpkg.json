@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    "cuda",
+    "boost-algorithm",
+    "boost-filesystem",
+    "boost-program-options",
+    "boost-system"
+    ]
+}
