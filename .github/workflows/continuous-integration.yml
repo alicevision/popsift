@@ -35,18 +35,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      # Cache build artifacts and dependencies (within container)
-      - name: Cache build artifacts
-        id: cache-build
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache
-            /tmp/popsift_cache
-          key: linux-${{ matrix.container }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', '.github/workflows/continuous-integration.yml') }}
-          restore-keys: |
-            linux-${{ matrix.container }}-
-
       - name: Make scripts executable
         run: chmod +x ./.github/scripts/*.sh
 
@@ -58,6 +46,7 @@ jobs:
           deps-install-dir: ${{ env.DEPS_INSTALL_DIR }}
 
       - name: Build Debug Configuration
+        # Skip Debug build for CUDA 11.8 because of a strange seg fault at compilation time
         if: ${{ !contains(matrix.container, 'cuda11.8.0') }}
         uses: ./.github/actions/build-config
         with:
