@@ -1,6 +1,17 @@
 # Windows build functions for PopSift
 # Usage: source this file and call the individual functions
 
+<#
+.SYNOPSIS
+Creates the necessary build directories for different build types on Windows.
+
+.DESCRIPTION
+Sets up build directories for the main PopSift build and third-party build testing.
+Creates directories with lowercase build type names (e.g. build_release) following Windows conventions.
+
+.PARAMETER BuildType
+The build configuration (Release or Debug)
+#>
 function Setup-Directories {
     param([string]$BuildType)
     
@@ -12,6 +23,23 @@ function Setup-Directories {
     New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
 }
 
+<#
+.SYNOPSIS
+Configures CMake for PopSift build on Windows using vcpkg for dependency management.
+
+.DESCRIPTION
+Sets up CMake configuration with Visual Studio 2022 generator, enables shared libraries,
+and configures PopSift-specific options. Uses vcpkg manifest mode for dependency management.
+
+.PARAMETER BuildType
+The build configuration (Release or Debug)
+
+.PARAMETER VcpkgRoot
+Path to the vcpkg installation directory
+
+.PARAMETER WorkspaceDir
+Path to the workspace directory for install location
+#>
 function Configure-CMake {
     param(
         [string]$BuildType,
@@ -42,6 +70,17 @@ function Configure-CMake {
     Set-Location ..
 }
 
+<#
+.SYNOPSIS
+Builds and installs PopSift for the specified build configuration.
+
+.DESCRIPTION
+Performs parallel build using all available CPU cores and installs the built
+libraries and executables to the configured install directory.
+
+.PARAMETER BuildType
+The build configuration (Release or Debug)
+#>
 function Build-AndInstall {
     param([string]$BuildType)
     
@@ -61,6 +100,25 @@ function Build-AndInstall {
     Set-Location ..
 }
 
+<#
+.SYNOPSIS
+Tests building PopSift applications as a third-party consumer on Windows.
+
+.DESCRIPTION
+Verifies that the installed PopSift can be found and used by external projects.
+This is important for testing the installation and packaging. Uses vcpkg manifest
+mode dependencies from the main project build since src/application doesn't have
+its own vcpkg.json file.
+
+.PARAMETER BuildType
+The build configuration (Release or Debug)
+
+.PARAMETER VcpkgRoot
+Path to the vcpkg installation directory
+
+.PARAMETER WorkspaceDir
+Path to the workspace directory containing the main build and install
+#>
 function Build-AsThirdParty {
     param(
         [string]$BuildType,
