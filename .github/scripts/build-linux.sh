@@ -6,9 +6,9 @@
 # Uses BUILD_TYPE environment variable to create build and install directories
 setup_directories() {
     echo "Setting up build directories..."
-    mkdir -p ./build_${BUILD_TYPE,,}
-    mkdir -p ./build_as_3rdparty_${BUILD_TYPE,,}
-    mkdir -p ../popsift_install_${BUILD_TYPE,,}
+    mkdir -p ./build_"${BUILD_TYPE,,}"
+    mkdir -p ./build_as_3rdparty_"${BUILD_TYPE,,}"
+    mkdir -p ../popsift_install_"${BUILD_TYPE,,}"
 }
 
 # Configures CMake for PopSift build with specified options
@@ -23,7 +23,7 @@ configure_cmake() {
     local install_dir="../popsift_install_${build_type,,}"
     
     echo "Configuring CMake for $build_type..."
-    cd "./$build_dir"
+    cd "./$build_dir" || exit
     cmake .. \
      -DCMAKE_BUILD_TYPE="$build_type" \
      -DBUILD_SHARED_LIBS:BOOL=ON \
@@ -42,7 +42,7 @@ build_and_install() {
     local build_dir="build_${build_type,,}"
     
     echo "Building and installing $build_type..."
-    cd "./$build_dir"
+    cd "./$build_dir" || exit
     cmake --build . --config "$build_type" --parallel
     cmake --install . --config "$build_type"
     cd ..
@@ -61,7 +61,7 @@ build_as_third_party() {
     local install_dir="../popsift_install_${build_type,,}"
     
     echo "Testing third-party build for $build_type..."
-    cd "./$build_dir"
+    cd "./$build_dir" || exit
     cmake ../src/application \
      -DBUILD_SHARED_LIBS:BOOL=ON \
      -DCMAKE_BUILD_TYPE="$build_type" \
