@@ -107,8 +107,6 @@ We acknowledge that there is at least one SIFT implementation that is vastly fas
 
 * ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=develop) develop branch (Linux and Windows).
 
-* [![Build status](https://ci.appveyor.com/api/projects/status/rsm5269hs288c2ji/branch/develop?svg=true)](https://ci.appveyor.com/project/AliceVision/popsift/branch/develop) develop branch on Windows (AppVeyor - legacy).
-
 ## License
 
 PopSift is licensed under [MPL v2 license](COPYING.md).
