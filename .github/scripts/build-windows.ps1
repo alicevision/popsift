@@ -56,7 +56,7 @@ function Configure-CMake {
     cmake .. -G "Visual Studio 17 2022" -A x64 `
       -DBUILD_SHARED_LIBS:BOOL=ON `
       -DCMAKE_GENERATOR_TOOLSET="cuda=$env:CUDA_PATH" `
-      -DPopSift_USE_GRID_FILTER:BOOL=OFF `
+      -DPopSift_USE_GRID_FILTER:BOOL=ON `
       -DPopSift_BUILD_DOCS:BOOL=OFF `
       -DPopSift_USE_POSITION_INDEPENDENT_CODE:BOOL=ON `
       -DPopSift_BUILD_EXAMPLES:BOOL=ON `
