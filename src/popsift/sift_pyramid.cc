@@ -226,40 +226,39 @@ void Pyramid::step2( const Config& conf )
  * This is possible because pointer arithmetic between Intel hosts and NVidia
  * GPUs are compatible.
  */
-void prep_features( Grid& g, Descriptor* descriptor_base, int up_fac )
+void prep_features(Descriptor* descriptor_base, int up_fac )
 {
-    g.reset();
-    while( g.nextBlock() )
-    {
-        while( g.nextX() )
-        {
-            int offset = g.blockIdx.x * 32 + g.threadIdx.x;
-            if( offset >= dct.extrema_count_total ) return;
-            const Extremum& ext = dobuf.extrema [offset];
-            Feature&        fet = dobuf.features[offset];
+    printf("Prep features called\n");
+    if (!dobuf.features) {
+        std::cerr << "[ERROR] dobuf.features is not allocated!" << std::endl;
+        return;
+    }
 
-            const int   octave  = ext.octave;
-            const float xpos    = ext.xpos  * powf(2.0f, float(octave - up_fac));
-            const float ypos    = ext.ypos  * powf(2.0f, float(octave - up_fac));
-            const float sigma   = ext.sigma * powf(2.0f, float(octave - up_fac));
-            const int   num_ori = ext.num_ori;
+    for (int offset = 0; offset < dct.extrema_count_total; ++offset) {
+        const Extremum& ext = dobuf.extrema[offset];
+        Feature& fet = dobuf.features[offset];
 
-            fet.xpos    = xpos;
-            fet.ypos    = ypos;
-            fet.sigma   = sigma;
-            fet.num_ori = num_ori;
+        const int   octave  = ext.octave;
+        const float xpos    = ext.xpos  * powf(2.0f, float(octave - up_fac));
+        const float ypos    = ext.ypos  * powf(2.0f, float(octave - up_fac));
+        const float sigma   = ext.sigma * powf(2.0f, float(octave - up_fac));
+        const int   num_ori = ext.num_ori;
 
-            fet.debug_octave = octave;
+        fet.xpos    = xpos;
+        fet.ypos    = ypos;
+        fet.sigma   = sigma;
+        fet.num_ori = num_ori;
 
-            int ori;
-            for( ori = 0; ori<num_ori; ori++ ) {
-                fet.desc[ori]        = descriptor_base + ( ext.idx_ori + ori );
-                fet.orientation[ori] = ext.orientation[ori];
-            }
-            for( ; ori<ORIENTATION_MAX_COUNT; ori++ ) {
-                fet.desc[ori]        = nullptr;
-                fet.orientation[ori] = 0;
-            }
+        fet.debug_octave = octave;
+
+        int ori;
+        for( ori = 0; ori < num_ori; ori++ ) {
+            fet.desc[ori]        = descriptor_base + ( ext.idx_ori + ori );
+            fet.orientation[ori] = ext.orientation[ori];
+        }
+        for( ; ori < ORIENTATION_MAX_COUNT; ori++ ) {
+            fet.desc[ori]        = nullptr;
+            fet.orientation[ori] = 0;
         }
     }
 }
@@ -275,11 +274,8 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
         return features;
     }
 
-    Grid g;
-    g.setGridDim( grid_divide( dct.extrema_count_total, 32 ) );
-    g.setBlockDim( 32 );
 
-    prep_features( g, features->getDescriptors(), up_fac );
+    prep_features(features->getDescriptors(), up_fac );
 
     features->pin( );
     memcpy( features->getFeatures(),
@@ -298,11 +294,7 @@ void Pyramid::clone_device_descriptors_sub( const Config& conf, FeaturesDev* fea
 {
     const float up_fac = conf.getUpscaleFactor();
 
-    Grid g;
-    g.setGridDim( grid_divide( dct.extrema_count_total, 32 ) );
-    g.setBlockDim( 32 );
-
-    prep_features( g, features->getDescriptors(), up_fac );
+    prep_features( features->getDescriptors(), up_fac );
 
     memcpy( features->getFeatures(),
             dobuf.features,
