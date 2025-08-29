@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Missing thrust include [PR](https://github.com/alicevision/popsift/pull/135)
 - Required thrust include for `s_filtergrid.cu` [PR](https://github.com/alicevision/popsift/pull/144)
 - Added vlFeat's descriptor extraction method as an option [PR](https://github.com/alicevision/popsift/pull/167)
+- Added CI for windows on Github Actions and refactoring [PR](https://github.com/alicevision/popsift/pull/172)
 
 ### Changed
 
@@ -40,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove broken and unused code path from L2 normalization [PR](https://github.com/alicevision/popsift/pull/166)
 - Do not use NVTX [PR](https://github.com/alicevision/popsift/pull/162)
 - Documentation: Biblio build [PR](https://github.com/alicevision/popsift/pull/132)
+- Fixed include for CUDA 13 [PR](https://github.com/alicevision/popsift/pull/169)
 
 ### Documentation
 
