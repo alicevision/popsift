@@ -13,7 +13,7 @@ Check out the [documentation](https://popsift.readthedocs.io/) for more info.
 
 PopSift compiles and works with NVidia cards of compute capability >= 3.0 (including the GT 650M), but the code is developed with the compute capability 5.2 card GTX 980 Ti in mind.
 
-CUDA SDK 11 does no longer support compute capability 3.0. 3.5 is still supported with deprecation warning.
+CUDA SDK 11 does no longer support compute capability 3.0. 3.5 is still supported with deprecation warnings.
 
 ## Dependencies
 
@@ -31,7 +31,7 @@ Optionally, for the provided applications:
 
 ## Build
 
-In order to build the library you can run:
+To build the library, you can run:
 
 ```
 mkdir build && cd build
@@ -55,7 +55,7 @@ Calling `popsift-demo` without parameters shows the options.
 ### Using PopSift as third party
 
 To integrate PopSift into other software, link with `libpopsift`.
-If your are using CMake for building your project you can easily add PopSift to your project.
+If you are using CMake for building your project, you can easily add PopSift to your project.
 Once you have built and installed PopSift in a directory (say, `<prefix>`), in your `CMakeLists.txt` file just add the dependency
 
 ```cmake
@@ -71,7 +71,7 @@ add_executable(poptest yourfile.cpp)
 target_link_libraries(poptest PUBLIC PopSift::popsift)
 ```
 
-Then, in order to build just pass the location of `PopSiftConfig.cmake` from the cmake command line:
+Then, to build just pass the location of `PopSiftConfig.cmake` from the cmake command line:
 
 ```bash
 cmake .. -DPopSift_DIR=<prefix>/lib/cmake/PopSift/
@@ -83,7 +83,7 @@ The caller must create a `popart::Config` struct (documented in `src/sift/sift_c
 
 After this, images can be enqueued for SIFT extraction using (`enqueue()`).
 A valid input is a single plane of grayscale values located in host memory.
-They can passed as a pointer to unsigned char, with a value range from 0 to 255, or as a pointer to float, with a value range from 0.0f to 1.0f.
+They can be passed as a pointer to unsigned char, with a value range from 0 to 255, or as a pointer to float, with a value range from 0.0f to 1.0f.
 
 Only host memory limits the number of images that can be enqueued.
 The `enqueue` function returns a pointer to a `SiftJob` immediately and performs the feature extraction asynchronously.
@@ -93,20 +93,19 @@ Features offer iterators that iterate over objects of type `Feature`.
 Both classes are documented in `sift_extremum.h`.
 Each feature represents a feature point in the coordinate system of the input image, providing X and Y coordinates and scale (sigma), as well as several alternative descriptors for the feature point (according to Lowe, 15% of the feature points should be expected to have 2 or more descriptors).
 
-In an alternate, deprecated, blocking API, `init()` must be called to pass image width and height to PopSift, followed by a call to `executed()` that takes image data and returns the extracted features. `execute()` is synchronous and blocking.
+In an alternate, deprecated, blocking API, `init()` must be called to pass image width and height to PopSift, followed by a call to `executed()` that takes image data and returns the extracted features.
+`execute()` is synchronous and blocking.
 
 As far as we know, no implementation that is faster than PopSift at the time of PopSift's release comes under a license that allows commercial use and sticks close to the original paper at the same time as well.
-PopSift can be configured at runtime to use constants that affect it behaviours.
+PopSift can be configured at runtime to use constants that affect its behaviours.
 In particular, users can choose to generate results very similar to VLFeat or results that are closer (but not as close) to the SIFT implementation of the OpenCV extras.
 We acknowledge that there is at least one SIFT implementation that is vastly faster, but it makes considerable sacrifices in terms of accuracy and compatibility.
 
 ## Continuous integration:
 
-* ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=master) master branch on Linux.
+* ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=master) master branch (Linux and Windows).
 
-* ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=develop) develop branch on Linux.
-
-* [![Build status](https://ci.appveyor.com/api/projects/status/rsm5269hs288c2ji/branch/develop?svg=true)](https://ci.appveyor.com/project/AliceVision/popsift/branch/develop) develop branch on Windows.
+* ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=develop) develop branch (Linux and Windows).
 
 ## License
 
