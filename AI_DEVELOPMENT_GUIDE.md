@@ -9,7 +9,8 @@ It ensures that contributions (from GitHub Copilot, ChatGPT, Claude, etc.) follo
 
 - Always prioritize **readability** and **clarity** over micro-optimizations.
 - Follow **modern C++17 best practices**.
-- Keep host-side C++ and CUDA device code **cleanly separated**.
+- Keep device-side __global__ functions in the same source file as the host-side C++ code that starts this kernel.
+- Always compile __device__ functions with the functions that call them. Preferably declare them static inline.
 - Prefer **modularity**: each class or major component should live in its own file.
 - Code should be **self-documenting** whenever possible, with clear naming and structure.
 
@@ -17,7 +18,12 @@ It ensures that contributions (from GitHub Copilot, ChatGPT, Claude, etc.) follo
 
 ## C++ Guidelines
 
-- **Standard**: Use **C++17**. Prefer `constexpr`, `auto`, `enum class`, range-based for loops, and smart pointers (`std::unique_ptr`, `std::shared_ptr`).
+- **Standard**:
+  - Use **C++17**. Prefer `constexpr`, `auto` and `enum class`.
+  - Use range-based for loops on the host side.
+  - Use smart pointers (`std::unique_ptr`, `std::shared_ptr`) on the host side.
+  - Never pass smart pointers as parameters to __global__ functions.
+  - Avoid dynamic memory allocation on the device side.
 - **Memory Management**: Use RAII. Avoid raw `new`/`delete` except in CUDA contexts where unavoidable.
 - **Error Handling**:
   - Use exceptions in host C++ code.  
