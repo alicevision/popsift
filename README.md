@@ -1,7 +1,7 @@
 
 # PopSift
 
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3728/badge)](https://bestpractices.coreinfrastructure.org/projects/3728) 
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3728/badge)](https://bestpractices.coreinfrastructure.org/projects/3728)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/64f9192b53df46b483e7cf5be7e2dddd)](https://app.codacy.com/gh/alicevision/popsift/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 PopSift is an open-source implementation of the SIFT algorithm in CUDA.
@@ -33,7 +33,7 @@ Optionally, for the provided applications:
 
 To build the library, you can run:
 
-```
+```shell
 mkdir build && cd build
 cmake ..
 make
@@ -101,7 +101,7 @@ PopSift can be configured at runtime to use constants that affect its behaviours
 In particular, users can choose to generate results very similar to VLFeat or results that are closer (but not as close) to the SIFT implementation of the OpenCV extras.
 We acknowledge that there is at least one SIFT implementation that is vastly faster, but it makes considerable sacrifices in terms of accuracy and compatibility.
 
-## Continuous integration:
+## Continuous integration
 
 * ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=master) master branch (Linux and Windows).
 
@@ -113,28 +113,27 @@ PopSift is licensed under [MPL v2 license](COPYING.md).
 SIFT was patented in the United States from 1999-03-08 to 2020-03-28. See the [patent link](https://patents.google.com/patent/US6711293B1/en) for more information.
 PopSift license only concerns the PopSift source code and does not release users of this code from any requirements that may arise from patents.
 
-
 ## Cite Us
 
 If you use PopSift for your publication, please cite us as:
+
 ```bibtex
 @inproceedings{Griwodz2018Popsift,
-	 author = {Griwodz, Carsten and Calvet, Lilian and Halvorsen, P{\aa}l},
-	 title = {Popsift: A Faithful SIFT Implementation for Real-time Applications},
-	 booktitle = {Proceedings of the 9th {ACM} Multimedia Systems Conference},
-	 series = {MMSys '18},
-	 year = {2018},
-	 isbn = {978-1-4503-5192-8},
-	 location = {Amsterdam, Netherlands},
-	 pages = {415--420},
-	 numpages = {6},
-	 doi = {10.1145/3204949.3208136},
-	 acmid = {3208136},
-	 publisher = {ACM},
-	 address = {New York, NY, USA},
+    author = {Griwodz, Carsten and Calvet, Lilian and Halvorsen, P{\aa}l},
+    title = {Popsift: A Faithful SIFT Implementation for Real-time Applications},
+    booktitle = {Proceedings of the 9th {ACM} Multimedia Systems Conference},
+    series = {MMSys '18},
+    year = {2018},
+    isbn = {978-1-4503-5192-8},
+    location = {Amsterdam, Netherlands},
+    pages = {415--420},
+    numpages = {6},
+    doi = {10.1145/3204949.3208136},
+    acmid = {3208136},
+    publisher = {ACM},
+    address = {New York, NY, USA},
 }
 ```
-
 
 ## Acknowledgements
 
