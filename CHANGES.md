@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - YYYY-MM-DD
 
+## 2025
+
+- Added vlFeat's descriptor extraction method as an option [PR](https://github.com/alicevision/popsift/pull/167)
+
 ## 2024
 
 - CMake: CUDA as first-order language, different CC selection

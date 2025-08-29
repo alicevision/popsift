@@ -13,6 +13,7 @@
 #include "s_desc_loop.h"
 #include "s_desc_normalize.h"
 #include "s_desc_notile.h"
+#include "s_desc_vlfeat.h"
 #include "s_gradiant.h"
 #include "sift_config.h"
 #include "sift_constants.h"
@@ -20,13 +21,6 @@
 
 #include <cstdio>
 #include <iostream>
-
-#if POPSIFT_IS_DEFINED(POPSIFT_USE_NVTX)
-#include <nvtx3/nvToolsExtCuda.h>
-#else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
-#endif
 
 using namespace popsift;
 using namespace std;
@@ -55,11 +49,8 @@ using namespace std;
 __host__
 void Pyramid::descriptors( const Config& conf )
 {
-   nvtxRangePushA("Reading orientation count");
-
    readDescCountersFromDevice( _octaves[0].getStream() );
    cudaStreamSynchronize( _octaves[0].getStream() );
-   nvtxRangePop( );
 
     for( int octave=_num_octaves-1; octave>=0; octave-- )
     // for( int octave=0; octave<_num_octaves; octave++ )
@@ -77,6 +68,8 @@ void Pyramid::descriptors( const Config& conf )
                 start_ext_desc_igrid( octave, oct_obj );
             } else if( conf.getDescMode() == Config::NoTile ) {
                 start_ext_desc_notile( octave, oct_obj );
+            } else if( conf.getDescMode() == Config::VLFeat_Desc ) {
+                start_ext_desc_vlfeat( octave, oct_obj );
             } else {
                 POP_FATAL( "not yet" );
             }
