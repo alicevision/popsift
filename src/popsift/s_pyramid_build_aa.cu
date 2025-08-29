@@ -1,5 +1,6 @@
 /*
  * Copyright 2016-2017, Simula Research Laboratory
+ *           2018-2024, University of Oslo
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -7,165 +8,123 @@
  */
 #include "common/assist.h"
 #include "gauss_filter.h"
-#include "s_pyramid_build_aa.h"
+#include "sift_pyramid.h"
 #include "sift_constants.h"
 
 namespace popsift {
-namespace gauss {
 namespace absoluteSource {
 
-__global__ void horiz(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
+__global__ static void horiz(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
 {
     const int    src_level = dst_level - 1;
     const int    span      =  d_gauss.inc.span[dst_level];
     const float* filter    = &d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
+    const int    block_x   = blockIdx.x * blockDim.x;
+    const int    block_y   = blockIdx.y * blockDim.y;
+    const int    xpos      = block_x + threadIdx.x;
+    const int    ypos      = block_y + threadIdx.y;
 
-    const int off_x = blockIdx.x * blockDim.x + threadIdx.x;
-    const int off_y = blockIdx.y * blockDim.y + threadIdx.y;
-
+    int   idx;
+    float g;
+    float val;
     float out = 0.0f;
 
-    float A = readTex( src_point_texture, off_x - span, off_y, src_level );
-    float B = readTex( src_point_texture, off_x + span, off_y, src_level );
-    float C = readTex( src_point_texture, off_x       , off_y, src_level );
-    float g  = filter[0];
-    out += C * g;
-    g    = filter[span];
-    out += ( A + B ) * g;
-
-    int shiftval = 0;
-    for( int offset=span-1; offset>0; offset-- ) {
-        shiftval += 1;
-        const float D1 = popsift::shuffle_down( A, shiftval );
-        const float D2 = popsift::shuffle_up  ( C, span - shiftval );
-        const float D  = threadIdx.x < (32 - shiftval) ? D1 : D2;
-        const float E1 = popsift::shuffle_up  ( B, shiftval );
-        const float E2 = popsift::shuffle_down( C, span - shiftval );
-        const float E  = threadIdx.x > shiftval        ? E1 : E2;
-        g = filter[offset];
-        out += ( D + E ) * g;
-    }
-
-    surf2DLayeredwrite( out, dst_data, off_x*4, off_y, dst_level, cudaBoundaryModeZero );
-}
-
-__global__ void vert(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
-{
-    const int    span   =  d_gauss.inc.span[dst_level];
-    const float* filter = &d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
-    int block_x = blockIdx.x * blockDim.x;
-    int block_y = blockIdx.y * blockDim.y;
-    int idx     = threadIdx.x;
-    int idy;
-
-    float g;
-    float val;
-    float out = 0;
-
     for( int offset = span; offset>0; offset-- ) {
         g  = filter[offset];
 
-        idy = threadIdx.y - offset;
-        val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+        idx = xpos - offset;
+        val = readTex( src_point_texture, idx, ypos, src_level );
         out += ( val * g );
 
-        idy = threadIdx.y + offset;
-        val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+        idx = xpos + offset;
+        val = readTex( src_point_texture, idx, ypos, src_level );
         out += ( val * g );
     }
 
     g  = filter[0];
-    idy = threadIdx.y;
-    val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+    val = readTex( src_point_texture, xpos, ypos, src_level );
     out += ( val * g );
 
-    idx = block_x+threadIdx.x;
-    idy = block_y+threadIdx.y;
-
-    surf2DLayeredwrite( out, dst_data, idx*4, idy, dst_level, cudaBoundaryModeZero );
+    surf2DLayeredwrite( out, dst_data, xpos*4, ypos, dst_level, cudaBoundaryModeZero );
 }
 
-__global__ void vert_abs0(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
+__global__ static void vert(cudaTextureObject_t src_point_texture, cudaSurfaceObject_t dst_data, int dst_level)
 {
-    const int    span   =  d_gauss.abs_o0.span[dst_level];
-    const float* filter = &d_gauss.abs_o0.filter[dst_level*GAUSS_ALIGN];
-    int block_x = blockIdx.x * blockDim.x;
-    int block_y = blockIdx.y * blockDim.y;
-    int idx     = threadIdx.x;
-    int idy;
+    const int    span    =  d_gauss.inc.span[dst_level];
+    const float* filter  = &d_gauss.inc.filter[dst_level*GAUSS_ALIGN];
+    const int    block_x = blockIdx.x * blockDim.x;
+    const int    block_y = blockIdx.y * blockDim.y;
+    const int    xpos    = block_x + threadIdx.x;
+    const int    ypos    = block_y + threadIdx.y;
 
+    int   idy;
     float g;
     float val;
-    float out = 0;
+    float out = 0.0f;
 
     for( int offset = span; offset>0; offset-- ) {
         g  = filter[offset];
 
-        idy = threadIdx.y - offset;
-        val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+        idy = ypos - offset;
+        val = readTex( src_point_texture, xpos, idy, dst_level );
         out += ( val * g );
 
-        idy = threadIdx.y + offset;
-        val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+        idy = ypos + offset;
+        val = readTex( src_point_texture, xpos, idy, dst_level );
         out += ( val * g );
     }
 
     g  = filter[0];
-    idy = threadIdx.y;
-    val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
+    val = readTex( src_point_texture, xpos, ypos, dst_level );
     out += ( val * g );
 
-    idx = block_x+threadIdx.x;
-    idy = block_y+threadIdx.y;
-
-    surf2DLayeredwrite( out, dst_data, idx*4, idy, dst_level, cudaBoundaryModeZero );
-}
-
-__global__ void vert_all_abs0(cudaTextureObject_t src_point_texture,
-                              cudaSurfaceObject_t dst_data,
-                              int start_level,
-                              int max_level)
-{
-    const int block_x = blockIdx.x * blockDim.x;
-    const int block_y = blockIdx.y * blockDim.y;
-
-    for( int dst_level=start_level; dst_level<max_level; dst_level++ )
-    {
-        const int    span   =  d_gauss.abs_o0.span[dst_level];
-        const float* filter = &d_gauss.abs_o0.filter[dst_level*GAUSS_ALIGN];
-
-        int idx = threadIdx.x;
-        int idy;
-
-        float g;
-        float val;
-        float out = 0;
-
-        for( int offset = span; offset>0; offset-- ) {
-            g  = filter[offset];
-
-            idy = threadIdx.y - offset;
-            val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
-            out += ( val * g );
-
-            idy = threadIdx.y + offset;
-            val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
-            out += ( val * g );
-        }
-
-        g  = filter[0];
-        idy = threadIdx.y;
-        val = readTex( src_point_texture, block_x + idx, block_y + idy, dst_level );
-        out += ( val * g );
-
-        idx = block_x+threadIdx.x;
-        idy = block_y+threadIdx.y;
-
-        surf2DLayeredwrite( out, dst_data, idx*4, idy, dst_level, cudaBoundaryModeZero );
-    }
+    surf2DLayeredwrite( out, dst_data, xpos*4, ypos, dst_level, cudaBoundaryModeZero );
 }
 
 } // namespace absoluteSource
-} // namespace gauss
+
+__host__
+void Pyramid::horiz_from_prev_level_basic( int octave, int level, cudaStream_t stream )
+{
+    Octave&      oct_obj = _octaves[octave];
+
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    // similar speed: dim3 block( 32,  4 ); dim3 block( 32,  3 ); dim3 block( 32,  2 );
+    dim3 block( 32,  8 ); // most stable good perf on GTX 980 TI
+    dim3 grid;
+    grid.x  = grid_divide( width,  32 );
+    grid.y  = grid_divide( height, block.y );
+
+    absoluteSource::horiz
+        <<<grid,block,0,stream>>>
+        ( oct_obj.getDataTexPoint( ),
+          oct_obj.getIntermediateSurface( ),
+          level );
+    POP_SYNC_CHK;
+}
+
+__host__
+void Pyramid::vert_from_interm_basic( int octave, int level, cudaStream_t stream )
+{
+    Octave& oct_obj = _octaves[octave];
+
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    dim3 block( 64, 2 );
+    dim3 grid;
+    grid.x = (unsigned int)grid_divide( width,  block.x );
+    grid.y = (unsigned int)grid_divide( height, block.y );
+
+    absoluteSource::vert
+        <<<grid,block,0,stream>>>
+        ( oct_obj.getIntermDataTexPoint( ),
+          oct_obj.getDataSurface( ),
+          level );
+    POP_SYNC_CHK;
+}
+
 } // namespace popsift
 

@@ -72,7 +72,7 @@ __global__
 void Pyramid::download_and_save_array( const char* basename )
 {
     for( int o=0; o<_num_octaves; o++ )
-    _octaves[o].download_and_save_array( basename, o );
+        _octaves[o].download_and_save_array( basename, o );
 }
 
 /*
