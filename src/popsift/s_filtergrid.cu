@@ -22,6 +22,7 @@
 #include <thrust/sort.h>
 #include <thrust/transform.h>
 #include <thrust/transform_scan.h>
+#include <thrust/version.h>
 
 namespace popsift
 {
@@ -285,7 +286,11 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 
         if( ocount > 0 ) {
             FunctionExtractIgnored fun_extract_ignore;
+#if THRUST_VERSION >= 300000
+            ::cuda::std::identity  fun_id;
+#else
             thrust::identity<int>  fun_id;
+#endif
 
             grid.resize( ocount );
 

@@ -13,7 +13,6 @@
 #include "sift_pyramid.h"
 
 #include <cuda_runtime.h>
-#include <texture_fetch_functions.h>
 
 #include <cstdio>
 
