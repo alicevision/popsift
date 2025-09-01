@@ -22,16 +22,23 @@ It ensures that contributions (from GitHub Copilot, ChatGPT, Claude, etc.) follo
   - Use **C++17**. Prefer `constexpr`, `auto` and `enum class`.
   - Use range-based for loops on the host side.
   - Use smart pointers (`std::unique_ptr`, `std::shared_ptr`) on the host side.
+  - Dynamic memory allocation on the device side is strongly discouraged.
   - Never pass smart pointers as parameters to __global__ functions.
-  - Avoid dynamic memory allocation on the device side.
-- **Memory Management**: Use RAII. Avoid raw `new`/`delete` except in CUDA contexts where unavoidable.
+- **Memory Management**:
+  - Use RAII on the host side.
+  - Avoid all dynamic memory allocation on the device side.
+  - Understand that reference-counting smart pointers cannot be kept consistent between
+    host and device, and that kernels run asynchronously from host code.
 - **Error Handling**:
   - Use exceptions in host C++ code.  
   - In CUDA, check and propagate error codes using helper utilities/macros. Never ignore errors.
 - **Namespaces**: Group related functions/classes logically. Avoid polluting the global namespace.
 - **Headers**:
   - Keep headers minimal; forward declare instead of including heavy dependencies.
-  - Each header should be guarded with `#pragma once`.
+    However, small helper functions declared `static inline __device__` use several times should be
+    included instead of copying the code.
+  - Each header should be guarded with `#pragma once`. ifndef/endif guards should be used in special
+    circumstances only.
 - **Style**:
   - `snake_case` for variables and functions.  
   - `CamelCase` for class and struct names.  
@@ -41,14 +48,19 @@ It ensures that contributions (from GitHub Copilot, ChatGPT, Claude, etc.) follo
 
 ## CUDA Guidelines
 
-- Separate **kernels** from host orchestration code.
+- Separate **kernels** (`__global__` functions) from host orchestration code, but keep
+  them in the same module as the host core that starts them.
 - Name kernels descriptively, e.g. `compute_gradient_kernel`.
 - Document assumptions about:
   - Thread/block layout
   - Shared memory usage
   - Synchronization requirements
 - Use `__restrict__` and `constexpr` where appropriate for performance and clarity.
-- Prefer small, focused kernels over overly complex ones.
+- Avoid writing kernels that use `local memory`, limit variables to registers and shared
+  memory as much as possible. To achieve this, prefer focused kernels over complex ones.
+- To structure larger kernels, use `__device__` functions that are declared
+  `static inline __device__`. Ensure that caller and device functions are compiled together.
+- Avoid dynamic parallelism.
 - Always validate CUDA API calls.
 
 ---
