@@ -275,11 +275,11 @@ inline T PlaneT<T>::getLinear( const float& y, const float& x ) const
     const float xf = x - x0;
     const float yf = y - y0;
 #if 1
-    return deref( y0,   x0   );
     /*
+    return deref( y0,   x0   );
+     */
     return interpolate( xf, deref( y0,   x0   ),
                             deref( y0,   x0+1 ) );
-     */
 #elif 0
     auto h1 = interpolate( xf, deref( y0,   x0   ),
                                deref( y0,   x0+1 ) );
