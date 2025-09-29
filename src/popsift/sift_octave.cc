@@ -98,6 +98,10 @@ void Octave::download_and_save_array( const Config& conf, const char* basename, 
         mkdir("dir-octave-dump", 0700);
     }
 
+    if (stat("dir-interm", &st) == -1) {
+        mkdir("dir-interm", 0700);
+    }
+
     if (stat("dir-dog", &st) == -1) {
         mkdir("dir-dog", 0700);
     }
@@ -121,6 +125,15 @@ void Octave::download_and_save_array( const Config& conf, const char* basename, 
         ostringstream ostr2;
         ostr2 << "dir-octave-dump/" << basename << "-o-" << octave << "-l-" << l << ".dump";
         popsift::dump_plane2Dfloat(ostr2.str().c_str(), false, p );
+    }
+
+    for( int l = 0; l<_levels; l++ ) {
+        Plane2D_float p;
+        p.copyFromPlane( _intm, l );
+
+        ostringstream ostr;
+        ostr << "dir-interm/" << basename << "-o-" << octave << "-l-" << l << ".pgm";
+        popsift::write_plane2Dunscaled( ostr.str().c_str(), false, p );
     }
 
     for (int l = 0; l<_levels - 1; l++) {

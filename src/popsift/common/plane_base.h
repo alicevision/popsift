@@ -270,21 +270,21 @@ inline T PlaneT<T>::getLinear( const float& x ) const
 template <typename T>
 inline T PlaneT<T>::getLinear( const float& y, const float& x ) const
 {
-    const int   x0 = (int)x;
-    const int   y0 = (int)y;
-    const float xf = x - x0;
-    const float yf = y - y0;
+    const int   x0 = (int)x; // x0 = floor(x)
+    const int   y0 = (int)y; // y0 = floor(y)
+    const float xf = x - x0; // xf = rest of x after subtracing floor(x)
+    const float yf = y - y0; // yf = same for y
 #if 1
-    /*
-    return deref( y0,   x0   );
-     */
-    return interpolate( xf, deref( y0,   x0   ),
-                            deref( y0,   x0+1 ) );
-#elif 0
+    // h1 = interpolate between neighbour x values x0 and x0+1 from row y0, but
+    //      weigthed with xf, such that value at positoin (y0,x0) has weight 1-xf
+    //      and value at position (y0,x0+1) has weigth xf
     auto h1 = interpolate( xf, deref( y0,   x0   ),
                                deref( y0,   x0+1 ) );
+
+    // h2 = the same for line y0+1
     auto h2 = interpolate( xf, deref( y0+1, x0   ),
                                deref( y0+1, x0+1 ) );
+
     return interpolate( yf, h1, h2 );
 #else
     return interpolate( yf, interpolate( xf, deref( y0,   x0   ),

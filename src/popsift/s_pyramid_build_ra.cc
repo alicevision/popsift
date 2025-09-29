@@ -45,8 +45,8 @@ static void horiz( const Config& conf,
         for( int x=0; x<dst.getDimX(); x++ )
         {
             // Create octave-0 - level-0 from the input image.
-            const int write_x = x;
-            const int write_y = y;
+            const int write_x = x + 1;
+            const int write_y = y + 1;
             const int write_z = 0;
 
             const int dst_w = dst.getDimX();
