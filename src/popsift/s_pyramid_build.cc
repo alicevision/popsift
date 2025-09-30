@@ -71,29 +71,25 @@ void Pyramid::downscale_from_prev_octave( int octave )
 namespace gauss {
 
 static
-void make_dog( Grid&          g,
-               PlaneD<float>& src,
+void make_dog( PlaneD<float>& src,
                PlaneD<float>& dog,
                const int      w,
                const int      h,
                const int      max_level )
 {
-    g.reset();
-
-    do {
-        const int idx   = g.blockIdx.x * g.blockDim.x + g.threadIdx.x;
-        const int idy   = g.blockIdx.y * g.blockDim.y + g.threadIdx.y;
-
-        // float a = readTex( src_data, idx, idy, 0 );
-        float a = src.get( 0, idy, idx );
-        for( int level=0; level<max_level-1; level++ )
+    for( int idy = 0; idy < h; idy++ )
+    {
+        for( int idx = 0; idx < w; idx++ )
         {
-            const float b = src.get( level+1, idy, idx );
-
-            dog.set( level, idy, idx, b-a );
-            a = b;
+            float a = src.get( 0, idy, idx );
+            for( int level = 0; level < max_level-1; level++ )
+            {
+                const float b = src.get( level+1, idy, idx );
+                dog.set( level, idy, idx, b-a );
+                a = b;
+            }
         }
-    } while( g.next() );
+    }
 }
 
 } // namespace gauss
@@ -105,12 +101,7 @@ void Pyramid::dogs_from_blurred( int octave, int max_level )
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
 
-    Grid g;
-    g.setBlockDim( 1024, 1, 1 );
-    g.setGridDim( grid_divide( width,  1024 ), height, 1 );
-
-    gauss::make_dog( g,
-                     oct_obj.getData( ),
+    gauss::make_dog(oct_obj.getData( ),
                      oct_obj.getDog( ),
                      oct_obj.getWidth(),
                      oct_obj.getHeight(),
