@@ -40,38 +40,41 @@ static void horiz( const Config& conf,
         assert( 0 );
     }
 
+    const int    span    =  h_gauss.dd.span[0];
+    const float* filter  = &h_gauss.dd.filter[0];
+
     for( int y=0; y<dst.getDimY(); y++ )
     {
         for( int x=0; x<dst.getDimX(); x++ )
         {
-            // Create octave-0 - level-0 from the input image.
-            const int write_x = x + 1;
-            const int write_y = y + 1;
+            const int write_x = x;
+            const int write_y = y;
             const int write_z = 0;
 
             const int dst_w = dst.getDimX();
             const int dst_h = dst.getDimY();
+            const int src_w = src.getDimX();
+            const int src_h = src.getDimY();
 
-            const int    span    =  h_gauss.dd.span[0];
-            const float* filter  = &h_gauss.dd.filter[0];
-            const float  read_x  = ( x + shift ) / dst_w;
-            const float  read_y  = ( y + shift ) / dst_h;
+            const float  read_x  = x * float(src_w) / float(dst_w);
+            const float  read_y  = y * float(src_h) / float(dst_h);
 
             float out = 0.0f;
 
-            #pragma unroll
             for( int offset = span; offset>0; offset-- ) {
                 const float& weight  = filter[offset];
-                const float  offrel = float(offset) / dst_w;
-                const float  v1 = src.getM( PlaneMode::NormalLinear, read_y, read_x - offrel );
-                const float  v2 = src.getM( PlaneMode::NormalLinear, read_y, read_x + offrel );
-                out += ( ( v1 + v2 ) * weight );
+                const float  offrel = float(offset) * float(src_w) / float(dst_w);
+                
+                const float  v1 = src.getM( PlaneMode::Linear, read_y, read_x - offrel );
+                const float  v2 = src.getM( PlaneMode::Linear, read_y, read_x + offrel );
+                out += (v1 + v2) * weight;;
+                
             }
+            
             const float& weight  = filter[0];
-            const float v3 = src.getM( PlaneMode::NormalLinear, read_y, read_x );
-            out += ( v3 * weight );
-
-            // POP_INFO2( conf.silent(), "span="<< span << " " << write_x << "," << write_y << "," << write_z << " is " << out * 255.f << " v3=" << v3 );
+            const float v3 = src.getM( PlaneMode::Linear, read_y, read_x );
+            out += v3 * weight;
+            
             dst.set( write_z, write_y, write_x, out * 255.0f);
         }
     }
@@ -80,7 +83,7 @@ static void horiz( const Config& conf,
 } // name'/home/griff/GIT/popsift-versions/popsift-cpp-port/build/dir-octave/pyramid-o-0-l-0.pgm' space normalizedSource
 
 void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base )
-{
+{    
     POP_INFO2( conf.silent(), "enter " << __PRETTY_FUNCTION__ );
 
     Octave&   oct_obj = _octaves[0];
