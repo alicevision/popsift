@@ -69,7 +69,10 @@ Plane2D_float& Image::getFloatPlane()
         {
             for( int x=0; x<getWidth(); x++ )
             {
-                const float f = _input_image_d.get( y, x ) / 255.0f;
+                uint8_t pixel = _input_image_d.get( y, x );
+                
+                const float f = (pixel - 0.5f) / 255.0f; 
+                
                 _hidden_conversion.set( y, x, f );
             }
         }
