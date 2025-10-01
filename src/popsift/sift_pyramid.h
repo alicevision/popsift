@@ -60,9 +60,9 @@ struct DevBuffers
     Feature*              features;
 };
 
-extern thread_local ExtremaCounters dct;
-extern thread_local ExtremaBuffers  dbuf;
-extern thread_local DevBuffers      dobuf;
+extern ExtremaCounters dct;
+extern ExtremaBuffers  dbuf;
+extern DevBuffers      dobuf;
 
 class Pyramid
 {

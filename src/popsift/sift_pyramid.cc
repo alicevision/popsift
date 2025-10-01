@@ -33,9 +33,9 @@ using namespace std;
 
 namespace popsift {
 
-thread_local ExtremaCounters dct;
-thread_local ExtremaBuffers dbuf;
-thread_local DevBuffers     dobuf;
+ExtremaCounters dct;
+ExtremaBuffers dbuf;
+DevBuffers     dobuf;
 
 void py_print_corner_float( Grid& g, float* img, uint32_t pitch, uint32_t height, uint32_t level)
 {
