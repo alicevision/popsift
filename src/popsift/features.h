@@ -10,6 +10,7 @@
 #include "common/simd_types.h"
 #include "sift_constants.h"
 
+#include <memory>
 #include <iostream>
 #include <vector>
 
@@ -39,23 +40,6 @@ struct Feature
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature );
 
-class FeaturesBase
-{
-    int          _num_ext;
-    int          _num_ori;
-
-public:
-    FeaturesBase( );
-    virtual~ FeaturesBase( );
-
-    inline int     size() const                { return _num_ext; }
-    inline int     getFeatureCount() const     { return _num_ext; }
-    inline int     getDescriptorCount() const  { return _num_ori; }
-
-    inline void    setFeatureCount( int num_ext )    { _num_ext = num_ext; }
-    inline void    setDescriptorCount( int num_ori ) { _num_ori = num_ori; }
-};
-
 /**
  * @brief This is a data structure that is returned to a calling program.
  * _ori is a transparent flat memory holding descriptors
@@ -67,60 +51,52 @@ public:
  *
  * Note: FeaturesHost is typedef'd to its older name Features
  */
-class FeaturesHost : public FeaturesBase
+class FeaturesHost
 {
-    Feature*     _ext;
-    Descriptor*  _ori;
+    int          _num_ext; // number of extrema
+    int          _num_ori; // number of descriptors
+    Feature*     _ext;     // array of extrema
+    Descriptor*  _ori;     // array of desciptors
+    int*         _rev;     // the reverse map from descriptors to extrema
+
+public:
+    typedef Feature*       F_iterator;
+    typedef const Feature* F_const_iterator;
 
 public:
     FeaturesHost( );
     FeaturesHost( int num_ext, int num_ori );
-    ~FeaturesHost( ) override;
-
-    typedef Feature*       F_iterator;
-    typedef const Feature* F_const_iterator;
-
-    inline F_iterator       begin()       { return _ext; }
-    inline F_const_iterator begin() const { return _ext; }
-    inline F_iterator       end()         { return &_ext[size()]; }
-    inline F_const_iterator end() const   { return &_ext[size()]; }
+    ~FeaturesHost( );
 
     void reset( int num_ext, int num_ori );
-    void pin( );
-    void unpin( );
 
+    inline int     size() const                { return _num_ext; }
+    inline int     getFeatureCount() const     { return _num_ext; }
+    inline int     getDescriptorCount() const  { return _num_ori; }
+
+private:
     inline Feature*    getFeatures()    { return _ext; }
     inline Descriptor* getDescriptors() { return _ori; }
+    inline int*        getReverseMap()  { return _rev; }
 
-    void print( std::ostream& ostr, bool write_as_uchar ) const;
-
-protected:
-    friend class Pyramid;
-};
-
-using Features = FeaturesHost;
-
-std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature );
-
-class FeaturesDev : public FeaturesBase
-{
-    Feature*     _ext;  // array of extrema
-    Descriptor*  _ori;  // array of desciptors
-    int*         _rev; // the reverse map from descriptors to extrema
+    void setReverseMap( const std::vector<int>& revmap );
 
 public:
-    FeaturesDev( );
-    FeaturesDev( int num_ext, int num_ori );
-    ~FeaturesDev( ) override;
+    inline void    setFeatureCount( int num_ext )    { _num_ext = num_ext; }
+    inline void    setDescriptorCount( int num_ori ) { _num_ori = num_ori; }
 
-    void reset( int num_ext, int num_ori );
+    Descriptor*       getDescriptor( int descIndex );
+    const Descriptor* getDescriptor( int descIndex ) const;
+
+    // Feature*          getFeatureForDescriptor( int descIndex );
+    const Feature*    getFeatureForDescriptor( int descIndex ) const;
 
     /** This function performs one-directional brute force matching on
      *  the GPU between the Descriptors in this objects and the object
      *  other.
      *  The resulting matches are printed.
      */
-    void match( FeaturesDev* other );
+    void match( std::unique_ptr<FeaturesHost> other );
 
     /** This function performs one-directional brute force matching on
      *  the GPU between the Descriptors in this objects and the object
@@ -134,21 +110,26 @@ public:
      *    int3.y is the index of the second best match in other->getDescriptors()
      *    int3.z indicates if the match is valid (non-zero) or not (zero)
      */
-    int3* matchAndReturn( FeaturesDev* other );
+    int3* matchAndReturn( std::unique_ptr<FeaturesHost>& other );
 
     /** This function takes as parameters that matches returned by
      *  matchAndReturn and releases that memory.
      */
     void freeMatches( int3* match_matrix );
 
-    inline Feature*    getFeatures()    { return _ext; }
-    inline Descriptor* getDescriptors() { return _ori; }
-    inline int*        getReverseMap()  { return _rev; }
+    inline F_iterator       begin()       { return _ext; }
+    inline F_const_iterator begin() const { return _ext; }
+    inline F_iterator       end()         { return &_ext[size()]; }
+    inline F_const_iterator end() const   { return &_ext[size()]; }
 
-    Descriptor*       getDescriptor( int descIndex );
-    const Descriptor* getDescriptor( int descIndex ) const;
-    Feature*          getFeatureForDescriptor( int descIndex );
-    const Feature*    getFeatureForDescriptor( int descIndex ) const;
+    void print( std::ostream& ostr, bool write_as_uchar ) const;
+
+protected:
+    friend class Pyramid;
 };
+
+using Features = FeaturesHost;
+
+std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature );
 
 } // namespace popsift

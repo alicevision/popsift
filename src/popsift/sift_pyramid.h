@@ -13,6 +13,7 @@
 #include "sift_constants.h"
 #include "sift_octave.h"
 
+#include <memory>
 #include <iostream>
 #include <vector>
 
@@ -51,18 +52,15 @@ struct ExtremaBuffers
     Descriptor*      desc;
     int              ext_allocated;
     int              ori_allocated;
-};
 
-struct DevBuffers
-{
-    int*                  feat_to_ext_map;
-    std::vector<Extremum> extrema;
     Feature*              features;
+    std::vector<Extremum> extrema;
+    std::vector<int>      feat_to_ext_map;
+    // int*                  feat_to_ext_map;
 };
 
 extern ExtremaCounters dct;
 extern ExtremaBuffers  dbuf;
-extern DevBuffers      dobuf;
 
 class Pyramid
 {
@@ -93,20 +91,20 @@ public:
     void resetDimensions( const Config& conf, int width, int height );
 
     /** step 1: load image and build pyramid */
-    void step1( const Config& conf, ImageBase* img );
+    void step1( const Config& conf, std::shared_ptr<ImageBase> img );
 
     /** step 2: find extrema, orientations and descriptor */
     void step2( const Config& conf );
 
     /** step 3: download descriptors */
-    FeaturesHost* get_descriptors( const Config& conf );
+    std::unique_ptr<FeaturesHost> get_descriptors( const Config& conf );
 
     /** step 3 (alternative): make copy of descriptors on device side */
-    FeaturesDev* clone_device_descriptors( const Config& conf );
+    std::unique_ptr<FeaturesHost> clone_device_descriptors( const Config& conf );
 
     void download_and_save_array( const Config& conf, const char* basename );
 
-    void save_descriptors( const Config& conf, FeaturesHost* features, const char* basename );
+    void save_descriptors( const Config& conf, std::unique_ptr<FeaturesHost>& features, const char* basename );
 
     inline int getNumOctaves() const { return _num_octaves; }
     inline int getNumLevels()  const { return _levels; }
@@ -114,8 +112,8 @@ public:
     inline Octave& getOctave(const int o){ return _octaves[o]; }
 
 private:
-    void horiz_from_input_image( const Config&    conf,
-                                 ImageBase*       base );
+    void horiz_from_input_image( const Config&              conf,
+                                 std::shared_ptr<ImageBase> base );
     void downscale_from_prev_octave( int octave );
 
     void horiz_from_prev_level( int octave, int level );
@@ -124,7 +122,7 @@ private:
     void dogs_from_blurred( int octave, int max_level );
 
     void reset_extrema_mgmt( );
-    void build_pyramid( const Config& conf, ImageBase* base );
+    void build_pyramid( const Config& conf, std::shared_ptr<ImageBase> base );
     void find_extrema( const Config& conf );
     void reallocExtrema( int numExtrema );
 
@@ -134,9 +132,11 @@ private:
     void descriptors( const Config& conf );
 
     int* getNumberOfBlocks( int octave );
-    void writeDescriptor( const Config& conf, std::ostream& ostr, FeaturesHost* features, bool really, bool with_orientation );
+    void writeDescriptor( const Config& conf, std::ostream& ostr,
+                          std::unique_ptr<FeaturesHost>& features,
+                          bool really, bool with_orientation );
 
-    void clone_device_descriptors_sub( const Config& conf, FeaturesDev* features );
+    void clone_device_descriptors_sub( const Config& conf, std::unique_ptr<FeaturesHost>& features );
 
 };
 

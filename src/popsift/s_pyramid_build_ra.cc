@@ -82,7 +82,7 @@ static void horiz( const Config& conf,
 
 } // name'/home/griff/GIT/popsift-versions/popsift-cpp-port/build/dir-octave/pyramid-o-0-l-0.pgm' space normalizedSource
 
-void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base )
+void Pyramid::horiz_from_input_image( const Config& conf, std::shared_ptr<ImageBase> base )
 {    
     POP_INFO2( conf.silent(), "enter " << __PRETTY_FUNCTION__ );
 

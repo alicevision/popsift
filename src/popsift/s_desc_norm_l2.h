@@ -45,7 +45,7 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc )
 
     // compute 1 / sqrt(sum)
     // norm = frsqrtf( norm );
-    norm = 1.0f / fsqrt( norm );
+    norm = 1.0f / std::sqrt( norm );
 
     float desc[128];
 
@@ -64,7 +64,7 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc )
     }
 
     // norm = frsqrtf( norm ); // inverse square root
-    norm = 1.0f / fsqrt( norm );
+    norm = 1.0f / std::sqrt( norm );
 
     // scale for the desired output scale (0-1, 0-256 og 0-512)
     norm = scalbnf( norm, h_consts.norm_multi );

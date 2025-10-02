@@ -478,18 +478,13 @@ void Pyramid::find_extrema( const Config& conf )
         int cols = oct_obj.getWidth();
         int rows = oct_obj.getHeight();
 
-        int3 g( cols, rows, _levels-3 );
-        // Grid g;
-        // g.setBlockDim( 32, 4 );
-        // g.setGridDim( grid_divide( cols, g.blockDim.x ), grid_divide( rows, g.blockDim.y ), _levels - 3 );
-
         int*  num_blocks      = extrema_num_blocks;
 
         switch( conf.getSiftMode() )
         {
         case Config::RefineInLevel :
                 find_extrema_in_dog<Config::RefineInLevel>
-                    ( g,
+                    ( int3(cols, rows, _levels-3),
                       oct_obj.getDog( ),
                       octave,
                       cols,
@@ -501,7 +496,7 @@ void Pyramid::find_extrema( const Config& conf )
                 break;
         default :
                 find_extrema_in_dog<Config::RefineInOctave>
-                    ( g,
+                    ( int3(cols, rows, _levels-3),
                       oct_obj.getDog( ),
                       octave,
                       cols,

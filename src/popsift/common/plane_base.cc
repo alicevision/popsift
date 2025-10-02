@@ -82,6 +82,7 @@ void PlaneBase::dealloc( )
     if (!_plane) return;
 
     free(_plane);
+    _plane = nullptr;
 }
 
 } // namespace popsift

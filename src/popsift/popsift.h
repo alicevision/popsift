@@ -7,13 +7,12 @@
  */
 #pragma once
 
-#include "common/sync_queue.h"
 #include "sift_conf.h"
 #include "sift_config.h"
 #include "sift_extremum.h"
 
+#include <memory>
 #include <exception>
-#include <future>
 #include <queue>
 #include <stack>
 #include <stdexcept>
@@ -25,21 +24,18 @@ namespace popsift
 {
     class ImageBase;
     class Pyramid;
-    class FeaturesBase;
     class FeaturesHost;
-    class FeaturesDev;
 
 }; // namespace popsift
 
 class SiftJob
 {
-    std::promise<popsift::FeaturesBase*> _p;
-    std::future <popsift::FeaturesBase*> _f;
+    std::unique_ptr<popsift::FeaturesHost> _promise;
+    std::unique_ptr<popsift::FeaturesHost> _f;
     int                 _w;
     int                 _h;
-    // unsigned char*      _imageData;
-    popsift::ImageBase* _img;
-    std::exception_ptr _err;
+    std::shared_ptr<popsift::ImageBase>    _img;
+    std::exception_ptr                     _err;
 
 public:
 
@@ -65,22 +61,15 @@ public:
     ~SiftJob( );
 
     /**
-     * @deprecated
-     * @see getHost()
-     */
-    popsift::FeaturesHost* get();
-    popsift::FeaturesBase* getBase();
-    /**
      * @brief
      * @return
      */
-    popsift::FeaturesHost* getHost();
-    popsift::FeaturesDev*  getDev();
+    std::unique_ptr<popsift::FeaturesHost>& get();
 
-    popsift::ImageBase* getImg();
+    std::shared_ptr<popsift::ImageBase> getImg();
 
     /** fulfill the promise */
-    void setFeatures( popsift::FeaturesBase* f );
+    void setFeatures( std::unique_ptr<popsift::FeaturesHost>& f );
 
     void setError(std::exception_ptr ptr);
 };
@@ -92,18 +81,12 @@ class PopSift
 {
     struct Pipe
     {
-        std::unique_ptr<std::thread>            _thread_stage1;
-        std::unique_ptr<std::thread>            _thread_stage2;
-        popsift::SyncQueue<SiftJob*>            _queue_stage1;
-        popsift::SyncQueue<SiftJob*>            _queue_stage2;
-        popsift::SyncQueue<popsift::ImageBase*> _unused;
+        // std::unique_ptr<std::thread>            _thread_stage1;
+        // std::unique_ptr<std::thread>            _thread_stage2;
+        std::queue<SiftJob*> _queue_stage1;
+        std::queue<SiftJob*> _queue_stage2;
 
-        popsift::Pyramid*                      _pyramid{nullptr};
-
-        /**
-         * @brief Release the allocated resources, if any.
-         */
-        void uninit();
+        popsift::Pyramid*    _pyramid{nullptr};
     };
 
 public:
@@ -159,11 +142,6 @@ public:
      *  constructor
      */
     bool configure( const popsift::Config& config, bool force = false );
-
-    /**
-     * @brief Release the resources.
-     */
-    void uninit( );
 
     /**
      *  @brief Check whether the current CUDA device can support the image
@@ -232,10 +210,15 @@ public:
                        int          h,
                        const float* imageData );
 
-    /**
-     * @deprecated
+    /* For the synchronous CPU variant:
+     * calls uploadImages and extractDownloadLoop
      */
-    inline void uninit( int /*pipe*/ ) { uninit(); }
+    void processExtract( );
+
+    /* For the synchronous CPU variant:
+     * calls uploadImages and matchPrepareLoop
+     */
+    void processMatch( );
 
     /**
      * @deprecated
@@ -249,12 +232,12 @@ public:
     /**
      * @deprecated
      */
-    inline popsift::FeaturesBase* execute( int /*pipe*/, const unsigned char* imageData )
+    inline std::unique_ptr<popsift::FeaturesHost> execute( int /*pipe*/, const unsigned char* imageData )
     {
         SiftJob* j = enqueue( _last_init_w, _last_init_h, imageData );
-        if( !j ) return nullptr;
-        popsift::FeaturesBase* f = j->getBase();
-        delete j;
+        std::unique_ptr<popsift::FeaturesHost> f;
+        f.swap( j->get() );
+        if(j) delete j;
         return f;
     }
 
@@ -262,7 +245,6 @@ private:
     bool applyConfiguration( bool force = false );
 
     bool private_init( int w, int h );
-    bool private_uninit( );
     void private_apply_scale_factor( int& w, int& h );
     void uploadImages( );
 
@@ -288,8 +270,5 @@ private:
     int             _last_init_w{}; /* to support deprecated interface */
     int             _last_init_h{}; /* to support deprecated interface */
     ImageMode       _image_mode;
-
-    /// whether the object is initialized
-    bool            _isInit{true};
 };
 

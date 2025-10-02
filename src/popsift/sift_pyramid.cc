@@ -35,7 +35,6 @@ namespace popsift {
 
 ExtremaCounters dct;
 ExtremaBuffers dbuf;
-DevBuffers     dobuf;
 
 void py_print_corner_float( Grid& g, float* img, uint32_t pitch, uint32_t height, uint32_t level)
 {
@@ -71,9 +70,9 @@ void Pyramid::download_and_save_array( const Config& conf, const char* basename 
 }
 
 /*
- * Note this is only for debug output. FeaturesHost has functions for final writing.
+ * Note this is only for debug output. Features has functions for final writing.
  */
-void Pyramid::save_descriptors( const Config& conf, FeaturesHost* features, const char* basename )
+void Pyramid::save_descriptors( const Config& conf, std::unique_ptr<FeaturesHost>& features, const char* basename )
 {
     struct stat st = { 0 };
     if (stat("dir-desc", &st) == -1) {
@@ -121,27 +120,27 @@ Pyramid::Pyramid( const Config& config,
 
     int sz = _num_octaves * h_consts.max_extrema;
 
-    // dobuf.i_ext_dat[0] = new InitialExtremum[sz];
-    // dobuf.i_ext_off[0] = new int[sz];
+    // dbuf.i_ext_dat[0] = new InitialExtremum[sz];
+    // dbuf.i_ext_off[0] = new int[sz];
     //
     // for (int o = 1; o<_num_octaves; o++) {
-        // dobuf.i_ext_dat[o] = dobuf.i_ext_dat[0] + (o*h_consts.max_extrema);
-        // dobuf.i_ext_off[o] = dobuf.i_ext_off[0] + (o*h_consts.max_extrema);
+        // dbuf.i_ext_dat[o] = dbuf.i_ext_dat[0] + (o*h_consts.max_extrema);
+        // dbuf.i_ext_off[o] = dbuf.i_ext_off[0] + (o*h_consts.max_extrema);
     // }
     // for (int o = _num_octaves; o<MAX_OCTAVES; o++) {
-        // dobuf.i_ext_dat[o] = nullptr;
-        // dobuf.i_ext_off[o] = nullptr;
+        // dbuf.i_ext_dat[o] = nullptr;
+        // dbuf.i_ext_off[o] = nullptr;
     // }
 
     sz = h_consts.max_extrema;
-    // dobuf.extrema  = new Extremum[sz];
-    dobuf.features = new Feature[sz];
+    // dbuf.extrema  = new Extremum[sz];
+    dbuf.features = new Feature[sz];
     dbuf.ext_allocated = sz;
 
     sz = max( 2 * h_consts.max_extrema, h_consts.max_orientations );
-    dbuf.desc             = new Descriptor[sz];
-    dobuf.feat_to_ext_map = new int[sz];
-    dbuf.ori_allocated    = sz;
+    dbuf.desc            = new Descriptor[sz];
+    // dbuf.feat_to_ext_map = new int[sz];
+    dbuf.ori_allocated   = sz;
 }
 
 void Pyramid::resetDimensions( const Config& conf, int width, int height )
@@ -161,24 +160,24 @@ void Pyramid::reallocExtrema( int numExtrema )
     if( numExtrema > dbuf.ext_allocated ) {
         numExtrema = ( ( numExtrema + 1024 ) & ( ~(1024-1) ) );
 
-        // delete [] dobuf.extrema;
-        dobuf.extrema.clear();
+        // delete [] dbuf.extrema;
+        dbuf.extrema.clear();
 
-        delete [] dobuf.features;
+        delete [] dbuf.features;
 
         int sz = numExtrema;
-        // dobuf.extrema  = new Extremum[sz];
-        dobuf.features = new Feature[sz];
+        // dbuf.extrema  = new Extremum[sz];
+        dbuf.features = new Feature[sz];
         dbuf.ext_allocated = sz;
 
         numExtrema *= 2;
         if( numExtrema > dbuf.ori_allocated ) {
             delete [] dbuf.desc;
-            delete [] dobuf.feat_to_ext_map;
+            dbuf.feat_to_ext_map.clear(); // delete [] dbuf.feat_to_ext_map;
 
             sz = numExtrema;
-            dbuf.desc             = new Descriptor[sz];
-            dobuf.feat_to_ext_map = new int[sz];
+            dbuf.desc            = new Descriptor[sz];
+            // dbuf.feat_to_ext_map = new int[sz];
             dbuf.ori_allocated = sz;
         }
     }
@@ -188,17 +187,17 @@ Pyramid::~Pyramid()
 {
     delete [] _d_extrema_num_blocks;
 
-    // delete [] dobuf.i_ext_dat[0];
-    // delete [] dobuf.i_ext_off[0];
-    delete [] dobuf.features;
-    // delete [] dobuf.extrema;
+    // delete [] dbuf.i_ext_dat[0];
+    // delete [] dbuf.i_ext_off[0];
+    delete [] dbuf.features;
+    // delete [] dbuf.extrema;
     delete [] dbuf.desc;
-    delete [] dobuf.feat_to_ext_map;
+    dbuf.feat_to_ext_map.clear(); // delete [] dbuf.feat_to_ext_map;
 
     delete[] _octaves;
 }
 
-void Pyramid::step1( const Config& conf, popsift::ImageBase* img )
+void Pyramid::step1( const Config& conf, std::shared_ptr<popsift::ImageBase> img )
 {
     POP_INFO2( conf.silent(), "enter " << __PRETTY_FUNCTION__ );
 
@@ -229,14 +228,14 @@ void Pyramid::step2( const Config& conf )
 void prep_features(Descriptor* descriptor_base, int up_fac )
 {
     printf("Prep features called\n");
-    if (!dobuf.features) {
-        std::cerr << "[ERROR] dobuf.features is not allocated!" << std::endl;
+    if (!dbuf.features) {
+        std::cerr << "[ERROR] dbuf.features is not allocated!" << std::endl;
         return;
     }
 
     for (int offset = 0; offset < dct.extrema_count_total; ++offset) {
-        const Extremum& ext = dobuf.extrema[offset];
-        Feature& fet = dobuf.features[offset];
+        const Extremum& ext = dbuf.extrema[offset];
+        Feature& fet = dbuf.features[offset];
 
         const int   octave  = ext.octave;
         const float xpos    = ext.xpos  * powf(2.0f, float(octave - up_fac));
@@ -263,11 +262,11 @@ void prep_features(Descriptor* descriptor_base, int up_fac )
     }
 }
 
-FeaturesHost* Pyramid::get_descriptors( const Config& conf )
+std::unique_ptr<FeaturesHost> Pyramid::get_descriptors( const Config& conf )
 {
     const float up_fac = conf.getUpscaleFactor();
 
-    FeaturesHost* features = new FeaturesHost( dct.extrema_count_total, dct.ori_total );
+    std::unique_ptr<FeaturesHost> features( new FeaturesHost( dct.extrema_count_total, dct.ori_total ) );
 
     if( dct.extrema_count_total == 0 || dct.ori_total == 0 )
     {
@@ -277,41 +276,47 @@ FeaturesHost* Pyramid::get_descriptors( const Config& conf )
 
     prep_features(features->getDescriptors(), up_fac );
 
-    features->pin( );
     memcpy( features->getFeatures(),
-            dobuf.features,
+            dbuf.features,
             dct.extrema_count_total * sizeof(Feature) );
 
     memcpy( features->getDescriptors(),
             dbuf.desc,
             dct.ori_total * sizeof(Descriptor) );
-    features->unpin( );
 
     return features;
 }
 
-void Pyramid::clone_device_descriptors_sub( const Config& conf, FeaturesDev* features )
+void Pyramid::clone_device_descriptors_sub( const Config& conf, std::unique_ptr<FeaturesHost>& features )
 {
     const float up_fac = conf.getUpscaleFactor();
 
     prep_features( features->getDescriptors(), up_fac );
 
     memcpy( features->getFeatures(),
-            dobuf.features,
+            dbuf.features,
             dct.extrema_count_total * sizeof(Feature) );
 
     memcpy( features->getDescriptors(),
             dbuf.desc,
             dct.ori_total * sizeof(Descriptor) );
 
-    memcpy( features->getReverseMap(),
-            dobuf.feat_to_ext_map,
-            dct.ori_total * sizeof(int) );
+#if 1
+    if( dbuf.feat_to_ext_map.size() != dct.ori_total )
+    {
+        std::cerr << "feature to ext map has bad size " << dbuf.feat_to_ext_map.size()
+                  << ", should be number of orientations " << dct.ori_total
+                  << std::endl;
+        exit( -1 );
+    }
+#endif
+    features->setReverseMap( dbuf.feat_to_ext_map );
+    // memcpy( features->getReverseMap(), dbuf.feat_to_ext_map, dct.ori_total * sizeof(int) );
 }
 
-FeaturesDev* Pyramid::clone_device_descriptors( const Config& conf )
+std::unique_ptr<FeaturesHost> Pyramid::clone_device_descriptors( const Config& conf )
 {
-    FeaturesDev* features = new FeaturesDev( dct.extrema_count_total, dct.ori_total );
+    std::unique_ptr<FeaturesHost> features( new FeaturesHost( dct.extrema_count_total, dct.ori_total ) );
 
     clone_device_descriptors_sub( conf, features );
 
@@ -333,7 +338,7 @@ int* Pyramid::getNumberOfBlocks( int octave )
 /*
  * Note this is only for debug output. FeaturesHost has functions for final writing.
  */
-void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, FeaturesHost* features, bool really, bool with_orientation )
+void Pyramid::writeDescriptor( const Config& conf, ostream& ostr, std::unique_ptr<FeaturesHost>& features, bool really, bool with_orientation )
 {
     if( features->getFeatureCount() == 0 ) return;
 

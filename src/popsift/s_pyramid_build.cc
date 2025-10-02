@@ -111,10 +111,10 @@ void Pyramid::dogs_from_blurred( int octave, int max_level )
 /*************************************************************
  * V11: host side
  *************************************************************/
-void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
+void Pyramid::build_pyramid( const Config& conf, std::shared_ptr<ImageBase> base )
 {
     POP_INFO2( conf.silent(), "enter " << __PRETTY_FUNCTION__ );
-    POP_INFO2( conf.silent(), "is image NULL? " << (base->isNull() ? "yes" : "no") );
+    POP_INFO2( conf.silent(), "is image NULL? " << ( base->isNull() ? "yes" : "no") );
 
     for( uint32_t octave=0; octave<_num_octaves; octave++ )
     {

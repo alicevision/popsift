@@ -236,7 +236,13 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 
 void read_job( SiftJob* job, bool really_write )
 {
-    popsift::Features* feature_list = job->get();
+    std::unique_ptr<popsift::FeaturesHost>& feature_list = job->get();
+    if( !feature_list )
+    {
+        cerr << "Job contains an empty descriptor list" << endl;
+        return;
+    }
+
     cerr << "Number of feature points: " << feature_list->getFeatureCount()
          << " number of feature descriptors: " << feature_list->getDescriptorCount()
          << endl;
@@ -245,7 +251,6 @@ void read_job( SiftJob* job, bool really_write )
         std::ofstream of( "output-features.txt" );
         feature_list->print( of, write_as_uchar );
     }
-    delete feature_list;
 }
 
 int main(int argc, char **argv)
@@ -292,6 +297,8 @@ int main(int argc, char **argv)
         jobs.push( job );
     }
 
+    PopSift.processExtract();
+
     while( !jobs.empty() )
     {
         SiftJob* job = jobs.front();
@@ -301,8 +308,6 @@ int main(int argc, char **argv)
             delete job;
         }
     }
-
-    PopSift.uninit( );
 
     return EXIT_SUCCESS;
 }

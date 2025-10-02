@@ -221,11 +221,13 @@ int main(int argc, char **argv)
     SiftJob* lJob = process_image( lFile, PopSift );
     SiftJob* rJob = process_image( rFile, PopSift );
 
-    popsift::FeaturesDev* lFeatures = lJob->getDev();
+    PopSift.processMatch( );
+
+    std::unique_ptr<popsift::FeaturesHost>& lFeatures = lJob->get();
     cout << "Number of features:    " << lFeatures->getFeatureCount() << endl;
     cout << "Number of descriptors: " << lFeatures->getDescriptorCount() << endl;
 
-    popsift::FeaturesDev* rFeatures = rJob->getDev();
+    std::unique_ptr<popsift::FeaturesHost>& rFeatures = rJob->get();
     cout << "Number of features:    " << rFeatures->getFeatureCount() << endl;
     cout << "Number of descriptors: " << rFeatures->getDescriptorCount() << endl;
 
@@ -246,11 +248,6 @@ int main(int argc, char **argv)
     }
 
     lFeatures->freeMatches( matches );
-
-    delete lFeatures;
-    delete rFeatures;
-
-    PopSift.uninit( );
 
     return EXIT_SUCCESS;
 }

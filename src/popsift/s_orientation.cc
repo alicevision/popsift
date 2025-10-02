@@ -181,11 +181,11 @@ void compute_all_orientations( const int            extremum_index,
         debug_ostr5 << std::endl;
     }
 
-    POP_INFO2( false, debug_ostr.str() );
-    POP_INFO2( false, debug_ostr2.str() );
-    POP_INFO2( false, debug_ostr3.str() );
-    POP_INFO2( false, debug_ostr4.str() );
-    POP_INFO2( false, debug_ostr5.str() );
+    // POP_INFO2( false, debug_ostr.str() );
+    // POP_INFO2( false, debug_ostr2.str() );
+    // POP_INFO2( false, debug_ostr3.str() );
+    // POP_INFO2( false, debug_ostr4.str() );
+    // POP_INFO2( false, debug_ostr5.str() );
 
     std::vector<float> sm_hist(ORI_NBINS);
 
@@ -222,6 +222,7 @@ void compute_all_orientations( const int            extremum_index,
 #endif // not WITH_VLFEAT_SMOOTHING
 
     // debug output block: smoothed histogram
+#if 0
     {
         std::ostringstream debug_ostr;
         debug_ostr << "smoothed histogram: " << setprecision(4);
@@ -230,6 +231,7 @@ void compute_all_orientations( const int            extremum_index,
                    std::ostream_iterator<float>(debug_ostr, " ") );
         POP_INFO2( false, debug_ostr.str() );
     }
+#endif
 
     std::vector<float> yval         (ORI_NBINS);
     std::vector<float> refined_angle(ORI_NBINS);
@@ -267,6 +269,7 @@ void compute_all_orientations( const int            extremum_index,
         yval[bin]          = predicate ?  -(num*num) / (4.0f * denB) + sm_hist[prev] : -INFINITY;
     }
 
+#if 0
     // debug output block: prev + newbin ???
     {
         std::ostringstream debug_ostr;
@@ -281,7 +284,7 @@ void compute_all_orientations( const int            extremum_index,
                    std::ostream_iterator<float>(debug_ostr, " ") );
         POP_INFO2( false, debug_ostr.str() );
     }
-
+#endif
 
     std::vector<int> best_index(ORI_NBINS);
 
@@ -298,6 +301,7 @@ void compute_all_orientations( const int            extremum_index,
                    return ( yval[l_idx] > yval[r_idx] );
                } );
 
+#if 0
     // debug output block
     {
         std::ostringstream debug_ostr;
@@ -308,7 +312,7 @@ void compute_all_orientations( const int            extremum_index,
         debug_ostr << std::endl;
         POP_INFO2( false, debug_ostr.str() );
     }
-
+#endif
 
     Extremum ext;
 
@@ -341,15 +345,17 @@ void compute_all_orientations( const int            extremum_index,
         }
     }
 
+#if 1
     // the selected angles
     {
         std::ostringstream debug_ostr;
         debug_ostr << "Result for the pixel at ( " << iext.xpos << "," << iext.ypos << "," << iext.lpos << ") is : " << angles << " selected angles: ";
         for( int i=0; i<angles; i++ )
-            debug_ostr << ext.orientation[i] / M_PI2 * 360.0f << " ";
+            debug_ostr << std::fixed << std::setprecision(3) << ext.orientation[i] / M_PI2 * 360.0f << " ";
         debug_ostr << std::endl;
         POP_INFO2( false, debug_ostr.str() );
     }
+#endif
 
     ext.xpos    = iext.xpos;
     ext.ypos    = iext.ypos;
@@ -358,7 +364,7 @@ void compute_all_orientations( const int            extremum_index,
     ext.octave  = octave;
     ext.num_ori = angles;
 
-    dobuf.extrema.emplace_back( ext );
+    dbuf.extrema.emplace_back( ext );
 }
 
 }; // namespace popsift
@@ -427,26 +433,25 @@ void ori_prefix_sum( const int num_octaves )
         POP_FATAL("Calling " << __FUNCTION__ << " with " << dct.extrema_count_total << " found extrema");
     }
 
-    std::vector<Extremum>& all_extrema = dobuf.extrema;
+    std::vector<Extremum>& all_extrema = dbuf.extrema;
 
     assert( all_extrema.size() == dct.extrema_count_total );
 
     vector<int> ori_count;
-    vector<int> ori_offset( dct.extrema_count_total+1 );
 
     /* collect the numbers of orientation for every extremum in ori_count */
     // for( int i=0; i<dct.extrema_count_total; i++ )
     // {
         // ori_count[i] = all_extrema.num_ori;
     // }
-    std::ostringstream ostr;
-    ostr << "Number of orientations:";
+    std::ostringstream debug_ostr;
+    debug_ostr << "Number of orientations:";
     for( auto ext : all_extrema )
     {
-        ostr << ext.num_ori << " ";
+        debug_ostr << ext.num_ori << " ";
         ori_count.push_back( ext.num_ori );
     }
-    POP_INFO2( false, ostr.str() );
+    POP_INFO2( false, debug_ostr.str() );
 
     if( ori_count.size() != dct.extrema_count_total )
     {
@@ -457,12 +462,30 @@ void ori_prefix_sum( const int num_octaves )
      * then compute an inclusive prefix sum for the values in ori_count into
      * the target array ori_offset, but starting at offset 1 instead of 0.
      * The last entry of ori_offset is the total number of orientations, which
-     * we also want to keep. */
+     * we also want to keep.
+     */
+    vector<int> ori_offset( dct.extrema_count_total+1 );
     ori_offset[0] = 0;
-    std::inclusive_scan( &ori_count[0],
-                         &ori_count[dct.extrema_count_total-1],
-                         &ori_offset[1] );
+    std::inclusive_scan( ori_count.begin(), ori_count.end(), &ori_offset[1] );
     const int total_ori = ori_offset[dct.extrema_count_total];
+#if 1
+    { 
+        ostringstream debug_ostr1;
+        debug_ostr1 << "Orientation count array: ";
+        for( int i=0; i<ori_count.size(); i++ )
+            debug_ostr1 << ori_count[i] << " ";
+
+        ostringstream debug_ostr2;
+        debug_ostr2 << "Orientation offset array: ";
+        for( int i=0; i<ori_offset.size(); i++ )
+            debug_ostr2 << ori_offset[i] << " ";
+        debug_ostr2 << "(prefix sum of count aray)";
+
+        POP_INFO2( false, debug_ostr1.str() );
+        POP_INFO2( false, debug_ostr2.str() );
+    }
+#endif
+    POP_INFO2( false, "Total number of orientations: " << total_ori );
 
     for( int i=0; i<dct.extrema_count_total; i++ )
     {
@@ -471,41 +494,73 @@ void ori_prefix_sum( const int num_octaves )
 
     /* For every orientation (there are total_ori of them), store the extremum
      * to which they belong in the array feat_to_ext_map. */
-    int* feat_to_ext_map = dobuf.feat_to_ext_map;
+    std::vector<int>& feat_to_ext_map = dbuf.feat_to_ext_map;
 
-    int ftem = 0;
+    if( dbuf.feat_to_ext_map.size() != 0 )
+    {
+        POP_FATAL( "Programming error in " << __FILE__ << ":" << __LINE__ << ": reverse map size should be 0 but it is " << dbuf.feat_to_ext_map.size() );
+    }
+
     for( int extr=0; extr<dct.extrema_count_total; extr++ )
     {
-        for( int ori=0; ori<ori_offset[extr+1]; ori++ )
+        for( int ori=0; ori<ori_count[extr]; ori++ )
         {
-            feat_to_ext_map[ftem++] = extr;
+            feat_to_ext_map.push_back( extr );
         }
     }
 
+#if 1
+    {
+        ostringstream debug_ostr;
+        debug_ostr << "Reverse map from orientation index to extremum index: ";
+        for( auto map : feat_to_ext_map )
+        {
+            debug_ostr << map << " ";
+        }
+        POP_INFO2( false, debug_ostr.str() );
+    }
+#endif
+
     /* Fill the array ori_ct with the number of orientations that belong
-     * the octave given by the index. */
+     * to the octave given by the index. */
     for( int o=0; o<MAX_OCTAVES; o++ ) {
         if( dct.extrema_count_per_octave[o] == 0 ) {
             dct.ori_ct[o] = 0;
         } else {
             int fe = dct.extrema_count_prefix_sum[o  ];   /* first extremum for this octave */
             int le = dct.extrema_count_prefix_sum[o+1]-1; /* last  extremum for this octave */
-            int lo_ori_index = dobuf.extrema[fe].idx_ori;
-            int num_ori      = dobuf.extrema[le].num_ori;
-            int hi_ori_index = dobuf.extrema[le].idx_ori + num_ori;
+            int lo_ori_index = dbuf.extrema[fe].idx_ori;
+            int num_ori      = dbuf.extrema[le].num_ori;
+            int hi_ori_index = dbuf.extrema[le].idx_ori + num_ori;
             dct.ori_ct[o] = hi_ori_index - lo_ori_index;
         }
     }
 
     /* Like above, compute the exclusive prefix sum of all orientations
      * in ori_ps. */
+#if 1
+    std::cerr << "Orientations by octave (dct.ori_ct): ";
+    for( int i=0; i<MAX_OCTAVES; i++ ) std::cerr << dct.ori_ct[i] << " ";
+    std::cerr << std::endl;
+#endif
+
     std::copy( &dct.ori_ct[0],
                &dct.ori_ct[MAX_OCTAVES],
                &dct.ori_ps[0] );
+#if 1
+    std::cerr << "Orientations by octave (dct.ori_ps): ";
+    for( int i=0; i<MAX_OCTAVES; i++ ) std::cerr << dct.ori_ps[i] << " ";
+    std::cerr << std::endl;
+#endif
     std::exclusive_scan( &dct.ori_ps[0],
                          &dct.ori_ps[MAX_OCTAVES],
                          &dct.ori_ps[0],
                          0 );
+#if 1
+    std::cerr << "Exclusive prefix sum of orientations (dct.ori_ps): ";
+    for( int i=0; i<MAX_OCTAVES; i++ ) std::cerr << dct.ori_ps[i] << " ";
+    std::cerr << std::endl;
+#endif
 
     /* Store the total number of orientations and the total number of
      * extrema as well. */

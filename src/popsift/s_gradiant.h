@@ -63,10 +63,10 @@ void get_gradiant32( float&               grad,
                      const Plane2D_float& layer,
                      const int            level )
 {
-    const float dx = layer.get( level, y  , x+1 );
+    const float dx = layer.get( level, y  , x+1 )
                    - layer.get( level, y  , x-1 );
 
-    const float dy = layer.get( level, y+1, x   );
+    const float dy = layer.get( level, y+1, x   )
                    - layer.get( level, y-1, x   );
 
     grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);

@@ -56,10 +56,6 @@ void Pyramid::descriptors( const Config& conf )
         return;
     }
 
-    Grid g;
-    g.setGridDim( grid_divide( dct.ori_total, 32 ) );
-    g.setBlockDim( 32, 32, 1 );
-
     if( conf.getUseRootSift() ) {
         normalize_histogram<NormalizeRootSift>( );
     } else {
