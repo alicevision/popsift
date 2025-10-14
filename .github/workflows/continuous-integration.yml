@@ -15,8 +15,11 @@ on:
       - '**.md'
       - '**.rst'
       - 'docs/**'
+  # Allows manual triggering from GitHub UI or CLI
   workflow_dispatch:
-    # Allows manual triggering from GitHub UI or CLI
+  # Weekly build every Monday at 8 UTC
+  schedule:
+    - cron: "0 8 * * 1" 
 
 jobs:
   build-linux:
