@@ -16,7 +16,7 @@ else()
       STRING "Which CUDA CCs to support: native, all, all-major or an explicit list delimited by semicolons")
 endif()
 
-project(PopSift VERSION 1.0.0 LANGUAGES CXX CUDA)
+project(PopSift VERSION 0.10.0 LANGUAGES CXX CUDA)
 
 # Policy to support CUDA as a first-order language for CMake.
 # Since CMake 3.18. See https://cmake.org/cmake/help/latest/policy/CMP0104.html
