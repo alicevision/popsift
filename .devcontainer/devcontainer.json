@@ -1,0 +1,13 @@
+{
+  "name": "popsift",
+  "image": "alicevision/popsift-deps:cuda12.1.0-ubuntu22.04",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ]
+    }
+  },
+  "remoteUser": "root"
+}
