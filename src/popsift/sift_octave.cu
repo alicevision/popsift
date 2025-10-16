@@ -120,6 +120,10 @@ void Octave::download_and_save_array( const char* basename, int octave )
         mkdir("dir-octave", 0700);
     }
 
+    if (stat("dir-interm", &st) == -1) {
+        mkdir("dir-interm", 0700);
+    }
+
     if (stat("dir-octave-dump", &st) == -1) {
         mkdir("dir-octave-dump", 0700);
     }
@@ -158,6 +162,22 @@ void Octave::download_and_save_array( const char* basename, int octave )
         ostringstream ostr2;
         ostr2 << "dir-octave-dump/" << basename << "-o-" << octave << "-l-" << l << ".dump";
         popsift::dump_plane2Dfloat(ostr2.str().c_str(), false, p );
+    }
+
+    memset( &s, 0, sizeof(cudaMemcpy3DParms) );
+    s.srcArray = _intm;
+    s.dstPtr   = make_cudaPitchedPtr( array, width * sizeof(float), width, height );
+    s.extent   = make_cudaExtent( width, height, _levels );
+    s.kind     = cudaMemcpyDeviceToHost;
+    err = cudaMemcpy3D(&s);
+    POP_CUDA_FATAL_TEST(err, "cudaMemcpy3D failed: ");
+
+    for( int l = 0; l<_levels; l++ ) {
+        Plane2D_float p(width, height, &array[l*width*height], width * sizeof(float));
+
+        ostringstream ostr;
+        ostr << "dir-interm/" << basename << "-o-" << octave << "-l-" << l << ".pgm";
+        popsift::write_plane2Dunscaled( ostr.str().c_str(), false, p );
     }
 
     memset( &s, 0, sizeof(cudaMemcpy3DParms) );
