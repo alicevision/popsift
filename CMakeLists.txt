@@ -1,10 +1,41 @@
 cmake_minimum_required(VERSION 3.24)
 
-# This must be called before project() or cmake sets it to the oldest non-deprecated CC
-# "all" and "all-major" work for Intel and perhaps for ARM with discrete GPUs, but not Tegra and Jetson.
 project(PopSift VERSION 1.0.0 LANGUAGES CXX)
 
-# Set build path as a folder named as the platform (linux, windows, darwin...) plus the processor type
+# ============================================================================
+# CRITICAL: Force Intel DPC++ Compiler Check
+# ============================================================================
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM" AND 
+   NOT CMAKE_CXX_COMPILER MATCHES "icpx" AND 
+   NOT CMAKE_CXX_COMPILER MATCHES "dpcpp")
+    message(FATAL_ERROR 
+        "\n=================================================================\n"
+        "ERROR: This project requires Intel DPC++ compiler (icpx)!\n"
+        "Current compiler: ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER})\n\n"
+        "Please reconfigure with:\n"
+        "  cmake .. -DCMAKE_CXX_COMPILER=icpx -DCMAKE_C_COMPILER=icx\n"
+        "=================================================================\n")
+endif()
+
+message(STATUS "✓ Using Intel DPC++ compiler: ${CMAKE_CXX_COMPILER}")
+
+# ============================================================================
+# SYCL Compiler Setup (BEFORE C++ STANDARD)
+# ============================================================================
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsycl")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsycl")
+
+# ============================================================================
+# C++ Standard - Required for SYCL (MUST BE AFTER -fsycl FLAG)
+# ============================================================================
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Add explicit -std=c++17 flag AFTER -fsycl
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+
+# Set build path
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 
@@ -22,17 +53,14 @@ endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
-# set(CMAKE_BUILD_TYPE Debug)
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release)
   message(STATUS "Build type not set, building in Release configuration")
-  # Set the possible values of build type for cmake-gui
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 else()
   message(STATUS "Building in ${CMAKE_BUILD_TYPE} configuration")
 endif()
 
-# ensure the proper linker flags when building the static version on MSVC
 if(MSVC AND NOT BUILD_SHARED_LIBS)
   foreach(config "DEBUG" "RELEASE" "MINSIZEREL" "RELWITHDEBINFO")
     string(REPLACE /MD /MT CMAKE_C_FLAGS_${config} "${CMAKE_C_FLAGS_${config}}")
@@ -42,34 +70,16 @@ if(MSVC AND NOT BUILD_SHARED_LIBS)
   endforeach()
 endif()
 
-# ==============================================================================
-# GNUInstallDirs CMake module
-# - Define GNU standard installation directories
-# - Provides install directory variables as defined by the GNU Coding Standards.
-# ==============================================================================
 include(GNUInstallDirs)
-
 
 if(BUILD_SHARED_LIBS)
   message(STATUS "BUILD_SHARED_LIBS ON")
-
-  # Auto-build dll exports on Windows
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 else()
   message(STATUS "BUILD_SHARED_LIBS OFF")
 endif()
 
-# Require threads because of std::thread.
 find_package(Threads REQUIRED)
-
-set(PopSift_CXX_STANDARD 20)
-
-if(NOT MSVC)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++${PopSift_CXX_STANDARD}")
-endif()
-set(CMAKE_CXX_STANDARD ${PopSift_CXX_STANDARD})
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 
 if(NOT PopSift_USE_GRID_FILTER)
   message(STATUS "Disabling grid filter compilation")
@@ -94,14 +104,12 @@ if(PopSift_USE_TEST_CMD)
   add_subdirectory(testScripts)
 endif()
 
-########### Add uninstall target ###############
 CONFIGURE_FILE(
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
   "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake"
   IMMEDIATE @ONLY)
 ADD_CUSTOM_TARGET(uninstall
   "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake")
-
 
 ######################################
 # SUMMARY
@@ -110,7 +118,10 @@ message("\n")
 message("******************************************")
 message("Building configuration:\n")
 message(STATUS "PopSift version: " ${PROJECT_VERSION})
+message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
+message(STATUS "C++ Standard: " ${CMAKE_CXX_STANDARD})
+message(STATUS "CXX Flags: ${CMAKE_CXX_FLAGS}")
 message(STATUS "Build Shared libs: " ${BUILD_SHARED_LIBS})
 message(STATUS "Build examples: " ${PopSift_BUILD_EXAMPLES})
 message(STATUS "Build documentation: " ${PopSift_BUILD_DOCS})

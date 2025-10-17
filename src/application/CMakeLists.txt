@@ -50,17 +50,17 @@ if(WIN32)
 endif(WIN32)
 
 set(PD_INCLUDE_DIRS    ${Boost_INCLUDE_DIRS})
-set(PD_LINK_LIBS       ${Boost_LIBRARIES} ${CUDA_CUDADEVRT_LIBRARY})
+set(PD_LINK_LIBS       ${Boost_LIBRARIES})
 
-find_package(OpenImageIO)
-
-if(OpenImageIO_FOUND)
-  message(STATUS "OpenImageIO found")
-  set(PD_COMPILE_OPTIONS "-DUSE_OIIO")
-else()
-  message(WARNING "OpenImageIO not found -- Falling back to pgmread")
+# Disable OpenImageIO - incompatible with Intel SYCL compiler
+# find_package(OpenImageIO)
+# if(OpenImageIO_FOUND)
+#   message(STATUS "OpenImageIO found")
+#   set(PD_COMPILE_OPTIONS "-DUSE_OIIO")
+# else()
+  message(WARNING "OpenImageIO disabled (incompatible with SYCL) -- Using pgmread")
   set(PD_COMPILE_OPTIONS "" )
-endif()
+# endif()
 
 #############################################################
 # popsift-demo
@@ -68,14 +68,14 @@ endif()
 
 add_executable(popsift-demo  main.cpp pgmread.cpp pgmread.h)
 
-set_property(TARGET popsift-demo PROPERTY CXX_STANDARD 11)
+set_property(TARGET popsift-demo PROPERTY CXX_STANDARD 17)
+set_property(TARGET popsift-demo PROPERTY CXX_STANDARD_REQUIRED ON)
+set_property(TARGET popsift-demo PROPERTY CXX_EXTENSIONS OFF)
 
-target_compile_options(popsift-demo PRIVATE ${PD_COMPILE_OPTIONS} )
-target_include_directories(popsift-demo PUBLIC PopSift::popsift
-	                                       OpenImageIO::OpenImageIO ${PD_INCLUDE_DIRS})
+target_compile_options(popsift-demo PRIVATE ${PD_COMPILE_OPTIONS})
+target_include_directories(popsift-demo PUBLIC ${PD_INCLUDE_DIRS})
 target_compile_definitions(popsift-demo PRIVATE ${Boost_DEFINITIONS})
-target_link_libraries(popsift-demo PUBLIC PopSift::popsift
-	                                  OpenImageIO::OpenImageIO ${PD_LINK_LIBS})
+target_link_libraries(popsift-demo PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 
 
 #############################################################
@@ -84,17 +84,17 @@ target_link_libraries(popsift-demo PUBLIC PopSift::popsift
 
 add_executable(popsift-match match.cpp pgmread.cpp pgmread.h)
 
-set_property(TARGET popsift-match PROPERTY CXX_STANDARD 11)
+set_property(TARGET popsift-match PROPERTY CXX_STANDARD 17)
+set_property(TARGET popsift-match PROPERTY CXX_STANDARD_REQUIRED ON)
+set_property(TARGET popsift-match PROPERTY CXX_EXTENSIONS OFF)
 
-target_compile_options(popsift-match PRIVATE ${PD_COMPILE_OPTIONS} )
-target_include_directories(popsift-match PUBLIC PopSift::popsift
-	                                        OpenImageIO::OpenImageIO ${PD_INCLUDE_DIRS})
+target_compile_options(popsift-match PRIVATE ${PD_COMPILE_OPTIONS})
+target_include_directories(popsift-match PUBLIC ${PD_INCLUDE_DIRS})
 target_compile_definitions(popsift-match PRIVATE ${Boost_DEFINITIONS})
-target_link_libraries(popsift-match PUBLIC PopSift::popsift
-	                                   OpenImageIO::OpenImageIO ${PD_LINK_LIBS})
+target_link_libraries(popsift-match PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 
 #############################################################
 # installation
 #############################################################
 
-install(TARGETS popsift-demo DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS popsift-demo popsift-match DESTINATION ${CMAKE_INSTALL_BINDIR})
