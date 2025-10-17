@@ -17,6 +17,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <memory> // for shared pointer
+#include <sycl/sycl.hpp>
 
 #include "debug_macros.h"
 #include "plane_base.h"
@@ -81,8 +82,28 @@ public:
         _ptr->alloc( w, h, d );
     }
 
+    // NEW: SYCL-aware alloc (device memory)
+    inline void alloc( int w, int h, int d, sycl::queue* queue ) {
+        _ptr.reset( new PlaneT<T> );
+        _ptr->alloc( w, h, d, queue );
+    }
+
     inline void dealloc( ) {
         _ptr->dealloc();
+    }
+
+    // NEW: Device pointer access for SYCL kernels
+    inline T* getDevicePtr() {
+        return _ptr ? _ptr->getDevicePtr() : nullptr;
+    }
+
+    inline const T* getDevicePtr() const {
+        return _ptr ? _ptr->getDevicePtr() : nullptr;
+    }
+
+    // NEW: Get pitch in elements (not bytes)
+    inline int getPitch() const {
+        return _ptr ? _ptr->getPitchElements() : 0;
     }
 
     inline void memcpyFromBuffer( const void* ptr ) {

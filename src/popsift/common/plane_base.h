@@ -15,6 +15,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <algorithm>
+#include <sycl/sycl.hpp>
 
 #include "debug_macros.h"
 
@@ -66,11 +67,23 @@ struct PlaneBase
      * bool alloc( int elemSize, MemMode m, int w, int h = 1, int d = 1 );
      */
 
+    // NEW: SYCL-aware alloc (device memory with queue)
+    bool alloc( int elemSize, int w, int h, int d, sycl::queue* queue );
+
     void resize( int elemSize, int w, int h = 1, int d = 1 );
 
     void adopt( void* ptr, int elemSize, int w, int h = 1, int d = 1 );
 
     void dealloc( );
+
+    // NEW: Get device pointer
+    inline void* getDevicePtr() {
+        return _plane;
+    }
+
+    inline const void* getDevicePtr() const {
+        return _plane;
+    }
 
     inline void* base() {
         return _plane;
@@ -120,6 +133,8 @@ private:
     int   _x;     /// width in elements
     int   _y;     /// height
     int   _z;     /// depth
+    MemMode      _mode{AlignmentUndefined};
+    sycl::queue* _queue{};  // Store queue pointer for deallocation
 };
 
 /*************************************************************
@@ -142,6 +157,12 @@ template <typename T> struct PlaneT : public PlaneBase
         PlaneBase::alloc( elemSize(), w, h, d );
     }
 
+    // NEW: SYCL-aware alloc (calls PlaneBase with queue)
+    inline void alloc( int w, int h, int d, sycl::queue* queue )
+    {
+        PlaneBase::alloc( elemSize(), w, h, d, queue );
+    }
+
     inline void adopt( T* ptr, int w, int h = 1, int d = 1 )
     {
         PlaneBase::adopt( ptr, elemSize(), w, h, d );
@@ -150,6 +171,20 @@ template <typename T> struct PlaneT : public PlaneBase
     inline void resize( int w, int h = 1, int d = 1 )
     {
         PlaneBase::resize( elemSize(), w, h, d );
+    }
+
+    // NEW: Typed device pointer access
+    inline T* getDevicePtr() {
+        return static_cast<T*>(PlaneBase::getDevicePtr());
+    }
+
+    inline const T* getDevicePtr() const {
+        return static_cast<const T*>(PlaneBase::getDevicePtr());
+    }
+
+    // NEW: Get pitch in elements (not bytes)
+    inline int getPitchElements() const {
+        return PlaneBase::getPitch() / elemSize();
     }
 
     inline size_t elemSize() const { return elem_size; }
