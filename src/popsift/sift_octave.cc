@@ -17,6 +17,8 @@
 
 #include <new> // for placement new
 #include <sstream>
+#include <sycl/sycl.hpp>  
+
 #ifdef _WIN32
 #include <direct.h>
 #define stat _stat
@@ -30,6 +32,37 @@ namespace popsift {
 Octave::Octave()
 { }
 
+void Octave::initQueue()
+{
+    try {
+        // Correct syntax for Intel DPC++ 2024.2
+        // Properties must be passed as a property_list
+        auto props = sycl::property_list{
+            sycl::property::queue::in_order(),
+            sycl::property::queue::enable_profiling()
+        };
+        
+        _queue = sycl::queue(sycl::gpu_selector_v, props);
+        
+        // Optional: Print device info for debugging
+        auto device = _queue.get_device();
+        std::cout << "Octave " << _debug_octave_id << " queue initialized on: " 
+                  << device.get_info<sycl::info::device::name>() << std::endl;
+    }
+    catch (sycl::exception const& e) {
+        std::cerr << "SYCL exception in Octave::initQueue(): " << e.what() << std::endl;
+        std::cerr << "Falling back to CPU for octave " << _debug_octave_id << std::endl;
+        
+        // Fallback to CPU with same properties
+        auto props = sycl::property_list{
+            sycl::property::queue::in_order(),
+            sycl::property::queue::enable_profiling()
+        };
+        
+        _queue = sycl::queue(sycl::cpu_selector_v, props);
+    }
+}
+
 void Octave::alloc( const Config& conf, int width, int height, int levels )
 {
     _w = width;
@@ -39,9 +72,29 @@ void Octave::alloc( const Config& conf, int width, int height, int levels )
     _w_grid_divider = float(_w) / conf.getFilterGridSize();
     _h_grid_divider = float(_h) / conf.getFilterGridSize();
 
-    _data  .alloc( width, height, levels );
-    _intm  .alloc( width, height, levels );
-    _dog_3d.alloc( width, height, levels-1 );
+    // Initialize SYCL queue first
+    initQueue();
+    
+    auto device = _queue.get_device();
+    std::cout << "Octave " << _debug_octave_id 
+              << " allocating on device: " 
+              << device.get_info<sycl::info::device::name>() 
+              << std::endl;
+
+    // All planes must use this octave's queue
+    _data  .alloc( width, height, levels, &_queue );
+    _intm  .alloc( width, height, levels, &_queue );
+    _dog_3d.alloc( width, height, levels-1, &_queue );
+    
+    // Verify allocation succeeded
+    if (!_data.getDevicePtr() || !_dog_3d.getDevicePtr()) {
+        throw std::runtime_error("Failed to allocate device memory for octave");
+    }
+    
+    std::cout << "Octave " << _debug_octave_id 
+              << " allocated: data=" << _data.getDevicePtr()
+              << ", dog=" << _dog_3d.getDevicePtr()
+              << std::endl;
 }
 
 void Octave::resetDimensions( const Config& conf, int width, int height )
@@ -71,6 +124,16 @@ void Octave::resetDimensions( const Config& conf, int width, int height )
 
 void Octave::free()
 {
+
+    // Wait for any pending operations on this queue before freeing
+    try {
+        _queue.wait();
+    }
+    catch (sycl::exception const& e) {
+        std::cerr << "SYCL exception during queue wait in Octave::free(): " 
+                  << e.what() << std::endl;
+    }
+
     _data = PlaneD<float>();    
     _intm = PlaneD<float>();
     _dog_3d = PlaneD<float>();

@@ -15,6 +15,7 @@
 
 #include <iostream>
 #include <vector>
+#include <sycl/sycl.hpp>  // Add SYCL header
 
 namespace popsift {
 
@@ -31,6 +32,8 @@ class Octave
     Plane2D_float _data;
     Plane2D_float _intm;
     Plane2D_float _dog_3d;
+
+    sycl::queue _queue;
 
 public:
     Octave( );
@@ -52,6 +55,16 @@ public:
     inline Plane2D_float& getData()  { return _data; }
     inline Plane2D_float& getIntm()  { return _intm; }
     inline Plane2D_float& getDog()   { return _dog_3d; }
+
+    // SYCL queue access methods
+    inline sycl::queue& getQueue() { return _queue; }
+    inline const sycl::queue& getQueue() const { return _queue; }
+
+    /**
+     * @brief Initialize SYCL queue for this octave
+     */
+    void initQueue();
+
 
      /**
       * @brief Allocates all GPU memories for one octave.
