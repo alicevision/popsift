@@ -16,6 +16,9 @@
 #include <cstdio>
 #include <iostream>
 
+#include <sycl/sycl.hpp>
+
+
 /* It makes no sense whatsoever to change this value */
 #define PREV_LEVEL 3
 
@@ -70,42 +73,111 @@ void Pyramid::downscale_from_prev_octave( int octave )
 
 namespace gauss {
 
+// static
+// void make_dog( PlaneD<float>& src,
+//                PlaneD<float>& dog,
+//                const int      w,
+//                const int      h,
+//                const int      max_level )
+// {
+//     for( int idy = 0; idy < h; idy++ )
+//     {
+//         for( int idx = 0; idx < w; idx++ )
+//         {
+//             float a = src.get( 0, idy, idx );
+//             for( int level = 0; level < max_level-1; level++ )
+//             {
+//                 const float b = src.get( level+1, idy, idx );
+//                 dog.set( level, idy, idx, b-a );
+//                 a = b;
+//             }
+//         }
+//     }
+// }
+
 static
-void make_dog( PlaneD<float>& src,
-               PlaneD<float>& dog,
-               const int      w,
-               const int      h,
-               const int      max_level )
+sycl::event make_dog( sycl::queue&   q,
+                      PlaneD<float>& src,
+                      PlaneD<float>& dog,
+                      const int      w,
+                      const int      h,
+                      const int      max_level )
 {
-    for( int idy = 0; idy < h; idy++ )
-    {
-        for( int idx = 0; idx < w; idx++ )
-        {
-            float a = src.get( 0, idy, idx );
-            for( int level = 0; level < max_level-1; level++ )
-            {
-                const float b = src.get( level+1, idy, idx );
-                dog.set( level, idy, idx, b-a );
-                a = b;
-            }
-        }
-    }
+    // Get device pointers 
+    float* d_src = src.getDevicePtr();
+    float* d_dog = dog.getDevicePtr();
+    
+    const int src_pitch = src.getPitch();
+    const int dog_pitch = dog.getPitch();
+    
+    // Calculate grid dimensions (matching CUDA: 1024x1 blocks)
+    const int block_x = 1024;
+    const int block_y = 1;
+    const int grid_x = (w + block_x - 1) / block_x;
+    const int grid_y = (h + block_y - 1) / block_y;
+    
+    sycl::range<2> local_range(block_y, block_x);
+    sycl::range<2> global_range(grid_y * block_y, grid_x * block_x);
+    
+    // Submit kernel and return event (non-blocking)
+    auto event = q.submit([&](sycl::handler& cgh) {
+        cgh.parallel_for(
+            sycl::nd_range<2>(global_range, local_range),
+            [=](sycl::nd_item<2> item) {
+                const int idx = item.get_global_id(1);
+                const int idy = item.get_global_id(0);
+                
+                if (idx < w && idy < h) {
+                    const int pixel_offset = idy * src_pitch + idx;
+                    float a = d_src[pixel_offset];
+                    
+                    for (int level = 0; level < max_level - 1; level++) {
+                        const int next_level_offset = (level + 1) * h * src_pitch + pixel_offset;
+                        const int dog_level_offset = level * h * dog_pitch + idy * dog_pitch + idx;
+                        
+                        const float b = d_src[next_level_offset];
+                        d_dog[dog_level_offset] = b - a;
+                        a = b;
+                    }
+                }
+            });
+    });
+    
+    // Return event without waiting - allows parallel execution
+    return event;
 }
+
 
 } // namespace gauss
 
-void Pyramid::dogs_from_blurred( int octave, int max_level )
+// void Pyramid::dogs_from_blurred( int octave, int max_level )
+// {
+//     Octave&      oct_obj = _octaves[octave];
+
+//     const int width  = oct_obj.getWidth();
+//     const int height = oct_obj.getHeight();
+
+//     gauss::make_dog(oct_obj.getData( ),
+//                      oct_obj.getDog( ),
+//                      oct_obj.getWidth(),
+//                      oct_obj.getHeight(),
+//                      max_level );
+// }
+
+// Async version - returns event
+sycl::event Pyramid::dogs_from_blurred( int octave, int max_level )
 {
-    Octave&      oct_obj = _octaves[octave];
-
-    const int width  = oct_obj.getWidth();
-    const int height = oct_obj.getHeight();
-
-    gauss::make_dog(oct_obj.getData( ),
-                     oct_obj.getDog( ),
-                     oct_obj.getWidth(),
-                     oct_obj.getHeight(),
-                     max_level );
+    Octave& oct_obj = _octaves[octave];
+    
+    // Use the octave's own queue for parallel execution
+    sycl::queue& q = oct_obj.getQueue();
+    
+    return gauss::make_dog( q,
+                            oct_obj.getData(),
+                            oct_obj.getDog(),
+                            oct_obj.getWidth(),
+                            oct_obj.getHeight(),
+                            max_level);
 }
 
 /*************************************************************
@@ -150,13 +222,34 @@ void Pyramid::build_pyramid( const Config& conf, std::shared_ptr<ImageBase> base
         }
     }
 
+    // for( int octave=0; octave<_num_octaves; octave++ )
+    // {
+    //     Octave&      oct_obj = _octaves[octave];
+    //     POP_INFO2( conf.silent(), "call dogs_from_blurred" );
+    //     dogs_from_blurred( octave, _levels );
+    // }
+
+    // Launch DoG kernels asynchronously on all octaves
+    // Each octave uses its own queue, so they execute in parallel
+    std::vector<sycl::event> events;
     for( int octave=0; octave<_num_octaves; octave++ )
     {
-        Octave&      oct_obj = _octaves[octave];
-        POP_INFO2( conf.silent(), "call dogs_from_blurred" );
-        dogs_from_blurred( octave, _levels );
+        POP_INFO2( conf.silent(), "call dogs_from_blurred (async)" );
+        
+        // Submit kernel on octave's queue (non-blocking)
+        sycl::event event = dogs_from_blurred( octave, _levels );
+        events.push_back(event);
     }
+
+    // Wait for all DoG computations to complete
+    POP_INFO2( conf.silent(), "waiting for all DoG kernels to complete" );
+    for (auto& e : events) {
+        e.wait();
+    }
+    
+    POP_INFO2( conf.silent(), "DoG computation complete" );
 }
 
-} // namespace popsift
+    
+}// namespace popsift
 
