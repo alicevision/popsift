@@ -119,7 +119,7 @@ private:
     void horiz_from_prev_level( int octave, int level );
     void vert_from_interm( int octave, int level );
 
-    void dogs_from_blurred( int octave, int max_level );
+    sycl::event dogs_from_blurred( int octave, int max_level );
 
     void reset_extrema_mgmt( );
     void build_pyramid( const Config& conf, std::shared_ptr<ImageBase> base );
