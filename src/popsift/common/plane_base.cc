@@ -47,6 +47,45 @@ bool PlaneBase::alloc( int elemSize, int w, int h, int d )
     POP_FATAL(ss.str());
 }
 
+
+// NEW: SYCL-aware alloc implementation (device memory with queue)
+bool PlaneBase::alloc( int elemSize, int w, int h, int d, sycl::queue* queue )
+{
+    if (!queue) {
+        POP_FATAL("PlaneBase::alloc() called with null queue pointer");
+        return false;
+    }
+
+    _pitch = w * elemSize;
+    _x     = w;
+    _y     = h;
+    _z     = d;
+    _queue = queue;  // Store queue for later deallocation
+
+    size_t sz = static_cast<size_t>(w) * h * d * elemSize;
+
+    try {
+        // Allocate device memory using SYCL
+        _plane = sycl::malloc_device(sz, *queue);
+        
+        if (!_plane) {
+            stringstream ss;
+            ss << "Failed to allocate " << sz << " bytes of device memory via SYCL.";
+            POP_FATAL(ss.str());
+            return false;
+        }
+        
+        _mode = MemMode::CUDA1D;  // Mark as device memory
+        return true;
+    }
+    catch (const sycl::exception& e) {
+        stringstream ss;
+        ss << "SYCL exception during device allocation: " << e.what();
+        POP_FATAL(ss.str());
+        return false;
+    }
+}
+
 void PlaneBase::resize( int elemSize, int w, int h, int d )
 {
     int new_sz = w * h * d * elemSize;
@@ -81,8 +120,23 @@ void PlaneBase::dealloc( )
 {
     if (!_plane) return;
 
-    free(_plane);
+    // Check if this is device memory allocated via SYCL
+    if (_mode == MemMode::CUDA1D && _queue) {
+        try {
+            sycl::free(_plane, *_queue);
+        }
+        catch (const sycl::exception& e) {
+            cerr << "SYCL exception during deallocation: " << e.what() << endl;
+        }
+    }
+    else {
+        // Regular host memory
+        free(_plane);
+    }
+    
     _plane = nullptr;
+    _queue = nullptr;
+    _mode = MemMode::AlignmentUndefined;
 }
 
 } // namespace popsift
