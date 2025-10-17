@@ -24,11 +24,15 @@
 #include <stdexcept>
 #include <string>
 
+#ifdef USE_OIIO
 #include <OpenImageIO/imageio.h>
+#endif
 
 #include "pgmread.h"
 
+#ifdef USE_OIIO
 using namespace OIIO;
+#endif
 using namespace std;
 
 static bool print_dev_info  = false;
