@@ -164,7 +164,7 @@ __host__
 void PlaneBase::memcpyToHost( void* dst, int dst_pitch,
                               void* src, int src_pitch,
                               short cols, short rows,
-                              int elemSize )
+                              int elemSize ) const
 {
     assert( dst != 0 );
     assert( dst_pitch != 0 );
@@ -185,7 +185,7 @@ void PlaneBase::memcpyToHost( void* dst, int dst_pitch,
                               void* src, int src_pitch,
                               short cols, short rows,
                               int elemSize,
-                              cudaStream_t stream )
+                              cudaStream_t stream ) const
 {
     assert( dst != 0 );
     assert( dst_pitch != 0 );
