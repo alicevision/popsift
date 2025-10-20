@@ -92,6 +92,15 @@ public:
         _ptr->dealloc();
     }
 
+    // NEW: Host pointer access (for CPU operations)
+    inline T* getHostPtr() {
+        return _ptr ? static_cast<T*>(_ptr->base()) : nullptr;
+    }
+
+    inline const T* getHostPtr() const {
+        return _ptr ? static_cast<const T*>(_ptr->base()) : nullptr;
+    }
+
     // NEW: Device pointer access for SYCL kernels
     inline T* getDevicePtr() {
         return _ptr ? _ptr->getDevicePtr() : nullptr;
@@ -165,4 +174,3 @@ typedef PlaneD<uint16_t>     Plane2D_uint16;
 typedef PlaneD<float>        Plane2D_float;
 
 } // namespace popsift
-
