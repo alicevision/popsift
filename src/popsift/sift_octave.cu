@@ -153,7 +153,7 @@ void Octave::download_and_save_array( const char* basename, int octave )
     POP_CUDA_FATAL_TEST(err, "cudaMemcpy3D failed: ");
 
     for( int l = 0; l<_levels; l++ ) {
-        Plane2D_float p(width, height, &array[l*width*height], width * sizeof(float));
+        const Plane2D_float p(width, height, &array[l*width*height], width * sizeof(float));
 
         ostringstream ostr;
         ostr << "dir-octave/" << basename << "-o-" << octave << "-l-" << l << ".pgm";
@@ -173,7 +173,7 @@ void Octave::download_and_save_array( const char* basename, int octave )
     POP_CUDA_FATAL_TEST(err, "cudaMemcpy3D failed: ");
 
     for( int l = 0; l<_levels; l++ ) {
-        Plane2D_float p(width, height, &array[l*width*height], width * sizeof(float));
+        const Plane2D_float p(width, height, &array[l*width*height], width * sizeof(float));
 
         ostringstream ostr;
         ostr << "dir-interm/" << basename << "-o-" << octave << "-l-" << l << ".pgm";
@@ -189,7 +189,7 @@ void Octave::download_and_save_array( const char* basename, int octave )
     POP_CUDA_FATAL_TEST(err, "cudaMemcpy3D failed: ");
 
     for (int l = 0; l<_levels - 1; l++) {
-        Plane2D_float p(width, height, &array[l*width*height], width * sizeof(float));
+        const Plane2D_float p(width, height, &array[l*width*height], width * sizeof(float));
 
         ostringstream ostr;
         ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".pgm";
