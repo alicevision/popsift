@@ -102,21 +102,19 @@ void print_gauss_filter_symbol( int columns )
     }
     printf("\n");
 
-    printf("    level 0-filters for direct downscaling\n");
+    printf("    level 0-filter for the creation of the first level of the first octave\n" );
 
-    for( int lvl=0; lvl<MAX_OCTAVES; lvl++ ) {
-        int span = d_gauss.dd.span[lvl] + d_gauss.dd.span[lvl] - 1;
+    int span = d_gauss.dd.span[0] + d_gauss.dd.span[0] - 1;
 
-        printf("      %d %d %2.6f: ", lvl, span, d_gauss.dd.sigma[lvl] );
-        int m = min( d_gauss.dd.span[lvl], columns );
-        for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.dd.filter[lvl*GAUSS_ALIGN+x] );
-        }
-        if( m < d_gauss.dd.span[lvl] )
-            printf("...\n");
-        else
-            printf("\n");
+    printf("      %d %d %2.6f: ", 0, span, d_gauss.dd.sigma[0] );
+    int m = min( d_gauss.dd.span[0], columns );
+    for( int x=0; x<m; x++ ) {
+        printf("%0.8f ", d_gauss.dd.filter[x] );
     }
+    if( m < d_gauss.dd.span[0] )
+        printf("...\n");
+    else
+        printf("\n");
     printf("\n");
 }
 
@@ -215,26 +213,17 @@ void init_filter( const Config& conf,
     h_gauss.abs_oN.computeBlurTable( &h_gauss );
 
     /* dd :
-     * The direct-downscaling kernels make use of the assumption that downscaling
-     * from MAX_LEVEL-3 is identical to applying 2*sigma on the identical image
-     * before downscaling, which would be identical to applying 1*sigma after
-     * downscaling.
-     * In reality, this is not true because images are not continuous, but we
-     * support the options because it is interesting. Perhaps it works for the later
-     * octaves, where it is also good for performance.
+     * A leftover from an attempt to create all top levels of all octaves from the
+     * input image.
      * dd is only for creating level 0 of all octave directly from the input image.
      */
-    for( int oct=0; oct<MAX_OCTAVES; oct++ ) {
-        // sigma * 2^i
-        float oct_sigma = scalbnf( sigma0, oct );
 
-        // subtract initial blur
-        float b = sqrt( fabs( oct_sigma * oct_sigma - initial_blur * initial_blur ) );
+    // subtract initial blur
+    const float sigma_o0_l0 = sqrt( fabs( sigma0 * sigma0 - initial_blur * initial_blur ) );
 
-        // sigma / 2^i
-        h_gauss.dd.sigma[oct] = scalbnf( b, -oct );
-        h_gauss.dd.computeBlurTable( &h_gauss );
-    }
+    // sigma / 2^i
+    h_gauss.dd.sigma[0] = sigma_o0_l0;
+    h_gauss.dd.computeBlurTable( &h_gauss );
 
     cudaError_t err;
     err = cudaMemcpyToSymbol( d_gauss,
