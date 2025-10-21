@@ -96,11 +96,7 @@ void make_dog( cudaTextureObject_t src_data,
 __host__
 inline void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base, cudaStream_t stream )
 {
-    // Variable octave is a leftover of a parameter from the attempt to create
-    // the top level of every octave directly from the upscaled input
-    const int octave = 0;
-
-    Octave&   oct_obj = _octaves[octave];
+    Octave&   oct_obj = _octaves[0];
 
     const int width   = oct_obj.getWidth();
     const int height  = oct_obj.getHeight();
@@ -113,8 +109,8 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base
     const Config::SiftMode& mode = conf.getSiftMode();
     float shift  = 0.5f;
 
-    if( octave == 0 && ( mode == Config::PopSift || mode == Config::VLFeat ) ) {
-        shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() - octave );
+    if( mode == Config::PopSift || mode == Config::VLFeat ) {
+        shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() );
     }
 
     gauss::normalizedSource::horiz
@@ -123,7 +119,6 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base
           oct_obj.getIntermediateSurface(),
           width,
           height,
-          octave,
           shift );
 
     POP_SYNC_CHK;

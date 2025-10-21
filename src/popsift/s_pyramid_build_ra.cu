@@ -19,20 +19,15 @@ void horiz( cudaTextureObject_t src_linear_tex,
             cudaSurfaceObject_t dst_data,
             int                 dst_w,
             int                 dst_h,
-            int                 octave,
             float               shift )
 {
-    // Create level-0 for the first octave from the input image.
-    // TODO: octave is always 0
-    //       remove the unused levels of d_gauss.dd.span and d_gauss.dd.filter
-
     const int    write_x = blockIdx.x * blockDim.x + threadIdx.x;
     const int    write_y = blockIdx.y;
 
     if( write_x >= dst_w ) return;
 
-    const int    span    =  d_gauss.dd.span[octave];
-    const float* filter  = &d_gauss.dd.filter[octave*GAUSS_ALIGN];
+    const int    span    =  d_gauss.dd.span[0];
+    const float* filter  = &d_gauss.dd.filter[0];
     const float  read_x  = ( blockIdx.x * blockDim.x + threadIdx.x + shift ) / dst_w;
     const float  read_y  = ( blockIdx.y + shift ) / dst_h;
 
