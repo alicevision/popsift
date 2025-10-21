@@ -22,10 +22,9 @@ void horiz( cudaTextureObject_t src_linear_tex,
             int                 octave,
             float               shift )
 {
-    // Create level-0 for any octave from the input image.
-    // Since we are computing the direct-downscaling gauss filter tables
-    // and the first entry in that table is identical to the "normal"
-    // table, we do not need a special case.
+    // Create level-0 for the first octave from the input image.
+    // TODO: octave is always 0
+    //       remove the unused levels of d_gauss.dd.span and d_gauss.dd.filter
 
     const int    write_x = blockIdx.x * blockDim.x + threadIdx.x;
     const int    write_y = blockIdx.y;

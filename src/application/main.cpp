@@ -88,8 +88,6 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         "reject points when reaching max iterations, "
         "first contrast threshold is floor(.5 * peak thresh). "
         "Computed filter width are lower than VLFeat/PopSift")
-        ("direct-scaling", bool_switch()->notifier([&](bool b) { if(b) config.setScalingMode(popsift::Config::ScaleDirect); }),
-         "Direct each octave from upscaled orig instead of blurred level.")
         ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
         ( "norm-mode", value<std::string>()->notifier([&](const std::string& s) { config.setNormMode(s); }),
           popsift::Config::getNormModeUsage() )

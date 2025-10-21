@@ -70,16 +70,6 @@ struct Config
     };
 
     /**
-     * @brief The scaling mode.
-     */
-    enum ScalingMode
-    {
-        ScaleDirect,
-        /// Indirect - only working method
-        ScaleDefault
-    };
-
-    /**
      * @brief Modes for descriptor extraction.
      */
     enum DescMode
@@ -164,7 +154,6 @@ struct Config
      * @see LogMode
      */
     void setLogMode( LogMode mode = All );
-    void setScalingMode( ScalingMode mode = ScaleDefault );
 
     /**
      * @brief Enable/desable verbose mode.
@@ -329,13 +318,6 @@ struct Config
     GridFilterMode getFilterSorting() const { return _grid_filter_mode; }
 
     /**
-     * @brief Get the scaling mode.
-     * @return the descriptor extraction mode.
-     * @see ScalingMode
-     */
-    inline ScalingMode getScalingMode() const { return _scaling_mode; }
-
-    /**
      * @brief Get the descriptor extraction mode
      * @return the descriptor extraction mode
      * @see DescMode
@@ -360,9 +342,6 @@ private:
 
     /// default LogMode::None
     LogMode  _log_mode;
-
-    /// default: ScalingMode::DownscaledOctaves
-    ScalingMode _scaling_mode;
 
     /// default: DescMode::Loop
     DescMode    _desc_mode;

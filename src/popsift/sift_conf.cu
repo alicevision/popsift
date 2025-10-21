@@ -25,7 +25,6 @@ Config::Config( )
     , _gauss_mode( getGaussModeDefault() )
     , _sift_mode( Config::PopSift )
     , _log_mode( Config::None )
-    , _scaling_mode( Config::ScaleDefault )
     , _desc_mode( Config::Loop )
     , _grid_filter_mode( Config::RandomScale )
     , verbose( false )
@@ -182,11 +181,6 @@ Config::LogMode Config::getLogMode( ) const
     return _log_mode;
 }
 
-void Config::setScalingMode( ScalingMode mode )
-{
-    _scaling_mode = mode;
-}
-
 /**
  * Normalization mode
  * Should the descriptor normalization use L2-like classic normalization
@@ -313,7 +307,6 @@ bool Config::equal( const Config& other ) const
         COMPARE( _edge_limit ) ||
         COMPARE( _threshold ) ||
         COMPARE( _upscale_factor ) ||
-        COMPARE( _scaling_mode ) ||
         COMPARE( _max_extrema ) ||
         COMPARE( _gauss_mode ) ||
         COMPARE( _sift_mode ) ||
