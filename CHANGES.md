@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+## [0.10.1] - 2025-10-21
+
+### Removed
+
+- Removed option to create top level of every octave from input image [PR](https://github.com/alicevision/popsift/pull/178)
+
 ## [0.10.0] - 2025-10-14
 
 ### Added

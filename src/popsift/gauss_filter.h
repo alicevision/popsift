@@ -74,12 +74,13 @@ struct GaussInfo
      */
     GaussTable<GAUSS_LEVELS> abs_oN;
 
-    /* In theory, level 0 of octave 2 contains the same information
-     * whether it is constructed by downscaling and blurring the
-     * input image with sigma or by blurring the input image with 2*sigma
-     * and downscaling afterwards.
+    /* The dd table was meant for the creation of every top-level of
+     * every octave directly from the upscaling input image. This option
+     * has been removed because it didn't work well.
+     * As a consequence, the table dd needs only its first entry for
+     * Gaussian filtering of the first octave.
      */
-    GaussTable<MAX_OCTAVES> dd;
+    GaussTable<1> dd;
 
     __host__
     void clearTables( );

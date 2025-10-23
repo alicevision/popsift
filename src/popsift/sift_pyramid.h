@@ -116,7 +116,6 @@ public:
 private:
     inline void horiz_from_input_image( const Config&    conf,
                                         ImageBase*       base,
-					                    int              octave,
 					                    cudaStream_t     stream );
     inline void horiz_level_from_input_image( const Config&    conf,
                                               ImageBase*       base,

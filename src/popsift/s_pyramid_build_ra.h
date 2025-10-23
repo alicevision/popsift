@@ -15,7 +15,6 @@ __global__ void horiz(cudaTextureObject_t src_data,
                       cudaSurfaceObject_t dst_data,
                       int dst_w,
                       int dst_h,
-                      int octave,
                       float shift);
 
 __global__ void horiz_level(cudaTextureObject_t src_linear_tex,

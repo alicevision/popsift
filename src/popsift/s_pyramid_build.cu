@@ -94,9 +94,9 @@ void make_dog( cudaTextureObject_t src_data,
 } // namespace gauss
 
 __host__
-inline void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base, int octave, cudaStream_t stream )
+inline void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base, cudaStream_t stream )
 {
-    Octave&   oct_obj = _octaves[octave];
+    Octave&   oct_obj = _octaves[0];
 
     const int width   = oct_obj.getWidth();
     const int height  = oct_obj.getHeight();
@@ -109,8 +109,8 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base
     const Config::SiftMode& mode = conf.getSiftMode();
     float shift  = 0.5f;
 
-    if( octave == 0 && ( mode == Config::PopSift || mode == Config::VLFeat ) ) {
-        shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() - octave );
+    if( mode == Config::PopSift || mode == Config::VLFeat ) {
+        shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() );
     }
 
     gauss::normalizedSource::horiz
@@ -119,7 +119,6 @@ inline void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base
           oct_obj.getIntermediateSurface(),
           width,
           height,
-          octave,
           shift );
 
     POP_SYNC_CHK;
@@ -475,16 +474,7 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
         Octave&      oct_obj = _octaves[octave];
         cudaStream_t stream  = oct_obj.getStream();
 
-        if( ( conf.getScalingMode() == Config::ScaleDirect ) &&
-            ( conf.getGaussMode() == Config::Fixed9 || conf.getGaussMode() == Config::Fixed15 ) ) {
-            if( octave == 0 ) {
-                make_octave( conf, base, oct_obj, stream, true );
-            } else {
-                horiz_from_input_image( conf, base, octave, stream );
-                vert_from_interm( octave, 0, stream, NotInterpolated_FromPrevious );
-                make_octave( conf, base, oct_obj, stream, false );
-            }
-        } else if( conf.getGaussMode() == Config::Fixed9 || conf.getGaussMode() == Config::Fixed15 ) {
+        if( conf.getGaussMode() == Config::Fixed9 || conf.getGaussMode() == Config::Fixed15 ) {
             if( octave == 0 ) {
                 make_octave( conf, base, oct_obj, stream, true );
             } else {
@@ -496,22 +486,6 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
             }
 
             cuda::event_record( oct_obj.getEventScaleDone(), stream, __FILE__, __LINE__ );
-        } else if( conf.getScalingMode() == Config::ScaleDirect ) {
-            GaussTableChoice useGauss = ( conf.getGaussMode() == Config::VLFeat_Relative ) ? Interpolated_FromPrevious
-                                                                                           : NotInterpolated_FromPrevious;
-            for( int level=0; level<_levels; level++ )
-            {
-                if( level == 0 )
-                {
-                    horiz_from_input_image( conf, base, octave, stream );
-                    vert_from_interm( octave, level, stream, useGauss );
-                }
-                else
-                {
-                    horiz_from_prev_level( octave, level, stream, useGauss );
-                    vert_from_interm( octave, level, stream, useGauss );
-                }
-            }
         } else if( conf.getGaussMode() == Config::VLFeat_Relative ) {
             for( int level=0; level<_levels; level++ )
             {
@@ -519,7 +493,7 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
                 {
                     if( octave == 0 )
                     {
-                        horiz_from_input_image( conf, base, 0, stream );
+                        horiz_from_input_image( conf, base, stream );
                         vert_from_interm( octave, 0, stream, Interpolated_FromPrevious );
                     }
                     else
@@ -551,7 +525,7 @@ void Pyramid::build_pyramid( const Config& conf, ImageBase* base )
                 {
                     if( octave == 0 )
                     {
-                        horiz_from_input_image( conf, base, 0, stream );
+                        horiz_from_input_image( conf, base, stream );
                         vert_from_interm( octave, 0, stream, NotInterpolated_FromPrevious );
                     }
                     else
