@@ -273,8 +273,6 @@ int GaussInfo::getSpan( float sigma ) const
         return GaussInfo::vlFeatSpan( sigma );
     case Config::VLFeat_Relative :
         return GaussInfo::vlFeatRelativeSpan( sigma );
-    case Config::OpenCV_Compute :
-        return GaussInfo::openCVSpan( sigma );
     case Config::Fixed9 :
         return 5;
     case Config::Fixed15 :
@@ -304,15 +302,6 @@ int GaussInfo::vlFeatRelativeSpan( float sigma )
     int spn = vlFeatSpan( sigma );
     if( ( spn & 1 ) == 0 ) spn += 1;
     return spn;
-}
-
-__host__
-int GaussInfo::openCVSpan( float sigma )
-{
-    int span = int( roundf( 2.0f * 4.0f * sigma + 1.0f ) ) | 1;
-    span >>= 1;
-    span  += 1;
-    return std::min<int>( span, GAUSS_ALIGN - 1 );
 }
 
 template<int LEVELS>

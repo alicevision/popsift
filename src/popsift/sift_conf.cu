@@ -111,8 +111,6 @@ void Config::setGaussMode( const std::string& m )
         setGaussMode( Config::VLFeat_Relative );
     else if( m == "vlfeat-direct" )
         setGaussMode( Config::VLFeat_Relative_All );
-    else if( m == "opencv" )
-        setGaussMode( Config::OpenCV_Compute );
     else if( m == "fixed9" )
         setGaussMode( Config::Fixed9 );
     else if( m == "fixed15" )
@@ -134,7 +132,6 @@ const char* Config::getGaussModeUsage( )
         "vlfeat (default), "
         "vlfeat-hw-interpolated, "
         "vlfeat-direct, "
-        "opencv, "
         "fixed9, "
         "fixed15, "
         "relative (synonym for vlfeat-hw-interpolated)";

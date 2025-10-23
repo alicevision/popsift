@@ -100,9 +100,6 @@ private:
 
     __host__
     static int vlFeatRelativeSpan( float sigma );
-
-    __host__
-    static int openCVSpan( float sigma );
 };
 
 extern __device__ __constant__ GaussInfo d_gauss;

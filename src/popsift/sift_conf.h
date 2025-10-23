@@ -40,7 +40,6 @@ struct Config
         VLFeat_Compute,
         VLFeat_Relative,
         VLFeat_Relative_All,
-        OpenCV_Compute,
         Fixed9,
         Fixed15
     };
