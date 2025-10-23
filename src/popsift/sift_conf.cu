@@ -115,7 +115,10 @@ void Config::setGaussMode( const std::string& m )
         setGaussMode( Config::Fixed9 );
     else if( m == "fixed15" )
         setGaussMode( Config::Fixed15 );
-    else
+    else if( m == "opencv" ) {
+        POP_WARN( string("Gauss mode 'opencv' has been deprecated. Using mode vlfeat instead.\n") );
+        setGaussMode( Config::VLFeat_Compute );
+    } else
         POP_FATAL( string("Bad Gauss mode.\n") + getGaussModeUsage() );
 }
 
