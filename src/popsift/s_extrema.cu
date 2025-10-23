@@ -579,17 +579,12 @@ void Pyramid::find_extrema( const Config& conf )
 
         int*  num_blocks      = extrema_num_blocks;
 
-#ifdef USE_DOG_TEX_LINEAR
-#define getDogTexture getDogTextureLinear
-#else
-#define getDogTexture getDogTexturePoint
-#endif
         switch( conf.getSiftMode() )
         {
         case Config::VLFeat :
                 find_extrema_in_dog<HEIGHT,Config::VLFeat>
                     <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
+                    ( oct_obj.getDogTexturePoint( ),
                       octave,
                       cols,
                       rows,
@@ -604,7 +599,7 @@ void Pyramid::find_extrema( const Config& conf )
         case Config::OpenCV :
                 find_extrema_in_dog<HEIGHT,Config::OpenCV>
                     <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
+                    ( oct_obj.getDogTexturePoint( ),
                       octave,
                       cols,
                       rows,
@@ -619,7 +614,7 @@ void Pyramid::find_extrema( const Config& conf )
         default :
                 find_extrema_in_dog<HEIGHT,Config::PopSift>
                     <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
+                    ( oct_obj.getDogTexturePoint( ),
                       octave,
                       cols,
                       rows,
@@ -632,7 +627,6 @@ void Pyramid::find_extrema( const Config& conf )
                 POP_SYNC_CHK;
                 break;
         }
-#undef getDogTexture
 
         cuda::event_record( oct_obj.getEventExtremaDone(), oct_str, __FILE__, __LINE__ );
     }

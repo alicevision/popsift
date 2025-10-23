@@ -410,18 +410,11 @@ void Octave::alloc_dog_tex()
 
         err = cudaCreateTextureObject(&_dog_3d_tex_point, &dog_res_desc, &dog_tex_desc, 0);
         POP_CUDA_FATAL_TEST(err, "Could not create DoG texture: ");
-
-        dog_tex_desc.filterMode = cudaFilterModeLinear; // linear interpolation
-        err = cudaCreateTextureObject(&_dog_3d_tex_linear.tex, &dog_res_desc, &dog_tex_desc, 0);
-        POP_CUDA_FATAL_TEST(err, "Could not create DoG texture: ");
 }
 
 void Octave::free_dog_tex()
 {
     cudaError_t err;
-
-    err = cudaDestroyTextureObject(_dog_3d_tex_linear.tex);
-    POP_CUDA_FATAL_TEST(err, "Could not destroy DoG texture: ");
 
     err = cudaDestroyTextureObject(_dog_3d_tex_point);
     POP_CUDA_FATAL_TEST(err, "Could not destroy DoG texture: ");
