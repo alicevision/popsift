@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed option to create top level of every octave from input image [PR](https://github.com/alicevision/popsift/pull/178)
 - Removed option to compute very narrow Gaussian filters called opencv [PR](https://github.com/alicevision/popsift/pull/179)
+- Removed unreachable code for alternative downscaling between octaves [PR](https://github.com/alicevision/popsift/pull/180)
 
 ## [0.10.0] - 2025-10-14
 
