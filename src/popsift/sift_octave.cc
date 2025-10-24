@@ -35,14 +35,8 @@ Octave::Octave()
 void Octave::initQueue()
 {
     try {
-        // Correct syntax for Intel DPC++ 2024.2
-        // Properties must be passed as a property_list
-        auto props = sycl::property_list{
-            sycl::property::queue::in_order(),
-            sycl::property::queue::enable_profiling()
-        };
         
-        _queue = sycl::queue(sycl::gpu_selector_v, props);
+        _queue = sycl::queue(sycl::gpu_selector_v);
         
         // Optional: Print device info for debugging
         auto device = _queue.get_device();
