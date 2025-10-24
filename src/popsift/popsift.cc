@@ -324,7 +324,8 @@ void SiftJob::setFeatures( std::unique_ptr<popsift::FeaturesHost>& f )
 std::unique_ptr<popsift::FeaturesHost>& SiftJob::get()
 {
     if( _err != nullptr ) std::rethrow_exception( _err );
-    return _f;
+    
+    return _promise;
 }
 
 void SiftJob::setError(std::exception_ptr ptr)
