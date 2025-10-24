@@ -366,7 +366,7 @@ private:
     /// default: 1
     int  _filter_grid_size;
 
-    /// Modes are computation according to VLFeat or OpenCV,
+    /// Modes are computation according to VLFeat
     /// or fixed size. Default is VLFeat mode.
     GaussMode _gauss_mode;
 
