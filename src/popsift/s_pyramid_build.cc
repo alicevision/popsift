@@ -31,7 +31,8 @@ namespace popsift {
 namespace gauss {
 
 static inline
-void get_by_2_pick_every_second( const int      src_level,
+void get_by_2_pick_every_second( sycl::queue&   queue,
+                                 const int      src_level,
                                  PlaneD<float>& src,
                                  PlaneD<float>& dst )
 {
@@ -41,19 +42,48 @@ void get_by_2_pick_every_second( const int      src_level,
     const int src_h = src.getDimY();
     const int dst_w = dst.getDimX();
     const int dst_h = dst.getDimY();
+    
+    float* src_ptr = src.getDevicePtr();
+    float* dst_ptr = dst.getDevicePtr();
+    
+    const int src_pitch = src.getPitch();
+    const int dst_pitch = dst.getPitch();
 
-    for( int idy=0; idy<dst_h; idy++ )
-    {
-        for( int idx=0; idx<dst_w; idx++ )
-        {
-            const int read_x = std::clamp( idx << 1, 0, src_w-1 );
-            const int read_y = std::clamp( idy << 1, 0, src_h-1 );
-
-            const float val = src.get( src_level, read_y, read_x );
-
-            dst.set( dst_level, idy, idx, val );
-        }
-    }
+    // Launch SYCL kernel for downsampling
+    auto event = queue.submit([&](sycl::handler& cgh) {
+        const int c_src_w = src_w;
+        const int c_src_h = src_h;
+        const int c_dst_w = dst_w;
+        const int c_dst_h = dst_h;
+        const int c_src_pitch = src_pitch;
+        const int c_dst_pitch = dst_pitch;
+        const int c_src_level = src_level;
+        const int c_dst_level = dst_level;
+        
+        cgh.parallel_for(
+            sycl::range<2>(dst_h, dst_w),
+            [=](sycl::id<2> idx) {
+                const int write_x = idx[1];
+                const int write_y = idx[0];
+                
+                if (write_x >= c_dst_w || write_y >= c_dst_h) return;
+                
+                // Read every second pixel from source (2x downsampling)
+                const int read_x = sycl::clamp(write_x << 1, 0, c_src_w - 1);
+                const int read_y = sycl::clamp(write_y << 1, 0, c_src_h - 1);
+                
+                // Read from src_level
+                const int src_idx = c_src_level * c_src_h * c_src_pitch + read_y * c_src_pitch + read_x;
+                const float val = src_ptr[src_idx];
+                
+                // Write to dst_level (layer 0)
+                const int dst_idx = c_dst_level * c_dst_h * c_dst_pitch + write_y * c_dst_pitch + write_x;
+                dst_ptr[dst_idx] = val;
+            }
+        );
+    });
+    
+    event.wait();
 }
 
 }; // namespace gauss
@@ -65,35 +95,18 @@ void Pyramid::downscale_from_prev_octave( int octave )
 
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
+    
+    // Use the current octave's queue
+    sycl::queue& queue = oct_obj.getQueue();
 
-   gauss::get_by_2_pick_every_second( _levels-PREV_LEVEL,
-                                      prev_oct_obj.getData( ),
-                                      oct_obj.getData( ) );
+    gauss::get_by_2_pick_every_second( queue,
+                                       _levels-PREV_LEVEL,
+                                       prev_oct_obj.getData( ),
+                                       oct_obj.getData( ) );
 }
 
 namespace gauss {
 
-// static
-// void make_dog( PlaneD<float>& src,
-//                PlaneD<float>& dog,
-//                const int      w,
-//                const int      h,
-//                const int      max_level )
-// {
-//     for( int idy = 0; idy < h; idy++ )
-//     {
-//         for( int idx = 0; idx < w; idx++ )
-//         {
-//             float a = src.get( 0, idy, idx );
-//             for( int level = 0; level < max_level-1; level++ )
-//             {
-//                 const float b = src.get( level+1, idy, idx );
-//                 dog.set( level, idy, idx, b-a );
-//                 a = b;
-//             }
-//         }
-//     }
-// }
 
 static
 sycl::event make_dog( sycl::queue&   q,
@@ -150,19 +163,6 @@ sycl::event make_dog( sycl::queue&   q,
 
 } // namespace gauss
 
-// void Pyramid::dogs_from_blurred( int octave, int max_level )
-// {
-//     Octave&      oct_obj = _octaves[octave];
-
-//     const int width  = oct_obj.getWidth();
-//     const int height = oct_obj.getHeight();
-
-//     gauss::make_dog(oct_obj.getData( ),
-//                      oct_obj.getDog( ),
-//                      oct_obj.getWidth(),
-//                      oct_obj.getHeight(),
-//                      max_level );
-// }
 
 // Async version - returns event
 sycl::event Pyramid::dogs_from_blurred( int octave, int max_level )
@@ -221,13 +221,6 @@ void Pyramid::build_pyramid( const Config& conf, std::shared_ptr<ImageBase> base
             }
         }
     }
-
-    // for( int octave=0; octave<_num_octaves; octave++ )
-    // {
-    //     Octave&      oct_obj = _octaves[octave];
-    //     POP_INFO2( conf.silent(), "call dogs_from_blurred" );
-    //     dogs_from_blurred( octave, _levels );
-    // }
 
     // Launch DoG kernels asynchronously on all octaves
     // Each octave uses its own queue, so they execute in parallel
