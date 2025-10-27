@@ -30,24 +30,6 @@ namespace popsift {
 namespace gauss {
 
 __global__
-void get_by_2_interpolate( cudaTextureObject_t src_data,
-                           const int           src_level,
-                           cudaSurfaceObject_t dst_data,
-                           const int           dst_w,
-                           const int           dst_h )
-{
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if( idx >= dst_w ) return;
-    if( idy >= dst_h ) return;
-
-    const float val = readTex( src_data, 2.0f * idx + 1.0f, 2.0f * idy + 1.0f, src_level );
-
-    surf2DLayeredwrite( val, dst_data, idx*4, idy, 0, cudaBoundaryModeZero ); // dst_data.ptr(idy)[idx] = val;
-}
-
-__global__
 void get_by_2_pick_every_second( cudaTextureObject_t src_data,
                                  const int           src_w,
                                  const int           src_h,
@@ -214,35 +196,17 @@ inline void Pyramid::downscale_from_prev_octave( int octave, cudaStream_t stream
     h_grid.x = (unsigned int)grid_divide( width,  h_block.x );
     h_grid.y = (unsigned int)grid_divide( height, h_block.y );
 
-    switch( mode )
-    {
-    case Config::PopSift :
-    case Config::VLFeat :
-    case Config::OpenCV :
-        gauss::get_by_2_pick_every_second
-            <<<h_grid,h_block,0,stream>>>
-            ( prev_oct_obj.getDataTexPoint( ),
-              prev_oct_obj.getWidth(),
-              prev_oct_obj.getHeight(),
-              _levels-PREV_LEVEL,
-              oct_obj.getDataSurface( ),
-              oct_obj.getWidth(),
-              oct_obj.getHeight() );
+    gauss::get_by_2_pick_every_second
+        <<<h_grid,h_block,0,stream>>>
+        ( prev_oct_obj.getDataTexPoint( ),
+          prev_oct_obj.getWidth(),
+          prev_oct_obj.getHeight(),
+          _levels-PREV_LEVEL,
+          oct_obj.getDataSurface( ),
+          oct_obj.getWidth(),
+          oct_obj.getHeight() );
 
-        POP_SYNC_CHK;
-        break;
-    default :
-        gauss::get_by_2_interpolate
-            <<<h_grid,h_block,0,stream>>>
-            ( prev_oct_obj.getDataTexLinear( ).tex,
-              _levels-PREV_LEVEL,
-              oct_obj.getDataSurface( ),
-              oct_obj.getWidth(),
-              oct_obj.getHeight() );
-
-        POP_SYNC_CHK;
-        break;
-    }
+    POP_SYNC_CHK;
 }
 
 __host__
