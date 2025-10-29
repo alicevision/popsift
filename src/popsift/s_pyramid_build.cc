@@ -51,14 +51,6 @@ void get_by_2_pick_every_second( sycl::queue&   queue,
 
     // Launch SYCL kernel for downsampling
     auto event = queue.submit([&](sycl::handler& cgh) {
-        const int c_src_w = src_w;
-        const int c_src_h = src_h;
-        const int c_dst_w = dst_w;
-        const int c_dst_h = dst_h;
-        const int c_src_pitch = src_pitch;
-        const int c_dst_pitch = dst_pitch;
-        const int c_src_level = src_level;
-        const int c_dst_level = dst_level;
         
         cgh.parallel_for(
             sycl::range<2>(dst_h, dst_w),
@@ -66,18 +58,18 @@ void get_by_2_pick_every_second( sycl::queue&   queue,
                 const int write_x = idx[1];
                 const int write_y = idx[0];
                 
-                if (write_x >= c_dst_w || write_y >= c_dst_h) return;
+                if (write_x >= dst_w || write_y >= dst_h) return;
                 
                 // Read every second pixel from source (2x downsampling)
-                const int read_x = sycl::clamp(write_x << 1, 0, c_src_w - 1);
-                const int read_y = sycl::clamp(write_y << 1, 0, c_src_h - 1);
+                const int read_x = sycl::clamp(write_x << 1, 0, src_w - 1);
+                const int read_y = sycl::clamp(write_y << 1, 0, src_h - 1);
                 
                 // Read from src_level
-                const int src_idx = c_src_level * c_src_h * c_src_pitch + read_y * c_src_pitch + read_x;
+                const int src_idx = src_level * src_h * src_pitch + read_y * src_pitch + read_x;
                 const float val = src_ptr[src_idx];
                 
                 // Write to dst_level (layer 0)
-                const int dst_idx = c_dst_level * c_dst_h * c_dst_pitch + write_y * c_dst_pitch + write_x;
+                const int dst_idx = dst_level * dst_h * dst_pitch + write_y * dst_pitch + write_x;
                 dst_ptr[dst_idx] = val;
             }
         );
