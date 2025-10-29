@@ -77,13 +77,9 @@ void Pyramid::horiz_from_input_image( const Config& conf, std::shared_ptr<ImageB
     const int src_pitch = src.getPitch();
     const int dst_pitch = dst.getPitch();
 
-    POP_INFO2( conf.silent(), "  dst: " << dst_w << "x" << dst_h << "x" << dst_z << " layers, pitch=" << dst_pitch );
-    POP_INFO2( conf.silent(), "  src: " << src_w << "x" << src_h << ", pitch=" << src_pitch );
-
     // Get Gaussian filter parameter of span for input image
     const int span = h_gauss.dd.span[0];
     
-
     // Get SYCL queue from octave
     sycl::queue& queue = oct_obj.getQueue();
 
@@ -101,42 +97,34 @@ void Pyramid::horiz_from_input_image( const Config& conf, std::shared_ptr<ImageB
         const int src_total_floats = src_pitch * src_h;
         const int dst_total_floats = dst_pitch * dst_h * dst_z;
 
-        POP_INFO2( conf.silent(), "  src total floats: " << src_total_floats << " (" << (src_total_floats * 4) << " bytes)" );
-        POP_INFO2( conf.silent(), "  dst total floats: " << dst_total_floats << " (" << (dst_total_floats * 4) << " bytes)" );
+        // POP_INFO2( conf.silent(), "  src total floats: " << src_total_floats << " (" << (src_total_floats * 4) << " bytes)" );
+        // POP_INFO2( conf.silent(), "  dst total floats: " << dst_total_floats << " (" << (dst_total_floats * 4) << " bytes)" );
 
         // Allocate device memory for src
-        POP_INFO2( conf.silent(), "  Allocating device memory for src..." );
+        // POP_INFO2( conf.silent(), "  Allocating device memory for src..." );
         float* src_device_ptr = sycl::malloc_device<float>(src_total_floats, queue);
         
         // Copy src from host to device
-        POP_INFO2( conf.silent(), "  Copying src to device..." );
-        queue.memcpy(src_device_ptr, src_host_ptr, src_total_floats * sizeof(float)).wait();
+        //POP_INFO2( conf.silent(), "  Copying src to device..." );
+        sycl::event copy_src_event = queue.memcpy(src_device_ptr, src_host_ptr, src_total_floats * sizeof(float));
 
         // Allocate filter on device
         float* d_filter = sycl::malloc_device<float>(span + 1, queue);
-        queue.memcpy(d_filter, h_gauss.dd.filter, (span + 1) * sizeof(float)).wait();
+        sycl::event copy_filter_event = queue.memcpy(d_filter, h_gauss.dd.filter, (span + 1) * sizeof(float));
 
-        POP_INFO2( conf.silent(), "  Data uploaded, submitting kernel..." );
-
-        // Prepare POD copies for kernel capture
-        const float* d_filter_ptr = d_filter;
-        const float* src_dev_ptr = src_device_ptr;
-        float* dst_dev_ptr = dst_device_ptr;
-        const int c_dst_w = dst_w;
-        const int c_dst_h = dst_h;
-        const int c_src_w = src_w;
-        const int c_src_h = src_h;
-        const int c_src_pitch = src_pitch;
-        const int c_dst_pitch = dst_pitch;
-        const int c_span = span;
+        //POP_INFO2( conf.silent(), "  Data uploaded, submitting kernel..." );
 
         // precompute scale factors for mapping dst -> src
-        const float scale_x = float(c_src_w) / float(c_dst_w);
-        const float scale_y = float(c_src_h) / float(c_dst_h);
+        const float scale_x = float(src_w) / float(dst_w);
+        const float scale_y = float(src_h) / float(dst_h);
 
         // Use a file-scope kernel name and only POD captures to avoid missing kernel images
         auto event = queue.submit([=](sycl::handler& cgh) {
-            cgh.parallel_for<HorizFromInputKernelTag>(sycl::range<2>(c_dst_h, c_dst_w),
+
+            // Make kernel wait for copies to finish
+            cgh.depends_on({ copy_src_event, copy_filter_event });
+
+            cgh.parallel_for<HorizFromInputKernelTag>(sycl::range<2>(dst_h, dst_w),
                 [=](sycl::id<2> idx) {
                     const int write_y = idx[0];
                     const int write_x = idx[1];
@@ -148,22 +136,22 @@ void Pyramid::horiz_from_input_image( const Config& conf, std::shared_ptr<ImageB
                     float out = 0.0f;
 
                     // accumulate symmetric filter samples
-                    for (int offset = c_span; offset > 0; --offset) {
-                        const float w = d_filter_ptr[offset];
+                    for (int offset = span; offset > 0; --offset) {
+                        const float w = d_filter[offset];
                         const float offrel = offset * scale_x;
 
                         // sample left and right using the helper
-                        out += (bilinear_sample_device(src_dev_ptr, c_src_pitch, c_src_w, c_src_h, read_x - offrel, read_y)
-                              + bilinear_sample_device(src_dev_ptr, c_src_pitch, c_src_w, c_src_h, read_x + offrel, read_y))
+                        out += (bilinear_sample_device(src_device_ptr, src_pitch, src_w, src_h, read_x - offrel, read_y)
+                              + bilinear_sample_device(src_device_ptr, src_pitch, src_w, src_h, read_x + offrel, read_y))
                               * w;
                     }
 
                     // center sample
-                    out += bilinear_sample_device(src_dev_ptr, c_src_pitch, c_src_w, c_src_h, read_x, read_y)
-                         * d_filter_ptr[0];
+                    out += bilinear_sample_device(src_device_ptr, src_pitch, src_w, src_h, read_x, read_y)
+                         * d_filter[0];
 
-                    const int dst_idx = write_y * c_dst_pitch + write_x;
-                    dst_dev_ptr[dst_idx] = out * 255.0f;
+                    const int dst_idx = write_y * dst_pitch + write_x;
+                    dst_device_ptr[dst_idx] = out * 255.0f;
                 });
         });
 
