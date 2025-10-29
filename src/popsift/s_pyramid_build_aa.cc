@@ -21,16 +21,17 @@ void Pyramid::horiz_from_prev_level( int octave, int level )
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
     
-    PlaneD<float>& data = oct_obj.getData();  // Device memory (source)
-    PlaneD<float>& intm = oct_obj.getIntm();  // Device memory (destination)
+    PlaneD<float>& data = oct_obj.getData();  
+    PlaneD<float>& intm = oct_obj.getIntm();  
     
     float* src_ptr = data.getDevicePtr();
     float* dst_ptr = intm.getDevicePtr();
     
     const int src_pitch = data.getPitch();
     const int dst_pitch = intm.getPitch();
-    
+
     const int src_level = level - 1;
+    const int src_level_offset = src_level * height * src_pitch;
     const int span = h_gauss.inc.span[level];
     
     // Copy filter to device
@@ -44,46 +45,39 @@ void Pyramid::horiz_from_prev_level( int octave, int level )
     queue.memcpy(d_filter, filter_host.data(), (span + 1) * sizeof(float)).wait();
     
     // Launch SYCL kernel for horizontal filtering
-    auto event = queue.submit([&](sycl::handler& cgh) {
-        const int c_width = width;
-        const int c_height = height;
-        const int c_src_pitch = src_pitch;
-        const int c_dst_pitch = dst_pitch;
-        const int c_span = span;
-        const int c_src_level = src_level;
-        const int c_dst_level = level;
-        
+    auto event = queue.submit([&](sycl::handler& cgh) {        
         cgh.parallel_for(
             sycl::range<2>(height, width),
             [=](sycl::id<2> idx) {
                 const int x = idx[1];
                 const int y = idx[0];
                 
-                if (x >= c_width || y >= c_height) return;
+                if (x >= width || y >= height) return;
                 
                 float out = 0.0f;
                 
-                for(int offset = c_span; offset > 0; offset--) {
+                #pragma unroll
+                for(int offset = span; offset > 0; offset--) {
                     const float weight = d_filter[offset];
                     
                     // Clamp x coordinates
                     int x_neg = sycl::max(0, x - offset);
-                    int x_pos = sycl::min(c_width - 1, x + offset);
+                    int x_pos = sycl::min(width - 1, x + offset);
                     
                     // Read from src_level, write to dst_level
-                    const int idx_neg = c_src_level * c_height * c_src_pitch + y * c_src_pitch + x_neg;
-                    const int idx_pos = c_src_level * c_height * c_src_pitch + y * c_src_pitch + x_pos;
+                    const int idx_neg = src_level_offset + y * src_pitch + x_neg;
+                    const int idx_pos = src_level_offset + y * src_pitch + x_pos;
                     
                     out += src_ptr[idx_neg] * weight;
                     out += src_ptr[idx_pos] * weight;
                 }
                 
                 const float weight0 = d_filter[0];
-                const int idx_center = c_src_level * c_height * c_src_pitch + y * c_src_pitch + x;
+                const int idx_center = src_level_offset + y * src_pitch + x;
                 out += src_ptr[idx_center] * weight0;
                 
                 // Write to dst_level of intermediate plane
-                const int dst_idx = c_dst_level * c_height * c_dst_pitch + y * c_dst_pitch + x;
+                const int dst_idx = level * height * dst_pitch + y * dst_pitch + x;
                 dst_ptr[dst_idx] = out;
             }
         );
@@ -100,14 +94,16 @@ void Pyramid::vert_from_interm( int octave, int level )
     const int width  = oct_obj.getWidth();
     const int height = oct_obj.getHeight();
     
-    PlaneD<float>& intm = oct_obj.getIntm();  // Device memory
-    PlaneD<float>& data = oct_obj.getData();  // Device memory
+    PlaneD<float>& intm = oct_obj.getIntm();  
+    PlaneD<float>& data = oct_obj.getData(); 
     
     float* src_ptr = intm.getDevicePtr();
     float* dst_ptr = data.getDevicePtr();
     
     const int src_pitch = intm.getPitch();
     const int dst_pitch = data.getPitch();
+
+    const int src_level_offset = level * height * src_pitch;
     
     const int span = h_gauss.inc.span[level];
     float* h_filter = h_gauss.inc.filter + level * GAUSS_ALIGN;
@@ -118,12 +114,6 @@ void Pyramid::vert_from_interm( int octave, int level )
     
     // Launch SYCL kernel
     auto event = queue.submit([&](sycl::handler& cgh) {
-        const int c_width = width;
-        const int c_height = height;
-        const int c_src_pitch = src_pitch;
-        const int c_dst_pitch = dst_pitch;
-        const int c_span = span;
-        const int c_level = level;
         
         cgh.parallel_for(
             sycl::range<2>(height, width),
@@ -131,29 +121,30 @@ void Pyramid::vert_from_interm( int octave, int level )
                 const int x = idx[1];
                 const int y = idx[0];
                 
-                if (x >= c_width || y >= c_height) return;
+                if (x >= width || y >= height) return;
                 
                 float out = 0.0f;
                 
-                for(int offset = c_span; offset > 0; offset--) {
+                #pragma unroll
+                for(int offset = span; offset > 0; offset--) {
                     const float weight = d_filter[offset];
                     
                     // Clamp coordinates
                     int y_neg = sycl::max(0, y - offset);
-                    int y_pos = sycl::min(c_height - 1, y + offset);
+                    int y_pos = sycl::min(height - 1, y + offset);
                     
-                    const int idx_neg = c_level * c_height * c_src_pitch + y_neg * c_src_pitch + x;
-                    const int idx_pos = c_level * c_height * c_src_pitch + y_pos * c_src_pitch + x;
+                    const int idx_neg = src_level_offset + y_neg * src_pitch + x;
+                    const int idx_pos = src_level_offset + y_pos * src_pitch + x;
                     
                     out += src_ptr[idx_neg] * weight;
                     out += src_ptr[idx_pos] * weight;
                 }
                 
                 const float weight0 = d_filter[0];
-                const int idx_center = c_level * c_height * c_src_pitch + y * c_src_pitch + x;
+                const int idx_center = level * height * src_pitch + y * src_pitch + x;
                 out += src_ptr[idx_center] * weight0;
                 
-                const int dst_idx = c_level * c_height * c_dst_pitch + y * c_dst_pitch + x;
+                const int dst_idx = level * height * dst_pitch + y * dst_pitch + x;
                 dst_ptr[dst_idx] = out;
             }
         );
