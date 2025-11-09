@@ -62,6 +62,30 @@ public:
         return ( _ptr == nullptr );
     }
 
+    // Add these public methods to PlaneD class (around line 90):
+
+    inline T* getDevPtr() const { 
+        return _ptr ? _ptr->getDevicePtr() : nullptr;
+    }
+
+    inline int getCols() const { 
+        return _ptr ? _ptr->getPitch() / sizeof(T) : 0;
+    }
+
+    inline int getRows() const {
+        return _ptr ? _ptr->getDimY() : 0;
+    }
+
+    inline sycl::queue* getQueue() const {
+        return _ptr ? _ptr->getQueue() : nullptr;
+    }
+
+
+    inline int getPitchElements() const {
+        return _ptr ? _ptr->getPitch() / sizeof(T) : 0;
+    }
+    
+
     /** Overwrite the width and height information. Useful if smaller
      *  planes should be loaded into larger preallocated host planes
      *  without actually allocating again, but dangerous.
@@ -145,7 +169,16 @@ public:
             std::cerr << "E     Alignment trouble, different pitches" << std::endl;
         }
 
-        std::memcpy( _ptr->base(), src._ptr->plane(zLevel),  p * h );
+       // CRITICAL: Use SYCL memcpy for device-to-host transfer
+       sycl::queue* q = src.getQueue();
+       if (q) {
+           // Device memory - use SYCL queue to copy
+           const float* src_ptr = static_cast<const float*>(src._ptr->plane(zLevel));
+           q->memcpy(_ptr->base(), src_ptr, p * h).wait();
+       } else {
+           // Host memory - use regular memcpy
+           std::memcpy( _ptr->base(), src._ptr->plane(zLevel),  p * h );
+       }
     }
 
     inline       T& get( int x )                     { return _ptr->deref( x ); }
