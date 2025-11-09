@@ -86,7 +86,6 @@ void Pyramid::horiz_from_input_image( const Config& conf, std::shared_ptr<ImageB
     POP_INFO2( conf.silent(), "Submitting horiz_from_input_image SYCL kernel..." );
 
     try {
-        // FIX: src is HOST memory, need to copy to device!
         float* src_host_ptr = src.getHostPtr();  // Get host pointer
         float* dst_device_ptr = dst.getDevicePtr();
 
@@ -97,28 +96,20 @@ void Pyramid::horiz_from_input_image( const Config& conf, std::shared_ptr<ImageB
         const int src_total_floats = src_pitch * src_h;
         const int dst_total_floats = dst_pitch * dst_h * dst_z;
 
-        // POP_INFO2( conf.silent(), "  src total floats: " << src_total_floats << " (" << (src_total_floats * 4) << " bytes)" );
-        // POP_INFO2( conf.silent(), "  dst total floats: " << dst_total_floats << " (" << (dst_total_floats * 4) << " bytes)" );
-
         // Allocate device memory for src
-        // POP_INFO2( conf.silent(), "  Allocating device memory for src..." );
         float* src_device_ptr = sycl::malloc_device<float>(src_total_floats, queue);
         
         // Copy src from host to device
-        //POP_INFO2( conf.silent(), "  Copying src to device..." );
         sycl::event copy_src_event = queue.memcpy(src_device_ptr, src_host_ptr, src_total_floats * sizeof(float));
 
         // Allocate filter on device
         float* d_filter = sycl::malloc_device<float>(span + 1, queue);
         sycl::event copy_filter_event = queue.memcpy(d_filter, h_gauss.dd.filter, (span + 1) * sizeof(float));
 
-        //POP_INFO2( conf.silent(), "  Data uploaded, submitting kernel..." );
-
         // precompute scale factors for mapping dst -> src
         const float scale_x = float(src_w) / float(dst_w);
         const float scale_y = float(src_h) / float(dst_h);
 
-        // Use a file-scope kernel name and only POD captures to avoid missing kernel images
         auto event = queue.submit([=](sycl::handler& cgh) {
 
             // Make kernel wait for copies to finish
@@ -155,7 +146,7 @@ void Pyramid::horiz_from_input_image( const Config& conf, std::shared_ptr<ImageB
                 });
         });
 
-        // wait for kernel and check event for error (some backends report asynchronously)
+        // wait for kernel and check event for error
         event.wait();
 
         // Free device memory
