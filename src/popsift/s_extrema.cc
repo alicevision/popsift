@@ -25,9 +25,12 @@
 namespace popsift{
 
 
+// Host-side storage for extrema counts (one per octave)
+static std::vector<int> extrema_count_host;
+
 template<int sift_mode>
 static
-void find_extrema_in_dog( const int3&    g,
+sycl::event find_extrema_in_dog( const int3&    g,
                           Plane2D_float& dog,
                           int            octave,
                           int            width,
@@ -39,8 +42,6 @@ void find_extrema_in_dog( const int3&    g,
                           Pyramid*       pyramid )
 {
     const bool no_extrema_reporting = false;
-
-    std::vector<InitialExtremum>& i_extrema = dct.initial_extrema_in_octave[octave];
 
     POP_INFO2( no_extrema_reporting, "Converting find_extrema to SYCL kernel for octave " << octave );
 
@@ -377,42 +378,14 @@ void find_extrema_in_dog( const int3&    g,
         });
     });
 
-    event.wait();
 
     // Copy results back to host
-    int extrema_count = 0;
-    queue.memcpy(&extrema_count, d_count, sizeof(int)).wait();
+    auto copy_event = queue.memcpy(&extrema_count_host[octave], d_count, sizeof(int), event);
 
-    POP_INFO2( no_extrema_reporting, "Found " << extrema_count << " extrema on device" );
+    // Store device pointers in pyramid for later cleanup
+    pyramid->storeDevicePointers(octave, d_extrema, d_count);
 
-    if(extrema_count > 0) {
-        std::vector<InitialExtremum> host_extrema(extrema_count);
-        queue.memcpy(host_extrema.data(), d_extrema, extrema_count * sizeof(InitialExtremum)).wait();
-                
-        std::vector<InitialExtremum> unique_extrema;
-        for(const auto& ex : host_extrema) {
-            unique_extrema.push_back(ex);
-        }
-                
-        // DEBUG: Print extrema positions grouped by level (like CPU version)
-        POP_INFO2( false, "Extrema in octave " << octave << " by level:" );
-                
-        // Group by level (lpos)
-        std::map<int, std::vector<InitialExtremum>> by_level;
-        for(const auto& ex : unique_extrema) {
-            by_level[ex.lpos].push_back(ex);
-        }
-                
-        i_extrema.insert(i_extrema.end(), unique_extrema.begin(), unique_extrema.end());
-    }
-
-    // Cleanup
-    sycl::free(d_extrema, queue);
-    sycl::free(d_count, queue);
-
-    dct.extrema_count_per_octave[octave] = i_extrema.size();
-
-    POP_INFO2( no_extrema_reporting, "final extrema count in octave " << octave << ": " << dct.extrema_count_per_octave[octave] );
+    return copy_event;
 }
 
 void Pyramid::find_extrema( const Config& conf )
@@ -420,7 +393,12 @@ void Pyramid::find_extrema( const Config& conf )
     POP_INFO2( false, "Enter " << __FUNCTION__ );
 
     dct.extrema_count_per_octave.resize( MAX_OCTAVES );
+    extrema_count_host.resize( MAX_OCTAVES );
 
+    // Store events for async execution
+    std::vector<sycl::event> octave_events;
+    octave_events.reserve(_num_octaves);
+      
     for( int octave=0; octave<_num_octaves; octave++ )
     {
         Octave& oct_obj = _octaves[octave];
@@ -430,20 +408,21 @@ void Pyramid::find_extrema( const Config& conf )
         int cols = oct_obj.getWidth();
         int rows = oct_obj.getHeight();
 
-       //Get the DoG plane that was allocated on THIS octave's queue
-       Plane2D_float& dog = oct_obj.getDog();
+        //Get the DoG plane that was allocated on THIS octave's queue
+        Plane2D_float& dog = oct_obj.getDog();
        
-       // Verify the dog pointer is valid before passing to kernel
-       float* dog_test_ptr = (float*)dog.getDevicePtr();
-       if(dog_test_ptr == nullptr) {
+        // Verify the dog pointer is valid before passing to kernel
+        float* dog_test_ptr = (float*)dog.getDevicePtr();
+        if(dog_test_ptr == nullptr) {
            POP_FATAL("ERROR: DoG pointer is NULL for octave " << octave);
            continue;
-       }
+        }
 
         switch( conf.getSiftMode() )
         {
         case Config::RefineInLevel :
-                find_extrema_in_dog<Config::RefineInLevel>
+               octave_events.push_back(
+                   find_extrema_in_dog<Config::RefineInLevel>
                     ( int3(cols, rows, _levels-3),
                       dog,
                       octave,
@@ -453,10 +432,11 @@ void Pyramid::find_extrema( const Config& conf )
                       oct_obj.getWGridDivider(),
                       oct_obj.getHGridDivider(),
                       conf.getFilterGridSize(),
-                      this );
+                      this ));
                 break;
         default :
-                find_extrema_in_dog<Config::RefineInOctave>
+               octave_events.push_back(
+                   find_extrema_in_dog<Config::RefineInOctave>
                     ( int3(cols, rows, _levels-3),
                       dog,
                       octave,
@@ -466,9 +446,49 @@ void Pyramid::find_extrema( const Config& conf )
                       oct_obj.getWGridDivider(),
                       oct_obj.getHGridDivider(),
                       conf.getFilterGridSize(),
-                      this ); 
+                     this));
                 break;
         }
+
+   }
+
+   // Wait for ALL octaves to complete
+   POP_INFO2( false, "Waiting for all " << octave_events.size() << " octave kernels to complete..." );
+   for(auto& evt : octave_events) {
+       evt.wait();
+   }
+   POP_INFO2( false, "All octave extrema detection complete" );
+
+   // Now process results for each octave
+   for( int octave=0; octave<_num_octaves; octave++ )
+   {
+        Octave& oct_obj = _octaves[octave];
+
+        std::vector<InitialExtremum>& i_extrema = dct.initial_extrema_in_octave[octave];
+      
+        int extrema_count = extrema_count_host[octave];
+        POP_INFO2( false, "Found " << extrema_count << " extrema in octave " << octave );
+      
+
+       // Get stored device pointers
+       auto [d_extrema, d_count] = getDevicePointers(octave);
+   
+
+       if(extrema_count > 0) {
+          std::vector<InitialExtremum> host_extrema(extrema_count);
+          oct_obj.getQueue().memcpy(host_extrema.data(), d_extrema, 
+                                    extrema_count * sizeof(InitialExtremum)).wait();
+          
+          i_extrema.insert(i_extrema.end(), host_extrema.begin(), host_extrema.end());
+      }
+      
+      // Cleanup device memory
+      sycl::free(d_extrema, oct_obj.getQueue());
+      sycl::free(d_count, oct_obj.getQueue());
+      
+      dct.extrema_count_per_octave[octave] = i_extrema.size();
+      POP_INFO2( false, "final extrema count in octave " << octave << ": " << dct.extrema_count_per_octave[octave] );
+
 
         bool log_to_file = ( conf.getLogMode() == popsift::Config::All );
         if( log_to_file ) {

@@ -76,6 +76,9 @@ class Pyramid
     /* used to implement a global barrier per octave */
     int*         _d_extrema_num_blocks;
 
+    /* Storage for device pointers during async extrema detection */
+    std::vector<std::pair<InitialExtremum*, int*>> _device_extrema_ptrs;
+
 public:
     enum GaussTableChoice {
         Interpolated_FromPrevious,
@@ -110,6 +113,19 @@ public:
     inline int getNumLevels()  const { return _levels; }
 
     inline Octave& getOctave(const int o){ return _octaves[o]; }
+
+   /* Store device pointers for async extrema detection cleanup */
+   void storeDevicePointers(int octave, InitialExtremum* d_extrema, int* d_count) {
+       if(_device_extrema_ptrs.size() <= (size_t)octave) {
+           _device_extrema_ptrs.resize(octave + 1);
+       }
+       _device_extrema_ptrs[octave] = {d_extrema, d_count};
+   }
+   
+   /* Retrieve device pointers for processing results */
+   std::pair<InitialExtremum*, int*> getDevicePointers(int octave) {
+       return _device_extrema_ptrs[octave];
+   }
 
 private:
     void horiz_from_input_image( const Config&              conf,
