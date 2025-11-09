@@ -56,7 +56,6 @@ void Pyramid::horiz_from_prev_level( int octave, int level )
                 
                 float out = 0.0f;
                 
-                #pragma unroll
                 for(int offset = span; offset > 0; offset--) {
                     const float weight = d_filter[offset];
                     
@@ -125,7 +124,6 @@ void Pyramid::vert_from_interm( int octave, int level )
                 
                 float out = 0.0f;
                 
-                #pragma unroll
                 for(int offset = span; offset > 0; offset--) {
                     const float weight = d_filter[offset];
                     
