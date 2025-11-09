@@ -36,12 +36,14 @@ void Octave::initQueue()
 {
     try {
         
-        _queue = sycl::queue(sycl::gpu_selector_v);
+        //_queue = sycl::queue(sycl::cpu_selector_v); // Changes sometimes between CPU and GPU to debug
+        _queue = sycl::queue(sycl::gpu_selector_v); // Changes sometimes between CPU and GPU to debug
+
         
         // Optional: Print device info for debugging
         auto device = _queue.get_device();
-        std::cout << "Octave " << _debug_octave_id << " queue initialized on: " 
-                  << device.get_info<sycl::info::device::name>() << std::endl;
+        // std::cout << "Octave " << _debug_octave_id << " queue initialized on: " 
+        //           << device.get_info<sycl::info::device::name>() << std::endl;
     }
     catch (sycl::exception const& e) {
         std::cerr << "SYCL exception in Octave::initQueue(): " << e.what() << std::endl;
@@ -70,25 +72,25 @@ void Octave::alloc( const Config& conf, int width, int height, int levels )
     initQueue();
     
     auto device = _queue.get_device();
-    std::cout << "Octave " << _debug_octave_id 
-              << " allocating on device: " 
-              << device.get_info<sycl::info::device::name>() 
-              << std::endl;
+    // std::cout << "Octave " << _debug_octave_id 
+    //           << " allocating on device: " 
+    //           << device.get_info<sycl::info::device::name>() 
+    //           << std::endl;
 
     // All planes must use this octave's queue
     _data  .alloc( width, height, levels, &_queue );
     _intm  .alloc( width, height, levels, &_queue );
-    _dog_3d.alloc( width, height, levels-1, &_queue );
+    _dog_3d.alloc( width, height, levels, &_queue );
     
     // Verify allocation succeeded
     if (!_data.getDevicePtr() || !_dog_3d.getDevicePtr()) {
         throw std::runtime_error("Failed to allocate device memory for octave");
     }
     
-    std::cout << "Octave " << _debug_octave_id 
-              << " allocated: data=" << _data.getDevicePtr()
-              << ", dog=" << _dog_3d.getDevicePtr()
-              << std::endl;
+    // std::cout << "Octave " << _debug_octave_id 
+    //           << " allocated: data=" << _data.getDevicePtr()
+    //           << ", dog=" << _dog_3d.getDevicePtr()
+    //           << std::endl;
 }
 
 void Octave::resetDimensions( const Config& conf, int width, int height )
@@ -172,8 +174,12 @@ void Octave::download_and_save_array( const Config& conf, const char* basename, 
     }
 
     for( int l = 0; l<_levels; l++ ) {
-        Plane2D_float p;
-        p.copyFromPlane( _data, l );
+       // Allocate HOST memory for downloading
+       Plane2D_float p( _w, _h );  // This allocates host memory
+       
+      // Copy from device to host using SYCL
+       const float* src_device = static_cast<const float*>(_data.getDevicePtr()) + (l * _h * _data.getPitchElements());
+       _queue.memcpy(p.getHostPtr(), src_device, _w * _h * sizeof(float)).wait();
 
         ostringstream ostr;
         ostr << "dir-octave/" << basename << "-o-" << octave << "-l-" << l << ".pgm";
@@ -185,8 +191,12 @@ void Octave::download_and_save_array( const Config& conf, const char* basename, 
     }
 
     for( int l = 0; l<_levels; l++ ) {
-        Plane2D_float p;
-        p.copyFromPlane( _intm, l );
+       // Allocate HOST memory for downloading
+       Plane2D_float p( _w, _h );
+       
+       // Copy from device to host using SYCL
+       const float* src_device = static_cast<const float*>(_intm.getDevicePtr()) + (l * _h * _intm.getPitchElements());
+       _queue.memcpy(p.getHostPtr(), src_device, _w * _h * sizeof(float)).wait();
 
         ostringstream ostr;
         ostr << "dir-interm/" << basename << "-o-" << octave << "-l-" << l << ".pgm";
@@ -194,8 +204,12 @@ void Octave::download_and_save_array( const Config& conf, const char* basename, 
     }
 
     for (int l = 0; l<_levels - 1; l++) {
-        Plane2D_float p;
-        p.copyFromPlane( _dog_3d, l );
+       // Allocate HOST memory for downloading
+       Plane2D_float p( _w, _h );
+       
+       // Copy from device to host using SYCL
+       const float* src_device = static_cast<const float*>(_dog_3d.getDevicePtr()) + (l * _h * _dog_3d.getPitchElements());
+       _queue.memcpy(p.getHostPtr(), src_device, _w * _h * sizeof(float)).wait();
 
         ostringstream ostr;
         ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".pgm";
