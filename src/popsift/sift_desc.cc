@@ -42,6 +42,12 @@ using namespace std;
  *************************************************************/
 void Pyramid::descriptors( const Config& conf )
 {
+    if( dct.ori_total == 0 )
+    {
+        cerr << "Warning: no descriptors to extract" << endl;
+        return;
+    }
+
     // Store events and device memory for cleanup
     std::vector<sycl::event> descriptor_events;
     std::vector<DescriptorDeviceMemory> device_memory;
@@ -66,23 +72,50 @@ void Pyramid::descriptors( const Config& conf )
     for(auto& evt : descriptor_events) {
         evt.wait();
     }
-    std::cerr << "All descriptor extractions complete" << std::endl;
     
-    // Clean up device memory after all events complete
-    for(auto& dev_mem : device_memory) {
-        dev_mem.cleanup();
-    }
+   // Allocate device memory for all descriptors
+   sycl::queue& q = _octaves[0].getQueue();  // Use shared queue
 
-    if( dct.ori_total == 0 )
-    {
-        cerr << "Warning: no descriptors extracted" << endl;
+   Descriptor* d_all_descs = sycl::malloc_device<Descriptor>(dct.ori_total, q);
+ 
+    if (!d_all_descs) {
+        cerr << "Error: Failed to allocate device memory for descriptors" << endl;
+        // Clean up extraction memory and return
+        for(auto& dev_mem : device_memory) {
+            dev_mem.cleanup();
+        }
         return;
-    }
+    }   
 
+
+    // Copy all descriptors to device AND WAIT
+    auto copy_to_device = q.memcpy(d_all_descs, dbuf.desc, 
+                                    dct.ori_total * sizeof(Descriptor));
+    copy_to_device.wait();  // CRITICAL: Wait for copy to complete!
+
+   // Launch normalization kernel
+   sycl::event norm_event;
     if( conf.getUseRootSift() ) {
-        normalize_histogram<NormalizeRootSift>( );
+        norm_event = normalize_histogram_sycl<NormalizeRootSift>(q, d_all_descs, dct.ori_total);
     } else {
-        normalize_histogram<NormalizeL2>( );
+        norm_event = normalize_histogram_sycl<NormalizeL2>(q, d_all_descs, dct.ori_total);
     }
+    
+    norm_event.wait();
+
+   // Copy normalized descriptors back to host
+    auto copy_to_host = q.memcpy(dbuf.desc, d_all_descs, 
+                                  dct.ori_total * sizeof(Descriptor));   
+   // Wait for normalization to complete
+   copy_to_host.wait();
+
+   // Clean up
+   sycl::free(d_all_descs, q);
+   
+   // Clean up descriptor extraction device memory
+   for(auto& dev_mem : device_memory) {
+       dev_mem.cleanup();
+   }
+
 }
 

@@ -7,9 +7,9 @@
  */
 #pragma once
 #include "common/assist.h"
-#include "s_desc_normalize.h"
 #include "sift_config.h"
-
+#include "sift_extremum.h"
+#include <sycl/sycl.hpp>
 #include <cmath>
 
 using namespace popsift;
@@ -74,5 +74,52 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc )
     {
         dst_desc[i] = desc[i] * norm;
     }
+}
+
+// SYCL kernel for L2 normalization 
+static sycl::event normalize_descriptors_sycl(
+    sycl::queue& q,
+    Descriptor* d_descs,
+    const int num_orientations,
+    const int norm_multi,
+    NormalizeL2*)
+{
+    return q.submit([&](sycl::handler& cgh) {
+        cgh.parallel_for(sycl::range<1>(num_orientations), [=](sycl::id<1> idx) {
+            const int i = idx[0];
+            
+            Descriptor* desc = &d_descs[i];
+            float* features = desc->features;
+            
+            // First normalization pass
+            float norm = 0.0f;
+            for(int j = 0; j < 128; j++) {
+                norm += (features[j] * features[j]);
+            }
+            
+            norm = 1.0f / sycl::sqrt(norm);
+            
+            float temp[128];
+            for(int j = 0; j < 128; j++) {
+                temp[j] = sycl::min(features[j] * norm, 0.2f); 
+            }
+            
+            // Second normalization pass
+            norm = 0.0f;
+            for(int j = 0; j < 128; j++) {
+                norm += (temp[j] * temp[j]);
+            }
+            
+            norm = 1.0f / sycl::sqrt(norm);
+            
+            // Scale for output
+            norm = sycl::ldexp(norm, norm_multi);  // scalbnf equivalent
+            
+            // Write back normalized and scaled descriptors
+            for(int j = 0; j < 128; j++) {
+                features[j] = temp[j] * norm;
+            }
+        });
+    });
 }
 

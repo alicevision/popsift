@@ -11,7 +11,18 @@
 #include "s_desc_norm_l2.h"
 #include "s_desc_norm_rs.h"
 #include "sift_extremum.h"
+#include <sycl/sycl.hpp>
 
+// Host wrapper for SYCL normalization
+template<class T>
+sycl::event normalize_histogram_sycl(sycl::queue& q, Descriptor* d_descs, const int num_orientations)
+{
+   // Use tag dispatch to select correct overload
+   T* tag = nullptr;
+   return normalize_descriptors_sycl(q, d_descs, num_orientations, h_consts.norm_multi, tag);
+}
+
+// CPU fallback (original implementation)
 template<class T>
 void normalize_histogram( )
 {

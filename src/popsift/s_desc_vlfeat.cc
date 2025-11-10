@@ -222,10 +222,11 @@ std::pair<sycl::event, DescriptorDeviceMemory> start_ext_desc_vlfeat_async(
                         );
         
     // Copy results back to host asynchronously
-    auto copy_back_event = q.memcpy(&dbuf.desc[dct.ori_ps[octave]], d_desc, 
+    const int host_offset = dct.ori_ps[octave];
+    auto copy_back_event = q.memcpy(&dbuf.desc[host_offset], d_desc, 
                                      num_orientations * sizeof(Descriptor),
-                                     kernel_event);  // Depend on kernel   
-    
+                                     kernel_event);
+                                     
     // Return event and device memory (caller will clean up after event completes)
     DescriptorDeviceMemory dev_mem(d_extrema, d_feat_to_ext_map, d_desc, &q);
     return {copy_back_event, dev_mem};
