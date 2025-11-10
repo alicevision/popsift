@@ -23,8 +23,15 @@ using namespace popsift;
 namespace popsift
 {
 
+// Define cleanup method (declared in header)
+void DescriptorDeviceMemory::cleanup() {
+    if (d_extrema) sycl::free(d_extrema, *queue);
+    if (d_feat_to_ext_map) sycl::free(d_feat_to_ext_map, *queue);
+    if (d_desc) sycl::free(d_desc, *queue);
+}
+
 // SYCL kernel for descriptor extraction
-static void ext_desc_vlfeat_sycl(
+static sycl::event ext_desc_vlfeat_sycl(
     sycl::queue& q,
     const int octave,
     const float* d_layer_data,
@@ -36,9 +43,14 @@ static void ext_desc_vlfeat_sycl(
     const int* d_feat_to_ext_map,
     const int num_orientations,
     const int orientation_offset,
-    Descriptor* d_descriptors)
+    Descriptor* d_descriptors,
+    const std::vector<sycl::event>& depends_on = {})
 {
-    q.submit([&](sycl::handler& cgh) {
+return q.submit([&](sycl::handler& cgh) {
+        // Add dependencies if provided
+        if (!depends_on.empty()) {
+            cgh.depends_on(depends_on);
+        }
         cgh.parallel_for(sycl::range<1>(num_orientations), [=](sycl::id<1> idx) {
             const int ori_idx = idx[0];
             const int o_offset = orientation_offset + ori_idx;
@@ -163,53 +175,60 @@ static void ext_desc_vlfeat_sycl(
                 desc->features[i] = dpt[i];
             }
         });
-    }).wait();
+    });
 }
-bool start_ext_desc_vlfeat( const int octave, Octave& oct_obj )
-{
-    std::cerr << __FUNCTION__ << " computing descriptors for octave " << octave << std::endl;
-    std::cerr << "    number of orientations: " << dct.ori_ct[octave] << std::endl;
-    
-    if( dct.ori_ct[octave] == 0 ) return false;
 
-    const int num_orientations = dct.ori_ct[octave];
-    
+std::pair<sycl::event, DescriptorDeviceMemory> start_ext_desc_vlfeat_async(
+    const int octave, 
+    Octave& oct_obj )
+{
     sycl::queue& q = oct_obj.getQueue();
+    
+    if( dct.ori_ct[octave] == 0 ) {
+        // Return dummy event for no-op
+        auto dummy_event = q.submit([&](sycl::handler& cgh) {
+            cgh.single_task([=]() { /* no-op */ });
+        });
+        return {dummy_event, DescriptorDeviceMemory(nullptr, nullptr, nullptr, &q)};
+    }
+
+    // Allocate device memory
+    const int num_orientations = dct.ori_ct[octave];
      
     Descriptor* d_desc = sycl::malloc_device<Descriptor>(num_orientations, q);
     
-    // Allocate device memory and copy data
     Extremum* d_extrema = sycl::malloc_device<Extremum>(dbuf.extrema.size(), q);
     int* d_feat_to_ext_map = sycl::malloc_device<int>(dbuf.feat_to_ext_map.size(), q);
     
-    q.memcpy(d_extrema, dbuf.extrema.data(), dbuf.extrema.size() * sizeof(Extremum)).wait();
-    q.memcpy(d_feat_to_ext_map, dbuf.feat_to_ext_map.data(), dbuf.feat_to_ext_map.size() * sizeof(int)).wait();
-        
-    ext_desc_vlfeat_sycl(
-        q,
-        octave,
-        oct_obj.getData().getDevPtr(),
-        oct_obj.getData().getCols(),
-        oct_obj.getLevels(),
-        oct_obj.getWidth(),
-        oct_obj.getHeight(),
-        d_extrema,
-        d_feat_to_ext_map,
-        num_orientations,
-        dct.ori_ps[octave],
-        d_desc
-    );
-        
-    // Copy results back to host (dbuf.desc)
-    q.memcpy(&dbuf.desc[dct.ori_ps[octave]], d_desc, num_orientations * sizeof(Descriptor)).wait();
-        
-    // Clean up
-    sycl::free(d_extrema, q);
-    sycl::free(d_feat_to_ext_map, q);
-    sycl::free(d_desc, q);
+    auto copy_event1 = q.memcpy(d_extrema, dbuf.extrema.data(), 
+                                 dbuf.extrema.size() * sizeof(Extremum));
+    auto copy_event2 = q.memcpy(d_feat_to_ext_map, dbuf.feat_to_ext_map.data(), 
+                                dbuf.feat_to_ext_map.size() * sizeof(int));
 
-    return true;
+    auto kernel_event = ext_desc_vlfeat_sycl(
+                            q,
+                            octave,
+                            oct_obj.getData().getDevPtr(),
+                            oct_obj.getData().getCols(),
+                            oct_obj.getLevels(),
+                            oct_obj.getWidth(),
+                            oct_obj.getHeight(),
+                            d_extrema,
+                            d_feat_to_ext_map,
+                            num_orientations,
+                            dct.ori_ps[octave],
+                            d_desc,
+                            {copy_event1, copy_event2}
+                        );
+        
+    // Copy results back to host asynchronously
+    auto copy_back_event = q.memcpy(&dbuf.desc[dct.ori_ps[octave]], d_desc, 
+                                     num_orientations * sizeof(Descriptor),
+                                     kernel_event);  // Depend on kernel   
+    
+    // Return event and device memory (caller will clean up after event completes)
+    DescriptorDeviceMemory dev_mem(d_extrema, d_feat_to_ext_map, d_desc, &q);
+    return {copy_back_event, dev_mem};
 }
-
 
 }; // namespace popsift

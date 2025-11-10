@@ -17,6 +17,7 @@
 
 #include <cstdio>
 #include <iostream>
+#include <vector>
 
 using namespace popsift;
 using namespace std;
@@ -41,13 +42,35 @@ using namespace std;
  *************************************************************/
 void Pyramid::descriptors( const Config& conf )
 {
+    // Store events and device memory for cleanup
+    std::vector<sycl::event> descriptor_events;
+    std::vector<DescriptorDeviceMemory> device_memory;
+    
+    descriptor_events.reserve(_num_octaves);
+    device_memory.reserve(_num_octaves);
+    
+    // Launch all octave descriptor extractions asynchronously
     for( int octave=_num_octaves-1; octave>=0; octave-- )
     {
         if( dct.ori_ct[octave] != 0 ) {
             Octave& oct_obj = _octaves[octave];
 
-            start_ext_desc_vlfeat( octave, oct_obj );
+            // Launch async and store event + device memory
+            auto [event, dev_mem] = start_ext_desc_vlfeat_async( octave, oct_obj );
+            descriptor_events.push_back(event);
+            device_memory.push_back(dev_mem);
         }
+    }
+
+    // Wait for ALL descriptor extractions to complete
+    for(auto& evt : descriptor_events) {
+        evt.wait();
+    }
+    std::cerr << "All descriptor extractions complete" << std::endl;
+    
+    // Clean up device memory after all events complete
+    for(auto& dev_mem : device_memory) {
+        dev_mem.cleanup();
     }
 
     if( dct.ori_total == 0 )
