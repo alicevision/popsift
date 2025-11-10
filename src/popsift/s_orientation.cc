@@ -370,31 +370,15 @@ void ori_prefix_sum( const int num_octaves )
         }
     }
 
-    /* Like above, compute the exclusive prefix sum of all orientations
-     * in ori_ps. */
-#if 1
-    std::cerr << "Orientations by octave (dct.ori_ct): ";
-    for( int i=0; i<MAX_OCTAVES; i++ ) std::cerr << dct.ori_ct[i] << " ";
-    std::cerr << std::endl;
-#endif
 
     std::copy( &dct.ori_ct[0],
                &dct.ori_ct[MAX_OCTAVES],
                &dct.ori_ps[0] );
-#if 1
-    std::cerr << "Orientations by octave (dct.ori_ps): ";
-    for( int i=0; i<MAX_OCTAVES; i++ ) std::cerr << dct.ori_ps[i] << " ";
-    std::cerr << std::endl;
-#endif
+
     std::exclusive_scan( &dct.ori_ps[0],
                          &dct.ori_ps[MAX_OCTAVES],
                          &dct.ori_ps[0],
                          0 );
-#if 1
-    std::cerr << "Exclusive prefix sum of orientations (dct.ori_ps): ";
-    for( int i=0; i<MAX_OCTAVES; i++ ) std::cerr << dct.ori_ps[i] << " ";
-    std::cerr << std::endl;
-#endif
 
     /* Store the total number of orientations and the total number of
      * extrema as well. */
