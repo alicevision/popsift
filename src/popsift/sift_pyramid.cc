@@ -142,8 +142,8 @@ Pyramid::Pyramid( const Config& config,
     int w = width;
     int h = height;
 
-    memset( &dct,  0, sizeof(ExtremaCounters) );
-    memset( &dbuf, 0, sizeof(ExtremaBuffers) );
+    dct = ExtremaCounters();
+    dbuf = ExtremaBuffers();
 
     _d_extrema_num_blocks = new int[_num_octaves];
 
@@ -361,7 +361,7 @@ std::unique_ptr<FeaturesHost> Pyramid::clone_device_descriptors( const Config& c
 
 void Pyramid::reset_extrema_mgmt()
 {
-    memset( &dct, 0, sizeof(ExtremaCounters) );
+    dct = ExtremaCounters();
     memset( _d_extrema_num_blocks, 0, _num_octaves * sizeof(int) );
 
 }

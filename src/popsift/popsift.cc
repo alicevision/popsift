@@ -234,9 +234,9 @@ void PopSift::extractDownloadLoop( )
     // Clean up thread-local allocated memory before thread exit
     POP_INFO2( _config.silent(), "DEBUG: Cleaning up thread-local memory" );
     
-    // Zero out the structures
-    memset(&popsift::dct, 0, sizeof(popsift::dct));
-    memset(&popsift::dbuf, 0, sizeof(popsift::dbuf));
+     // Properly reset the structures
+    popsift::dct = popsift::ExtremaCounters();
+    popsift::dbuf = popsift::ExtremaBuffers();
 
     POP_INFO2( _config.silent(), "DEBUG: ExtractDownloadLoop finished" );
 }
