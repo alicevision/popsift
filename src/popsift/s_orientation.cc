@@ -61,7 +61,7 @@ float smoothe( const std::vector<float>& src, const int bin )
 }
 
 
-static void compute_orientations_sycl(
+static sycl::event compute_orientations_sycl(
     sycl::queue& q,
     const int octave,
     const float* d_layer_data,  // Device pointer to layer data
@@ -72,12 +72,18 @@ static void compute_orientations_sycl(
     const InitialExtremum* d_initial_extrema,
     const int extrema_count,
     Extremum* d_output_extrema,
-    int* d_extrema_counter)
+    int* d_extrema_counter,
+    sycl::event depends_on = {})  // Optional dependency event
 {
     const int ORI_NBINS_LOCAL = ORI_NBINS;
     const float ORI_WINFACTOR_LOCAL = ORI_WINFACTOR;
     
-    q.submit([&](sycl::handler& cgh) {
+    auto event = q.submit([&](sycl::handler& cgh) {
+        // If there's a dependency, wait for it
+        if(depends_on != sycl::event{}) {
+            cgh.depends_on(depends_on);
+        }
+  
         cgh.parallel_for(sycl::range<1>(extrema_count), [=](sycl::id<1> idx) {
             const int extremum_index = idx[0];
             
@@ -225,7 +231,9 @@ static void compute_orientations_sycl(
             
             d_output_extrema[output_idx] = ext;
         });
-    }).wait();
+    });
+    
+    return event;  // Return event for async execution
 }
 
 
@@ -429,7 +437,13 @@ void Pyramid::orientation( const Config& conf )
     
     q.memset(d_counter, 0, sizeof(int)).wait();
 
-    for( int octave=0; octave<_num_octaves; octave++ )
+   // Store events and device pointers for async execution
+   std::vector<sycl::event> orientation_events;
+   std::vector<InitialExtremum*> d_extrema_ptrs(_num_octaves, nullptr);
+   orientation_events.reserve(_num_octaves);
+
+   // Launch all octave orientation kernels asynchronously
+   for( int octave=0; octave<_num_octaves; octave++ )
     {
         Octave& oct_obj = _octaves[octave];
         int extrema_count = dct.extrema_count_per_octave[octave];
@@ -439,10 +453,13 @@ void Pyramid::orientation( const Config& conf )
             POP_INFO2( conf.silent(), "Computing orientations for octave " << octave << " with " << extrema_count << " extrema" );
             
             const std::vector<InitialExtremum>& h_extrema = dct.initial_extrema_in_octave[octave];
-            InitialExtremum* d_extrema_ptr = sycl::malloc_device<InitialExtremum>(extrema_count, q);
-            q.memcpy(d_extrema_ptr, h_extrema.data(), extrema_count * sizeof(InitialExtremum)).wait();
+           d_extrema_ptrs[octave] = sycl::malloc_device<InitialExtremum>(extrema_count, q);
+           
+           // Copy extrema to device (async)
+           auto copy_event = q.memcpy(d_extrema_ptrs[octave], h_extrema.data(), extrema_count * sizeof(InitialExtremum));
             
-            compute_orientations_sycl(
+           // Launch orientation kernel (depends on copy_event)
+           auto kernel_event = compute_orientations_sycl(
                 oct_obj.getQueue(),
                 octave,
                 oct_obj.getData().getDevPtr(),
@@ -450,16 +467,29 @@ void Pyramid::orientation( const Config& conf )
                 oct_obj.getLevels(),
                 oct_obj.getWidth(),
                 oct_obj.getHeight(),
-                d_extrema_ptr,
+                d_extrema_ptrs[octave],
                 extrema_count,
                 d_output_extrema,
-                d_counter);
+                d_counter,
+                copy_event);  // Pass dependency
             
-            // Free device memory after kernel completes
-            sycl::free(d_extrema_ptr, q);
+            orientation_events.push_back(kernel_event);
         }
     }
 
+    // Wait for ALL orientation kernels to complete
+   POP_INFO2( conf.silent(), "Waiting for all orientation kernels to complete..." );
+   for(auto& evt : orientation_events) {
+       evt.wait();
+   }
+   POP_INFO2( conf.silent(), "All orientation computation complete" );
+   
+   // Free device memory for extrema inputs
+   for(int octave=0; octave<_num_octaves; octave++) {
+       if(d_extrema_ptrs[octave] != nullptr) {
+           sycl::free(d_extrema_ptrs[octave], q);
+       }
+   }
 
     int h_counter;
     q.memcpy(&h_counter, d_counter, sizeof(int)).wait();
