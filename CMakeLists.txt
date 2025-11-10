@@ -5,19 +5,22 @@ project(PopSift VERSION 1.0.0 LANGUAGES CXX)
 # ============================================================================
 # CRITICAL: Force Intel DPC++ Compiler Check
 # ============================================================================
-if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM" AND 
-   NOT CMAKE_CXX_COMPILER MATCHES "icpx" AND 
-   NOT CMAKE_CXX_COMPILER MATCHES "dpcpp")
+if(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM" OR
+        CMAKE_CXX_COMPILER MATCHES "icpx" OR
+        CMAKE_CXX_COMPILER MATCHES "dpcpp" OR
+        CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
     message(FATAL_ERROR 
         "\n=================================================================\n"
-        "ERROR: This project requires Intel DPC++ compiler (icpx)!\n"
+        "ERROR: This project requires a SYCL-capable compiler (icpx/dpcpp or clang with SYCL)\n"
         "Current compiler: ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER})\n\n"
-        "Please reconfigure with:\n"
-        "  cmake .. -DCMAKE_CXX_COMPILER=icpx -DCMAKE_C_COMPILER=icx\n"
+        "Please reconfigure with one of:\n"
+        "  Intel oneAPI:  cmake .. -DCMAKE_CXX_COMPILER=icpx\n"
+        "  Custom LLVM:   cmake .. -DCMAKE_CXX_COMPILER=$HOME/llvm/build/bin/clang++\n"
         "=================================================================\n")
 endif()
 
-message(STATUS "✓ Using Intel DPC++ compiler: ${CMAKE_CXX_COMPILER}")
+message(STATUS "✓ Using SYCL compiler: ${CMAKE_CXX_COMPILER}")
+message(STATUS "  Compiler ID: ${CMAKE_CXX_COMPILER_ID}")
 
 # ============================================================================
 # SYCL Compiler Setup (BEFORE C++ STANDARD)
