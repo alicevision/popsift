@@ -67,6 +67,7 @@ class Pyramid
     int          _num_octaves;
     int          _levels;
     Octave*      _octaves;
+    sycl::queue  _shared_queue;  // Single queue for all octaves
 
     /* initial blur variables are used for Gauss table computation,
      * not needed on device */
@@ -92,6 +93,8 @@ public:
     ~Pyramid( );
 
     void resetDimensions( const Config& conf, int width, int height );
+
+    inline sycl::queue& getQueue() { return _shared_queue; }
 
     /** step 1: load image and build pyramid */
     void step1( const Config& conf, std::shared_ptr<ImageBase> img );
@@ -153,6 +156,12 @@ private:
                           bool really, bool with_orientation );
 
     void clone_device_descriptors_sub( const Config& conf, std::unique_ptr<FeaturesHost>& features );
+
+    /**
+     * @brief Initialize SYCL queue with GPU fallback to CPU
+     * @return sycl::queue configured for best available device
+     */
+    static sycl::queue initializeQueue();
 
 };
 

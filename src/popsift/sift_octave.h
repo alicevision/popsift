@@ -33,7 +33,7 @@ class Octave
     Plane2D_float _intm;
     Plane2D_float _dog_3d;
 
-    sycl::queue _queue;
+    sycl::queue* _queue;
 
 public:
     Octave( );
@@ -57,14 +57,12 @@ public:
     inline Plane2D_float& getDog()   { return _dog_3d; }
 
     // SYCL queue access methods
-    inline sycl::queue& getQueue() { return _queue; }
-    inline const sycl::queue& getQueue() const { return _queue; }
+    inline sycl::queue& getQueue() { return *_queue; }
+    inline const sycl::queue& getQueue() const { return *_queue; }
 
     /**
      * @brief Initialize SYCL queue for this octave
      */
-    void initQueue();
-
 
      /**
       * @brief Allocates all GPU memories for one octave.
@@ -76,7 +74,9 @@ public:
     void alloc( const Config& conf,
                 int           width,
                 int           height,
-                int           levels );
+                int           levels,
+                sycl::queue&  shared_queue );  // Accept shared queue
+                
     void free();
 
     void resetDimensions( const Config& conf, int w, int h );

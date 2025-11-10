@@ -92,6 +92,42 @@ void Pyramid::save_descriptors( const Config& conf, std::unique_ptr<FeaturesHost
     writeDescriptor( conf, of2, features, false, true );
 }
 
+sycl::queue Pyramid::initializeQueue()
+{
+    try {
+        // Try GPU first
+        sycl::queue q(sycl::gpu_selector_v);
+         
+        auto device = q.get_device();
+        std::cout << "[PopSift] Using GPU: " 
+                   << device.get_info<sycl::info::device::name>() 
+                   << std::endl;
+         
+        return q;
+    }
+    catch (sycl::exception const& e) {
+        std::cerr << "[PopSift WARNING] GPU not available: " << e.what() << std::endl;
+        std::cerr << "[PopSift] Falling back to CPU..." << std::endl;
+         
+        try {
+            // Fallback to CPU
+            sycl::queue q(sycl::cpu_selector_v);
+              
+            auto device = q.get_device();
+            std::cout << "[PopSift] Using CPU: " 
+                      << device.get_info<sycl::info::device::name>() 
+                      << std::endl;
+             
+            return q;
+        }
+        catch (sycl::exception const& e2) {
+            std::cerr << "[PopSift ERROR] No SYCL devices available!" << std::endl;
+            std::cerr << "[PopSift ERROR] " << e2.what() << std::endl;
+            throw std::runtime_error("Failed to initialize SYCL queue: no GPU or CPU available");
+        }
+    }
+}
+
 Pyramid::Pyramid( const Config& config,
                   int width,
                   int height )
@@ -99,6 +135,7 @@ Pyramid::Pyramid( const Config& config,
     , _levels( config.levels + 3 )
     , _assume_initial_blur( config.hasInitialBlur() )
     , _initial_blur( config.getInitialBlur() )
+    , _shared_queue( initializeQueue() )  // Initialize with fallback
 {
     _octaves = new Octave[_num_octaves];
 
@@ -107,13 +144,12 @@ Pyramid::Pyramid( const Config& config,
 
     memset( &dct,  0, sizeof(ExtremaCounters) );
     memset( &dbuf, 0, sizeof(ExtremaBuffers) );
-    memset( &dbuf, 0, sizeof(ExtremaBuffers) );
 
     _d_extrema_num_blocks = new int[_num_octaves];
 
     for (int o = 0; o<_num_octaves; o++) {
         _octaves[o].debugSetOctave(o);
-        _octaves[o].alloc( config, w, h, _levels );
+        _octaves[o].alloc( config, w, h, _levels, _shared_queue ); 
         w = ceilf(w / 2.0f);
         h = ceilf(h / 2.0f);
     }

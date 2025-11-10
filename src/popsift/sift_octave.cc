@@ -32,34 +32,7 @@ namespace popsift {
 Octave::Octave()
 { }
 
-void Octave::initQueue()
-{
-    try {
-        
-        //_queue = sycl::queue(sycl::cpu_selector_v); // Changes sometimes between CPU and GPU to debug
-        _queue = sycl::queue(sycl::gpu_selector_v); // Changes sometimes between CPU and GPU to debug
-
-        
-        // Optional: Print device info for debugging
-        auto device = _queue.get_device();
-        // std::cout << "Octave " << _debug_octave_id << " queue initialized on: " 
-        //           << device.get_info<sycl::info::device::name>() << std::endl;
-    }
-    catch (sycl::exception const& e) {
-        std::cerr << "SYCL exception in Octave::initQueue(): " << e.what() << std::endl;
-        std::cerr << "Falling back to CPU for octave " << _debug_octave_id << std::endl;
-        
-        // Fallback to CPU with same properties
-        auto props = sycl::property_list{
-            sycl::property::queue::in_order(),
-            sycl::property::queue::enable_profiling()
-        };
-        
-        _queue = sycl::queue(sycl::cpu_selector_v, props);
-    }
-}
-
-void Octave::alloc( const Config& conf, int width, int height, int levels )
+void Octave::alloc( const Config& conf, int width, int height, int levels, sycl::queue& shared_queue )
 {
     _w = width;
     _h = height;
@@ -69,18 +42,20 @@ void Octave::alloc( const Config& conf, int width, int height, int levels )
     _h_grid_divider = float(_h) / conf.getFilterGridSize();
 
     // Initialize SYCL queue first
-    initQueue();
+    //initQueue();
+
+     // Use shared queue instead
+    _queue = &shared_queue;
     
-    auto device = _queue.get_device();
+    auto device = _queue->get_device();
     // std::cout << "Octave " << _debug_octave_id 
     //           << " allocating on device: " 
     //           << device.get_info<sycl::info::device::name>() 
     //           << std::endl;
 
-    // All planes must use this octave's queue
-    _data  .alloc( width, height, levels, &_queue );
-    _intm  .alloc( width, height, levels, &_queue );
-    _dog_3d.alloc( width, height, levels, &_queue );
+   _data  .alloc( width, height, levels, _queue );
+   _intm  .alloc( width, height, levels, _queue );
+   _dog_3d.alloc( width, height, levels, _queue );
     
     // Verify allocation succeeded
     if (!_data.getDevicePtr() || !_dog_3d.getDevicePtr()) {
@@ -123,7 +98,7 @@ void Octave::free()
 
     // Wait for any pending operations on this queue before freeing
     try {
-        _queue.wait();
+        _queue->wait();
     }
     catch (sycl::exception const& e) {
         std::cerr << "SYCL exception during queue wait in Octave::free(): " 
@@ -179,7 +154,7 @@ void Octave::download_and_save_array( const Config& conf, const char* basename, 
        
       // Copy from device to host using SYCL
        const float* src_device = static_cast<const float*>(_data.getDevicePtr()) + (l * _h * _data.getPitchElements());
-       _queue.memcpy(p.getHostPtr(), src_device, _w * _h * sizeof(float)).wait();
+       _queue->memcpy(p.getHostPtr(), src_device, _w * _h * sizeof(float)).wait();
 
         ostringstream ostr;
         ostr << "dir-octave/" << basename << "-o-" << octave << "-l-" << l << ".pgm";
@@ -196,7 +171,7 @@ void Octave::download_and_save_array( const Config& conf, const char* basename, 
        
        // Copy from device to host using SYCL
        const float* src_device = static_cast<const float*>(_intm.getDevicePtr()) + (l * _h * _intm.getPitchElements());
-       _queue.memcpy(p.getHostPtr(), src_device, _w * _h * sizeof(float)).wait();
+       _queue->memcpy(p.getHostPtr(), src_device, _w * _h * sizeof(float)).wait();
 
         ostringstream ostr;
         ostr << "dir-interm/" << basename << "-o-" << octave << "-l-" << l << ".pgm";
@@ -209,7 +184,7 @@ void Octave::download_and_save_array( const Config& conf, const char* basename, 
        
        // Copy from device to host using SYCL
        const float* src_device = static_cast<const float*>(_dog_3d.getDevicePtr()) + (l * _h * _dog_3d.getPitchElements());
-       _queue.memcpy(p.getHostPtr(), src_device, _w * _h * sizeof(float)).wait();
+       _queue->memcpy(p.getHostPtr(), src_device, _w * _h * sizeof(float)).wait();
 
         ostringstream ostr;
         ostr << "dir-dog/d-" << basename << "-o-" << octave << "-l-" << l << ".pgm";
