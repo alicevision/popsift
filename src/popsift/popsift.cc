@@ -35,8 +35,25 @@ PopSift::PopSift( ImageMode imode )
 
 PopSift::~PopSift()
 {
-    delete _pipe._pyramid;
-    _pipe._pyramid = nullptr;
+   // Clean up any remaining jobs in queue_stage1
+   while(!_pipe._queue_stage1.empty()) {
+       SiftJob* job = _pipe._queue_stage1.front();
+       _pipe._queue_stage1.pop();
+       delete job;
+   }
+   
+   // Clean up any remaining jobs in queue_stage2
+   while(!_pipe._queue_stage2.empty()) {
+       SiftJob* job = _pipe._queue_stage2.front();
+       _pipe._queue_stage2.pop();
+       delete job;
+   }
+   
+   // Delete the pyramid (this will call Pyramid destructor and free all memory)
+   if(_pipe._pyramid) {
+        delete _pipe._pyramid;
+        _pipe._pyramid = nullptr;
+   }
 }
 
 bool PopSift::configure( const popsift::Config& config, bool /*force*/ )
@@ -230,13 +247,6 @@ void PopSift::extractDownloadLoop( )
 
         job->setFeatures( features );
     }
-
-    // Clean up thread-local allocated memory before thread exit
-    POP_INFO2( _config.silent(), "DEBUG: Cleaning up thread-local memory" );
-    
-     // Properly reset the structures
-    popsift::dct = popsift::ExtremaCounters();
-    popsift::dbuf = popsift::ExtremaBuffers();
 
     POP_INFO2( _config.silent(), "DEBUG: ExtractDownloadLoop finished" );
 }

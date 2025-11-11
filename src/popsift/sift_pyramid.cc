@@ -220,17 +220,37 @@ void Pyramid::reallocExtrema( int numExtrema )
 }
 
 Pyramid::~Pyramid()
-{
-    delete [] _d_extrema_num_blocks;
+{    
+    // Free extrema management
+    if(_d_extrema_num_blocks) {
+        delete[] _d_extrema_num_blocks;
+        _d_extrema_num_blocks = nullptr;
+    }
 
-    // delete [] dbuf.i_ext_dat[0];
-    // delete [] dbuf.i_ext_off[0];
-    delete [] dbuf.features;
-    // delete [] dbuf.extrema;
-    delete [] dbuf.desc;
-    dbuf.feat_to_ext_map.clear(); // delete [] dbuf.feat_to_ext_map;
+    // Free descriptor buffers
+    if(dbuf.features) {
+        delete[] dbuf.features;
+        dbuf.features = nullptr;
+    }
+    
+    if(dbuf.desc) {
+        delete[] dbuf.desc;
+        dbuf.desc = nullptr;
+    }
 
-    delete[] _octaves;
+    // Clear vectors
+    dbuf.feat_to_ext_map.clear();
+    dbuf.extrema.clear();
+
+    // Free all octaves - THIS IS WHERE THE 7.2MB LEAK IS!
+    if(_octaves) {
+        for(int o = 0; o < _num_octaves; o++) {
+            _octaves[o].free();
+        }
+        delete[] _octaves;
+        _octaves = nullptr;
+    }
+   
 }
 
 void Pyramid::step1( const Config& conf, std::shared_ptr<popsift::ImageBase> img )
