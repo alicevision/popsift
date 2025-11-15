@@ -15,6 +15,7 @@
 
 #include <cstdio>
 #include <iostream>
+#include <chrono>
 
 #include <sycl/sycl.hpp>
 
@@ -180,6 +181,8 @@ void Pyramid::build_pyramid( const Config& conf, std::shared_ptr<ImageBase> base
     POP_INFO2( conf.silent(), "enter " << __PRETTY_FUNCTION__ );
     POP_INFO2( conf.silent(), "is image NULL? " << ( base->isNull() ? "yes" : "no") );
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     for( uint32_t octave=0; octave<_num_octaves; octave++ )
     {
         Octave&      oct_obj = _octaves[octave];
@@ -214,12 +217,19 @@ void Pyramid::build_pyramid( const Config& conf, std::shared_ptr<ImageBase> base
         }
     }
 
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> duration = end - start;
+
+    std::cout << "Gaussian filtering" << " took " << duration.count() << " ms" << std::endl;
+
+    start = std::chrono::high_resolution_clock::now();
+
     // Launch DoG kernels asynchronously on all octaves
     // Each octave uses its own queue, so they execute in parallel
     std::vector<sycl::event> events;
     for( int octave=0; octave<_num_octaves; octave++ )
     {
-        POP_INFO2( conf.silent(), "call dogs_from_blurred (async)" );
+        //POP_INFO2( conf.silent(), "call dogs_from_blurred (async)" );
         
         // Submit kernel on octave's queue (non-blocking)
         sycl::event event = dogs_from_blurred( octave, _levels );
@@ -227,12 +237,17 @@ void Pyramid::build_pyramid( const Config& conf, std::shared_ptr<ImageBase> base
     }
 
     // Wait for all DoG computations to complete
-    POP_INFO2( conf.silent(), "waiting for all DoG kernels to complete" );
+    //POP_INFO2( conf.silent(), "waiting for all DoG kernels to complete" );
     for (auto& e : events) {
         e.wait();
     }
+
+    end = std::chrono::high_resolution_clock::now();
+    duration = end - start;
+
+    std::cout << "DoG" << " took " << duration.count() << " ms" << std::endl;
     
-    POP_INFO2( conf.silent(), "DoG computation complete" );
+    //POP_INFO2( conf.silent(), "DoG computation complete" );
 }
 
     

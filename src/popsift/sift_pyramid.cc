@@ -12,7 +12,7 @@
 #include "sift_config.h"
 #include "sift_extremum.h"
 #include "sift_pyramid.h"
-
+#include <chrono>
 #include <sys/stat.h>
 
 #include <cstdio>
@@ -93,11 +93,17 @@ void Pyramid::save_descriptors( const Config& conf, std::unique_ptr<FeaturesHost
 }
 
 sycl::queue Pyramid::initializeQueue()
-{
+{   
+    auto start = std::chrono::high_resolution_clock::now();
+
     try {
         // Try GPU first
         sycl::queue q(sycl::gpu_selector_v);
          
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> duration = end - start;
+        std::cout << "initializing Queue" << " took " << duration.count() << " ms" << std::endl;
+
         auto device = q.get_device();
         std::cout << "[PopSift] Using GPU: " 
                    << device.get_info<sycl::info::device::name>() 
@@ -266,11 +272,23 @@ void Pyramid::step1( const Config& conf, std::shared_ptr<popsift::ImageBase> img
 
 void Pyramid::step2( const Config& conf )
 {
+    auto start = std::chrono::high_resolution_clock::now();
     find_extrema( conf );
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> duration = end - start;
+    std::cout << "Finding extrema" << " took " << duration.count() << " ms" << std::endl;
 
+    start = std::chrono::high_resolution_clock::now();
     orientation( conf );
+    end = std::chrono::high_resolution_clock::now();
+    duration = end - start;
+    std::cout << "Orientation" << " took " << duration.count() << " ms" << std::endl;
 
+    start = std::chrono::high_resolution_clock::now();
     descriptors( conf );
+    end = std::chrono::high_resolution_clock::now();
+    duration = end - start;
+    std::cout << "descriptors" << " took " << duration.count() << " ms" << std::endl;
 }
 
 /* Important detail: this function takes the pointer descriptor_base as input

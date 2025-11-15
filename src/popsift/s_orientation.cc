@@ -330,7 +330,7 @@ void ori_prefix_sum( const int num_octaves )
     std::inclusive_scan( ori_count.begin(), ori_count.end(), &ori_offset[1] );
     const int total_ori = ori_offset[dct.extrema_count_total];
 
-    POP_INFO2( false, "Total number of orientations: " << total_ori );
+//    POP_INFO2( false, "Total number of orientations: " << total_ori );
 
     for( int i=0; i<dct.extrema_count_total; i++ )
     {

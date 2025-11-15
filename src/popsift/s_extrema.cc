@@ -43,7 +43,7 @@ sycl::event find_extrema_in_dog( const int3&    g,
 {
     const bool no_extrema_reporting = false;
 
-    POP_INFO2( no_extrema_reporting, "Converting find_extrema to SYCL kernel for octave " << octave );
+//    POP_INFO2( no_extrema_reporting, "Converting find_extrema to SYCL kernel for octave " << octave );
 
     Octave& oct_obj = pyramid->getOctave(octave);
     sycl::queue& queue = oct_obj.getQueue();
@@ -390,7 +390,7 @@ sycl::event find_extrema_in_dog( const int3&    g,
 
 void Pyramid::find_extrema( const Config& conf )
 {
-    POP_INFO2( false, "Enter " << __FUNCTION__ );
+//    POP_INFO2( false, "Enter " << __FUNCTION__ );
 
     dct.extrema_count_per_octave.resize( MAX_OCTAVES );
     extrema_count_host.resize( MAX_OCTAVES );
@@ -453,11 +453,11 @@ void Pyramid::find_extrema( const Config& conf )
    }
 
    // Wait for ALL octaves to complete
-   POP_INFO2( false, "Waiting for all " << octave_events.size() << " octave kernels to complete..." );
+//   POP_INFO2( false, "Waiting for all " << octave_events.size() << " octave kernels to complete..." );
    for(auto& evt : octave_events) {
        evt.wait();
    }
-   POP_INFO2( false, "All octave extrema detection complete" );
+//   POP_INFO2( false, "All octave extrema detection complete" );
 
    // Now process results for each octave
    for( int octave=0; octave<_num_octaves; octave++ )
@@ -467,7 +467,7 @@ void Pyramid::find_extrema( const Config& conf )
         std::vector<InitialExtremum>& i_extrema = dct.initial_extrema_in_octave[octave];
       
         int extrema_count = extrema_count_host[octave];
-        POP_INFO2( false, "Found " << extrema_count << " extrema in octave " << octave );
+//        POP_INFO2( false, "Found " << extrema_count << " extrema in octave " << octave );
       
 
        // Get stored device pointers
@@ -487,7 +487,7 @@ void Pyramid::find_extrema( const Config& conf )
       sycl::free(d_count, oct_obj.getQueue());
       
       dct.extrema_count_per_octave[octave] = i_extrema.size();
-      POP_INFO2( false, "final extrema count in octave " << octave << ": " << dct.extrema_count_per_octave[octave] );
+      //POP_INFO2( false, "final extrema count in octave " << octave << ": " << dct.extrema_count_per_octave[octave] );
 
 
         bool log_to_file = ( conf.getLogMode() == popsift::Config::All );
@@ -510,7 +510,7 @@ void Pyramid::find_extrema( const Config& conf )
         }
     }
 
-    POP_INFO2( false, "found extrema in all octaves" );
+//    POP_INFO2( false, "found extrema in all octaves" );
  
     /* Copy the extreme count for every octave from the (already initialized)
      * array extrema_count_per_octave to the (uninitialized) array extrema_count_prefix_sum. */
@@ -530,21 +530,21 @@ void Pyramid::find_extrema( const Config& conf )
      * extrema as well. */
     dct.extrema_count_total = dct.extrema_count_prefix_sum.back();
 
-    std::ostringstream debug_ostr;
-    debug_ostr << "Extrema per octave:" << std::endl;
-    std::copy( dct.extrema_count_per_octave.begin(),
-               dct.extrema_count_per_octave.end(),
-               std::ostream_iterator<int>(debug_ostr, " ") );
-    debug_ostr << std::endl
-          << "Extrema prefix sum per octave:" << std::endl;
-    std::copy( dct.extrema_count_prefix_sum.begin(),
-               dct.extrema_count_prefix_sum.end(),
-               std::ostream_iterator<int>(debug_ostr, " ") );
-    debug_ostr << std::endl
-          << "Extrema prefix sum per octave: "
-          << dct.extrema_count_total
-          << std::endl;
-    POP_INFO2( false, debug_ostr.str() );
+    // std::ostringstream debug_ostr;
+    // debug_ostr << "Extrema per octave:" << std::endl;
+    // std::copy( dct.extrema_count_per_octave.begin(),
+    //            dct.extrema_count_per_octave.end(),
+    //            std::ostream_iterator<int>(debug_ostr, " ") );
+    // debug_ostr << std::endl
+    //       << "Extrema prefix sum per octave:" << std::endl;
+    // std::copy( dct.extrema_count_prefix_sum.begin(),
+    //            dct.extrema_count_prefix_sum.end(),
+    //            std::ostream_iterator<int>(debug_ostr, " ") );
+    // debug_ostr << std::endl
+    //       << "Extrema prefix sum per octave: "
+    //       << dct.extrema_count_total
+    //       << std::endl;
+    // POP_INFO2( false, debug_ostr.str() );
 }
 
 } // namespace popsift
