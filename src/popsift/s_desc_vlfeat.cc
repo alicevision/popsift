@@ -31,7 +31,7 @@ void DescriptorDeviceMemory::cleanup() {
 }
 
 // SYCL kernel for descriptor extraction
-static sycl::event ext_desc_vlfeat_sycl(
+sycl::event ext_desc_vlfeat_sycl(
     sycl::queue& q,
     const int octave,
     const float* d_layer_data,
@@ -44,7 +44,7 @@ static sycl::event ext_desc_vlfeat_sycl(
     const int num_orientations,
     const int orientation_offset,
     Descriptor* d_descriptors,
-    const std::vector<sycl::event>& depends_on = {})
+    const std::vector<sycl::event>& depends_on)
 {
 return q.submit([&](sycl::handler& cgh) {
         // Add dependencies if provided
