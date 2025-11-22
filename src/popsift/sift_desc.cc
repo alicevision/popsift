@@ -42,80 +42,112 @@ using namespace std;
  *************************************************************/
 void Pyramid::descriptors( const Config& conf )
 {
+    auto start = std::chrono::high_resolution_clock::now();
+
     if( dct.ori_total == 0 )
     {
         cerr << "Warning: no descriptors to extract" << endl;
         return;
     }
 
-    // Store events and device memory for cleanup
-    std::vector<sycl::event> descriptor_events;
-    std::vector<DescriptorDeviceMemory> device_memory;
+    sycl::queue& q = _shared_queue;
     
-    descriptor_events.reserve(_num_octaves);
-    device_memory.reserve(_num_octaves);
+    // Allocate ALL device memory at once (instead of per-octave)
+    Descriptor* d_all_descs = sycl::malloc_device<Descriptor>(dct.ori_total, q);
+    Extremum* d_extrema = sycl::malloc_device<Extremum>(dbuf.extrema.size(), q);
+    int* d_feat_to_ext_map = sycl::malloc_device<int>(dbuf.feat_to_ext_map.size(), q);
     
-    // Launch all octave descriptor extractions asynchronously
-    for( int octave=_num_octaves-1; octave>=0; octave-- )
-    {
-        if( dct.ori_ct[octave] != 0 ) {
-            Octave& oct_obj = _octaves[octave];
-
-            // Launch async and store event + device memory
-            auto [event, dev_mem] = start_ext_desc_vlfeat_async( octave, oct_obj );
-            descriptor_events.push_back(event);
-            device_memory.push_back(dev_mem);
-        }
-    }
-
-    // Wait for ALL descriptor extractions to complete
-    for(auto& evt : descriptor_events) {
-        evt.wait();
-    }
-    
-   // Allocate device memory for all descriptors
-   sycl::queue& q = _octaves[0].getQueue();  // Use shared queue
-
-   Descriptor* d_all_descs = sycl::malloc_device<Descriptor>(dct.ori_total, q);
- 
-    if (!d_all_descs) {
+    if (!d_all_descs || !d_extrema || !d_feat_to_ext_map) {
         cerr << "Error: Failed to allocate device memory for descriptors" << endl;
-        // Clean up extraction memory and return
-        for(auto& dev_mem : device_memory) {
-            dev_mem.cleanup();
-        }
+        if (d_all_descs) sycl::free(d_all_descs, q);
+        if (d_extrema) sycl::free(d_extrema, q);
+        if (d_feat_to_ext_map) sycl::free(d_feat_to_ext_map, q);
         return;
-    }   
-
-
-    // Copy all descriptors to device AND WAIT
-    auto copy_to_device = q.memcpy(d_all_descs, dbuf.desc, 
-                                    dct.ori_total * sizeof(Descriptor));
-    copy_to_device.wait();  // CRITICAL: Wait for copy to complete!
-
-   // Launch normalization kernel
-   sycl::event norm_event;
-    if( conf.getUseRootSift() ) {
-        norm_event = normalize_histogram_sycl<NormalizeRootSift>(q, d_all_descs, dct.ori_total);
-    } else {
-        norm_event = normalize_histogram_sycl<NormalizeL2>(q, d_all_descs, dct.ori_total);
     }
+
+    // Copy shared data ONCE (instead of per-octave)
+    auto copy_extrema = q.memcpy(d_extrema, dbuf.extrema.data(), 
+                                  dbuf.extrema.size() * sizeof(Extremum));
+    auto copy_feat_map = q.memcpy(d_feat_to_ext_map, dbuf.feat_to_ext_map.data(), 
+                                   dbuf.feat_to_ext_map.size() * sizeof(int));
+
+
+    std::vector<sycl::event> kernel_events;
+    kernel_events.reserve(_num_octaves);
     
-    norm_event.wait();
+    // Launch all octave kernels asynchronously with dependencies
+    for( int octave = _num_octaves - 1; octave >= 0; octave-- )
+    {
+        if( dct.ori_ct[octave] == 0 ) continue;
+        
+        Octave& oct_obj = _octaves[octave];
+        const int num_orientations = dct.ori_ct[octave];
+        const int orientation_offset = dct.ori_ps[octave];
+        
+        // Launch kernel with pointer offsets (no extra allocations!)
+        auto kernel_event = ext_desc_vlfeat_sycl(
+            q,
+            octave,
+            oct_obj.getData().getDevPtr(),
+            oct_obj.getData().getCols(),
+            oct_obj.getLevels(),
+            oct_obj.getWidth(),
+            oct_obj.getHeight(),
+            d_extrema,
+            d_feat_to_ext_map,
+            num_orientations,
+            orientation_offset,
+            d_all_descs + orientation_offset,  // Direct write to final buffer
+            {copy_extrema, copy_feat_map}      // Dependencies
+        );
+        
+        kernel_events.push_back(kernel_event);
+    }
 
-   // Copy normalized descriptors back to host
+    for(sycl::event e : kernel_events){
+        e.wait();
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> duration = end - start;
+    std::cout << "descriptor extraction" 
+              << " took " << duration.count() << " ms" << std::endl;
+
+    
+    auto start_norm = std::chrono::high_resolution_clock::now();
+
+    // Normalize immediately after extraction (don't wait individually)
+    sycl::event norm_event;
+    if( conf.getUseRootSift() ) {
+        norm_event = normalize_histogram_sycl<NormalizeRootSift>(
+            q, d_all_descs, dct.ori_total);
+    } else {
+        norm_event = normalize_histogram_sycl<NormalizeL2>(
+            q, d_all_descs, dct.ori_total);
+    }
+
+    auto end_norm = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> norm_duration = end_norm - start_norm;
+    std::cout << "normalization" 
+              << " took " << norm_duration.count() << " ms" << std::endl;
+
+    auto start_copy = std::chrono::high_resolution_clock::now();
+    
+    // Copy all results back in one shot
     auto copy_to_host = q.memcpy(dbuf.desc, d_all_descs, 
-                                  dct.ori_total * sizeof(Descriptor));   
-   // Wait for normalization to complete
-   copy_to_host.wait();
+                                  dct.ori_total * sizeof(Descriptor),
+                                  norm_event);
+    copy_to_host.wait();
 
-   // Clean up
-   sycl::free(d_all_descs, q);
-   
-   // Clean up descriptor extraction device memory
-   for(auto& dev_mem : device_memory) {
-       dev_mem.cleanup();
-   }
+    auto end_copy = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> copy_duration = end_copy - start_copy;
+    std::cout << "descriptor download" << " took " << copy_duration.count() << " ms" << std::endl;
 
+    // ============================================
+    // Cleanup
+    // ============================================
+    
+    sycl::free(d_all_descs, q);
+    sycl::free(d_extrema, q);
+    sycl::free(d_feat_to_ext_map, q);
 }
-
