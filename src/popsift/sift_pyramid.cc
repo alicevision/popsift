@@ -284,11 +284,7 @@ void Pyramid::step2( const Config& conf )
     duration = end - start;
     std::cout << "Orientation" << " took " << duration.count() << " ms" << std::endl;
 
-    start = std::chrono::high_resolution_clock::now();
     descriptors( conf );
-    end = std::chrono::high_resolution_clock::now();
-    duration = end - start;
-    std::cout << "descriptors" << " took " << duration.count() << " ms" << std::endl;
 }
 
 /* Important detail: this function takes the pointer descriptor_base as input
