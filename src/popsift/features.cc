@@ -259,7 +259,11 @@ compute_distance( int3* match_matrix, Descriptor* l, int l_len, Descriptor* r, i
 
         bool accept = ( match_1st_val / match_2nd_val < 0.8f );
 
-        match_matrix[left_idx] = int3( match_1st_idx, match_2nd_idx, accept );
+        #ifdef __CUDACC__
+            match_matrix[left_idx] = make_int3(match_1st_idx, match_2nd_idx, accept);
+        #else
+            match_matrix[left_idx] = int3(match_1st_idx, match_2nd_idx, accept);
+        #endif
     }
 }
 
