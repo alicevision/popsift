@@ -47,9 +47,8 @@ if(SYCL_IMPL STREQUAL "ACPP")
     set(CMAKE_USE_PTHREADS_INIT 1)
     
 elseif(SYCL_IMPL STREQUAL "INTEL")
-    message(STATUS "Configuring for Intel DPC++ CUDA backend (sm_89)")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsycl -fsycl-targets=nvptx64-nvidia-cuda")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xsycl-target-backend=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_89")
+    message(STATUS "Configuring for Intel DPC++ CPU/OpenCL backend")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsycl")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsycl")
     
 elseif(SYCL_IMPL STREQUAL "LLVM")
