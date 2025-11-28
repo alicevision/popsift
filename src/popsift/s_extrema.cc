@@ -423,7 +423,7 @@ void Pyramid::find_extrema( const Config& conf )
         case Config::RefineInLevel :
                octave_events.push_back(
                    find_extrema_in_dog<Config::RefineInLevel>
-                    ( int3(cols, rows, _levels-3),
+                    ( make_int3(cols, rows, _levels-3),
                       dog,
                       octave,
                       cols,
@@ -437,7 +437,7 @@ void Pyramid::find_extrema( const Config& conf )
         default :
                octave_events.push_back(
                    find_extrema_in_dog<Config::RefineInOctave>
-                    ( int3(cols, rows, _levels-3),
+                    ( make_int3(cols, rows, _levels-3),
                       dog,
                       octave,
                       cols,
@@ -501,7 +501,7 @@ void Pyramid::find_extrema( const Config& conf )
             std::vector<int2> red_pixel_list;
             for( auto it : dct.initial_extrema_in_octave[octave] )
             {
-                red_pixel_list.emplace_back( int2( roundf(it.xpos), roundf(it.ypos) ) );
+                red_pixel_list.emplace_back( make_int2( roundf(it.xpos), roundf(it.ypos) ) );
             }
 
             std::ostringstream ostr;
