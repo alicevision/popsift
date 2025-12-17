@@ -17,6 +17,12 @@
 #include <sstream>
 #include <stdexcept>
 #include <memory> // for shared pointer
+
+// IMPORTANT: Include simd_types.h BEFORE sycl.hpp
+// This allows simd_types.h to detect HIP and avoid redefinition
+#include "simd_types.h"
+
+// Now include SYCL (which may pull in HIP headers)
 #include <sycl/sycl.hpp>
 
 #include "debug_macros.h"
