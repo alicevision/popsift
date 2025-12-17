@@ -26,6 +26,61 @@ message(STATUS "SYCL Implementation: ${SYCL_IMPL}")
 message(STATUS "Using compiler: ${CMAKE_CXX_COMPILER}")
 
 # ============================================================================
+# Auto-detect GPU Architecture
+# ============================================================================
+if(NOT DEFINED GPU_ARCH)
+    # First, try to detect NVIDIA GPU
+    execute_process(
+        COMMAND nvidia-smi --query-gpu=compute_cap --format=csv,noheader
+        OUTPUT_VARIABLE GPU_COMPUTE_CAP
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE NVIDIA_RESULT
+    )
+    
+    if(NVIDIA_RESULT EQUAL 0 AND GPU_COMPUTE_CAP)
+        string(REPLACE "." "" GPU_ARCH_NUM ${GPU_COMPUTE_CAP})
+        set(GPU_ARCH "sm_${GPU_ARCH_NUM}")
+        set(GPU_VENDOR "NVIDIA")
+        set(GPU_BACKEND "cuda")
+        message(STATUS "✓ Auto-detected NVIDIA GPU: ${GPU_ARCH} (compute capability ${GPU_COMPUTE_CAP})")
+    else()
+        # Try to detect AMD GPU using rocminfo
+        execute_process(
+            COMMAND bash -c "rocminfo | grep 'Name:.*gfx' | head -n 1 | sed 's/.*Name: *//'"
+            OUTPUT_VARIABLE ROCM_ARCH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+            RESULT_VARIABLE ROCM_RESULT
+        )
+        
+        if(ROCM_RESULT EQUAL 0 AND ROCM_ARCH)
+            set(GPU_ARCH "${ROCM_ARCH}")
+            set(GPU_VENDOR "AMD")
+            set(GPU_BACKEND "hip")
+            message(STATUS "✓ Auto-detected AMD GPU: ${GPU_ARCH}")
+        else()
+            # Fallback to safe default for NVIDIA
+            set(GPU_ARCH "sm_70")
+            set(GPU_VENDOR "NVIDIA")
+            set(GPU_BACKEND "cuda")
+            message(WARNING "Could not detect GPU, using default: ${GPU_ARCH}")
+        endif()
+    endif()
+else()
+    # User specified GPU_ARCH, detect vendor from format
+    if(GPU_ARCH MATCHES "^sm_")
+        set(GPU_VENDOR "NVIDIA")
+        set(GPU_BACKEND "cuda")
+    elseif(GPU_ARCH MATCHES "^gfx")
+        set(GPU_VENDOR "AMD")
+        set(GPU_BACKEND "hip")
+    else()
+        message(FATAL_ERROR "Unknown GPU architecture format: ${GPU_ARCH}")
+    endif()
+endif()
+
+# ============================================================================
 # C++ Standard (SET BEFORE COMPILER FLAGS!)
 # ============================================================================
 set(CMAKE_CXX_STANDARD 17)
@@ -36,10 +91,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Compiler-Specific SYCL Flags
 # ============================================================================
 if(SYCL_IMPL STREQUAL "ACPP")
-    message(STATUS "Configuring for AdaptiveCpp CUDA backend (sm_89)")
-    # ✅ Don't add -std=c++17 manually for AdaptiveCpp!
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --acpp-targets=cuda:sm_89 -pthread")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --acpp-targets=cuda:sm_89 -pthread")
+    if(GPU_VENDOR STREQUAL "AMD")
+        message(STATUS "Configuring for AdaptiveCpp ROCm backend (${GPU_ARCH})")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --acpp-targets=hip:${GPU_ARCH} -pthread")
+        # Prevent HIP from defining vector types (SYCL already has them)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__HIP_NO_VECTOR_TYPES__")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --acpp-targets=hip:${GPU_ARCH} -pthread")
+    else()
+        message(STATUS "Configuring for AdaptiveCpp CUDA backend (${GPU_ARCH})")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --acpp-targets=cuda:${GPU_ARCH} -pthread")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --acpp-targets=cuda:${GPU_ARCH} -pthread")
+    endif()
     
     # Force pthread detection
     set(CMAKE_THREAD_LIBS_INIT "-lpthread")
@@ -52,12 +114,17 @@ elseif(SYCL_IMPL STREQUAL "INTEL")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsycl")
     
 elseif(SYCL_IMPL STREQUAL "LLVM")
-    message(STATUS "Configuring for Custom LLVM SYCL CUDA backend (sm_89)")
-    
-    # ✅ Add UR loader path for custom LLVM
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsycl -fsycl-targets=nvptx64-nvidia-cuda")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xsycl-target-backend=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_89")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+    if(GPU_VENDOR STREQUAL "AMD")
+        message(STATUS "Configuring for Custom LLVM SYCL AMD backend (${GPU_ARCH})")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsycl -fsycl-targets=amdgcn-amd-amdhsa")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=${GPU_ARCH}")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+    else()
+        message(STATUS "Configuring for Custom LLVM SYCL CUDA backend (${GPU_ARCH})")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsycl -fsycl-targets=nvptx64-nvidia-cuda")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xsycl-target-backend=nvptx64-nvidia-cuda --cuda-gpu-arch=${GPU_ARCH}")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+    endif()
     
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsycl -pthread")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L$ENV{HOME}/llvm/build/lib")
@@ -144,6 +211,9 @@ ADD_CUSTOM_TARGET(uninstall
 message("\n******************************************")
 message("Building configuration:")
 message(STATUS "SYCL Implementation: ${SYCL_IMPL}")
+message(STATUS "GPU Vendor: ${GPU_VENDOR}")
+message(STATUS "GPU Architecture: ${GPU_ARCH}")
+message(STATUS "GPU Backend: ${GPU_BACKEND}")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "CXX Flags: ${CMAKE_CXX_FLAGS}")
