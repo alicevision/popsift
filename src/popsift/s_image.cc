@@ -61,19 +61,30 @@ void Image::allocate( int w, int h )
 
 Plane2D_float& Image::getFloatPlane()
 {
+    sycl::queue q;  // Temporary queue for backward compatibility
+    return getFloatPlane(q);
+}
+
+Plane2D_float& Image::getFloatPlane(sycl::queue& q)
+{
     if( _hidden_conversion.isNull() )
     {
         _hidden_conversion.alloc( getWidth(), getHeight() );
 
-        for( int y=0; y<getHeight(); y++ )
-        {
-            for( int x=0; x<getWidth(); x++ )
-            {
-                uint8_t pixel = _input_image_d.get( y, x );
-                
-                const float f = (pixel - 0.5f) / 255.0f; 
-                
-                _hidden_conversion.set( y, x, f );
+        const int width = getWidth();
+        const int height = getHeight();
+        const int src_pitch = _input_image_d.getPitch();
+        const int dst_pitch = _hidden_conversion.getPitch();
+        
+        // Simple CPU conversion (original code - works reliably)
+        uint8_t* src_host = _input_image_d.getHostPtr();
+        float* dst_host = _hidden_conversion.getHostPtr();
+        
+        for( int y = 0; y < height; y++ ) {
+            for( int x = 0; x < width; x++ ) {
+                uint8_t pixel = src_host[y * src_pitch + x];
+                float f = (pixel - 0.5f) / 255.0f;
+                dst_host[y * dst_pitch + x] = f;
             }
         }
     }
@@ -115,6 +126,11 @@ void ImageFloat::allocate( int w, int h )
 Plane2D_float& ImageFloat::getFloatPlane()
 {
     return _input_image_d;
+}
+
+Plane2D_float& ImageFloat::getFloatPlane(sycl::queue& q)
+{
+    return _input_image_d;  // Already float, no conversion needed
 }
 
 } // namespace popsift

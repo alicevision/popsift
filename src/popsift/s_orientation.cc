@@ -60,12 +60,59 @@ float smoothe( const std::vector<float>& src, const int bin )
     return f;
 }
 
+struct LaunchConfig {
+    int work_group_size;
+    int num_work_groups;
+    int max_compute_units;
+};
+
+inline LaunchConfig getOptimalLaunchConfig(sycl::queue& q, int total_work_items) {
+    LaunchConfig config;
+    
+    auto device = q.get_device();
+    
+    // Query device properties
+    config.max_compute_units = device.get_info<sycl::info::device::max_compute_units>();
+    size_t max_work_group_size = device.get_info<sycl::info::device::max_work_group_size>();
+    
+    // Determine optimal work-group size based on vendor
+    auto vendor = device.get_info<sycl::info::device::vendor>();
+    std::string vendor_name = vendor;
+    
+    if (vendor_name.find("NVIDIA") != std::string::npos) {
+        // NVIDIA: Use warp size (32) multiple, typically 128-256
+        config.work_group_size = std::min(size_t(256), max_work_group_size);
+    }
+    else if (vendor_name.find("AMD") != std::string::npos || 
+             vendor_name.find("Advanced Micro Devices") != std::string::npos) {
+        // AMD: Use wavefront size (64) multiple, typically 256
+        config.work_group_size = std::min(size_t(256), max_work_group_size);
+    }
+    else if (vendor_name.find("Intel") != std::string::npos) {
+        // Intel: Typically prefers smaller work groups
+        config.work_group_size = std::min(size_t(128), max_work_group_size);
+    }
+    else {
+        // Generic/unknown device: use conservative value
+        config.work_group_size = std::min(size_t(128), max_work_group_size);
+    }
+    
+    // Calculate number of work groups to saturate the device
+    // Aim for at least 4 work-groups per compute unit for good occupancy
+    int min_work_groups = config.max_compute_units * 4;
+    config.num_work_groups = std::max(
+        min_work_groups,
+        (total_work_items + config.work_group_size - 1) / config.work_group_size
+    );
+    
+    return config;
+}
 
 static sycl::event compute_orientations_sycl(
     sycl::queue& q,
     const int octave,
-    const float* d_layer_data,  // Device pointer to layer data
-    const int layer_pitch,      // Pitch in elements, not bytes
+    const float* d_layer_data,
+    const int layer_pitch,
     const int num_levels,
     const int width,
     const int height,
@@ -73,8 +120,16 @@ static sycl::event compute_orientations_sycl(
     const int extrema_count,
     Extremum* d_output_extrema,
     int* d_extrema_counter,
-    sycl::event depends_on = {})  // Optional dependency event
+    sycl::event depends_on = {})
 {
+    // Get optimal launch configuration for this device
+    LaunchConfig launch_config = getOptimalLaunchConfig(q, extrema_count);
+    
+    const int work_group_size = launch_config.work_group_size;
+    const int num_work_groups = launch_config.num_work_groups;
+    const int total_threads = num_work_groups * work_group_size;
+
+
     const int ORI_NBINS_LOCAL = ORI_NBINS;
     const float ORI_WINFACTOR_LOCAL = ORI_WINFACTOR;
     

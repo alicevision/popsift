@@ -118,6 +118,10 @@ sycl::queue Pyramid::initializeQueue()
         try {
             // Fallback to CPU
             sycl::queue q(sycl::cpu_selector_v);
+
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double, std::milli> duration = end - start;
+            std::cout << "initializing Queue" << " took " << duration.count() << " ms" << std::endl;
               
             auto device = q.get_device();
             std::cout << "[PopSift] Using CPU: " 
@@ -284,7 +288,11 @@ void Pyramid::step2( const Config& conf )
     duration = end - start;
     std::cout << "Orientation" << " took " << duration.count() << " ms" << std::endl;
 
+    start = std::chrono::high_resolution_clock::now();
     descriptors( conf );
+    end = std::chrono::high_resolution_clock::now();
+    duration = end - start;
+    std::cout << "descriptor step2" << " took " << duration.count() << " ms" << std::endl;
 }
 
 /* Important detail: this function takes the pointer descriptor_base as input

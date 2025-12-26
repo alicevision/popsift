@@ -28,6 +28,260 @@ namespace popsift{
 // Host-side storage for extrema counts (one per octave)
 static std::vector<int> extrema_count_host;
 
+
+// Break the large kernel into smaller functions
+__attribute__((noinline))
+static bool check_extremum_26_neighbors(
+    const float val,
+    const float* dog_ptr_kernel,
+    int level, int y, int x,
+    int c_width, int c_height, int c_dog_pitch, int c_maxlevel,
+    size_t c_dog_total_elems)
+{
+    // Inline the clamp and dog_get logic here
+    auto clamp = [](int v, int lo, int hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
+    };
+    
+    auto dog_get = [=](int z, int y, int x) -> float {
+        int zz = clamp(z, 0, c_maxlevel + 1);
+        int yy = clamp(y, 0, c_height - 1);
+        int xx = clamp(x, 0, c_width - 1);
+        const std::size_t dog_idx = (std::size_t)zz * (std::size_t)c_height * (std::size_t)c_dog_pitch
+                                  + (std::size_t)yy * (std::size_t)c_dog_pitch
+                                  + (std::size_t)xx;
+        
+        if (dog_idx >= c_dog_total_elems) return 0.0f;
+        return dog_ptr_kernel[dog_idx];
+    };
+    
+    uint32_t gt = 0, lt = 0;
+    
+    auto extremum_cmp = [&](float f, uint32_t mask) {
+        gt |= ((val > f) ? mask : 0);
+        lt |= ((val < f) ? mask : 0);
+    };
+
+    // 1st group: TX(0,1,1) and TX(2,1,1)
+    extremum_cmp(dog_get(level, y, x - 1), 0x00400000);
+    extremum_cmp(dog_get(level, y, x + 1), 0x00040000);
+    
+    if((gt != 0x00440000) && (lt != 0x00440000)) return false;
+
+    // 2nd group
+    extremum_cmp(dog_get(level, y - 1, x), 0x00800000);
+    extremum_cmp(dog_get(level, y + 1, x), 0x00200000);
+    extremum_cmp(dog_get(level - 1, y - 1, x), 0x80000000);
+    extremum_cmp(dog_get(level - 1, y + 1, x), 0x40000000);
+    extremum_cmp(dog_get(level - 1, y, x), 0x20000000);
+    extremum_cmp(dog_get(level + 1, y - 1, x), 0x00008000);
+    extremum_cmp(dog_get(level + 1, y, x), 0x00004000);
+    extremum_cmp(dog_get(level + 1, y + 1, x), 0x00002000);
+
+    if((gt != 0xe0e4e000) && (lt != 0xe0e4e000)) return false;
+
+    // 3rd group
+    extremum_cmp(dog_get(level, y - 1, x - 1), 0x00010000);
+    extremum_cmp(dog_get(level, y - 1, x + 1), 0x00020000);
+    extremum_cmp(dog_get(level, y + 1, x - 1), 0x00100000);
+    extremum_cmp(dog_get(level, y + 1, x + 1), 0x00080000);
+
+    if((gt != 0xe0ffe000) && (lt != 0xe0ffe000)) return false;
+
+    // 4th group
+    extremum_cmp(dog_get(level - 1, y - 1, x - 1), 0x01000000);
+    extremum_cmp(dog_get(level - 1, y - 1, x + 1), 0x02000000);
+    extremum_cmp(dog_get(level - 1, y, x - 1), 0x00000004);
+    extremum_cmp(dog_get(level - 1, y, x + 1), 0x04000000);
+    extremum_cmp(dog_get(level - 1, y + 1, x - 1), 0x10000000);
+    extremum_cmp(dog_get(level - 1, y + 1, x + 1), 0x08000000);
+
+    if((gt != 0xffffe004) && (lt != 0xffffe004)) return false;
+
+    // 5th group
+    extremum_cmp(dog_get(level + 1, y - 1, x - 1), 0x00000100);
+    extremum_cmp(dog_get(level + 1, y - 1, x + 1), 0x00000200);
+    extremum_cmp(dog_get(level + 1, y, x - 1), 0x00000001);
+    extremum_cmp(dog_get(level + 1, y, x + 1), 0x00000400);
+    extremum_cmp(dog_get(level + 1, y + 1, x - 1), 0x00001000);
+    extremum_cmp(dog_get(level + 1, y + 1, x + 1), 0x00000800);
+
+    return (gt == 0xffffff05) || (lt == 0xffffff05);
+}
+
+__attribute__((noinline))
+static bool refine_extremum(
+    int3& n, float3& d,
+    const float* dog_ptr_kernel,
+    int c_width, int c_height, int c_maxlevel,
+    int c_dog_pitch, float c_threshold,
+    float c_edge_limit,
+    size_t c_dog_total_elems,
+    int initial_x, int initial_y, int initial_level,
+    int max_iterations)
+{
+    // Define dog_get locally - compiler can optimize this
+    auto clamp = [](int v, int lo, int hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
+    };
+    
+    auto dog_get = [=](int z, int y, int x) -> float {
+        int zz = clamp(z, 0, c_maxlevel + 1);
+        int yy = clamp(y, 0, c_height - 1);
+        int xx = clamp(x, 0, c_width - 1);
+        const size_t dog_idx = (size_t)zz * (size_t)c_height * (size_t)c_dog_pitch
+                              + (size_t)yy * (size_t)c_dog_pitch
+                              + (size_t)xx;
+        
+        if (dog_idx >= c_dog_total_elems) return 0.0f;
+        return dog_ptr_kernel[dog_idx];
+    };
+    
+    // Recompute gradients on demand instead of storing
+    auto compute_gradient = [&](const int3& pos) -> float3 {
+        float3 grad;
+        grad.x = 0.5f * (dog_get(pos.z, pos.y, pos.x + 1) - dog_get(pos.z, pos.y, pos.x - 1));
+        grad.y = 0.5f * (dog_get(pos.z, pos.y + 1, pos.x) - dog_get(pos.z, pos.y - 1, pos.x));
+        grad.z = 0.5f * (dog_get(pos.z + 1, pos.y, pos.x) - dog_get(pos.z - 1, pos.y, pos.x));
+        return grad;
+    };
+    
+    auto compute_hessian_diag = [&](const int3& pos) -> float3 {
+        float center = dog_get(pos.z, pos.y, pos.x);
+        float3 hess;
+        hess.x = dog_get(pos.z, pos.y, pos.x + 1) + dog_get(pos.z, pos.y, pos.x - 1) - 2.0f * center;
+        hess.y = dog_get(pos.z, pos.y + 1, pos.x) + dog_get(pos.z, pos.y - 1, pos.x) - 2.0f * center;
+        hess.z = dog_get(pos.z + 1, pos.y, pos.x) + dog_get(pos.z - 1, pos.y, pos.x) - 2.0f * center;
+        return hess;
+    };
+    
+    auto compute_hessian_offdiag = [&](const int3& pos) -> float3 {
+        float3 hess_off;
+        // Dxy
+        hess_off.x = 0.25f * (dog_get(pos.z, pos.y + 1, pos.x + 1) + 
+                              dog_get(pos.z, pos.y - 1, pos.x - 1) - 
+                              dog_get(pos.z, pos.y + 1, pos.x - 1) - 
+                              dog_get(pos.z, pos.y - 1, pos.x + 1));
+        // Dxs
+        hess_off.y = 0.25f * (dog_get(pos.z + 1, pos.y, pos.x + 1) + 
+                              dog_get(pos.z - 1, pos.y, pos.x - 1) - 
+                              dog_get(pos.z + 1, pos.y, pos.x - 1) - 
+                              dog_get(pos.z - 1, pos.y, pos.x + 1));
+        // Dys
+        hess_off.z = 0.25f * (dog_get(pos.z + 1, pos.y + 1, pos.x) + 
+                              dog_get(pos.z - 1, pos.y - 1, pos.x) - 
+                              dog_get(pos.z + 1, pos.y - 1, pos.x) - 
+                              dog_get(pos.z - 1, pos.y + 1, pos.x));
+        return hess_off;
+    };
+    
+    // Refinement loop
+    n = {initial_x, initial_y, initial_level};
+    int iter = 0;
+    
+    while(iter < max_iterations) {
+        iter++;
+        
+        // Recompute at current position
+        float3 D = compute_gradient(n);
+        float3 DD = compute_hessian_diag(n);
+        float3 DX = compute_hessian_offdiag(n);
+        
+        // Build matrix A
+        float A[3][3];
+        A[0][0] = DD.x; A[0][1] = DX.x; A[0][2] = DX.y;
+        A[1][0] = DX.x; A[1][1] = DD.y; A[1][2] = DX.z;
+        A[2][0] = DX.y; A[2][1] = DX.z; A[2][2] = DD.z;
+        
+        float3 b = {-D.x, -D.y, -D.z};
+        
+        // Compute determinant using cofactor expansion
+        float det = A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[1][2])
+                  - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0])
+                  + A[0][2] * (A[1][0] * A[1][2] - A[1][1] * A[2][0]);
+        
+        if(sycl::fabs(det) < 1e-10f) {
+            d = {0.0f, 0.0f, 0.0f};
+            return false;
+        }
+        
+        float rsd = 1.0f / det;
+        
+        // Compute inverse (only what we need for solution)
+        float inv00 = (A[1][1] * A[2][2] - A[1][2] * A[1][2]) * rsd;
+        float inv01 = (A[0][2] * A[1][2] - A[0][1] * A[2][2]) * rsd;
+        float inv02 = (A[0][1] * A[1][2] - A[0][2] * A[1][1]) * rsd;
+        float inv11 = (A[0][0] * A[2][2] - A[0][2] * A[0][2]) * rsd;
+        float inv12 = (A[0][1] * A[0][2] - A[0][0] * A[1][2]) * rsd;
+        float inv22 = (A[0][0] * A[1][1] - A[0][1] * A[0][1]) * rsd;
+        
+        // Solve: d = inv * b
+        d.x = inv00 * b.x + inv01 * b.y + inv02 * b.z;
+        d.y = inv01 * b.x + inv11 * b.y + inv12 * b.z;
+        d.z = inv02 * b.x + inv12 * b.y + inv22 * b.z;
+        
+        // Check convergence
+        if(iter == max_iterations) break;
+        
+        // Determine movement
+        int3 t = {0, 0, 0};
+        t.x = ((d.x >= 0.6f && n.x < c_width - 2) ? 1 : 0) +
+              ((d.x <= -0.6f && n.x > 1) ? -1 : 0);
+        t.y = ((d.y >= 0.6f && n.y < c_height - 2) ? 1 : 0) +
+              ((d.y <= -0.6f && n.y > 1) ? -1 : 0);
+        t.z = ((d.z >= 0.6f && n.z < c_maxlevel - 1) ? 1 : 0) +
+              ((d.z <= -0.6f && n.z > 1) ? -1 : 0);
+        
+        if(t.x == 0 && t.y == 0 && t.z == 0) break;
+        
+        n.x += t.x;
+        n.y += t.y;
+        n.z += t.z;
+    }
+    
+    // Final validation
+    if(sycl::fabs(d.x) >= 1.5f || sycl::fabs(d.y) >= 1.5f || sycl::fabs(d.z) >= 1.5f) {
+        return false;
+    }
+    
+    float xn = n.x + d.x;
+    float yn = n.y + d.y;
+    float sn = n.z + d.z;
+    
+    if(xn < 0.0f || xn > c_width - 1.0f ||
+       yn < 0.0f || yn > c_height - 1.0f || 
+       sn < 0.0f || sn > c_maxlevel) {
+        return false;
+    }
+    
+    // Final contrast and edge checks - recompute only what we need
+    float3 D_final = compute_gradient(n);
+    float3 DD_final = compute_hessian_diag(n);
+    float center = dog_get(n.z, n.y, n.x);
+    
+    float contr = center + 0.5f * (D_final.x * d.x + D_final.y * d.y + D_final.z * d.z);
+    
+    if(sycl::fabs(contr) < 2.0f * c_threshold) return false;
+    
+    // Edge check - only compute Dxy for this
+    float Dxy = 0.25f * (dog_get(n.z, n.y + 1, n.x + 1) + 
+                         dog_get(n.z, n.y - 1, n.x - 1) - 
+                         dog_get(n.z, n.y + 1, n.x - 1) - 
+                         dog_get(n.z, n.y - 1, n.x + 1));
+    
+    float tr = DD_final.x + DD_final.y;
+    float det = DD_final.x * DD_final.y - Dxy * Dxy;
+    
+    if(det <= 0.0f) return false;
+    
+    float edgeval = tr * tr / det;
+    if(edgeval >= (c_edge_limit + 1.0f) * (c_edge_limit + 1.0f) / c_edge_limit) {
+        return false;
+    }
+    
+    return true;
+}
+
 template<int sift_mode>
 static
 sycl::event find_extrema_in_dog( const int3&    g,
@@ -120,250 +374,41 @@ sycl::event find_extrema_in_dog( const int3&    g,
             // TX(0,1,1) = dog.get((level-1)+1, (y-1)+1, (x-1)+0) = dog.get(level, y, x-1)
             // TX(2,1,1) = dog.get((level-1)+1, (y-1)+1, (x-1)+2) = dog.get(level, y, x+1)
             
-            uint32_t gt = 0;
-            uint32_t lt = 0;
-
-            auto extremum_cmp = [&](float f, uint32_t mask) {
-                gt |= ((val > f) ? mask : 0);
-                lt |= ((val < f) ? mask : 0);
-            };
-
-            // 1st group: TX(0,1,1) and TX(2,1,1)
-            extremum_cmp(dog_get(level, y, x - 1), 0x00400000);
-            extremum_cmp(dog_get(level, y, x + 1), 0x00040000);
-            
-            if((gt != 0x00440000) && (lt != 0x00440000)) return;
-
-            // 2nd group: TX(1,0,1), TX(1,2,1), TX(1,0,0), TX(1,2,0), TX(1,1,0), TX(1,0,2), TX(1,1,2), TX(1,2,2)
-            extremum_cmp(dog_get(level, y - 1, x), 0x00800000);
-            extremum_cmp(dog_get(level, y + 1, x), 0x00200000);
-            extremum_cmp(dog_get(level - 1, y - 1, x), 0x80000000);
-            extremum_cmp(dog_get(level - 1, y + 1, x), 0x40000000);
-            extremum_cmp(dog_get(level - 1, y, x), 0x20000000);
-            extremum_cmp(dog_get(level + 1, y - 1, x), 0x00008000);
-            extremum_cmp(dog_get(level + 1, y, x), 0x00004000);
-            extremum_cmp(dog_get(level + 1, y + 1, x), 0x00002000);
-
-            if((gt != 0xe0e4e000) && (lt != 0xe0e4e000)) return;
-
-            // 3rd group: TX(0,0,1), TX(2,0,1), TX(0,2,1), TX(2,2,1)
-            extremum_cmp(dog_get(level, y - 1, x - 1), 0x00010000);
-            extremum_cmp(dog_get(level, y - 1, x + 1), 0x00020000);
-            extremum_cmp(dog_get(level, y + 1, x - 1), 0x00100000);
-            extremum_cmp(dog_get(level, y + 1, x + 1), 0x00080000);
-
-            if((gt != 0xe0ffe000) && (lt != 0xe0ffe000)) return;
-
-            // 4th group: TX(0,0,0), TX(2,0,0), TX(0,1,0), TX(2,1,0), TX(0,2,0), TX(2,2,0)
-            extremum_cmp(dog_get(level - 1, y - 1, x - 1), 0x01000000);
-            extremum_cmp(dog_get(level - 1, y - 1, x + 1), 0x02000000);
-            extremum_cmp(dog_get(level - 1, y, x - 1), 0x00000004);
-            extremum_cmp(dog_get(level - 1, y, x + 1), 0x04000000);
-            extremum_cmp(dog_get(level - 1, y + 1, x - 1), 0x10000000);
-            extremum_cmp(dog_get(level - 1, y + 1, x + 1), 0x08000000);
-
-            if((gt != 0xffffe004) && (lt != 0xffffe004)) return;
-
-            // 5th group: TX(0,0,2), TX(2,0,2), TX(0,1,2), TX(2,1,2), TX(0,2,2), TX(2,2,2)
-            extremum_cmp(dog_get(level + 1, y - 1, x - 1), 0x00000100);
-            extremum_cmp(dog_get(level + 1, y - 1, x + 1), 0x00000200);
-            extremum_cmp(dog_get(level + 1, y, x - 1), 0x00000001);
-            extremum_cmp(dog_get(level + 1, y, x + 1), 0x00000400);
-            extremum_cmp(dog_get(level + 1, y + 1, x - 1), 0x00001000);
-            extremum_cmp(dog_get(level + 1, y + 1, x + 1), 0x00000800);
-
-            if((gt != 0xffffff05) && (lt != 0xffffff05)) return;
-
-            // NOW the extremum check passed, use the SAME value v for refinement
-            const float v = val;  // This is already dog_get(level, y, x)
-
-
-            // Refinement loop - use coordinates (x, y, level)
-            float3 D; // Dx Dy Ds
-            float3 DD; // Dxx Dyy Dss
-            float3 DX; // Dxy Dxs Dys
-            float3 d; // dx dy ds
-            int3 n = {x, y, level};
-            int iter = 0;
-            const int MAX_ITER = 5;
-            
-
-            while(iter < MAX_ITER) {
-                iter++;
-
-                // ... gradient and Hessian computation stays the same ...
-                
-                const float x2y1z1 = dog_get(n.z, n.y, n.x + 1);
-                const float x0y1z1 = dog_get(n.z, n.y, n.x - 1);
-                const float x1y2z1 = dog_get(n.z, n.y + 1, n.x);
-                const float x1y0z1 = dog_get(n.z, n.y - 1, n.x);
-                const float x1y1z2 = dog_get(n.z + 1, n.y, n.x);
-                const float x1y1z0 = dog_get(n.z - 1, n.y, n.x);
-
-                D.x = 0.5f * (x2y1z1 - x0y1z1);
-                D.y = 0.5f * (x1y2z1 - x1y0z1);
-                D.z = 0.5f * (x1y1z2 - x1y1z0);
-
-                const float x1y1z1 = dog_get(n.z, n.y, n.x);
-
-                DD.x = x2y1z1 + x0y1z1 - 2.0f * x1y1z1;
-                DD.y = x1y2z1 + x1y0z1 - 2.0f * x1y1z1;
-                DD.z = x1y1z2 + x1y1z0 - 2.0f * x1y1z1;
-
-                const float x0y0z1 = dog_get(n.z, n.y - 1, n.x - 1);
-                const float x0y2z1 = dog_get(n.z, n.y + 1, n.x - 1);
-                const float x2y0z1 = dog_get(n.z, n.y - 1, n.x + 1);
-                const float x2y2z1 = dog_get(n.z, n.y + 1, n.x + 1);
-                const float x0y1z0 = dog_get(n.z - 1, n.y, n.x - 1);
-                const float x0y1z2 = dog_get(n.z + 1, n.y, n.x - 1);
-                const float x2y1z0 = dog_get(n.z - 1, n.y, n.x + 1);
-                const float x2y1z2 = dog_get(n.z + 1, n.y, n.x + 1);
-                const float x1y0z0 = dog_get(n.z - 1, n.y - 1, n.x);
-                const float x1y0z2 = dog_get(n.z + 1, n.y - 1, n.x);
-                const float x1y2z0 = dog_get(n.z - 1, n.y + 1, n.x);
-                const float x1y2z2 = dog_get(n.z + 1, n.y + 1, n.x);
-
-                DX.x = 0.25f * (x2y2z1 + x0y0z1 - x0y2z1 - x2y0z1);
-                DX.y = 0.25f * (x2y1z2 + x0y1z0 - x0y1z2 - x2y1z0);
-                DX.z = 0.25f * (x1y2z2 + x1y0z0 - x1y2z0 - x1y0z2);
-
-                float A[3][3];
-                A[0][0] = DD.x; A[0][1] = DX.x; A[0][2] = DX.y;
-                A[1][0] = DX.x; A[1][1] = DD.y; A[1][2] = DX.z;
-                A[2][0] = DX.y; A[2][1] = DX.z; A[2][2] = DD.z;
-
-                float3 b = {-D.x, -D.y, -D.z};
-
-                // Compute determinants for matrix inversion
-                float det0b = -A[1][2] * A[1][2];
-                float det0a = A[1][1] * A[2][2];
-                float det0 = det0b + det0a;
-
-                float det1b = -A[0][1] * A[2][2];
-                float det1a = A[1][2] * A[0][2];
-                float det1 = det1b + det1a;
-
-                float det2b = -A[1][1] * A[0][2];
-                float det2a = A[0][1] * A[1][2];
-                float det2 = det2b + det2a;
-
-                float det3b = -A[0][2] * A[0][2];
-                float det3a = A[0][0] * A[2][2];
-                float det3 = det3b + det3a;
-
-                float det4b = -A[0][0] * A[1][2];
-                float det4a = A[0][1] * A[0][2];
-                float det4 = det4b + det4a;
-
-                float det5b = -A[0][1] * A[0][1];
-                float det5a = A[0][0] * A[1][1];
-                float det5 = det5b + det5a;
-
-                float det = (A[0][0] * det0) + (A[0][1] * det1) + (A[0][2] * det2);
-
-                if(sycl::fabs(det) < 1e-10f) {
-                    d.x = 0.0f;
-                    d.y = 0.0f;
-                    d.z = 0.0f;
-                    break;
-                }
-
-                float rsd = 1.0f / det;
-
-                // Compute inverse matrix
-                float inv[3][3];
-                inv[0][0] = det0 * rsd;
-                inv[1][0] = det1 * rsd;
-                inv[2][0] = det2 * rsd;
-                inv[1][1] = det3 * rsd;
-                inv[1][2] = det4 * rsd;
-                inv[2][2] = det5 * rsd;
-                inv[0][1] = inv[1][0];
-                inv[0][2] = inv[2][0];
-                inv[2][1] = inv[1][2];
-
-                // Multiply inv * b to get solution
-                d.x = inv[0][0] * b.x + inv[0][1] * b.y + inv[0][2] * b.z;
-                d.y = inv[1][0] * b.x + inv[1][1] * b.y + inv[1][2] * b.z;
-                d.z = inv[2][0] * b.x + inv[2][1] * b.y + inv[2][2] * b.z;
-
-                // Match CPU refine logic: on last iteration, don't check for movement
-                const bool last_it = (iter == MAX_ITER);
-                if(last_it) break;  // CPU returns 0 (continue), but loop ends anyway
-                
-                int3 t = {0, 0, 0};
-                
-                // Launch (cols-2)×(rows-2), threads at [1, cols-2]×[1, rows-2]
-                // Allow movement to reach [1, cols-1]×[1, rows-1], but ensure neighbors stay valid
-                // Max position where we can read n+1 is width-2, so before moving must be < width-2
-                t.x = ((d.x >= 0.6f && n.x < c_width - 2) ? 1 : 0) +
-                      ((d.x <= -0.6f && n.x > 1) ? -1 : 0);
-                t.y = ((d.y >= 0.6f && n.y < c_height - 2) ? 1 : 0) +
-                      ((d.y <= -0.6f && n.y > 1) ? -1 : 0);
-                
-                if constexpr (sift_mode == Config::RefineInOctave) {
-                    t.z = ((d.z >= 0.6f && n.z < c_maxlevel - 1) ? 1 : 0) +
-                          ((d.z <= -0.6f && n.z > 1) ? -1 : 0);
-                }
-                
-                if(t.x == 0 && t.y == 0 && t.z == 0) break;  // No movement, converged
-                
-                n.x += t.x;
-                n.y += t.y;
-                n.z += t.z;
+            if (!check_extremum_26_neighbors(val, dog_ptr_kernel, 
+                                            level, y, x,
+                                            c_width, c_height, c_dog_pitch, c_maxlevel,
+                                            c_dog_total_elems))
+            {
+                return;
             }
-
-            // Final validation
-            if(d.x >= 1.5f || d.y >= 1.5f || d.z >= 1.5f) return;
-
-            const float xn = n.x + d.x;
-            const float yn = n.y + d.y;
-            const float sn = n.z + d.z;
-
-
-            if(xn < 0.0f || xn > c_width - 1.0f ||   // Match CPU: allows positions up to width-1
-               yn < 0.0f || yn > c_height - 1.0f || 
-               sn < -0.0f || sn > c_maxlevel) return;
-                
-
-            const float x2y1z1_f = dog_get(n.z, n.y, n.x + 1);
-            const float x0y1z1_f = dog_get(n.z, n.y, n.x - 1);
-            const float x1y2z1_f = dog_get(n.z, n.y + 1, n.x);
-            const float x1y0z1_f = dog_get(n.z, n.y - 1, n.x);
-            const float x1y1z2_f = dog_get(n.z + 1, n.y, n.x);
-            const float x1y1z0_f = dog_get(n.z - 1, n.y, n.x);
-            const float x1y1z1_f = dog_get(n.z, n.y, n.x);
-
-            float3 D_f;
-            D_f.x = 0.5f * (x2y1z1_f - x0y1z1_f);
-            D_f.y = 0.5f * (x1y2z1_f - x1y0z1_f);
-            D_f.z = 0.5f * (x1y1z2_f - x1y1z0_f);
-
-            float3 DD_f;
-            DD_f.x = x2y1z1_f + x0y1z1_f - 2.0f * x1y1z1_f;
-            DD_f.y = x1y2z1_f + x1y0z1_f - 2.0f * x1y1z1_f;
-            DD_f.z = x1y1z2_f + x1y1z0_f - 2.0f * x1y1z1_f;
-
-            // Compute DX_f at final position
-            const float x0y0z1_f = dog_get(n.z, n.y - 1, n.x - 1);
-            const float x0y2z1_f = dog_get(n.z, n.y + 1, n.x - 1);
-            const float x2y0z1_f = dog_get(n.z, n.y - 1, n.x + 1);
-            const float x2y2z1_f = dog_get(n.z, n.y + 1, n.x + 1);
-           
-            float DX_f_x = 0.25f * (x2y2z1_f + x0y0z1_f - x0y2z1_f - x2y0z1_f);
-
-            const float contr = x1y1z1_f + 0.5f * (D_f.x * d.x + D_f.y * d.y + D_f.z * d.z);
-            const float tr      = DD_f.x + DD_f.y;
-            const float det     = DD_f.x * DD_f.y - DX_f_x * DX_f_x;
-            const float edgeval = tr * tr / det;
             
-            if(sycl::fabs(contr) < 2.0f * c_threshold) return;
-            if(det <= 0.0f) return;
+            // Refine extremum
+            int3 n;
+            float3 d;
+            const int MAX_ITER = 5;
 
-            if(edgeval >= (c_edge_limit + 1.0f) * (c_edge_limit + 1.0f) / c_edge_limit) return;
+            bool refinement_success = refine_extremum(
+                n, d,
+                dog_ptr_kernel,
+                c_width, c_height, c_maxlevel,
+                c_dog_pitch, c_threshold,
+                c_edge_limit,
+                c_dog_total_elems,
+                x, y, level,
+                MAX_ITER
+            );
+
+            if(!refinement_success) return;
+
+            // Compute final position
+            float xn = n.x + d.x;
+            float yn = n.y + d.y;
+            float sn = n.z + d.z;
 
             // Atomically add extremum
-            int write_idx = sycl::atomic_ref<int, sycl::memory_order_acq_rel, sycl::memory_scope::device>(d_count[0]).fetch_add(1);            
+            int write_idx = sycl::atomic_ref<int, sycl::memory_order_acq_rel, 
+                                            sycl::memory_scope::device>(d_count[0]).fetch_add(1);
+                                            
             if(write_idx < c_max_extrema) {
                 InitialExtremum& ec = d_extrema[write_idx];
                 ec.xpos = xn;

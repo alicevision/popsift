@@ -7,33 +7,58 @@
  */
 #pragma once
 
-#include "common/grid.h"
-#include "s_desc_norm_l2.h"
-#include "s_desc_norm_rs.h"
 #include "sift_extremum.h"
 #include <sycl/sycl.hpp>
 
-// Host wrapper for SYCL normalization
-template<class T>
-sycl::event normalize_histogram_sycl(sycl::queue& q, Descriptor* d_descs, const int num_orientations)
-{
-   // Use tag dispatch to select correct overload
-   T* tag = nullptr;
-   return normalize_descriptors_sycl(q, d_descs, num_orientations, h_consts.norm_multi, tag);
-}
+namespace popsift {
+
+// Forward declarations
+class NormalizeRootSift;
+class NormalizeL2;
 
 // CPU fallback (original implementation)
 template<class T>
-void normalize_histogram( )
+void normalize_histogram(Descriptor* descs, const int num_orientations)
 {
-    Descriptor* descs            = dbuf.desc;
-    const int   num_orientations = dct.ori_total;
-
-    for( int i=0; i<num_orientations; i++ )
+    for(int i = 0; i < num_orientations; i++)
     {
         Descriptor* desc = &descs[i];
-
-        T::normalize( desc->features );
+        T::normalize(desc->features);
     }
 }
 
+// Forward declare the tag dispatch functions (implemented in norm classes)
+sycl::event normalize_descriptors_sycl(
+    sycl::queue& q,
+    Descriptor* d_descs,
+    const int num_orientations,
+    const int norm_multi,
+    NormalizeRootSift*);
+
+sycl::event normalize_descriptors_sycl(
+    sycl::queue& q,
+    Descriptor* d_descs,
+    const int num_orientations,
+    const int norm_multi,
+    NormalizeL2*);
+
+// Host wrapper for SYCL normalization
+template<class T>
+sycl::event normalize_histogram_sycl(
+    sycl::queue& q, 
+    Descriptor* d_descs, 
+    const int num_orientations,
+    float norm_multi,
+    bool use_sub_group = true)
+{
+    // Use tag dispatch to call the appropriate kernel in the norm class
+    T* tag = nullptr;
+    return normalize_descriptors_sycl(q, d_descs, num_orientations, 
+                                      static_cast<int>(norm_multi), tag);
+}
+
+} // namespace popsift
+
+// Include the implementations AFTER the declarations
+#include "s_desc_norm_l2.h"
+#include "s_desc_norm_rs.h"

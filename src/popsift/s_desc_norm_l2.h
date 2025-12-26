@@ -12,8 +12,7 @@
 #include <sycl/sycl.hpp>
 #include <cmath>
 
-using namespace popsift;
-using namespace std;
+namespace popsift {
 
 class NormalizeL2
 {
@@ -44,7 +43,6 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc )
     }
 
     // compute 1 / sqrt(sum)
-    // norm = frsqrtf( norm );
     norm = 1.0f / std::sqrt( norm );
 
     float desc[128];
@@ -52,7 +50,7 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc )
     // quasi-normalize all 128 floats
     for( int i=0; i<128; i++ )
     {
-        desc[i] = min( src_desc[i] * norm, 0.2f );
+        desc[i] = std::min( src_desc[i] * norm, 0.2f );
     }
 
     norm = 0;
@@ -63,7 +61,6 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc )
         norm += ( desc[i] * desc[i] );
     }
 
-    // norm = frsqrtf( norm ); // inverse square root
     norm = 1.0f / std::sqrt( norm );
 
     // scale for the desired output scale (0-1, 0-256 og 0-512)
@@ -76,8 +73,8 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc )
     }
 }
 
-// SYCL kernel for L2 normalization 
-static sycl::event normalize_descriptors_sycl(
+// SYCL kernel for L2 normalization
+inline sycl::event normalize_descriptors_sycl(
     sycl::queue& q,
     Descriptor* d_descs,
     const int num_orientations,
@@ -113,7 +110,7 @@ static sycl::event normalize_descriptors_sycl(
             norm = 1.0f / sycl::sqrt(norm);
             
             // Scale for output
-            norm = sycl::ldexp(norm, norm_multi);  // scalbnf equivalent
+            norm = sycl::ldexp(norm, norm_multi);
             
             // Write back normalized and scaled descriptors
             for(int j = 0; j < 128; j++) {
@@ -123,3 +120,4 @@ static sycl::event normalize_descriptors_sycl(
     });
 }
 
+} // namespace popsift

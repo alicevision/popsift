@@ -43,6 +43,7 @@ struct ImageBase
     virtual int getHeight() const = 0;
 
     virtual Plane2D_float& getFloatPlane() = 0;
+    virtual Plane2D_float& getFloatPlane(sycl::queue& q) = 0;
 };
 
 /*************************************************************
@@ -78,6 +79,7 @@ struct Image : public ImageBase
     virtual int getHeight() const override { return _input_image_d.getDimY(); }
 
     virtual Plane2D_float& getFloatPlane() override;
+    virtual Plane2D_float& getFloatPlane(sycl::queue& q) override; 
 private:
     void allocate( int w, int h );
 
@@ -121,6 +123,7 @@ struct ImageFloat : public ImageBase
     virtual int getHeight() const override { return _input_image_d.getDimY(); }
 
     virtual Plane2D_float& getFloatPlane() override;
+    virtual Plane2D_float& getFloatPlane(sycl::queue& q) override; 
 
 private:
     void allocate( int w, int h );

@@ -63,8 +63,11 @@ void Pyramid::horiz_from_input_image( const Config& conf, std::shared_ptr<ImageB
 
     float shift = 0.5f * std::pow( 2.0f, conf.getUpscaleFactor() );
 
+    // Get SYCL queue from octave
+    sycl::queue& queue = oct_obj.getQueue();
+
     // Get source and destination planes
-    PlaneD<float>& src = base->getFloatPlane();
+    PlaneD<float>& src = base->getFloatPlane(queue);
     PlaneD<float>& dst = oct_obj.getIntm();
 
     // Get dimensions
@@ -80,9 +83,6 @@ void Pyramid::horiz_from_input_image( const Config& conf, std::shared_ptr<ImageB
     // Get Gaussian filter parameter of span for input image
     const int span = h_gauss.dd.span[0];
     
-    // Get SYCL queue from octave
-    sycl::queue& queue = oct_obj.getQueue();
-
     POP_INFO2( conf.silent(), "Submitting horiz_from_input_image SYCL kernel..." );
 
     try {
