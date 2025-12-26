@@ -523,6 +523,9 @@ void Pyramid::orientation( const Config& conf )
    }
    POP_INFO2( conf.silent(), "All orientation computation complete" );
    
+   // **EXTRA: Wait for the main queue as well**
+   q.wait_and_throw();
+
    // Free device memory for extrema inputs
    for(int octave=0; octave<_num_octaves; octave++) {
        if(d_extrema_ptrs[octave] != nullptr) {
