@@ -14,7 +14,6 @@
 #include "sift_config.h"
 #include "sift_constants.h"
 #include "sift_pyramid.h"
-#include "s_desc_loop.h"
 
 #include <cstdio>
 #include <iostream>
@@ -22,22 +21,6 @@
 
 using namespace popsift;
 using namespace std;
-
-// Helper function to query kernel sub-group size
-template<typename KernelName>
-size_t get_kernel_subgroup_size(sycl::queue& q) {
-    auto device = q.get_device();
-    
-    // Query the maximum sub-group size supported by the device
-    auto sg_sizes = device.get_info<sycl::info::device::sub_group_sizes>();
-    
-    if(sg_sizes.empty()) {
-        return 1; // Fallback if no sub-group support
-    }
-    
-    // Return the maximum sub-group size
-    return *std::max_element(sg_sizes.begin(), sg_sizes.end());
-}
 
 /*************************************************************
  * descriptor extraction
@@ -57,79 +40,74 @@ size_t get_kernel_subgroup_size(sycl::queue& q) {
  *       device-side octave structure that contains an array of
  *       levels on the device side.
  *************************************************************/
-void Pyramid::descriptors(const Config& conf) {
-
+void Pyramid::descriptors( const Config& conf )
+{
     auto start = std::chrono::high_resolution_clock::now();
 
-    // === Phase 1: Unified Allocation ===
-    Descriptor* d_all_descs = sycl::malloc_device<Descriptor>(dct.ori_total, _shared_queue);
-    Extremum* d_extrema = sycl::malloc_device<Extremum>(dbuf.extrema.size(), _shared_queue);
-    int* d_feat_to_ext_map = sycl::malloc_device<int>(dbuf.feat_to_ext_map.size(), _shared_queue);
-    
-    auto copy_extrema = _shared_queue.memcpy(d_extrema, dbuf.extrema.data(), 
-                                             dbuf.extrema.size() * sizeof(Extremum));
-    auto copy_feat_map = _shared_queue.memcpy(d_feat_to_ext_map, dbuf.feat_to_ext_map.data(), 
-                                              dbuf.feat_to_ext_map.size() * sizeof(int));
-    
-    // === Phase 2: Hardware Detection ===
-    auto group_size = get_kernel_subgroup_size<sub_group_desc_loop>(_shared_queue);
-    bool use_sub_group = group_size >= 32;
-    
-    if(!use_sub_group) {
-        std::cerr << "Warning: Sub-group size " << group_size 
-                  << " < 32, using local memory fallback" << std::endl;
+    if( dct.ori_total == 0 )
+    {
+        cerr << "Warning: no descriptors to extract" << endl;
+        return;
     }
+
+    sycl::queue& q = _shared_queue;
     
-    // === Phase 3: Multi-threaded Extraction ===
-    std::vector<sycl::event> extraction_events;
-    for(int octave = _num_octaves - 1; octave >= 0; octave--) {
-        if(dct.ori_ct[octave] == 0) continue;
+    // Allocate ALL device memory at once (instead of per-octave)
+    Descriptor* d_all_descs = sycl::malloc_device<Descriptor>(dct.ori_total, q);
+    Extremum* d_extrema = sycl::malloc_device<Extremum>(dbuf.extrema.size(), q);
+    int* d_feat_to_ext_map = sycl::malloc_device<int>(dbuf.feat_to_ext_map.size(), q);
+    
+    if (!d_all_descs || !d_extrema || !d_feat_to_ext_map) {
+        cerr << "Error: Failed to allocate device memory for descriptors" << endl;
+        if (d_all_descs) sycl::free(d_all_descs, q);
+        if (d_extrema) sycl::free(d_extrema, q);
+        if (d_feat_to_ext_map) sycl::free(d_feat_to_ext_map, q);
+        return;
+    }
+
+    // Copy shared data ONCE (instead of per-octave)
+    auto copy_extrema = q.memcpy(d_extrema, dbuf.extrema.data(), 
+                                  dbuf.extrema.size() * sizeof(Extremum));
+    auto copy_feat_map = q.memcpy(d_feat_to_ext_map, dbuf.feat_to_ext_map.data(), 
+                                   dbuf.feat_to_ext_map.size() * sizeof(int));
+
+
+    std::vector<sycl::event> kernel_events;
+    kernel_events.reserve(_num_octaves);
+    
+    // Launch all octave kernels asynchronously with dependencies
+    for( int octave = _num_octaves - 1; octave >= 0; octave-- )
+    {
+        if( dct.ori_ct[octave] == 0 ) continue;
         
         Octave& oct_obj = _octaves[octave];
         const int num_orientations = dct.ori_ct[octave];
         const int orientation_offset = dct.ori_ps[octave];
         
-        sycl::range<3> global{4, 4, static_cast<size_t>(num_orientations * 32)};
-        sycl::range<3> local{4, 4, 32};
+        // Launch kernel with pointer offsets (no extra allocations!)
+        auto kernel_event = ext_desc_vlfeat_sycl(
+            q,
+            octave,
+            oct_obj.getData().getDevPtr(),
+            oct_obj.getData().getCols(),
+            oct_obj.getLevels(),
+            oct_obj.getWidth(),
+            oct_obj.getHeight(),
+            d_extrema,
+            d_feat_to_ext_map,
+            num_orientations,
+            orientation_offset,
+            d_all_descs + orientation_offset,  // Direct write to final buffer
+            {copy_extrema, copy_feat_map}      // Dependencies
+        );
         
-        sycl::event e;
-        if(use_sub_group) {
-            e = _shared_queue.parallel_for(
-                sycl::nd_range{global, local},
-                {copy_extrema, copy_feat_map},
-                Ext_desc_loop(octave, orientation_offset,
-                             oct_obj.getWidth(), oct_obj.getHeight(),
-                             d_all_descs + orientation_offset,
-                             d_extrema, d_feat_to_ext_map,
-                             oct_obj.getData().getDevPtr(),
-                             oct_obj.getData().getCols()));
-        } else {
-            e = _shared_queue.submit([&](sycl::handler& cgh) {
-                cgh.depends_on({copy_extrema, copy_feat_map});
-                auto sum = sycl::local_accessor<float, 1>((local[2] + 7) * 16, cgh);
-                cgh.parallel_for(
-                    sycl::nd_range{global, local},
-                    Ext_desc_loop_local_mem(sum, octave, orientation_offset,
-                                           oct_obj.getWidth(), oct_obj.getHeight(),
-                                           d_all_descs + orientation_offset,
-                                           d_extrema, d_feat_to_ext_map,
-                                           oct_obj.getData().getDevPtr(),
-                                           oct_obj.getData().getCols()));
-            });
-        }
-        extraction_events.push_back(e);
+        kernel_events.push_back(kernel_event);
     }
-    sycl::event::wait(extraction_events);
-    
-    // === Phase 4: Check for descriptors ===
-    if(dct.ori_total == 0) {
-        fprintf(stderr, "Warning: no descriptors extracted\n");
-        sycl::free(d_all_descs, _shared_queue);
-        sycl::free(d_extrema, _shared_queue);
-        sycl::free(d_feat_to_ext_map, _shared_queue);
-        return;
+
+    for(sycl::event e : kernel_events){
+        e.wait();
     }
-    
+
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;
     std::cout << "descriptor extraction" 
@@ -138,37 +116,38 @@ void Pyramid::descriptors(const Config& conf) {
     
     auto start_norm = std::chrono::high_resolution_clock::now();
 
-    // === Phase 5: Normalization ===
+    // Normalize immediately after extraction (don't wait individually)
     sycl::event norm_event;
-    if(conf.getUseRootSift()) {
+    if( conf.getUseRootSift() ) {
         norm_event = normalize_histogram_sycl<NormalizeRootSift>(
-            _shared_queue, 
-            d_all_descs, 
-            dct.ori_total,
-            static_cast<float>(h_consts.norm_multi),
-            use_sub_group);
+            q, d_all_descs, dct.ori_total);
     } else {
         norm_event = normalize_histogram_sycl<NormalizeL2>(
-            _shared_queue, 
-            d_all_descs, 
-            dct.ori_total,
-            static_cast<float>(h_consts.norm_multi),
-            use_sub_group);
+            q, d_all_descs, dct.ori_total);
     }
 
     auto end_norm = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> norm_duration = end_norm - start_norm;
     std::cout << "normalization" 
               << " took " << norm_duration.count() << " ms" << std::endl;
+
+    auto start_copy = std::chrono::high_resolution_clock::now();
     
-    // === Phase 6: Download ===
-    auto download_event = _shared_queue.memcpy(dbuf.desc, d_all_descs,
-                                               dct.ori_total * sizeof(Descriptor),
-                                               norm_event);
-    download_event.wait();
+    // Copy all results back in one shot
+    auto copy_to_host = q.memcpy(dbuf.desc, d_all_descs, 
+                                  dct.ori_total * sizeof(Descriptor),
+                                  norm_event);
+    copy_to_host.wait();
+
+    auto end_copy = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> copy_duration = end_copy - start_copy;
+    std::cout << "descriptor download" << " took " << copy_duration.count() << " ms" << std::endl;
+
+    // ============================================
+    // Cleanup
+    // ============================================
     
-    // === Cleanup ===
-    sycl::free(d_all_descs, _shared_queue);
-    sycl::free(d_extrema, _shared_queue);
-    sycl::free(d_feat_to_ext_map, _shared_queue);
+    sycl::free(d_all_descs, q);
+    sycl::free(d_extrema, q);
+    sycl::free(d_feat_to_ext_map, q);
 }
