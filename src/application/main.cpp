@@ -38,6 +38,7 @@ using namespace std;
 static bool print_dev_info  = false;
 static bool print_time_info = false;
 static bool write_as_uchar  = false;
+static bool write_as_ori    = false;
 static bool dont_write      = false;
 static bool pgmread_loading = false;
 static bool float_mode      = false;
@@ -97,6 +98,8 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         ("print-time-info", bool_switch(&print_time_info)->default_value(false), "A debug output printing image processing time after load()")
         ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded to int.\n"
          "Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar")
+        ("write-as-orientation", bool_switch(&write_as_ori)->default_value(false), "Output descriptors have the form\n"
+         "'X Y sigma orientation value*' (vlfeat-like) instead of 'X Y sigma^2 0 sigma^2 value*'")
         ("dont-write", bool_switch(&dont_write)->default_value(false), "Suppress descriptor output")
         ("pgmread-loading", bool_switch(&pgmread_loading)->default_value(false), "Use the old image loader instead of LibDevIL")
         ("float-mode", bool_switch(&float_mode)->default_value(false), "Upload image to GPU as float instead of byte")
@@ -253,7 +256,7 @@ void read_job( SiftJob* job, bool really_write )
 
     if( really_write ) {
         std::ofstream of( "output-features.txt" );
-        feature_list->print( of, write_as_uchar );
+        feature_list->print( of, write_as_uchar, write_as_ori );
     }
 }
 
