@@ -28,6 +28,9 @@ message(STATUS "Using compiler: ${CMAKE_CXX_COMPILER}")
 # ============================================================================
 # Auto-detect GPU Architecture
 # ============================================================================
+if(APPLE)
+    message(STATUS "Apple platform, only CPU supported")
+else(APPLE)
 if(NOT DEFINED GPU_ARCH)
     # First, try to detect NVIDIA GPU
     execute_process(
@@ -92,6 +95,7 @@ else()
         message(FATAL_ERROR "Unknown GPU architecture format: ${GPU_ARCH}")
     endif()
 endif()
+endif(APPLE)
 
 # ============================================================================
 # C++ Standard (SET BEFORE COMPILER FLAGS!)
@@ -104,6 +108,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Compiler-Specific SYCL Flags
 # ============================================================================
 if(SYCL_IMPL STREQUAL "ACPP")
+  if(APPLE)
+        message(STATUS "Configuring for AdaptiveCpp OMP backend")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --acpp-targets=omp -pthread")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --acpp-targets=omp -pthread")
+  else(APPLE)
     if(GPU_VENDOR STREQUAL "AMD")
         message(STATUS "Configuring for AdaptiveCpp ROCm backend (${GPU_ARCH})")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --acpp-targets=hip:${GPU_ARCH} -pthread")
@@ -115,6 +124,7 @@ if(SYCL_IMPL STREQUAL "ACPP")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --acpp-targets=cuda:${GPU_ARCH} -pthread")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --acpp-targets=cuda:${GPU_ARCH} -pthread")
     endif()
+  endif(APPLE)
     
     # Force pthread detection
     set(CMAKE_THREAD_LIBS_INIT "-lpthread")
