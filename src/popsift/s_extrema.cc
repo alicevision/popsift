@@ -38,15 +38,11 @@ static bool check_extremum_26_neighbors(
     int c_width, int c_height, int c_dog_pitch, int c_maxlevel,
     size_t c_dog_total_elems)
 {
-    // Inline the clamp and dog_get logic here
-    auto clamp = [](int v, int lo, int hi) {
-        return v < lo ? lo : (v > hi ? hi : v);
-    };
-    
+    // Inline the dog_get logic here
     auto dog_get = [=](int z, int y, int x) -> float {
-        int zz = clamp(z, 0, c_maxlevel + 1);
-        int yy = clamp(y, 0, c_height - 1);
-        int xx = clamp(x, 0, c_width - 1);
+        int zz = sycl::clamp(z, 0, c_maxlevel + 1);
+        int yy = sycl::clamp(y, 0, c_height - 1);
+        int xx = sycl::clamp(x, 0, c_width - 1);
         const std::size_t dog_idx = (std::size_t)zz * (std::size_t)c_height * (std::size_t)c_dog_pitch
                                   + (std::size_t)yy * (std::size_t)c_dog_pitch
                                   + (std::size_t)xx;
@@ -121,14 +117,10 @@ static bool refine_extremum(
     int max_iterations)
 {
     // Define dog_get locally - compiler can optimize this
-    auto clamp = [](int v, int lo, int hi) {
-        return v < lo ? lo : (v > hi ? hi : v);
-    };
-    
     auto dog_get = [=](int z, int y, int x) -> float {
-        int zz = clamp(z, 0, c_maxlevel + 1);
-        int yy = clamp(y, 0, c_height - 1);
-        int xx = clamp(x, 0, c_width - 1);
+        int zz = sycl::clamp(z, 0, c_maxlevel + 1);
+        int yy = sycl::clamp(y, 0, c_height - 1);
+        int xx = sycl::clamp(x, 0, c_width - 1);
         const size_t dog_idx = (size_t)zz * (size_t)c_height * (size_t)c_dog_pitch
                               + (size_t)yy * (size_t)c_dog_pitch
                               + (size_t)xx;
@@ -205,7 +197,7 @@ static bool refine_extremum(
             return false;
         }
         
-        float rsd = 1.0f / det;
+        float rsd = sycl::native::recip(det); // 1.0f / det;
         
         // Compute inverse (only what we need for solution)
         float inv00 = (A[1][1] * A[2][2] - A[1][2] * A[1][2]) * rsd;
@@ -342,15 +334,11 @@ sycl::event find_extrema_in_dog( const int3&    g,
             const int y = gy + 1;
             const int level = gz + 1;
 
-            auto clamp = [](int v, int lo, int hi) {
-                return v < lo ? lo : (v > hi ? hi : v);
-            };
-
             auto dog_get = [=](int z, int y, int x) -> float {
                 // Clamp to valid range, matching PlaneT<T>::deref() logic
-                int zz = clamp(z, 0, c_maxlevel + 1);
-                int yy = clamp(y, 0, c_height - 1);
-                int xx = clamp(x, 0, c_width - 1);
+                int zz = sycl::clamp(z, 0, c_maxlevel + 1);
+                int yy = sycl::clamp(y, 0, c_height - 1);
+                int xx = sycl::clamp(x, 0, c_width - 1);
                 const std::size_t dog_idx = (std::size_t)zz * (std::size_t)c_height * (std::size_t)c_dog_pitch
                                           + (std::size_t)yy * (std::size_t)c_dog_pitch
                                           + (std::size_t)xx;
