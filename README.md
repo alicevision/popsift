@@ -1,146 +1,150 @@
+# Prep-for-SYCL: PopSift C++ Refactoring
 
-# PopSift
+Prep-for-SYCL is an intermediate C++ refactoring of the PopSift CUDA implementation, designed as a stepping stone toward a cross-vendor SYCL port. It represents Phase 1 of a two-stage migration strategy, transforming vendor-locked CUDA code into vendor-neutral C++ while preserving algorithmic correctness.
 
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3728/badge)](https://bestpractices.coreinfrastructure.org/projects/3728) 
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/64f9192b53df46b483e7cf5be7e2dddd)](https://app.codacy.com/gh/alicevision/popsift/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+## Overview
 
-PopSift is an open-source implementation of the SIFT algorithm in CUDA.
-PopSift tries to stick as closely as possible to David Lowe's famous paper [1], while extracting features from an image in real-time at least on an NVidia GTX 980 Ti GPU.
+Prep-for-SYCL strips away CUDA-specific optimizations and constructs from PopSift, converting GPU device kernels into sequential CPU-based implementations while maintaining the core SIFT algorithm's integrity. This intermediate stage serves three critical purposes:
 
-Check out the [documentation](https://popsift.readthedocs.io/) for more info.
+1. **Algorithm Validation**: Provides a reference implementation to verify algorithmic correctness against the original CUDA version
+2. **Knowledge Transfer**: Deepens understanding of the SIFT algorithm and PopSift's implementation details by forcing sequential, CPU-based comprehension
+3. **Bridge to SYCL**: Creates a vendor-neutral C++ baseline that simplifies the transition to SYCL's heterogeneous execution model
 
-## HW requirements
+## Motivation: The Two-Stage Approach
 
-PopSift compiles and works with NVidia cards of compute capability >= 3.0 (including the GT 650M), but the code is developed with the compute capability 5.2 card GTX 980 Ti in mind.
+Direct translation from CUDA to SYCL is conceptually complex because it requires simultaneously:
+- Understanding SYCL's abstractions (buffers, work-items, work-groups)
+- Eliminating CUDA-specific constructs
+- Learning new parallel programming paradigms
 
-CUDA SDK 11 does no longer support compute capability 3.0. 3.5 is still supported with deprecation warning.
+The two-stage approach separates these concerns:
+
+1. **Stage 1 (Prep-for-SYCL)**: Focus exclusively on removing CUDA specifics and creating a pure C++ baseline
+2. **Stage 2 (PopSift-SYCL)**: Translate the vendor-neutral C++ implementation to SYCL with full knowledge of algorithmic requirements
+
+This methodology offers several advantages:
+
+- **Incremental Understanding**: Implementing SIFT sequentially in C++ builds deep algorithmic comprehension before introducing parallelization complexity
+- **Simplified Refactoring**: SYCL translation becomes clearer when working from sequential C++ rather than parallel CUDA
+- **Correctness Assurance**: The C++ version can be validated against CUDA, providing confidence that PopSift-SYCL performance differences stem from design choices rather than algorithmic errors
+- **Educational Value**: The sequential implementation clearly exposes data dependencies, memory access patterns, and control flow that parallel GPU code obscures
+
+## Key Refactoring Steps
+
+### Decoupling Host and Device Code
+
+The original PopSift tightly couples host and device execution contexts through CUDA-specific abstractions:
+- Device memory structures and pitched allocations were converted to standard C++ containers with appropriate alignment
+- CUDA texture memory, used for efficient hardware-accelerated bilinear interpolation, was replaced with explicit CPU interpolation functions
+- Kernel launches with explicit grid and block configuration were replaced with nested loops, making computational ordering explicit
+
+### Removing CUDA-Specific Constructs
+
+All vendor-specific language features were systematically eliminated:
+
+- **Execution Configuration**: Kernel launch syntax (`<<<gridDim, blockDim>>>`) replaced with function calls
+- **Thread Synchronization**: `__syncthreads()` primitives removed or converted to sequential ordering guarantees
+- **Shared Memory**: Device shared memory allocations converted to stack-allocated arrays or eliminated entirely
+- **Device Function Qualifiers**: `__device__`, `__global__` removed; all functions become ordinary C++ functions
+- **Memory Management**: CUDA runtime API (`cudaMalloc`, `cudaMemcpy`) replaced with standard C++ allocation (`new`, `std::vector`)
+- **Intrinsics and Atomics**: CUDA-specific intrinsics (`__shfl_*`, `__popc`, `__ballot`) reimplemented using standard C++
+
+### Algorithm Validation and Correctness Testing
+
+The refactoring was performed incrementally, validating each SIFT pipeline stage:
+
+- **Gaussian Pyramid**: Separable Gaussian filtering verified against CUDA outputs
+- **Keypoint Detection**: Extrema detection and subpixel refinement validated
+- **Dominant Orientation**: 36-bin histogram computation and peak detection verified
+- **Descriptor Extraction**: 128-dimensional descriptor generation validated
+
+Numerical differences between C++ and CUDA outputs were expected due to:
+- Floating-point precision variations from different computation orders
+- Compiler optimizations affecting intermediate results
+- Differences between sequential and non-deterministic GPU execution
+
+These discrepancies remain within acceptable tolerances for feature matching applications, confirming algorithmic equivalence.
+
 
 ## Dependencies
 
-PopSift depends on:
+Prep-for-SYCL depends on:
 
-* Host compiler that supports C++14 for CUDA SDK >= 9.0 and C++11 for CUDA SDK 8
+* **C++ Compiler** supporting C++14 or later
+* **CMake** >= 3.10
 
-* CUDA >= 8.0
+Optionally, for building example applications:
 
-Optionally, for the provided applications:
-
-* Boost >= 1.71 (required components {atomic, chrono, date-time, system, thread}-dev)
-
-* DevIL (libdevil-dev) can be used to load a broader range of image formats, otherwise only pgm is supported.
+* **Boost** >= 1.71 (required components: {atomic, chrono, date-time, system, thread}-dev)
+* **DevIL** (libdevil-dev) for loading a broader range of image formats; otherwise only PGM is supported
 
 ## Build
 
-In order to build the library you can run:
-
-```
+```bash
 mkdir build && cd build
 cmake ..
 make
 make install
 ```
 
-Some build options are available:
+## Performance Characteristics
 
-* `PopSift_BUILD_EXAMPLES` (default: `ON`) enable building the applications that showcase the use of the library.
+As a sequential CPU implementation, Prep-for-SYCL is significantly slower than the original CUDA PopSift. Processing times depend on:
 
-* `BUILD_SHARED_LIBS` (default: `ON`) controls the type of library to build (`ON` for shared libraries, `OFF` for static)
+- Image resolution
+- Number of detected keypoints
+- Host CPU performance
+- Compiler optimization level
 
-## Usage
+Performance is not the primary goal; algorithmic correctness and clarity are paramount. Execution times serve as a baseline reference for comparing the final SYCL implementation's performance against pure CPU sequential execution.
 
-The main artifact created is `libpopsift`.
-If enabled, the test application `popsift-demo` is created as well.
-Calling `popsift-demo` without parameters shows the options.
+## Lessons Learned
 
-### Using PopSift as third party
+The sequential C++ implementation revealed several insights that informed the SYCL translation:
 
-To integrate PopSift into other software, link with `libpopsift`.
-If your are using CMake for building your project you can easily add PopSift to your project.
-Once you have built and installed PopSift in a directory (say, `<prefix>`), in your `CMakeLists.txt` file just add the dependency
+1. **GPU Memory Hierarchy Optimization**: PopSift heavily exploited shared memory and texture caches; algorithms optimized for these hierarchies required fundamental rethinking for CPU sequential execution
 
-```cmake
-# Find the package from the PopSiftConfig.cmake
-# in <prefix>/lib/cmake/PopSift/. Under the namespace PopSift::
-# it exposes the target popsift that allows you to compile
-# and link with the library
-find_package(PopSift CONFIG REQUIRED)
-...
-# suppose you want to try it out in a executable
-add_executable(poptest yourfile.cpp)
-# add link to the library
-target_link_libraries(poptest PUBLIC PopSift::popsift)
-```
+2. **Explicit Data Dependencies**: Sequential execution exposed subtle data dependencies and memory access patterns that parallel GPU execution obscures
 
-Then, in order to build just pass the location of `PopSiftConfig.cmake` from the cmake command line:
+3. **Interpolation Operations**: Manually implementing bilinear and trilinear interpolation (rather than relying on GPU texture hardware) demonstrated the operations that GPU hardware handles transparently. This experience directly guided the SYCL implementation, as AdaptiveCPP's lack of SYCL image support necessitated the same manual approach
+
+4. **Parallelization Opportunities**: Explicit sequential execution clarified which portions of the pipeline could be parallelized independently versus those with tight dependencies
+
+5. **Numerical Stability**: Understanding floating-point precision variations between different execution orders proved essential for validating correctness across different parallel implementations
+
+## Relation to PopSift-SYCL
+
+Prep-for-SYCL serves as the foundation for PopSift-SYCL (Phase 2). The C++ refactoring:
+
+- **Provides Algorithmic Baseline**: All subsequent SYCL kernels are designed and validated against this C++ reference
+- **Informs Kernel Design**: Understanding sequential control flow and data dependencies directly informs SYCL work-item and work-group design
+- **Guides Optimization Strategy**: Insights from sequential bottlenecks inform which SYCL kernels warrant optimization effort
+
+## Building and Running Examples
+
+After building Prep-for-SYCL, example applications demonstrate the API:
 
 ```bash
-cmake .. -DPopSift_DIR=<prefix>/lib/cmake/PopSift/
+# Run the demo application
+./popsift-demo -i image.pgm 
+
+# The application will:
+# 1. Load the grayscale image
+# 2. Extract SIFT features sequentially on CPU
+# 3. Display timing information for each pipeline stage
+# 4. Optionally output results to a file
 ```
 
-### Calling the API
+## Repository
 
-The caller must create a `popart::Config` struct (documented in `src/sift/sift_conf.h`) to control the behaviour of the PopSift, and instantiate an object of class `PopSift` (found in `src/sift/popsift.h`).
+This intermediate implementation is maintained in the `wip/prep-for-sycl` branch of the PopSift repository:
 
-After this, images can be enqueued for SIFT extraction using (`enqueue()`).
-A valid input is a single plane of grayscale values located in host memory.
-They can passed as a pointer to unsigned char, with a value range from 0 to 255, or as a pointer to float, with a value range from 0.0f to 1.0f.
-
-Only host memory limits the number of images that can be enqueued.
-The `enqueue` function returns a pointer to a `SiftJob` immediately and performs the feature extraction asynchronously.
-The memory of the image passed to enqueue remains the caller's responsibility. Calling `SiftJob::get` on the returned job blocks until features are extracted, and returns them.
-
-Features offer iterators that iterate over objects of type `Feature`.
-Both classes are documented in `sift_extremum.h`.
-Each feature represents a feature point in the coordinate system of the input image, providing X and Y coordinates and scale (sigma), as well as several alternative descriptors for the feature point (according to Lowe, 15% of the feature points should be expected to have 2 or more descriptors).
-
-In an alternate, deprecated, blocking API, `init()` must be called to pass image width and height to PopSift, followed by a call to `executed()` that takes image data and returns the extracted features. `execute()` is synchronous and blocking.
-
-As far as we know, no implementation that is faster than PopSift at the time of PopSift's release comes under a license that allows commercial use and sticks close to the original paper at the same time as well.
-PopSift can be configured at runtime to use constants that affect it behaviours.
-In particular, users can choose to generate results very similar to VLFeat or results that are closer (but not as close) to the SIFT implementation of the OpenCV extras.
-We acknowledge that there is at least one SIFT implementation that is vastly faster, but it makes considerable sacrifices in terms of accuracy and compatibility.
-
-## Continuous integration:
-
-* ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=master) master branch on Linux.
-
-* ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=develop) develop branch on Linux.
-
-* [![Build status](https://ci.appveyor.com/api/projects/status/rsm5269hs288c2ji/branch/develop?svg=true)](https://ci.appveyor.com/project/AliceVision/popsift/branch/develop) develop branch on Windows.
-
-## License
-
-PopSift is licensed under [MPL v2 license](COPYING.md).
-SIFT was patented in the United States from 1999-03-08 to 2020-03-28. See the [patent link](https://patents.google.com/patent/US6711293B1/en) for more information.
-PopSift license only concerns the PopSift source code and does not release users of this code from any requirements that may arise from patents.
-
-
-## Cite Us
-
-If you use PopSift for your publication, please cite us as:
-```bibtex
-@inproceedings{Griwodz2018Popsift,
-	 author = {Griwodz, Carsten and Calvet, Lilian and Halvorsen, P{\aa}l},
-	 title = {Popsift: A Faithful SIFT Implementation for Real-time Applications},
-	 booktitle = {Proceedings of the 9th {ACM} Multimedia Systems Conference},
-	 series = {MMSys '18},
-	 year = {2018},
-	 isbn = {978-1-4503-5192-8},
-	 location = {Amsterdam, Netherlands},
-	 pages = {415--420},
-	 numpages = {6},
-	 doi = {10.1145/3204949.3208136},
-	 acmid = {3208136},
-	 publisher = {ACM},
-	 address = {New York, NY, USA},
-}
+```
+https://github.com/alicevision/popsift/tree/wip/prep-for-sycl
 ```
 
+## References
 
-## Acknowledgements
+[1] Lowe, D. G. (2004). Distinctive Image Features from Scale-Invariant Keypoints. International Journal of Computer Vision, 60(2), 91–110. doi:10.1023/B:VISI.0000029664.99615.94
 
-PopSift was developed within the project [POPART](https://alicevision.org/popart), which has been funded by the [European Commission in the Horizon 2020](https://cordis.europa.eu/project/id/644874) framework.
-
-___
-
-[1]: Lowe, D. G. (2004). Distinctive Image Features from Scale-Invariant Keypoints. International Journal of Computer Vision, 60(2), 91–110. doi:10.1023/B:VISI.0000029664.99615.94
+[2] Griwodz, C., Calvet, L., & Halvorsen, P. (2018). Popsift: A Faithful SIFT Implementation for Real-time Applications. Proceedings of the 9th ACM Multimedia Systems Conference (pp. 415–420).
