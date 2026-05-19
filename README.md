@@ -1,146 +1,134 @@
+# PopSift-SYCL
 
-# PopSift
+PopSift-SYCL is a cross-vendor, portable implementation of the SIFT algorithm using SYCL. It is a faithful port of the original PopSift CUDA implementation, designed to be available on a wider range of platforms and GPU vendors while maintaining high performance and correctness.
 
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3728/badge)](https://bestpractices.coreinfrastructure.org/projects/3728) 
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/64f9192b53df46b483e7cf5be7e2dddd)](https://app.codacy.com/gh/alicevision/popsift/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+## Overview
 
-PopSift is an open-source implementation of the SIFT algorithm in CUDA.
-PopSift tries to stick as closely as possible to David Lowe's famous paper [1], while extracting features from an image in real-time at least on an NVidia GTX 980 Ti GPU.
+The Scale-Invariant Feature Transform (SIFT) algorithm is one of the most widely used image-matching algorithms, consisting of keypoint detection and descriptor extraction stages. PopSift-SYCL implements SIFT for real-time feature extraction on consumer and professional GPUs, as well as CPUs, without compromising the details of the SIFT algorithm described in David Lowe's famous paper [1].
 
-Check out the [documentation](https://popsift.readthedocs.io/) for more info.
+Unlike the original PopSift, which is vendor-locked to Nvidia GPUs via CUDA, PopSift-SYCL achieves cross-vendor compatibility by leveraging SYCL. This allows it to be compiled and executed on systems with AMD, Intel, or Nvidia GPUs, as well as on CPU-only systems, thereby making it accessible to a broader community of developers and researchers.
 
-## HW requirements
+PopSift-SYCL can be compiled by both Intel's DPC++ compiler and the open-source AdaptiveCPP compiler, providing flexibility in toolchain selection and deployment options.
 
-PopSift compiles and works with NVidia cards of compute capability >= 3.0 (including the GT 650M), but the code is developed with the compute capability 5.2 card GTX 980 Ti in mind.
+## HW Requirements
 
-CUDA SDK 11 does no longer support compute capability 3.0. 3.5 is still supported with deprecation warning.
+PopSift-SYCL is designed to work with a wide range of modern GPUs and CPUs:
+
+- **Nvidia GPUs**: Compute capability >= 3.5 (tested on RTX 4050, V100, and other modern GPUs)
+- **Intel GPUs**: Arc series and other Intel discrete GPUs supported by oneAPI
+- **AMD GPUs**: Supported through AdaptiveCPP
+- **CPU**: Can execute on multi-core CPUs with SYCL support
+
+The code has been developed and tested with modern GPUs in mind, but portable SYCL implementations allow execution across various hardware configurations.
 
 ## Dependencies
 
-PopSift depends on:
+PopSift-SYCL depends on:
 
-* Host compiler that supports C++14 for CUDA SDK >= 9.0 and C++11 for CUDA SDK 8
+* **Compiler**: One of the following:
+  - Intel DPC++ compiler (part of Intel oneAPI toolkit)
+  - AdaptiveCPP (open-source SYCL compiler)
 
-* CUDA >= 8.0
+* **SYCL Runtime**: Appropriate runtime for the target platform
+  - Intel Level-Zero for Intel GPUs
+  - CUDA backend for Nvidia GPUs
+  - HIP backend for AMD GPUs
 
-Optionally, for the provided applications:
+* **CMake** >= 3.18
 
-* Boost >= 1.71 (required components {atomic, chrono, date-time, system, thread}-dev)
+Optionally, for building example applications:
 
-* DevIL (libdevil-dev) can be used to load a broader range of image formats, otherwise only pgm is supported.
+* **Boost** >= 1.71 (required components: {atomic, chrono, date-time, system, thread}-dev)
+* **DevIL** (libdevil-dev) for loading a broader range of image formats; otherwise only PGM is supported
 
 ## Build
 
-In order to build the library you can run:
+To build PopSift-SYCL with DPC++:
 
-```
+```bash
 mkdir build && cd build
-cmake ..
+cmake .. -DCMAKE_CXX_COMPILER=dpcpp
 make
 make install
 ```
 
-Some build options are available:
+To build PopSift-SYCL with AdaptiveCPP:
 
-* `PopSift_BUILD_EXAMPLES` (default: `ON`) enable building the applications that showcase the use of the library.
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_CXX_COMPILER=acpp
+make
+make install
+```
 
-* `BUILD_SHARED_LIBS` (default: `ON`) controls the type of library to build (`ON` for shared libraries, `OFF` for static)
+## Implementation Highlights
+
+PopSift-SYCL maintains the core SIFT algorithm while adopting a synchronous processing model for research clarity. Key implementation features include:
+
+- **Gaussian Pyramid Construction**: Separable Gaussian filtering with bilinear interpolation explicitly implemented in device code
+- **Keypoint Detection**: One-work-item-per-pixel approach using bitmask operations for extrema detection
+- **Dominant Orientation Computation**: One-work-item-per-extremum with 36-bin orientation histogram smoothing
+- **Descriptor Extraction**: Loop-based approach computing 128-dimensional descriptors with trilinear interpolation
+- **Cross-Vendor Compatibility**: Single Source Multiple Compilers (SSMC) design enabling compilation with multiple backends
 
 ## Usage
 
-The main artifact created is `libpopsift`.
+The main artifact created is `libpopsift.so`.
 If enabled, the test application `popsift-demo` is created as well.
-Calling `popsift-demo` without parameters shows the options.
+The only mandatory parameter is the input image, provided via the `-i` option, which takes the image path as its argument (e.g., `./popsift-demo -i <testImage>`).
 
-### Using PopSift as third party
 
-To integrate PopSift into other software, link with `libpopsift`.
-If your are using CMake for building your project you can easily add PopSift to your project.
-Once you have built and installed PopSift in a directory (say, `<prefix>`), in your `CMakeLists.txt` file just add the dependency
 
-```cmake
-# Find the package from the PopSiftConfig.cmake
-# in <prefix>/lib/cmake/PopSift/. Under the namespace PopSift::
-# it exposes the target popsift that allows you to compile
-# and link with the library
-find_package(PopSift CONFIG REQUIRED)
-...
-# suppose you want to try it out in a executable
-add_executable(poptest yourfile.cpp)
-# add link to the library
-target_link_libraries(poptest PUBLIC PopSift::popsift)
-```
+## Performance
 
-Then, in order to build just pass the location of `PopSiftConfig.cmake` from the cmake command line:
+PopSift-SYCL achieves competitive performance across multiple platforms by leveraging SYCL's abstract execution model and backend-specific optimizations. The implementation has been tested on:
 
-```bash
-cmake .. -DPopSift_DIR=<prefix>/lib/cmake/PopSift/
-```
+- **Nvidia GPUs**: RTX 4050, V100
+- **Intel GPUs**: Arc series
+- **CPU backends**: Multi-core CPU execution via OpenCL
 
-### Calling the API
-
-The caller must create a `popart::Config` struct (documented in `src/sift/sift_conf.h`) to control the behaviour of the PopSift, and instantiate an object of class `PopSift` (found in `src/sift/popsift.h`).
-
-After this, images can be enqueued for SIFT extraction using (`enqueue()`).
-A valid input is a single plane of grayscale values located in host memory.
-They can passed as a pointer to unsigned char, with a value range from 0 to 255, or as a pointer to float, with a value range from 0.0f to 1.0f.
-
-Only host memory limits the number of images that can be enqueued.
-The `enqueue` function returns a pointer to a `SiftJob` immediately and performs the feature extraction asynchronously.
-The memory of the image passed to enqueue remains the caller's responsibility. Calling `SiftJob::get` on the returned job blocks until features are extracted, and returns them.
-
-Features offer iterators that iterate over objects of type `Feature`.
-Both classes are documented in `sift_extremum.h`.
-Each feature represents a feature point in the coordinate system of the input image, providing X and Y coordinates and scale (sigma), as well as several alternative descriptors for the feature point (according to Lowe, 15% of the feature points should be expected to have 2 or more descriptors).
-
-In an alternate, deprecated, blocking API, `init()` must be called to pass image width and height to PopSift, followed by a call to `executed()` that takes image data and returns the extracted features. `execute()` is synchronous and blocking.
-
-As far as we know, no implementation that is faster than PopSift at the time of PopSift's release comes under a license that allows commercial use and sticks close to the original paper at the same time as well.
-PopSift can be configured at runtime to use constants that affect it behaviours.
-In particular, users can choose to generate results very similar to VLFeat or results that are closer (but not as close) to the SIFT implementation of the OpenCV extras.
-We acknowledge that there is at least one SIFT implementation that is vastly faster, but it makes considerable sacrifices in terms of accuracy and compatibility.
-
-## Continuous integration:
-
-* ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=master) master branch on Linux.
-
-* ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=develop) develop branch on Linux.
-
-* [![Build status](https://ci.appveyor.com/api/projects/status/rsm5269hs288c2ji/branch/develop?svg=true)](https://ci.appveyor.com/project/AliceVision/popsift/branch/develop) develop branch on Windows.
-
-## License
-
-PopSift is licensed under [MPL v2 license](COPYING.md).
-SIFT was patented in the United States from 1999-03-08 to 2020-03-28. See the [patent link](https://patents.google.com/patent/US6711293B1/en) for more information.
-PopSift license only concerns the PopSift source code and does not release users of this code from any requirements that may arise from patents.
-
+Performance comparisons with the original CUDA PopSift are presented in the associated research paper [3], demonstrating the trade-offs between absolute performance and cross-vendor portability.
 
 ## Cite Us
 
-If you use PopSift for your publication, please cite us as:
+If you use PopSift-SYCL for your publication, please cite us as:
+
 ```bibtex
-@inproceedings{Griwodz2018Popsift,
-	 author = {Griwodz, Carsten and Calvet, Lilian and Halvorsen, P{\aa}l},
-	 title = {Popsift: A Faithful SIFT Implementation for Real-time Applications},
-	 booktitle = {Proceedings of the 9th {ACM} Multimedia Systems Conference},
-	 series = {MMSys '18},
-	 year = {2018},
-	 isbn = {978-1-4503-5192-8},
-	 location = {Amsterdam, Netherlands},
-	 pages = {415--420},
-	 numpages = {6},
-	 doi = {10.1145/3204949.3208136},
-	 acmid = {3208136},
-	 publisher = {ACM},
-	 address = {New York, NY, USA},
+@inproceedings{AlKhafaji2026PopSiftSYCL,
+    author = {Al Khafaji, Mohammad Fadel and Griwodz, Carsten and Stensland, H{\aa}kon Kvale},
+    title = {A cross-vendor implementation of PopSift using SYCL},
+    booktitle = {Proceedings of the 14th International Workshop on OpenCL and SYCL},
+    series = {IWOCL '26},
+    year = {2026},
+    location = {Heilbronn, Germany},
+    month = {May}
 }
 ```
 
+And the original PopSift:
 
-## Acknowledgements
+```bibtex
+@inproceedings{Griwodz2018Popsift,
+    author = {Griwodz, Carsten and Calvet, Lilian and Halvorsen, P{\aa}l},
+    title = {Popsift: A Faithful SIFT Implementation for Real-time Applications},
+    booktitle = {Proceedings of the 9th ACM Multimedia Systems Conference},
+    series = {MMSys '18},
+    year = {2018},
+    isbn = {978-1-4503-5192-8},
+    location = {Amsterdam, Netherlands},
+    pages = {415--420},
+    numpages = {6},
+    doi = {10.1145/3204949.3208136},
+    acmid = {3208136},
+    publisher = {ACM},
+    address = {New York, NY, USA},
+}
+```
 
-PopSift was developed within the project [POPART](https://alicevision.org/popart), which has been funded by the [European Commission in the Horizon 2020](https://cordis.europa.eu/project/id/644874) framework.
+## References
 
-___
+[1] Lowe, D. G. (2004). Distinctive Image Features from Scale-Invariant Keypoints. International Journal of Computer Vision, 60(2), 91–110. doi:10.1023/B:VISI.0000029664.99615.94
 
-[1]: Lowe, D. G. (2004). Distinctive Image Features from Scale-Invariant Keypoints. International Journal of Computer Vision, 60(2), 91–110. doi:10.1023/B:VISI.0000029664.99615.94
+[2] Griwodz, C., Calvet, L., & Halvorsen, P. (2018). Popsift: A Faithful SIFT Implementation for Real-time Applications. Proceedings of the 9th ACM Multimedia Systems Conference (pp. 415–420).
+
+[3] M. F. A. Khafaji, C. Griwodz and H. K. Stensland. “A Cross-vendor Implementation of PopSift using SYCL”. In: Proceedings of the International Workshop on OpenCL and SYCL (IWOCL’26). ACM, 2026. isbn: 979-8-4007-2499-2. doi: 10.1145/3811257.3811261.
