@@ -175,11 +175,22 @@ l2_in_t0( const float4* lptr, const float4* rptr )
 	        + mval.y * mval.y
 	        + mval.z * mval.z
 	        + mval.w * mval.w;
+    // 32-lane reduction over threadIdx.x (compute_distance is a 32-thread block).
+    // Force a width-32 sub-group on a 64-lane wavefront so the inactive upper
+    // half is never sampled. CUDA: width 32 is the whole warp, unchanged.
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    res += shuffle_down( res, 16, 32 );
+    res += shuffle_down( res,  8, 32 );
+    res += shuffle_down( res,  4, 32 );
+    res += shuffle_down( res,  2, 32 );
+    res += shuffle_down( res,  1, 32 );
+#else
     res += shuffle_down( res, 16 );
     res += shuffle_down( res,  8 );
     res += shuffle_down( res,  4 );
     res += shuffle_down( res,  2 );
     res += shuffle_down( res,  1 );
+#endif
     return res;
 }
 

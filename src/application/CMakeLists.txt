@@ -70,7 +70,24 @@ endif()
 
 add_executable(popsift-demo  main.cpp pgmread.cpp pgmread.h)
 
-set_property(TARGET popsift-demo PROPERTY CXX_STANDARD 11)
+if(USE_HIP)
+  # main.cpp/pgmread.cpp have NO device code; they consume popsift's host API only.
+  # popsift now links the HIP device-compile interface (roc::rocthrust -> hip::device,
+  # which injects "-x hip") PRIVATE and exposes only hip::host PUBLIC, so these
+  # sources compile as plain C++ (no "-x hip") and just link the HIP runtime. They
+  # still need the hip_compat <cuda_runtime.h> shim and the cuda_to_hip.h force-include
+  # because popsift's public headers (device_prop.h) #include <cuda_runtime.h>; the
+  # library keeps those PRIVATE, so the consumer adds them explicitly here. USE_HIP
+  # selects the HIP branch of cuda_to_hip.h. C++17 for the compat header.
+  set_property(TARGET popsift-demo PROPERTY CXX_STANDARD 17)
+  target_compile_definitions(popsift-demo PRIVATE USE_HIP)
+  target_include_directories(popsift-demo PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../popsift/hip_compat)
+  target_compile_options(popsift-demo PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:-include${CMAKE_CURRENT_SOURCE_DIR}/../popsift/cuda_to_hip.h>)
+else()
+  set_property(TARGET popsift-demo PROPERTY CXX_STANDARD 11)
+endif()
 
 target_compile_options(popsift-demo PRIVATE ${PD_COMPILE_OPTIONS} )
 target_include_directories(popsift-demo PUBLIC PopSift::popsift ${PD_INCLUDE_DIRS})
@@ -84,7 +101,17 @@ target_link_libraries(popsift-demo PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 
 add_executable(popsift-match match.cpp pgmread.cpp pgmread.h)
 
-set_property(TARGET popsift-match PROPERTY CXX_STANDARD 11)
+if(USE_HIP)
+  # See popsift-demo above: plain-C++ host consumer, no device code, no "-x hip".
+  set_property(TARGET popsift-match PROPERTY CXX_STANDARD 17)
+  target_compile_definitions(popsift-match PRIVATE USE_HIP)
+  target_include_directories(popsift-match PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../popsift/hip_compat)
+  target_compile_options(popsift-match PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:-include${CMAKE_CURRENT_SOURCE_DIR}/../popsift/cuda_to_hip.h>)
+else()
+  set_property(TARGET popsift-match PROPERTY CXX_STANDARD 11)
+endif()
 
 target_compile_options(popsift-match PRIVATE ${PD_COMPILE_OPTIONS} )
 target_include_directories(popsift-match PUBLIC PopSift::popsift ${PD_INCLUDE_DIRS})

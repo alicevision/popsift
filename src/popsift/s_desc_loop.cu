@@ -19,7 +19,7 @@ __device__ static inline
 void ext_desc_loop_sub( const float         ang,
                         const Extremum*     ext,
                         float* __restrict__ features,
-                        cudaTextureObject_t layer_tex,
+                        LayeredReadTex      layer_tex,
                         const int           width,
                         const int           height )
 {
@@ -124,6 +124,21 @@ void ext_desc_loop_sub( const float         ang,
     dpt[0] += dpt[8];
 
     /* reduction here */
+    // 32-lane reduction over threadIdx.x. The block is (32,4,4): each (y,z) pair
+    // is its own 32-thread group, so on a 64-lane wavefront (two groups per
+    // wavefront) the shuffles must be confined to a width-32 sub-group, else the
+    // reduction and the lane-0 broadcast leak across the group boundary and
+    // corrupt half the descriptors (NaN). On CUDA width 32 is the whole warp.
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    for (int i = 0; i < 8; i++) {
+        dpt[i] += popsift::shuffle_down( dpt[i], 16, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 8, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 4, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 2, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 1, 32 );
+        dpt[i]  = popsift::shuffle     ( dpt[i], 0, 32 );
+    }
+#else
     for (int i = 0; i < 8; i++) {
         dpt[i] += popsift::shuffle_down( dpt[i], 16 );
         dpt[i] += popsift::shuffle_down( dpt[i], 8 );
@@ -132,13 +147,14 @@ void ext_desc_loop_sub( const float         ang,
         dpt[i] += popsift::shuffle_down( dpt[i], 1 );
         dpt[i]  = popsift::shuffle     ( dpt[i], 0 );
     }
+#endif
 
     if( threadIdx.x < 8 ) {
         features[tile+threadIdx.x] = dpt[threadIdx.x];
     }
 }
 
-__global__ void ext_desc_loop(int octave, cudaTextureObject_t layer_tex, int w, int h)
+__global__ void ext_desc_loop(int octave, LayeredReadTex layer_tex, int w, int h)
 {
     const int   o_offset =  dct.ori_ps[octave] + blockIdx.x;
     Descriptor* desc     = &dbuf.desc           [o_offset];

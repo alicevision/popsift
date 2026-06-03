@@ -33,7 +33,7 @@ void ext_desc_notile_sub( const float x, const float y, const int level,
                          const float cos_t, const float sin_t, const float SBP,
                          const Extremum*     ext,
                          float* __restrict__ features,
-                         cudaTextureObject_t texLinear )
+                         LayeredReadTex      texLinear )
 {
     float dpt[8] = { 0 };
 
@@ -97,7 +97,7 @@ __global__
 // no -- __launch_bounds__(128) // 63/thread
 // no -- no launch bound // 64/thread/thread
 void ext_desc_notile( const int           octave,
-                      cudaTextureObject_t texLinear )
+                      LayeredReadTex      texLinear )
 {
     const int   num      = dct.ori_ct[octave];
 
@@ -149,7 +149,10 @@ bool start_ext_desc_notile( int octave, Octave& oct_obj )
     ext_desc_notile
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
-          oct_obj.getDataTexLinear( ).tex );
+          POPSIFT_LAYERED_SRC( oct_obj.getDataTexLinear( ).tex,
+                               oct_obj.getDataSurface( ),
+                               oct_obj.getWidth(),
+                               oct_obj.getHeight() ) );
     cudaDeviceSynchronize();
     cudaError_t err = cudaGetLastError( );
     POP_CUDA_FATAL_TEST(err, "cudaGetLastError failed: ");

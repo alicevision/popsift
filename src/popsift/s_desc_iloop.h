@@ -6,13 +6,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #pragma once
+#include "common/assist.h"
 #include "common/debug_macros.h"
 #include "common/plane_2d.h"
 #include "sift_extremum.h"
 #include "sift_octave.h"
 #include "sift_pyramid.h"
 
-__global__ void ext_desc_iloop(int octave, cudaTextureObject_t layer_tex, int width, int height);
+__global__ void ext_desc_iloop(int octave, popsift::LayeredReadTex layer_tex, int width, int height);
 
 namespace popsift
 {
@@ -34,7 +35,10 @@ inline static bool start_ext_desc_iloop( const int octave, Octave& oct_obj )
     ext_desc_iloop
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
-          oct_obj.getDataTexLinear( ).tex,
+          POPSIFT_LAYERED_SRC( oct_obj.getDataTexLinear( ).tex,
+                               oct_obj.getDataSurface( ),
+                               oct_obj.getWidth(),
+                               oct_obj.getHeight() ),
           oct_obj.getWidth(),
           oct_obj.getHeight() );
 

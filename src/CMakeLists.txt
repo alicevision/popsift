@@ -41,14 +41,70 @@ add_library(popsift
         popsift/common/vec_macros.h
         popsift/common/clamp.h)
 
+if(USE_HIP)
+  # Collect the .cu translation units so the HIP build can mark them LANGUAGE HIP.
+  # Under USE_HIP, .cu would otherwise default to CUDA (a language not enabled in
+  # the HIP build), so the language must be set explicitly. This is only needed on
+  # the HIP path, so the collection lives inside the guard.
+  get_target_property(_popsift_sources popsift SOURCES)
+  set(_popsift_cu_sources "")
+  foreach(_src ${_popsift_sources})
+    if(_src MATCHES "\\.cu$")
+      list(APPEND _popsift_cu_sources "${_src}")
+    endif()
+  endforeach()
+  set_source_files_properties(${_popsift_cu_sources} PROPERTIES LANGUAGE HIP)
+endif()
+
 target_link_libraries(popsift
                       PUBLIC
-		      CUDA::cudart
 		      Threads::Threads)
+if(USE_HIP)
+  # rocThrust transitively links hip::device, whose INTERFACE_COMPILE_OPTIONS inject
+  # "-x hip" for COMPILE_LANGUAGE:CXX. Keep that device-compile interface PRIVATE so
+  # it does not leak "-x hip" onto plain-C++ consumers of popsift (the example apps).
+  # Consumers still need the HIP runtime to link and its headers to satisfy the
+  # public <cuda_runtime.h> include, so expose hip::host PUBLIC (link + headers, no
+  # "-x hip"). The library .cu sources are already LANGUAGE HIP, so they get the HIP
+  # compiler regardless of the link visibility.
+  target_link_libraries(popsift PRIVATE roc::rocthrust)
+  target_link_libraries(popsift PUBLIC hip::host)
+else()
+  target_link_libraries(popsift PUBLIC CUDA::cudart)
+endif()
 
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
-set_target_properties(popsift PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+if(USE_HIP)
+  if(NOT DEFINED CMAKE_HIP_ARCHITECTURES OR CMAKE_HIP_ARCHITECTURES STREQUAL "")
+    set(CMAKE_HIP_ARCHITECTURES "gfx90a")
+  endif()
+  set_target_properties(popsift PROPERTIES
+    HIP_ARCHITECTURES "${CMAKE_HIP_ARCHITECTURES}")
+  # USE_HIP selects the HIP branch of cuda_to_hip.h. __HIP_PLATFORM_AMD__ is
+  # only defined once the HIP runtime header is included, so it cannot gate the
+  # include of that very header; the explicit define breaks the cycle.
+  target_compile_definitions(popsift PRIVATE USE_HIP)
+  # Force-include the compat header into every HIP translation unit so no
+  # per-file #include edits are needed (minimal footprint).
+  # -fgpu-rdc keeps device code relocatable so the cross-TU __device__/__constant__
+  # globals (d_consts, d_gauss, dct/dbuf/dobuf -- declared extern in headers,
+  # defined in one .cu, used in many) are resolved by the final --hip-link step.
+  # Without it each .o is device-linked standalone and those references are
+  # undefined. The matching -fgpu-rdc on the link rule (below) performs the
+  # device link.
+  target_compile_options(popsift PRIVATE
+    $<$<COMPILE_LANGUAGE:HIP>:-include${CMAKE_CURRENT_SOURCE_DIR}/popsift/cuda_to_hip.h>
+    $<$<COMPILE_LANGUAGE:HIP>:-fgpu-rdc>)
+  target_link_options(popsift PRIVATE -fgpu-rdc --hip-link)
+  # hip_compat/ supplies a <cuda_runtime.h> shim for the sources that include it
+  # directly; HIP build only. PRIVATE so the public popsift.h <cuda_runtime.h>
+  # include still resolves to the real CUDA header for downstream NVIDIA users.
+  target_include_directories(popsift PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/popsift/hip_compat)
+else()
+  set_target_properties(popsift PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+endif()
 if(MSVC)
         target_compile_options(popsift PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>)
 endif()

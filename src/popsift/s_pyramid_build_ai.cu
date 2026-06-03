@@ -14,7 +14,7 @@ namespace popsift {
 namespace gauss {
 namespace absoluteSourceInterpolated {
 
-__global__ void horiz(cudaTextureObject_t src_linear_tex, cudaSurfaceObject_t dst_data, int dst_level)
+__global__ void horiz(LayeredReadTex src_linear_tex, cudaSurfaceObject_t dst_data, int dst_level)
 {
     const int    src_level = dst_level - 1;
     const int    span      =  d_gauss.inc.i_span[dst_level];
@@ -40,7 +40,7 @@ __global__ void horiz(cudaTextureObject_t src_linear_tex, cudaSurfaceObject_t ds
     surf2DLayeredwrite( out, dst_data, off_x*4, blockIdx.y, dst_level, cudaBoundaryModeZero );
 }
 
-__global__ void vert(cudaTextureObject_t src_linear_tex, cudaSurfaceObject_t dst_data, int dst_level)
+__global__ void vert(LayeredReadTex src_linear_tex, cudaSurfaceObject_t dst_data, int dst_level)
 {
     const int    span   =  d_gauss.inc.i_span[dst_level];
     const float* filter = &d_gauss.inc.i_filter[dst_level*GAUSS_ALIGN];
@@ -68,7 +68,7 @@ __global__ void vert(cudaTextureObject_t src_linear_tex, cudaSurfaceObject_t dst
     surf2DLayeredwrite( out, dst_data, (block_x+idx)*4, block_y+idy, dst_level, cudaBoundaryModeZero );
 }
 
-__global__ void vert_abs0(cudaTextureObject_t src_linear_tex, cudaSurfaceObject_t dst_data, int dst_level)
+__global__ void vert_abs0(LayeredReadTex src_linear_tex, cudaSurfaceObject_t dst_data, int dst_level)
 {
     const int    span   =  d_gauss.abs_o0.i_span[dst_level];
     const float* filter = &d_gauss.abs_o0.i_filter[dst_level*GAUSS_ALIGN];
@@ -96,7 +96,7 @@ __global__ void vert_abs0(cudaTextureObject_t src_linear_tex, cudaSurfaceObject_
     surf2DLayeredwrite( out, dst_data, (block_x+idx)*4, block_y+idy, dst_level, cudaBoundaryModeZero );
 }
 
-__global__ void vert_all_abs0(cudaTextureObject_t src_linear_tex,
+__global__ void vert_all_abs0(LayeredReadTex src_linear_tex,
                               cudaSurfaceObject_t dst_data,
                               int start_level,
                               int max_level)

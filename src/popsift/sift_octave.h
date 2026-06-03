@@ -19,7 +19,11 @@ namespace popsift {
 
 struct LinearTexture
 {
-    cudaSurfaceObject_t tex;
+    // Holds a texture object (assigned from cudaCreateTextureObject and consumed
+    // by tex2DLayered). On CUDA texture and surface handles are both unsigned
+    // long long so the original cudaSurfaceObject_t typing compiled; HIP uses
+    // distinct pointer types, so the correct texture type must be used here.
+    cudaTextureObject_t tex;
 };
 
 class Octave

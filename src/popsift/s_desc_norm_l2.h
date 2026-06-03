@@ -58,19 +58,41 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
          + descr.y * descr.y
          + descr.z * descr.z
          + descr.w * descr.w;
+    // 32-lane reduction over threadIdx.x. The normalize block is (32,32): each
+    // threadIdx.y row is one descriptor. On a 64-lane wavefront two rows share a
+    // wavefront, so the reduction and the lane-0 broadcast must stay inside a
+    // width-32 sub-group, else rows cross-contaminate and the descriptor norm is
+    // wrong (NaN). CUDA: width 32 is the whole warp, unchanged.
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    norm += popsift::shuffle_down( norm, 16, 32 );
+    norm += popsift::shuffle_down( norm,  8, 32 );
+    norm += popsift::shuffle_down( norm,  4, 32 );
+    norm += popsift::shuffle_down( norm,  2, 32 );
+    norm += popsift::shuffle_down( norm,  1, 32 );
+#else
     norm += popsift::shuffle_down( norm, 16 );
     norm += popsift::shuffle_down( norm,  8 );
     norm += popsift::shuffle_down( norm,  4 );
     norm += popsift::shuffle_down( norm,  2 );
     norm += popsift::shuffle_down( norm,  1 );
+#endif
 
     if( threadIdx.x == 0 ) {
         // compute 1 / sqrt(sum) in round-to-nearest even mode in thread 0
         norm = __frsqrt_rn( norm );
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+        // A fully flat gradient window yields an all-zero descriptor; __frsqrt_rn(0)
+        // is +inf, and 0*inf below is NaN. Keep such degenerate descriptors all-zero.
+        if( ! isfinite( norm ) ) norm = 0.0f;
+#endif
     }
 
     // spread the inverted norm from thread 0 to all threads in the warp
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    norm = popsift::shuffle( norm,  0, 32 );
+#else
     norm = popsift::shuffle( norm,  0 );
+#endif
 
     // quasi-normalize all 128 floats
     descr.x = min( descr.x*norm, 0.2f );
@@ -86,18 +108,33 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
          + descr.y * descr.y
          + descr.z * descr.z
          + descr.w * descr.w;
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    norm += popsift::shuffle_down( norm, 16, 32 );
+    norm += popsift::shuffle_down( norm,  8, 32 );
+    norm += popsift::shuffle_down( norm,  4, 32 );
+    norm += popsift::shuffle_down( norm,  2, 32 );
+    norm += popsift::shuffle_down( norm,  1, 32 );
+#else
     norm += popsift::shuffle_down( norm, 16 );
     norm += popsift::shuffle_down( norm,  8 );
     norm += popsift::shuffle_down( norm,  4 );
     norm += popsift::shuffle_down( norm,  2 );
     norm += popsift::shuffle_down( norm,  1 );
+#endif
 
     if( threadIdx.x == 0 ) {
         norm = __frsqrt_rn( norm ); // inverse square root
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+        if( ! isfinite( norm ) ) norm = 0.0f; // see above: avoid 0*inf NaN
+#endif
         norm = scalbnf( norm, d_consts.norm_multi );
     }
 
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    norm = popsift::shuffle( norm,  0, 32 );
+#else
     norm = popsift::shuffle( norm,  0 );
+#endif
 
     descr.x = descr.x * norm;
     descr.y = descr.y * norm;

@@ -20,7 +20,7 @@ void ext_desc_igrid_sub( const float x, const float y, const int level,
                          const float cos_t, const float sin_t, const float SBP,
                          const Extremum*     ext,
                          float* __restrict__ features,
-                         cudaTextureObject_t texLinear )
+                         LayeredReadTex      texLinear )
 {
     const int ix   = threadIdx.y & 3;
     const int iy   = threadIdx.y / 4;
@@ -74,7 +74,7 @@ void ext_desc_igrid_sub( const float x, const float y, const int level,
     }
 }
 
-__global__ void ext_desc_igrid(int octave, cudaTextureObject_t texLinear)
+__global__ void ext_desc_igrid(int octave, LayeredReadTex texLinear)
 {
     const int   num      = dct.ori_ct[octave];
 

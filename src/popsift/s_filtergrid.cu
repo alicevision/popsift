@@ -24,6 +24,15 @@
 #include <thrust/transform_scan.h>
 #include <thrust/version.h>
 
+// The stream-bound parallel execution policy lives in thrust::cuda on NVIDIA
+// and thrust::hip on rocThrust. Fully qualified from the global namespace to
+// avoid colliding with popsift::cuda (debug_macros.h) inside namespace popsift.
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+#define POPSIFT_THRUST_PAR ::thrust::hip::par
+#else
+#define POPSIFT_THRUST_PAR ::thrust::cuda::par
+#endif
+
 namespace popsift
 {
 
@@ -129,12 +138,12 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
             cudaStream_t oct_str = _octaves[o].getStream();
 
             // fill a continuous device array with octave of all initial extrema
-            thrust::fill(     thrust::cuda::par.on(oct_str),
+            thrust::fill(     POPSIFT_THRUST_PAR.on(oct_str),
                               octave_index.begin() + sum,
                               octave_index.begin() + sum + ocount,
                               o );
             // fill a continuous device array with index within octave of all initial extrema
-            thrust::sequence( thrust::cuda::par.on(oct_str),
+            thrust::sequence( POPSIFT_THRUST_PAR.on(oct_str),
                               iext_index.begin() + sum,
                               iext_index.begin() + sum + ocount );
             sum += ocount;

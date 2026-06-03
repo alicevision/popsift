@@ -24,7 +24,7 @@ __device__ static inline
 void ext_desc_vlfeat_sub( const float         ang,
                           const Extremum*     ext,
                           float* __restrict__ features,
-                          cudaTextureObject_t layer_tex,
+                          LayeredReadTex      layer_tex,
                           const int           width,
                           const int           height )
 {
@@ -160,7 +160,7 @@ void ext_desc_vlfeat_sub( const float         ang,
     }
 }
 
-__global__ void ext_desc_vlfeat( int octave, cudaTextureObject_t layer_tex, int w, int h)
+__global__ void ext_desc_vlfeat( int octave, LayeredReadTex layer_tex, int w, int h)
 {
     const int   o_offset =  dct.ori_ps[octave] + blockIdx.x;
     Descriptor* desc     = &dbuf.desc           [o_offset];
@@ -201,7 +201,10 @@ bool start_ext_desc_vlfeat( const int octave, Octave& oct_obj )
     ext_desc_vlfeat
         <<<grid,block,shared_size,oct_obj.getStream()>>>
         ( octave,
-          oct_obj.getDataTexPoint( ),
+          POPSIFT_LAYERED_SRC( oct_obj.getDataTexPoint( ),
+                               oct_obj.getDataSurface( ),
+                               oct_obj.getWidth(),
+                               oct_obj.getHeight() ),
           oct_obj.getWidth(),
           oct_obj.getHeight() );
 

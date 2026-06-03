@@ -6,6 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #pragma once
+#include "common/assist.h"
 #include "common/debug_macros.h"
 #include "sift_extremum.h"
 #include "sift_octave.h"
@@ -16,7 +17,7 @@
  * block = 16,4,4 or with 32,4,4, depending on macros
  * grid  = nunmber of orientations
  */
-__global__ void ext_desc_igrid(int octave, cudaTextureObject_t texLinear);
+__global__ void ext_desc_igrid(int octave, popsift::LayeredReadTex texLinear);
 
 namespace popsift
 {
@@ -40,7 +41,10 @@ inline static bool start_ext_desc_igrid( const int octave, Octave& oct_obj )
     ext_desc_igrid
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
-          oct_obj.getDataTexLinear( ).tex );
+          POPSIFT_LAYERED_SRC( oct_obj.getDataTexLinear( ).tex,
+                               oct_obj.getDataSurface( ),
+                               oct_obj.getWidth(),
+                               oct_obj.getHeight() ) );
 
     POP_SYNC_CHK;
 
