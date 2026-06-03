@@ -70,13 +70,15 @@ void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, bool 
 #endif
 
 #if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
-    // RootSift takes sqrt(bin/sum). On AMD a bin can come out very slightly
-    // negative from the descriptor accumulation's round-toward-+inf intrinsics
-    // (mapped to round-to-nearest in cuda_to_hip.h) and an all-flat window gives
-    // sum==0; either makes sqrt(bin/sum) NaN. Clamp the quotient to >=0 (a negative
-    // bin is unphysical) and treat sum<=0 as an all-zero descriptor. CUDA, where
+    // RootSift takes sqrt(bin/sum). The fmaxf(.,0) below clamps a bin that came out
+    // slightly negative from the descriptor accumulation's round-toward-+inf
+    // intrinsics (mapped to round-to-nearest in cuda_to_hip.h; a negative bin is
+    // unphysical). The divisor is gated at a small threshold so a degenerate
+    // near-zero sum is treated as an all-zero descriptor: an all-flat window
+    // (sum==0) normalizes to 0, and a tiny subnormal sum can no longer make 1/sum
+    // overflow to +inf (which would normalize a positive bin to +inf). CUDA, where
     // the directed-rounding intrinsics exist and bins stay non-negative, is unchanged.
-    const float inv = ( sum > 0.0f ) ? __fdividef( 1.0f, sum ) : 0.0f;
+    const float inv = ( sum > 1e-20f ) ? __fdividef( 1.0f, sum ) : 0.0f;
     float val;
     val = scalbnf( __fsqrt_rn( fmaxf( descr.x * inv, 0.0f ) ), d_consts.norm_multi );
     descr.x = val;

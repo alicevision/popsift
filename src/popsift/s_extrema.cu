@@ -35,7 +35,7 @@ uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
     // lane is in [0, warpSize-1] (<= 63), so 1ull<<lane is always in range.
     const unsigned long long lane_mask = ( 1ull << lane ) - 1ull;
 
-    int write_index;
+    int write_index = 0;
     if( lane == 0 ) {
         write_index = atomicAdd( extrema_counter, __popcll( ballot ) );
     }
