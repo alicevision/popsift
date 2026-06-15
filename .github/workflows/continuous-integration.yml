@@ -58,7 +58,7 @@ jobs:
           deps-install-dir: ${{ env.DEPS_INSTALL_DIR }}
 
   build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     strategy:
       matrix:
         cuda_version: ["12.5.1", "12.9.0"]
