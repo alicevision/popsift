@@ -56,9 +56,12 @@ With a ROCm installation, configure with `-DUSE_HIP=ON` to build the GPU code th
 
 ```shell
 cmake .. -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx90a \
-  -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++
+  -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
+  -DCMAKE_PREFIX_PATH=/opt/rocm
 make
 ```
+
+Point `-DCMAKE_PREFIX_PATH` at the ROCm install prefix (`/opt/rocm` for a default install) so CMake can locate the `hip` and `rocThrust` packages when ROCm is not already on the search path.
 
 Set the target architecture with `-DCMAKE_HIP_ARCHITECTURES` (e.g. `gfx90a`, `gfx1100`); pass a semicolon-separated list such as `"gfx90a;gfx1100"` to emit a fat binary.
 
