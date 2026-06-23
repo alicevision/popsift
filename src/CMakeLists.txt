@@ -76,9 +76,10 @@ endif()
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 if(USE_HIP)
-  if(NOT DEFINED CMAKE_HIP_ARCHITECTURES OR CMAKE_HIP_ARCHITECTURES STREQUAL "")
-    set(CMAKE_HIP_ARCHITECTURES "gfx90a")
-  endif()
+  # CMAKE_HIP_ARCHITECTURES is already resolved by project(... LANGUAGES CXX HIP)
+  # in the top-level CMakeLists: it auto-detects the host GPU arch, honors an
+  # explicit -DCMAKE_HIP_ARCHITECTURES, and errors on a host with no GPU. Pass
+  # -DCMAKE_HIP_ARCHITECTURES to override.
   set_target_properties(popsift PROPERTIES
     HIP_ARCHITECTURES "${CMAKE_HIP_ARCHITECTURES}")
   # USE_HIP selects the HIP branch of cuda_to_hip.h. __HIP_PLATFORM_AMD__ is
