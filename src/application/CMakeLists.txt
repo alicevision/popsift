@@ -86,7 +86,7 @@ if(USE_HIP)
   target_compile_options(popsift-demo PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:-include${CMAKE_CURRENT_SOURCE_DIR}/../popsift/cuda_to_hip.h>)
 else()
-  set_property(TARGET popsift-demo PROPERTY CXX_STANDARD 11)
+  set_property(TARGET popsift-demo PROPERTY CXX_STANDARD ${PopSift_CXX_STANDARD})
 endif()
 
 target_compile_options(popsift-demo PRIVATE ${PD_COMPILE_OPTIONS} )
@@ -110,7 +110,7 @@ if(USE_HIP)
   target_compile_options(popsift-match PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:-include${CMAKE_CURRENT_SOURCE_DIR}/../popsift/cuda_to_hip.h>)
 else()
-  set_property(TARGET popsift-match PROPERTY CXX_STANDARD 11)
+  set_property(TARGET popsift-match PROPERTY CXX_STANDARD ${PopSift_CXX_STANDARD})
 endif()
 
 target_compile_options(popsift-match PRIVATE ${PD_COMPILE_OPTIONS} )
