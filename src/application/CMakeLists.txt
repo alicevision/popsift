@@ -70,7 +70,7 @@ endif()
 
 add_executable(popsift-demo  main.cpp pgmread.cpp pgmread.h)
 
-set_property(TARGET popsift-demo PROPERTY CXX_STANDARD 11)
+set_property(TARGET popsift-demo PROPERTY CXX_STANDARD ${PopSift_CXX_STANDARD})
 
 target_compile_options(popsift-demo PRIVATE ${PD_COMPILE_OPTIONS} )
 target_include_directories(popsift-demo PUBLIC PopSift::popsift ${PD_INCLUDE_DIRS})
@@ -84,7 +84,7 @@ target_link_libraries(popsift-demo PUBLIC PopSift::popsift ${PD_LINK_LIBS})
 
 add_executable(popsift-match match.cpp pgmread.cpp pgmread.h)
 
-set_property(TARGET popsift-match PROPERTY CXX_STANDARD 11)
+set_property(TARGET popsift-match PROPERTY CXX_STANDARD ${PopSift_CXX_STANDARD})
 
 target_compile_options(popsift-match PRIVATE ${PD_COMPILE_OPTIONS} )
 target_include_directories(popsift-match PUBLIC PopSift::popsift ${PD_INCLUDE_DIRS})
