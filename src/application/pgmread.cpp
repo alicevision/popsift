@@ -5,14 +5,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdlib.h>
-#include <iso646.h>
-#include <iostream>
-#include <fstream>
-#include <boost/filesystem.hpp>
-#include <boost/algorithm/string/trim.hpp>
-
 #include "pgmread.h"
+
+#include <boost/algorithm/string/trim.hpp>
+#include <boost/filesystem.hpp>
+
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
 
 #define RGB2GRAY_IN_INT
 
@@ -39,15 +39,15 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
 {
     boost::filesystem::path input_file( filename );
 
-    if( not boost::filesystem::exists( input_file ) ) {
+    if( ! boost::filesystem::exists( input_file ) ) {
         cerr << "File " << input_file << " does not exist" << endl;
-        return 0;
+        return nullptr;
     }
 
     ifstream pgmfile( filename.c_str(), ios::binary );
-    if( not pgmfile.is_open() ) {
+    if( ! pgmfile.is_open() ) {
         cerr << "File " << input_file << " could not be opened for reading" << endl;
-        return 0;
+        return nullptr;
     }
 
     string pgmtype;
@@ -55,7 +55,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         getline( pgmfile, pgmtype ); // this is the string version of getline()
         if( pgmfile.fail() ) {
             cerr << "File " << input_file << " is too short" << endl;
-            return 0;
+            return nullptr;
         }
         boost::algorithm::trim_left( pgmtype ); // nice because of trim
     } while( pgmtype.at(0) == '#' );
@@ -67,19 +67,20 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
     else if( pgmtype.substr(0,2) == "P6" ) type = 6;
     else {
         cerr << "File " << input_file << " can only contain P2, P3, P5 or P6 PGM images" << endl;
-        return 0;
+        return nullptr;
     }
 
-    char  line[1000];
-    char* parse;
-    int   maxval;
+    const int maxLineSize{1000};
+    char  line[maxLineSize];
+    char* parse{nullptr};
+    int   maxval{};
 
     do {
-        pgmfile.getline( line, 1000 );
+        pgmfile.getline( line, maxLineSize );
 
         if( pgmfile.fail() ) {
             cerr << "File " << input_file << " is too short" << endl;
-            return 0;
+            return nullptr;
         }
         int num = pgmfile.gcount();
         parse = line;
@@ -87,25 +88,25 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             parse++;
         }
         if( *parse == '#' ) continue;
-        int ct = sscanf( parse, "%d %d", &w, &h );
+        const int ct = sscanf( parse, "%d %d", &w, &h );
         if( ct != 2 ) {
             cerr << "Error in " << __FILE__ << ":" << __LINE__ << endl
                  << "File " << input_file << " PGM type header (" << type << ") must be followed by comments and WxH info" << endl
                  << "but line contains " << parse << endl;
-            return 0;
+            return nullptr;
         }
     } while( *parse == '#' );
 
     if( w <= 0 || h <= 0 ) {
         cerr << "File " << input_file << " has meaningless image size" << endl;
-        return 0;
+        return nullptr;
     }
 
     do {
-        pgmfile.getline( line, 1000 );
+        pgmfile.getline( line, maxLineSize );
         if( pgmfile.fail() ) {
             cerr << "File " << input_file << " is too short" << endl;
-            return 0;
+            return nullptr;
         }
         int num = pgmfile.gcount();
         parse = line;
@@ -113,14 +114,14 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             parse++;
         }
         if( *parse == '#' ) continue;
-        int ct = sscanf( parse, "%d", &maxval );
+        const int ct = sscanf( parse, "%d", &maxval );
         if( ct != 1 ) {
             cerr << "File " << input_file << " PGM dimensions must be followed by comments and max value info" << endl;
-            return 0;
+            return nullptr;
         }
     } while( *parse == '#' );
 
-    unsigned char* input_data = new unsigned char[ w * h ];
+    auto input_data = new unsigned char[ w * h ];
 
     switch( type )
     {
@@ -136,13 +137,13 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             if( pgmfile.fail() ) {
                 cerr << "File " << input_file << " file too short" << endl;
                 delete [] input_data;
-                return 0;
+                return nullptr;
             }
         }
         break;
     case 3 :
         {
-            unsigned char* i2 = new unsigned char[ w * h * 3 ];
+            auto i2 = new unsigned char[ w * h * 3 ];
             unsigned char* src = i2;
             for( int i=0; i<w*h*3; i++ ) {
                 int input;
@@ -156,20 +157,20 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
                     cerr << "File " << input_file << " file too short" << endl;
                     delete [] i2;
                     delete [] input_data;
-                    return 0;
+                    return nullptr;
                 }
             }
             for( int i=0; i<w*h; i++ ) {
 #ifdef RGB2GRAY_IN_INT
-                unsigned int r = *src; src++;
-                unsigned int g = *src; src++;
-                unsigned int b = *src; src++;
-                unsigned int res = ( ( R_RATE*r+G_RATE*g+B_RATE*b ) >> RATE_SHIFT );
+                const unsigned int r = *src; src++;
+                const unsigned int g = *src; src++;
+                const unsigned int b = *src; src++;
+                const unsigned int res = ( ( R_RATE*r+G_RATE*g+B_RATE*b ) >> RATE_SHIFT );
                 input_data[i] = (unsigned char)res;
 #else // RGB2GRAY_IN_INT
-                float r = *src; src++;
-                float g = *src; src++;
-                float b = *src; src++;
+                const float r = *src; src++;
+                const float g = *src; src++;
+                const float b = *src; src++;
                 input_data[i] = (unsigned char)( R_RATE*r+G_RATE*g+B_RATE*b );
 #endif // RGB2GRAY_IN_INT
             }
@@ -180,13 +181,13 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         if( maxval < 256 ) {
             pgmfile.read( (char*)input_data, w*h );
         } else {
-            unsigned short* i2 = new unsigned short[ w * h ];
+            auto i2 = new unsigned short[ w * h ];
             pgmfile.read( (char*)i2, w*h*2 );
             if( pgmfile.fail() ) {
                 cerr << "File " << input_file << " file too short" << endl;
                 delete [] i2;
                 delete [] input_data;
-                return 0;
+                return nullptr;
             }
             for( int i=0; i<w*h; i++ ) {
                 input_data[i] = (unsigned char)(i2[i] * 255.0 / maxval );
@@ -196,14 +197,14 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
         break;
     case 6 :
         if( maxval < 256 ) {
-            unsigned char* i2 = new unsigned char[ w * h * 3 ];
+            auto i2 = new unsigned char[ w * h * 3 ];
             unsigned char* src = i2;
             pgmfile.read( (char*)i2, w*h*3 );
             if( pgmfile.fail() ) {
                 cerr << "File " << input_file << " file too short" << endl;
                 delete [] i2;
                 delete [] input_data;
-                return 0;
+                return nullptr;
             }
             for( int i=0; i<w*h; i++ ) {
 #ifdef RGB2GRAY_IN_INT
@@ -221,7 +222,7 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             }
             delete [] i2;
         } else {
-            unsigned short* i2 = new unsigned short[ w * h * 2 * 3 ];
+            auto i2 = new unsigned short[ w * h * 2 * 3 ];
             unsigned short* src = i2;
             pgmfile.read( (char*)i2, w*h*2*3 );
             if( pgmfile.fail() ) {
@@ -247,6 +248,9 @@ unsigned char* readPGMfile( const string& filename, int& w, int& h )
             delete [] i2;
         }
         break;
+
+    default:
+        throw std::runtime_error("unsupported type " + std::to_string(type));
     }
 
     return input_data;

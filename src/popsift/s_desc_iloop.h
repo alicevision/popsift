@@ -6,17 +6,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #pragma once
-#include "sift_pyramid.h"
-#include "sift_octave.h"
-#include "sift_extremum.h"
-#include "common/plane_2d.h"
 #include "common/debug_macros.h"
+#include "common/plane_2d.h"
+#include "sift_extremum.h"
+#include "sift_octave.h"
+#include "sift_pyramid.h"
 
-__global__
-void ext_desc_iloop( const int           octave,
-                     cudaTextureObject_t layer_tex,
-                     const int           width,
-                     const int           height );
+__global__ void ext_desc_iloop(int octave, cudaTextureObject_t layer_tex, int width, int height);
 
 namespace popsift
 {

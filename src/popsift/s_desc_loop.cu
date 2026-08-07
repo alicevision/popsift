@@ -5,14 +5,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdio.h>
-#include <iso646.h>
-
-#include "sift_constants.h"
-#include "s_gradiant.h"
-#include "s_desc_loop.h"
 #include "common/assist.h"
 #include "common/vec_macros.h"
+#include "s_desc_loop.h"
+#include "s_gradiant.h"
+#include "sift_constants.h"
+
+#include <cstdio>
 
 using namespace popsift;
 
@@ -76,8 +75,10 @@ void ext_desc_loop_sub( const float         ang,
 
     float dpt[9] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 
-    for( int i = threadIdx.x; i < loops; i+=blockDim.x )
+    for( int i = threadIdx.x; popsift::any(i < loops); i+=blockDim.x )
     {
+        if( i >= loops ) continue;
+
         const int ii = i / wx + ymin;
         const int jj = i % wx + xmin;     
 
@@ -111,25 +112,25 @@ void ext_desc_loop_sub( const float         ang,
             const float wgt2 = do0;
 
             int fo  = fo0 % DESC_BINS;
-
+    
                 // maf: multiply-add
                 // _ru - round to positive infinity equiv to froundf since always >=0
             dpt[fo]   = __fmaf_ru( wgt1, wgt, dpt[fo] );   // dpt[fo]   += (wgt1*wgt);
             dpt[fo+1] = __fmaf_ru( wgt2, wgt, dpt[fo+1] ); // dpt[fo+1] += (wgt2*wgt);
         }
-        __syncthreads();
     }
+    __syncthreads();
 
     dpt[0] += dpt[8];
 
     /* reduction here */
     for (int i = 0; i < 8; i++) {
-        dpt[i] += __shfl_down( dpt[i], 16 );
-        dpt[i] += __shfl_down( dpt[i], 8 );
-        dpt[i] += __shfl_down( dpt[i], 4 );
-        dpt[i] += __shfl_down( dpt[i], 2 );
-        dpt[i] += __shfl_down( dpt[i], 1 );
-        dpt[i]  = __shfl     ( dpt[i], 0 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 16 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 8 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 4 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 2 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 1 );
+        dpt[i]  = popsift::shuffle     ( dpt[i], 0 );
     }
 
     if( threadIdx.x < 8 ) {
@@ -137,11 +138,7 @@ void ext_desc_loop_sub( const float         ang,
     }
 }
 
-__global__
-void ext_desc_loop( const int           octave,
-                    cudaTextureObject_t layer_tex,
-                    const int           w,
-                    const int           h )
+__global__ void ext_desc_loop(int octave, cudaTextureObject_t layer_tex, int w, int h)
 {
     const int   o_offset =  dct.ori_ps[octave] + blockIdx.x;
     Descriptor* desc     = &dbuf.desc           [o_offset];

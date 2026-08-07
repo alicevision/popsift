@@ -1,0 +1,81 @@
+name: 'Build Configuration'
+description: 'Build PopSift for a specific configuration (Release/Debug)'
+
+inputs:
+  build-type:
+    description: 'Build type (Release or Debug)'
+    required: true
+  platform:
+    description: 'Platform (linux or windows)'
+    required: true
+  deps-install-dir:
+    description: 'Dependencies install directory (Linux only)'
+    required: false
+    default: '/opt/'
+  vcpkg-root:
+    description: 'vcpkg root directory (Windows only)'
+    required: false
+  workspace-dir:
+    description: 'Workspace directory (Windows only)'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    # Linux steps
+    - name: Setup directories (Linux)
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        source ./.github/scripts/build-linux.sh
+        BUILD_TYPE=${{ inputs.build-type }} setup_directories
+
+    - name: Configure CMake (Linux)
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        source ./.github/scripts/build-linux.sh
+        configure_cmake "${{ inputs.build-type }}" "${{ inputs.deps-install-dir }}"
+
+    - name: Build and Install (Linux)
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        source ./.github/scripts/build-linux.sh
+        build_and_install "${{ inputs.build-type }}"
+
+    - name: Build As Third Party (Linux)
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        source ./.github/scripts/build-linux.sh
+        build_as_third_party "${{ inputs.build-type }}" "${{ inputs.deps-install-dir }}"
+
+    # Windows steps
+    - name: Setup directories (Windows)
+      if: inputs.platform == 'windows'
+      shell: powershell
+      run: |
+        . .\.github\scripts\build-windows.ps1
+        Setup-Directories -BuildType "${{ inputs.build-type }}"
+
+    - name: Configure CMake (Windows)
+      if: inputs.platform == 'windows'
+      shell: powershell
+      run: |
+        . .\.github\scripts\build-windows.ps1
+        Configure-CMake -BuildType "${{ inputs.build-type }}" -VcpkgRoot "${{ inputs.vcpkg-root }}" -WorkspaceDir "${{ inputs.workspace-dir }}"
+
+    - name: Build and Install (Windows)
+      if: inputs.platform == 'windows'
+      shell: powershell
+      run: |
+        . .\.github\scripts\build-windows.ps1
+        Build-AndInstall -BuildType "${{ inputs.build-type }}"
+
+    - name: Build As Third Party (Windows)
+      if: inputs.platform == 'windows'
+      shell: powershell
+      run: |
+        . .\.github\scripts\build-windows.ps1
+        Build-AsThirdParty -BuildType "${{ inputs.build-type }}" -VcpkgRoot "${{ inputs.vcpkg-root }}" -WorkspaceDir "${{ inputs.workspace-dir }}"

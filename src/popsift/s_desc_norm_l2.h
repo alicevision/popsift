@@ -6,7 +6,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #pragma once
+#include "common/assist.h"
 #include "s_desc_normalize.h"
+#include "sift_config.h"
 
 using namespace popsift;
 using namespace std;
@@ -48,85 +50,61 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
     float4 descr;
     descr = ptr4[threadIdx.x];
 
-#if __CUDACC_VER__ >= 70500
-    // normf() is an elegant function: sqrt(sum_0^127{v^2})
-    // It exists from CUDA 7.5 but the trouble with CUB on the GTX 980 Ti forces
-    // us to with CUDA 7.0 right now
-
     float norm;
 
-    if( threadIdx.x == 0 ) {
-        norm = normf( 128, src_desc );
-    }
-    __syncthreads();
-    norm = __shfl( norm, 0 );
-
-    descr.x = min( descr.x, 0.2f*norm );
-    descr.y = min( descr.y, 0.2f*norm );
-    descr.z = min( descr.z, 0.2f*norm );
-    descr.w = min( descr.w, 0.2f*norm );
-
+    // 32 threads compute 4 squares each, then shuffle to performing a addition by
+    // reduction for the sum of 128 squares, result in thread 0
     norm = descr.x * descr.x
          + descr.y * descr.y
          + descr.z * descr.z
          + descr.w * descr.w;
-    norm += __shfl_down( norm, 16 );
-    norm += __shfl_down( norm,  8 );
-    norm += __shfl_down( norm,  4 );
-    norm += __shfl_down( norm,  2 );
-    norm += __shfl_down( norm,  1 );
+    norm += popsift::shuffle_down( norm, 16 );
+    norm += popsift::shuffle_down( norm,  8 );
+    norm += popsift::shuffle_down( norm,  4 );
+    norm += popsift::shuffle_down( norm,  2 );
+    norm += popsift::shuffle_down( norm,  1 );
+
     if( threadIdx.x == 0 ) {
-        // norm = __fsqrt_rn( norm );
-        // norm = __fdividef( 512.0f, norm );
+        // compute 1 / sqrt(sum) in round-to-nearest even mode in thread 0
+        norm = __frsqrt_rn( norm );
+    }
+
+    // spread the inverted norm from thread 0 to all threads in the warp
+    norm = popsift::shuffle( norm,  0 );
+
+    // quasi-normalize all 128 floats
+    descr.x = min( descr.x*norm, 0.2f );
+    descr.y = min( descr.y*norm, 0.2f );
+    descr.z = min( descr.z*norm, 0.2f );
+    descr.w = min( descr.w*norm, 0.2f );
+
+    // Repeat the procedure, but also add a multiplier. E.g., if the user wants to
+    // descriptors as bytes rather than floats, multiply by 256 - or even by 512
+    // for better accuracy, which is OK because a point cannot be a keypoint if more
+    // than half of its gradient is in a single direction.
+    norm = descr.x * descr.x
+         + descr.y * descr.y
+         + descr.z * descr.z
+         + descr.w * descr.w;
+    norm += popsift::shuffle_down( norm, 16 );
+    norm += popsift::shuffle_down( norm,  8 );
+    norm += popsift::shuffle_down( norm,  4 );
+    norm += popsift::shuffle_down( norm,  2 );
+    norm += popsift::shuffle_down( norm,  1 );
+
+    if( threadIdx.x == 0 ) {
         norm = __frsqrt_rn( norm ); // inverse square root
         norm = scalbnf( norm, d_consts.norm_multi );
     }
-#else
-    float norm;
 
-    norm = descr.x * descr.x
-         + descr.y * descr.y
-         + descr.z * descr.z
-         + descr.w * descr.w;
-    norm += __shfl_down( norm, 16 );
-    norm += __shfl_down( norm,  8 );
-    norm += __shfl_down( norm,  4 );
-    norm += __shfl_down( norm,  2 );
-    norm += __shfl_down( norm,  1 );
-    if( threadIdx.x == 0 ) {
-        norm = __fsqrt_rn( norm );
-    }
-    norm = __shfl( norm,  0 );
-
-    descr.x = min( descr.x, 0.2f*norm );
-    descr.y = min( descr.y, 0.2f*norm );
-    descr.z = min( descr.z, 0.2f*norm );
-    descr.w = min( descr.w, 0.2f*norm );
-
-    norm = descr.x * descr.x
-         + descr.y * descr.y
-         + descr.z * descr.z
-         + descr.w * descr.w;
-    norm += __shfl_down( norm, 16 );
-    norm += __shfl_down( norm,  8 );
-    norm += __shfl_down( norm,  4 );
-    norm += __shfl_down( norm,  2 );
-    norm += __shfl_down( norm,  1 );
-    if( threadIdx.x == 0 ) {
-        // norm = __fsqrt_rn( norm );
-        // norm = __fdividef( 512.0f, norm );
-        norm = __frsqrt_rn( norm ); // inverse square root
-        norm = scalbnf( norm, d_consts.norm_multi );
-    }
-#endif
-    norm = __shfl( norm,  0 );
+    norm = popsift::shuffle( norm,  0 );
 
     descr.x = descr.x * norm;
     descr.y = descr.y * norm;
     descr.z = descr.z * norm;
     descr.w = descr.w * norm;
 
-    if( not ignoreme ) {
+    if( ! ignoreme ) {
         float4* out4 = (float4*)dst_desc;
         out4[threadIdx.x] = descr;
     }

@@ -5,27 +5,26 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include "sift_pyramid.h"
+#include "sift_config.h"
 #include "sift_extremum.h"
+#include "sift_pyramid.h"
 
-#ifdef USE_NVTX
-#include <nvToolsExtCuda.h>
-#else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
-#endif
+#if ! POPSIFT_IS_DEFINED(POPSIFT_DISABLE_GRID_FILTER)
 
-using namespace std;
-
-#if (__CUDACC_VER__ >= 80000) && not defined(DISABLE_GRID_FILTER)
-
-#include <thrust/device_vector.h>
-#include <thrust/sequence.h>
 #include <thrust/copy.h>
+#include <thrust/count.h>
+#include <thrust/device_vector.h>
+#include <thrust/execution_policy.h>
+#include <thrust/host_vector.h>
+#include <thrust/iterator/constant_iterator.h>
+#include <thrust/iterator/discard_iterator.h>
+#include <thrust/iterator/zip_iterator.h>
+#include <thrust/sequence.h>
+#include <thrust/sort.h>
 #include <thrust/transform.h>
 #include <thrust/transform_scan.h>
-#include <thrust/sort.h>
-#include <thrust/execution_policy.h>
+#include <thrust/tuple.h>
+#include <thrust/version.h>
 
 namespace popsift
 {
@@ -67,22 +66,10 @@ struct FunctionExtractCell
     }
 };
 
-struct FunctionReversePosition
-{
-    const int _total;
-    FunctionReversePosition( int total ) : _total(total) { }
-
-    __host__ __device__
-    inline int operator()(int val) const
-    {
-        return _total - val - 1;
-    }
-};
-
 struct FunctionIsAbove
 {
     int _limit;
-    FunctionIsAbove( int limit ) : _limit(limit) { }
+    explicit FunctionIsAbove( int limit ) : _limit(limit) { }
 
     __host__ __device__
     inline bool operator()( int val ) const
@@ -239,12 +226,14 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
     // inclusive prefix sum
     thrust::inclusive_scan( h_cell_counts.begin(), h_cell_counts.end(), cell_count_prefix_sums.begin() );
 
-    FunctionReversePosition fun_reverse_pos( n );
+    thrust::host_vector<int> h_reverse_index(n);
+    thrust::sequence( h_reverse_index.begin(), h_reverse_index.end(),
+                      n-1,
+                      -1 );
 
     // sumup[i] = prefix sum[i] + sum( cell[i] copied into remaining cells )
     thrust::transform( h_cell_counts.begin(), h_cell_counts.end(),
-                       thrust::make_transform_iterator( thrust::make_counting_iterator<int>(0),
-                                                        fun_reverse_pos ),
+                       h_reverse_index.begin(),
                        cell_count_sumup.begin(),
                        thrust::multiplies<int>() );
     thrust::transform( cell_count_sumup.begin(), cell_count_sumup.end(),
@@ -299,7 +288,11 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 
         if( ocount > 0 ) {
             FunctionExtractIgnored fun_extract_ignore;
+#if THRUST_VERSION >= 300000
+            ::cuda::std::identity  fun_id;
+#else
             thrust::identity<int>  fun_id;
+#endif
 
             grid.resize( ocount );
 
@@ -324,15 +317,13 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
         }
     }
 
-    nvtxRangePushA( "writing back count" );
     writeDescCountersToDevice( );
-    nvtxRangePop( );
 
     return ret_ext_total;
 }
 }; // namespace popsift
 
-#else // (__CUDACC_VER__ >= 80000) && not defined(DISABLE_GRID_FILTER)
+#else // not defined(DISABLE_GRID_FILTER)
 
 namespace popsift
 {
@@ -344,5 +335,4 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 }
 }; // namespace popsift
 
-#endif // (__CUDACC_VER__ >= 80000) && not defined(DISABLE_GRID_FILTER)
-
+#endif // not defined(DISABLE_GRID_FILTER)
