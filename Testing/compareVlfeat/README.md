@@ -89,4 +89,3 @@ To look through the results interactively, open the work dir with
 `Testing/analysis/explorer.py`. `Testing/analysis/make_explorer_package.py`
 packs the reports, plots and images of the work dir into a zip file for
 testers without a build.
-
