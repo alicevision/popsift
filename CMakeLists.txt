@@ -33,6 +33,9 @@ option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code
 option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
 option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
+option(PopSift_COMPARE_VLFEAT "Fetch, patch and build VLFeat, and add a ctest
+       comparing its SIFT output against PopSift's. The fetch/patch/build only
+       happens when ctest actually runs, not at configure or build time." OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE AND NOT MSVC)
@@ -155,13 +158,21 @@ if(PopSift_BUILD_DOCS)
 endif()
 
 set(PopSift_TESTFILE_PATH "popsift-samples/datasets/sample/big_set/" CACHE STRING "Base directory where your test files are stored")
-if(PopSift_USE_TEST_CMD)
+if(PopSift_USE_TEST_CMD OR PopSift_COMPARE_VLFEAT)
   if(NOT IS_ABSOLUTE("${PopSift_TESTFILE_PATH}"))
     get_filename_component(PopSift_TESTFILES "${PopSift_TESTFILE_PATH}" ABSOLUTE)
     set(PopSift_TESTFILE_PATH "${PopSift_TESTFILES}")
   endif()
+endif()
 
+if(PopSift_USE_TEST_CMD)
   add_subdirectory(testScripts)
+endif()
+
+if(PopSift_COMPARE_VLFEAT)
+  # Right now, we test only against VLFeat, so CTest only needed when we do it.
+  include(CTest)
+  add_subdirectory(compareVlfeat)
 endif()
 
 ########### Add uninstall target ###############
@@ -190,13 +201,14 @@ message(STATUS "Grid filtering: " ${PopSift_USE_GRID_FILTER})
 message(STATUS "Additional warning for CUDA nvcc: " ${PopSift_NVCC_WARNINGS})
 message(STATUS "Install path: " ${CMAKE_INSTALL_PREFIX})
 message(STATUS "Testing step: " ${PopSift_USE_TEST_CMD})
+message(STATUS "VLFeat comparison ctest: " ${PopSift_COMPARE_VLFEAT})
 
 message(STATUS "CMAKE_CUDA_COMPILER = ${CMAKE_CUDA_COMPILER}")
 message(STATUS "CMAKE_CUDA_COMPILER_ID = ${CMAKE_CUDA_COMPILER_ID}")
 message(STATUS "CMAKE_CUDA_COMPILER_VERSION = ${CMAKE_CUDA_COMPILER_VERSION}")
 message(STATUS "CMAKE_CUDA_ARCHITECTURES = ${CMAKE_CUDA_ARCHITECTURES}")
 
-if(PopSift_USE_TEST_CMD)
+if(PopSift_USE_TEST_CMD OR PopSift_COMPARE_VLFEAT)
   message(STATUS "Path for test input: " ${PopSift_TESTFILE_PATH})
 endif()
 message("\n******************************************")

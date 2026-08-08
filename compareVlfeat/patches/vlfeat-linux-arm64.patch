@@ -1,0 +1,69 @@
+diff --git a/Makefile b/Makefile
+index 908c578..6d0d267 100644
+--- a/Makefile
++++ b/Makefile
+@@ -130,6 +130,7 @@ Linux_i386_ARCH := glnx86
+ Linux_i686_ARCH := glnx86
+ Linux_unknown_ARCH := glnx86
+ Linux_x86_64_ARCH := glnxa64
++Linux_aarch64_ARCH := glnxarm64
+ 
+ UNAME := $(shell uname -sm)
+ ARCH ?= $($(shell echo "$(UNAME)" | tr \  _)_ARCH)
+@@ -233,6 +234,12 @@ STD_CFLAGS += -m$(march) -D_GNU_SOURCE -fno-stack-protector
+ STD_LDFLAGS += -m$(march) -Wl,--rpath,\$$ORIGIN/ -Wl,--as-needed
+ endif
+ 
++# Linux ARM64 (e.g. Jetson)
++ifeq "$(ARCH)" "glnxarm64"
++STD_CFLAGS += -D_GNU_SOURCE -fno-stack-protector
++STD_LDFLAGS += -Wl,--rpath,\$$ORIGIN/
++endif
++
+ # Convert back DISALBE_*="no" flags to be empty
+ ifeq "$(DISABLE_SSE2)" "no"
+ override DISABLE_SSE2:=
+@@ -327,8 +334,9 @@ no_dep_targets := clean archclean distclean help
+ 
+ include make/dll.mak
+ include make/bin.mak
+-include make/matlab.mak
+-include make/octave.mak
++# PopSift's VLFeat needs only CLI tools
++# include make/matlab.mak
++# include make/octave.mak
+ include make/doc.mak
+ include make/dist.mak
+ 
+diff --git a/make/bin.mak b/make/bin.mak
+index 4f59419..d116552 100644
+--- a/make/bin.mak
++++ b/make/bin.mak
+@@ -44,6 +44,11 @@ ifeq ($(ARCH),glnxa64)
+ BIN_LDFLAGS += -Wl,--rpath,\$$ORIGIN/
+ endif
+ 
++# Linux ARM64 (e.g. Jetson)
++ifeq ($(ARCH),glnxarm64)
++BIN_LDFLAGS += -Wl,--rpath,\$$ORIGIN/
++endif
++
+ # --------------------------------------------------------------------
+ #                                                                Build
+ # --------------------------------------------------------------------
+diff --git a/make/dll.mak b/make/dll.mak
+index 7895c75..9f37d61 100644
+--- a/make/dll.mak
++++ b/make/dll.mak
+@@ -76,6 +76,11 @@ DLL_SUFFIX := so
+ DLL_LDFLAGS += -m64
+ endif
+ 
++# Linux ARM64 (e.g. Jetson)
++ifeq ($(ARCH),glnxarm64)
++DLL_SUFFIX := so
++endif
++
+ # --------------------------------------------------------------------
+ #                                                                Build
+ # --------------------------------------------------------------------

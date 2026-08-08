@@ -1,0 +1,88 @@
+diff --git a/Makefile b/Makefile
+index 908c578..02e81c5 100644
+--- a/Makefile
++++ b/Makefile
+@@ -96,10 +96,10 @@ SHELL = /bin/bash
+ all:
+ 
+ # Select which features to disable
+-# DISABLE_SSE2=yes
+-# DISABLE_AVX=yes
++DISABLE_SSE2=yes
++DISABLE_AVX=yes
+ # DISABLE_THREADS=yes
+-# DISABLE_OPENMP=yes
++DISABLE_OPENMP=yes
+ 
+ # --------------------------------------------------------------------
+ #                                                       Error Messages
+@@ -126,6 +126,7 @@ Darwin_PPC_ARCH := mac
+ Darwin_Power_Macintosh_ARCH := mac
+ Darwin_i386_ARCH := maci64
+ Darwin_x86_64_ARCH := maci64
++Darwin_arm64_ARCH := arm64
+ Linux_i386_ARCH := glnx86
+ Linux_i686_ARCH := glnx86
+ Linux_unknown_ARCH := glnx86
+@@ -327,8 +328,9 @@ no_dep_targets := clean archclean distclean help
+ 
+ include make/dll.mak
+ include make/bin.mak
+-include make/matlab.mak
+-include make/octave.mak
++# PopSift's VLFeat comparison needs on CLI
++# include make/matlab.mak
++# include make/octave.mak
+ include make/doc.mak
+ include make/dist.mak
+ 
+diff --git a/make/bin.mak b/make/bin.mak
+index 4f59419..85b1fbd 100644
+--- a/make/bin.mak
++++ b/make/bin.mak
+@@ -34,6 +34,10 @@ endif
+ ifeq ($(ARCH),maci64)
+ endif
+ 
++# Mac OS X on Apple Silicon (ARM64)
++ifeq ($(ARCH),arm64)
++endif
++
+ # Linux-32
+ ifeq ($(ARCH),glnx86)
+ BIN_LDFLAGS += -Wl,--rpath,\$$ORIGIN/
+diff --git a/make/dll.mak b/make/dll.mak
+index 7895c75..e015748 100644
+--- a/make/dll.mak
++++ b/make/dll.mak
+@@ -62,6 +62,15 @@ endif
+ ifeq ($(ARCH),maci64)
+ DLL_SUFFIX := dylib
+ DLL_LDFLAGS += -m64
++DLL_DYLIB_UNDEFINED_FLAG := -undefined suppress
++DLL_DYLIB_ISYSROOT_FLAG := -isysroot $(SDKROOT)
++endif
++
++# Mac OS X on Apple Silicon (ARM64).
++ifeq ($(ARCH),arm64)
++DLL_SUFFIX := dylib
++DLL_LDFLAGS = $(STD_LDFLAGS)
++DLL_LDFLAGS += -m64
+ endif
+ 
+ # Linux-32
+@@ -122,12 +135,12 @@ $(BINDIR)/objs/%.d : $(VLDIR)/vl/%.c $(dll-dir)
+ $(BINDIR)/lib$(DLL_NAME).dylib : $(dll_obj)
+ 	$(call C,CC)						\
+ 	  -dynamiclib						\
+-	  -undefined suppress					\
++	  $(DLL_DYLIB_UNDEFINED_FLAG)				\
+ 	  -flat_namespace					\
+ 	  -install_name @loader_path/lib$(DLL_NAME).dylib	\
+ 	  -compatibility_version $(VER)				\
+ 	  -current_version $(VER)				\
+-	  -isysroot $(SDKROOT)					\
++	  $(DLL_DYLIB_ISYSROOT_FLAG)				\
+ 	  $(DLL_LDFLAGS)					\
+ 	  $(^)							\
+ 	  -o "$(@)"
