@@ -123,9 +123,15 @@ void ext_desc_grid_sub( const int           ix,
 
 __global__ void ext_desc_grid(int octave, cudaTextureObject_t layer_tex)
 {
-    const int   o_offset =  dct.ori_ps[octave] + blockIdx.x;
+    const int   num      = dct.ori_ct[octave];
+    const int   offset   = blockIdx.x;
+
+    const int   o_offset =  dct.ori_ps[octave] + offset;
     const int   ix       = threadIdx.y;
     const int   iy       = threadIdx.z;
+
+    if( offset >= num ) return;
+    if( o_offset >= dct.ori_total ) return;
 
     Descriptor* desc     = &dbuf.desc           [o_offset];
     const int   ext_idx  =  dobuf.feat_to_ext_map[o_offset];

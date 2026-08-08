@@ -79,8 +79,10 @@ __global__ void ext_desc_igrid(int octave, cudaTextureObject_t texLinear)
     const int   num      = dct.ori_ct[octave];
 
     const int   offset   = blockIdx.x * blockDim.z + threadIdx.z;
+
     const int   o_offset =  dct.ori_ps[octave] + offset;
     if( offset >= num ) return;
+    if( o_offset >= dct.ori_total ) return;
 
     Descriptor* desc     = &dbuf.desc           [o_offset];
     const int   ext_idx  =  dobuf.feat_to_ext_map[o_offset];
