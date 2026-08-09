@@ -12,6 +12,17 @@
 
 using namespace std;
 
+static bool isISame( const std::string& l, const std::string& r )
+{
+    if( l.length() != r.length() ) return false;
+
+    for( int i=0; i < l.length(); i++ )
+        if( tolower(l[i]) != tolower(r[i]) )
+            return false;
+
+    return true;
+}
+
 namespace popsift
 {
 
@@ -211,8 +222,9 @@ void Config::setNormMode( Config::NormMode m )
 
 void Config::setNormMode( const std::string& m )
 {
-    if( m == "RootSift" ) setNormMode( Config::RootSift );
-    else if( m == "classic" ) setNormMode( Config::Classic );
+    /* isISame is a static helper */
+    if( isISame( m, "RootSift" ) ) setNormMode( Config::RootSift );
+    else if( isISame( m, "Classic" ) ) setNormMode( Config::Classic );
     else
         POP_FATAL( string("Bad Normalization mode.\n") + getGaussModeUsage() );
 }
