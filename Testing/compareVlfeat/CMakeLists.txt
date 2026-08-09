@@ -1,7 +1,6 @@
 # Prep for CTest comparison between PopSift and VLFeat
 #
-# Download and build a specific vlfeat version when this is configured
-# and cmake test is called. vlfeat is patched and compiled once.
+# Download and patch last 2018 version of vlfeat.
 
 include(ExternalProject)
 
@@ -10,10 +9,7 @@ set(PopSift_VLFEAT_GIT_REPOSITORY "https://github.com/vlfeat/vlfeat.git"
 set(PopSift_VLFEAT_GIT_TAG "1b9075fc42fe54b42f0e937f8b9a230d8e2c7701"
     CACHE STRING "VLFeat commit to build against. Verify this works before using newer vlfeat commits.")
 set(PopSift_VLFEAT_SOURCE_DIR ""
-    CACHE PATH "Optional: point at an existing VLFeat checkout instead of cloning one. Useful when the machine running ctest has no network access. Leave empty to clone from PopSift_VLFEAT_GIT_REPOSITORY.")
-
-set(PopSift_VLFEAT_TEST_IMAGE "${PopSift_TESTFILE_PATH}/boat/img1"
-    CACHE STRING "Basename (no extension) of the Oxford dataset image used for the comparison. Expects <name>.pgm or <name>.ppm to exist; see ../testScripts/downloadOxfordDataset.sh.in to fetch the Oxford dataset.")
+    CACHE PATH "Optional: point at an existing VLFeat checkout instead of cloning one.")
 
 set(PopSift_VLFEAT_MAX_AVG_DESC_DIST "-1.0"
     CACHE STRING "ctest needs pass/fail indicators. Set a positive number of compare average descriptor distance. -1 disables and reports only.")
@@ -25,9 +21,8 @@ if(CONVERT MATCHES ".+-NOTFOUND")
                    "PopSift_VLFEAT_TEST_IMAGE already has a .pgm available.")
 endif()
 
-# --- Figure out the VLFeat ARCH name for this platform -------------------
-# (VLFeat's Makefile keys its output directory and compiler flags off ARCH,
-# see its own Makefile around 'Darwin_x86_64_ARCH := maci64' etc.)
+# Figure out the VLFeat ARCH name for this platform. Our patch has extended this list
+# for Tegra and M3 Mac.
 set(_vlfeat_arch "")
 if(APPLE)
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
@@ -50,9 +45,8 @@ if(_vlfeat_arch STREQUAL "")
                    "adjustment in compareVlfeat/CMakeLists.txt.")
 endif()
 
-# --- Patch step ------------------------------------------------------------
-# Fix bad comparison that breaks vlfeat CLI
-# After that, patch for 2 different ARM platforms.
+# Patch VLFeat download to fix a bad comparison that breaks vlfeat CLI
+# Patch Makefiles to compile CLI-only on ARM platforms (we don't need the rest for our tests)
 set(_vlfeat_patch_cmd
     patch -p1 -N -i "${CMAKE_CURRENT_SOURCE_DIR}/patches/vlfeat-pgm-fix.patch")
 
@@ -64,7 +58,7 @@ elseif(UNIX AND NOT APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
        COMMAND patch -p1 -N -i "${CMAKE_CURRENT_SOURCE_DIR}/patches/vlfeat-linux-arm64.patch")
 endif()
 
-# --- Download step -----------------------------------------------------
+# Use local version of download from Github
 set(_vlfeat_download_args)
 if(PopSift_VLFEAT_SOURCE_DIR)
   list(APPEND _vlfeat_download_args
@@ -77,8 +71,9 @@ else()
        GIT_SHALLOW    TRUE)
 endif()
 
-# VLFeat auto-detects SSE2/AVX support assuming x86.
-# Disable for ARM. Never use OpenMP.
+# Disable OpenMP on all platforms.
+# Disable SSE2 and AVX on ARM platforms
+# (TBD: disable SSE2 and AVX in the Makefile using the patches)
 set(_vlfeat_make_args ARCH=${_vlfeat_arch} DISABLE_OPENMP=yes)
 if(_vlfeat_arch STREQUAL "arm64" OR _vlfeat_arch STREQUAL "glnxarm64")
   list(APPEND _vlfeat_make_args DISABLE_SSE2=yes DISABLE_AVX=yes)
@@ -89,6 +84,7 @@ if(_vlfeat_arch STREQUAL "arm64")
   list(APPEND _vlfeat_make_args VER=0.9.21)
 endif()
 
+# Don't download at configure time. Download and make only when ctest needs it.
 ExternalProject_Add(vlfeat_external
   EXCLUDE_FROM_ALL     TRUE
   ${_vlfeat_download_args}
@@ -111,6 +107,7 @@ configure_file(run_comparison.sh.in
                "${CMAKE_CURRENT_BINARY_DIR}/run_comparison.sh"
                @ONLY)
 
+# Magic created by Claude. I don't understand what FIXTURES_SETUP does.
 # Fixture: (re-)builds vlfeat_external on demand. EXCLUDE_FROM_ALL keeps this
 # out of the normal build, so this is the only thing that triggers it.
 add_test(NAME vlfeat_build
@@ -123,8 +120,7 @@ add_test(NAME popsift_bins_build
                  --target popsift-demo --target popsift-compareSiftFiles)
 set_tests_properties(popsift_bins_build PROPERTIES FIXTURES_SETUP POPSIFT_BINS)
 
-add_test(NAME vlfeat-comparison-boat
+add_test(NAME vlfeat-comparison
          COMMAND /bin/bash "${CMAKE_CURRENT_BINARY_DIR}/run_comparison.sh")
-set_tests_properties(vlfeat-comparison-boat PROPERTIES
-  FIXTURES_REQUIRED "VLFEAT;POPSIFT_BINS")
+set_tests_properties(vlfeat-comparison PROPERTIES FIXTURES_REQUIRED "VLFEAT;POPSIFT_BINS")
 

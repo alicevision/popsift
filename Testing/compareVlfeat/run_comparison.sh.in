@@ -1,20 +1,16 @@
 #!/bin/bash
-# Configured by CMake - see compareVlfeat/CMakeLists.txt.
-# Runs VLFeat's patched sift CLI and popsift-demo on the same image with
-# matching output flags, then reports (and optionally gates on) how close
-# the two feature sets are.
-set -e
+# Configured by CMake
+# Runs a patched CLI of vlfeat to compare to popsift-demo on .pgm/.ppm files
+# found under PopSift_TESTFILE_PATH
+set -u
 
 VLFEAT_SIFT="@PopSift_VLFEAT_SIFT_BIN@"
 POPSIFT_DEMO="@CMAKE_RUNTIME_OUTPUT_DIRECTORY@/popsift-demo"
 COMPARE_BIN="@CMAKE_RUNTIME_OUTPUT_DIRECTORY@/popsift-compareSiftFiles"
 CONVERT="@CONVERT@"
-IMAGE_BASE="@PopSift_VLFEAT_TEST_IMAGE@"
+TESTFILE_PATH="@PopSift_TESTFILE_PATH@"
 MAX_AVG_DIST="@PopSift_VLFEAT_MAX_AVG_DESC_DIST@"
 WORKDIR="@CMAKE_CURRENT_BINARY_DIR@/run"
-
-mkdir -p "$WORKDIR"
-cd "$WORKDIR"
 
 if [ ! -x "$VLFEAT_SIFT" ]; then
     echo "VLFeat 'sift' binary not found at: $VLFEAT_SIFT"
@@ -22,37 +18,85 @@ if [ ! -x "$VLFEAT_SIFT" ]; then
     exit 1
 fi
 
-if [ -f "${IMAGE_BASE}.pgm" ]; then
-    IMAGE="${IMAGE_BASE}.pgm"
-elif [ -f "${IMAGE_BASE}.ppm" ]; then
-    if [ -z "$CONVERT" ] || [[ "$CONVERT" == *-NOTFOUND ]]; then
-        echo "Only a .ppm test image is available and ImageMagick's 'convert' was not found."
-        exit 1
-    fi
-    IMAGE="$WORKDIR/testimage.pgm"
-    "$CONVERT" "${IMAGE_BASE}.ppm" "$IMAGE"
-else
-    echo "Test image not found: ${IMAGE_BASE}.pgm or .ppm"
-    echo "See testScripts/downloadOxfordDataset.sh.in to fetch the Oxford dataset,"
-    echo "or set -DPopSift_VLFEAT_TEST_IMAGE=<basename without extension> to point at your own image."
+mkdir -p "$WORKDIR"
+
+# Sorted and newline-delimited list of image files stored in variable IMAGES
+mapfile -t IMAGES < <(find "$TESTFILE_PATH" \( -iname '*.pgm' -o -iname '*.ppm' \) | sort)
+
+if [ ${#IMAGES[@]} -eq 0 ]; then
+    echo "No .pgm/.ppm test images found under $TESTFILE_PATH"
     exit 1
 fi
 
-echo "== Running VLFeat sift on $IMAGE =="
-cp "$IMAGE" ./vlfeat-input.pgm
-"$VLFEAT_SIFT" -v vlfeat-input.pgm
-sort -n vlfeat-input.sift > vlfeat.sift
+echo "Found ${#IMAGES[@]} test image(s) under $TESTFILE_PATH"
 
-echo "== Running popsift-demo on $IMAGE =="
-# Flags chosen to line up with VLFeat's output format and algorithm choices;
-# see ../testScripts/README.txt for the descriptor/threshold rationale.
-# Tune these here as the comparison gets refined.
-"$POPSIFT_DEMO" --pgmread-loading --vlfeat-mode --desc-mode=vlfeat \
-                 --write-as-uchar --write-as-orientation --norm-multi 9 \
-                 --threshold 0 -i "$IMAGE"
-sort -n output-features.txt > popsift.sift
+overall_status=0
+index=0
 
-echo "== Comparing =="
-"$COMPARE_BIN" --max-avg-dist "$MAX_AVG_DIST" \
-               -o comparison.txt -d descriptor-distances.txt \
-               popsift.sift vlfeat.sift
+# Loop through image list. Use quotes to ensure that whitespace in filenames is OK.
+for SRC_IMAGE in "${IMAGES[@]}"; do
+    index=$((index + 1))
+    echo ""
+    echo "==================== [$index/${#IMAGES[@]}] $SRC_IMAGE ===================="
+
+    IMAGE_NAME="$(basename "$SRC_IMAGE")"
+    IMAGE_DIR="$WORKDIR/$(printf '%04d' "$index")-${IMAGE_NAME%.*}"
+    mkdir -p "$IMAGE_DIR"
+
+    (
+        set -e
+        cd "$IMAGE_DIR"
+
+        case "$SRC_IMAGE" in
+            *.[pP][gG][mM])
+                IMAGE="$SRC_IMAGE"
+                ;;
+            *.[pP][pP][mM])
+                if [ -z "$CONVERT" ] || [[ "$CONVERT" == *-NOTFOUND ]]; then
+                    echo "Skipping: this is a .ppm and ImageMagick's 'convert' was not found."
+                    exit 1
+                fi
+                IMAGE="$IMAGE_DIR/testimage.pgm"
+                "$CONVERT" "$SRC_IMAGE" "$IMAGE"
+                ;;
+            *)
+                echo "Skipping: unrecognized extension for $SRC_IMAGE"
+                exit 1
+                ;;
+        esac
+
+        echo "-- Running VLFeat sift --"
+        cp "$IMAGE" ./vlfeat-input.pgm
+        "$VLFEAT_SIFT" -v vlfeat-input.pgm
+        sort -n vlfeat-input.sift > vlfeat.sift
+
+        echo "-- Running popsift-demo --"
+        # Call popsift with the best known flags to emulate vlfeat CLI defaults.
+        "$POPSIFT_DEMO" --pgmread-loading --vlfeat-mode --desc-mode=vlfeat \
+                         --write-as-uchar --write-as-orientation --norm-multi 9 \
+                         --threshold 0 -i "$IMAGE"
+        sort -n output-features.txt > popsift.sift
+
+        echo "-- Comparing --"
+        "$COMPARE_BIN" --max-avg-dist "$MAX_AVG_DIST" \
+                       -o comparison.txt -d descriptor-distances.txt \
+                       popsift.sift vlfeat.sift
+    )
+    image_status=$?
+
+    if [ $image_status -ne 0 ]; then
+        echo "FAILED: $SRC_IMAGE (see $IMAGE_DIR)"
+        overall_status=1
+    fi
+done
+
+echo ""
+echo "==================== Summary ===================="
+echo "Compared ${#IMAGES[@]} image(s) under $TESTFILE_PATH"
+if [ $overall_status -ne 0 ]; then
+    echo "One or more images failed - see the per-image output above, or"
+    echo "the individual work directories under $WORKDIR."
+fi
+
+exit $overall_status
+

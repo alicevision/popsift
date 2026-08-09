@@ -157,14 +157,6 @@ if(PopSift_BUILD_DOCS)
   add_subdirectory(doc)
 endif()
 
-set(PopSift_TESTFILE_PATH "popsift-samples/datasets/sample/big_set/" CACHE STRING "Base directory where your test files are stored")
-if(PopSift_USE_TEST_CMD OR PopSift_COMPARE_VLFEAT)
-  if(NOT IS_ABSOLUTE("${PopSift_TESTFILE_PATH}"))
-    get_filename_component(PopSift_TESTFILES "${PopSift_TESTFILE_PATH}" ABSOLUTE)
-    set(PopSift_TESTFILE_PATH "${PopSift_TESTFILES}")
-  endif()
-endif()
-
 if(PopSift_COMPARE_VLFEAT)
   # for cTest to run, we must include it before we add scripts in Testing
   include(CTest)
@@ -205,8 +197,5 @@ message(STATUS "CMAKE_CUDA_COMPILER_ID = ${CMAKE_CUDA_COMPILER_ID}")
 message(STATUS "CMAKE_CUDA_COMPILER_VERSION = ${CMAKE_CUDA_COMPILER_VERSION}")
 message(STATUS "CMAKE_CUDA_ARCHITECTURES = ${CMAKE_CUDA_ARCHITECTURES}")
 
-if(PopSift_USE_TEST_CMD OR PopSift_COMPARE_VLFEAT)
-  message(STATUS "Path for test input: " ${PopSift_TESTFILE_PATH})
-endif()
 message("\n******************************************")
 message("\n")
