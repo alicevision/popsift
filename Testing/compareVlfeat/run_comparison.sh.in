@@ -74,6 +74,7 @@ for SRC_IMAGE in "${IMAGES[@]}"; do
         # Call popsift with the best known flags to emulate vlfeat CLI defaults.
         "$POPSIFT_DEMO" --pgmread-loading --vlfeat-mode --desc-mode=vlfeat \
                          --write-as-uchar --write-as-orientation --norm-multi 9 \
+                         --norm-mode classic \
                          --threshold 0 -i "$IMAGE"
         sort -n output-features.txt > popsift.sift
 
