@@ -155,7 +155,3 @@ if(PopSift_BUILD_EXAMPLES)
   add_subdirectory(application)
 endif()
 
-if(PopSift_COMPARE_VLFEAT)
-  add_subdirectory(compareSiftFiles)
-endif()
-

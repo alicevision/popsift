@@ -165,15 +165,12 @@ if(PopSift_USE_TEST_CMD OR PopSift_COMPARE_VLFEAT)
   endif()
 endif()
 
-if(PopSift_USE_TEST_CMD)
-  add_subdirectory(testScripts)
+if(PopSift_COMPARE_VLFEAT)
+  # for cTest to run, we must include it before we add scripts in Testing
+  include(CTest)
 endif()
 
-if(PopSift_COMPARE_VLFEAT)
-  # Right now, we test only against VLFeat, so CTest only needed when we do it.
-  include(CTest)
-  add_subdirectory(compareVlfeat)
-endif()
+add_subdirectory(Testing)
 
 ########### Add uninstall target ###############
 CONFIGURE_FILE(
