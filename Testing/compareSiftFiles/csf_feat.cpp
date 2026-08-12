@@ -19,7 +19,9 @@ const float M_PI2 = 2.0f * 3.14159265358979323846f;
 
 bool feat_t::_use_l2_distance = true;
 
-static float dist( const feat_t& l, const feat_t& r )
+typedef std::pair<float, const vector<feat_t>::const_iterator> dist_loc_t;
+
+static dist_loc_t dist( const feat_t& l, const vector<feat_t>::const_iterator r )
 {
     if( feat_t::_use_l2_distance )
     {
@@ -27,7 +29,7 @@ static float dist( const feat_t& l, const feat_t& r )
 
         for( int i=0; i<DescSize; i++ )
         {
-            const float val = l.desc[i] - r.desc[i];
+            const float val = l.desc[i] - r->desc[i];
             sum += ( val * val );
         }
         return sqrtf( sum );
@@ -38,10 +40,10 @@ static float dist( const feat_t& l, const feat_t& r )
 
         for( int i=0; i<DescSize; i++ )
         {
-            const float val = l.desc[i] - r.desc[i];
+            const float val = l.desc[i] - r->desc[i];
             sum += fabsf( val );
         }
-        return sum / DescSize;
+        return dist_loc_t( sum / DescSize, r );
     }
 }
 
@@ -136,78 +138,55 @@ float feat_t::compareBestMatch( ostream& ostr, ostream* dstr, const vector<feat_
     const int l_one_sz = l_one.size();
 
     // vector<float> distances( l_one_sz );
-    vector<float> distances;
+    vector<dist_loc_t> distances;
     distances.reserve( l_one.size() );
 
     if( !minOnly ) ostr << "==========" << endl;
 
     const feat_t& left( *this );
 
-    std::transform( l_one.begin(), l_one.end(),
-                    std::back_inserter( distances ),
-                    [left](const feat_t& item) {
-                        return dist( left, item );
-                    });
-
-/*
-    for( int j=0; j<l_one_sz; j++ )
+    for( auto lit = l_one.begin(); lit != l_one.end(); lit++ )
     {
-        distances[j] = dist( left, l_one[j] );
+        distances.emplace_back( dist( left, lit ) );
     }
-*/
 
     auto m = min_element( PAR_UNSEQ
                           distances.begin(),
-                          distances.end() );
+                          distances.end(),
+                          []( const dist_loc_t& a, const dist_loc_t& b ) { return a.first < b.first; } );
 
     if( minOnly )
     {
-        auto                 it       = distances.begin();
+        auto r = m->second;
+
         float                second   = INFINITY;
         const vector<float>& left     = desc;
 
-        for( int j=0; j<l_one_sz; j++ )
+        ostr << "desc dist " << m->first
+             << " MIN"
+             << " pixdist " << sqrtf( (x-r->x)*(x-r->x) + (y-r->y)*(y-r->y) )
+             << " scaledist " << fabsf( sigma - r->sigma )
+             << " angledist " << fabsf( ori/M_PI2*360.0f - r->ori/M_PI2*360.0f );
+
+        if( dstr )
         {
-            const feat_t& r = l_one[j];
-
-            if( it == m )
+            auto right = r->desc;
+            for( int i=0; i<DescSize; i++ )
             {
-                ostr << "desc dist " << *it
-                     << " MIN"
-                     << " pixdist " << sqrtf( (x-r.x)*(x-r.x) + (y-r.y)*(y-r.y) )
-                     << " scaledist " << fabsf( sigma - r.sigma )
-                     << " angledist " << fabsf( ori/M_PI2*360.0f - r.ori/M_PI2*360.0f );
-
-                if( dstr )
-                {
-                    auto right = r.desc;
-                    for( int i=0; i<DescSize; i++ )
-                    {
-                        const float d = left[i] - right[i];
-                        (*dstr) << d << " ";
-                        desc_stats[i] += d;
-                    }
-                    (*dstr) << endl;
-                }
+                const float d = left[i] - right[i];
+                (*dstr) << d << " ";
+                desc_stats[i] += d;
             }
-            else if( *it > *m )
-            {
-                second = min<float>( second, *it );
-            }
-            it++;
+            (*dstr) << endl;
         }
-
-        ostr << " 2best " << second << endl;
     }
     else
     {
-        auto it = distances.begin();
-
-        for( int j=0; j<l_one_sz; j++ )
+        for( auto it=distance.begin(); it!=distances.end(); it++ )
         {
-            const feat_t& r = l_one[j];
+            const feat_t& r = *it->second;
 
-            ostr << "desc dist " << *it;
+            ostr << "desc dist " << it->first;
             if( it == m )
                 ostr << " MIN ";
             else
