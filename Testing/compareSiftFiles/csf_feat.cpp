@@ -136,6 +136,7 @@ float feat_t::compareBestMatch( ostream& ostr, ostream* dstr, const vector<feat_
     const int l_one_sz = l_one.size();
 
     // vector<float> distances( l_one_sz );
+    vector<float> distances;
     distances.reserve( l_one.size() );
 
     if( !minOnly ) ostr << "==========" << endl;

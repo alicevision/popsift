@@ -10,12 +10,12 @@ typedef std::vector<float> desc_t;
 
 class feat_t
 {
+public:
     /* Indicator to compute descriptor distance as L2 (square root of sum of squares)
      * or as average absolute difference. Changed by setL2Distance().
      */
     static bool _use_l2_distance;
 
-public:
     float  x;
     float  y;
     float  sigma;
