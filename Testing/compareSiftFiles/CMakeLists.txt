@@ -31,6 +31,9 @@ target_link_libraries(popsift-compareSiftFiles PUBLIC ${Boost_LIBRARIES})
 
 set_property(TARGET popsift-compareSiftFiles PROPERTY CXX_STANDARD 14)
 
+# SIMDification of small loops with gcc works with -O3 -march=native -ftree-vectorize
+# How to make sure this happens?
+
 #############################################################
 # installation
 #############################################################

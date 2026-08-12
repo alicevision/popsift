@@ -23,23 +23,6 @@ static float dist( const feat_t& l, const feat_t& r )
 {
     if( feat_t::_use_l2_distance )
     {
-#ifdef HAVE_STD_TRANSFORM_REDUCE
-/* From C++17 numeric:
-template<class ExecutionPolicy,
-         class ForwardIt1, class ForwardIt2, class T, class BinaryOp1, class BinaryOp2>
-T transform_reduce(ExecutionPolicy&& policy,
-                   ForwardIt1 first1, ForwardIt1 last1, ForwardIt2 first2,
-                   T init, BinaryOp1 binary_op1, BinaryOp2 binary_op2);
-*/
-        const float sum = std::transform_reduce(
-                                     PAR_UNSEQ
-                                     l.desc, l.desc+DescSize,
-                                     r.desc,
-                                     0.0f,
-                                     std::plus<>(),
-                                     [](float l, float r){ float v=l-r; return (v*v); },
-                                     std::plus );
-#else
         float sum = 0.0f;
 
         for( int i=0; i<DescSize; i++ )
@@ -47,21 +30,10 @@ T transform_reduce(ExecutionPolicy&& policy,
             const float val = l.desc[i] - r.desc[i];
             sum += ( val * val );
         }
-#endif
         return sqrtf( sum );
     }
     else
     {
-#ifdef HAVE_STD_TRANSFORM_REDUCE
-        const float sum = std::transform_reduce(
-                                     PAR_UNSEQ
-                                     l.desc, l.desc+DescSize,
-                                     r.desc,
-                                     0.0f,
-                                     std::plus<>(),
-                                     [](float l, float r){ float v=l-r; return fabsf(v); },
-                                     std::plus );
-#else
         float sum = 0.0f;
 
         for( int i=0; i<DescSize; i++ )
@@ -69,7 +41,6 @@ T transform_reduce(ExecutionPolicy&& policy,
             const float val = l.desc[i] - r.desc[i];
             sum += fabsf( val );
         }
-#endif
         return sum / DescSize;
     }
 }
@@ -106,10 +77,11 @@ bool addFeat( vector<feat_t>& features, char* line )
         i++;
     }
 
+    if( i == 0 ) return false;
+
     // cerr << "Found " << i << " floats in line" << endl;
     features.emplace_back( i, values );
 
-    if( i == 0 ) return false;
     return true;
 }
 
