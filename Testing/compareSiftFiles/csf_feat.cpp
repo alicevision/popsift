@@ -97,6 +97,10 @@ feat_t::feat_t( int num, const vector<float>& input )
         sigma = *it++;
         ori   = *it++;
         for( int i=0; i<DescSize; i++ ) *to++ = *it++;
+
+        /* make sure orientation is between 0 and M_PI2 */
+        while( ori < 0 ) ori += M_PI2;
+        while( ori > M_PI2 ) ori -= M_PI2;
     }
     else if( num == DescSize+5 )
     {
