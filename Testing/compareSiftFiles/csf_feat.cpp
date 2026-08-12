@@ -33,7 +33,7 @@ T transform_reduce(ExecutionPolicy&& policy,
 */
         const float sum = std::transform_reduce(
                                      PAR_UNSEQ
-                                     l.desc, l.desc+DESC_SIZE,
+                                     l.desc, l.desc+DescSize,
                                      r.desc,
                                      0.0f,
                                      std::plus<>(),
@@ -42,7 +42,7 @@ T transform_reduce(ExecutionPolicy&& policy,
 #else
         float sum = 0.0f;
 
-        for( int i=0; i<DESC_SIZE; i++ )
+        for( int i=0; i<DescSize; i++ )
         {
             const float val = l.desc[i] - r.desc[i];
             sum += ( val * val );
@@ -55,7 +55,7 @@ T transform_reduce(ExecutionPolicy&& policy,
 #ifdef HAVE_STD_TRANSFORM_REDUCE
         const float sum = std::transform_reduce(
                                      PAR_UNSEQ
-                                     l.desc, l.desc+DESC_SIZE,
+                                     l.desc, l.desc+DescSize,
                                      r.desc,
                                      0.0f,
                                      std::plus<>(),
@@ -64,13 +64,13 @@ T transform_reduce(ExecutionPolicy&& policy,
 #else
         float sum = 0.0f;
 
-        for( int i=0; i<DESC_SIZE; i++ )
+        for( int i=0; i<DescSize; i++ )
         {
             const float val = l.desc[i] - r.desc[i];
             sum += fabsf( val );
         }
 #endif
-        return sum / DESC_SIZE;
+        return sum / DescSize;
     }
 }
 
@@ -97,7 +97,7 @@ int readFeats( vector<feat_t>& l_one, ifstream& f_one )
 
 bool addFeat( vector<feat_t>& features, char* line )
 {
-    vector<float> values(5+DESC_SIZE); // 4 or 5 values followed by DESC_SIZE desc values
+    vector<float> values(5+DescSize); // 4 or 5 values followed by DescSize desc values
 
     int i = 0;
     istringstream s( line );
@@ -114,19 +114,19 @@ bool addFeat( vector<feat_t>& features, char* line )
 }
 
 feat_t::feat_t( int num, const vector<float>& input )
-    : desc(DESC_SIZE)
+    : desc(DescSize)
 {
     auto it = input.begin();
     auto to = desc.begin();
-    if( num == DESC_SIZE+4 )
+    if( num == DescSize+4 )
     {
         x     = *it++;
         y     = *it++;
         sigma = *it++;
         ori   = *it++;
-        for( int i=0; i<DESC_SIZE; i++ ) *to++ = *it++;
+        for( int i=0; i<DescSize; i++ ) *to++ = *it++;
     }
-    else if( num == DESC_SIZE+5 )
+    else if( num == DescSize+5 )
     {
         float odbss;
         x     = *it++;
@@ -136,7 +136,7 @@ feat_t::feat_t( int num, const vector<float>& input )
         ori   = 0.0f;
         it++;
         it++;
-        for( int i=0; i<DESC_SIZE; i++ ) *to++ = *it++;
+        for( int i=0; i<DescSize; i++ ) *to++ = *it++;
     }
     else
     {
@@ -194,7 +194,7 @@ float feat_t::compareBestMatch( ostream& ostr, ostream* dstr, const vector<feat_
                 if( dstr )
                 {
                     auto right = r.desc;
-                    for( int i=0; i<DESC_SIZE; i++ )
+                    for( int i=0; i<DescSize; i++ )
                     {
                         const float d = left[i] - right[i];
                         (*dstr) << d << " ";

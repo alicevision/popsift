@@ -4,7 +4,7 @@
 #include <fstream>
 #include <vector>
 
-#define DESC_SIZE 128
+const int DescSize = 128;
 
 typedef std::vector<float> desc_t;
 
@@ -26,10 +26,10 @@ public:
     // Returns the descriptor distance of the best (closest) match, so that
     // callers can aggregate a pass/fail metric across all features.
     float compareBestMatch( std::ostream&              ostr,
-                           std::ostream*              dstr,
-                           const std::vector<feat_t>& l_one,
-                           std::vector<float>&        desc_stats,
-                           bool                       minOnly ) const;
+                            std::ostream*              dstr,
+                            const std::vector<feat_t>& l_one,
+                            std::vector<float>&        desc_stats,
+                            bool                       minOnly ) const;
 
     static void setL2Distance( bool onoff );
 };
