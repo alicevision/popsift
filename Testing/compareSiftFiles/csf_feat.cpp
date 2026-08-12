@@ -32,7 +32,7 @@ static dist_loc_t dist( const feat_t& l, const vector<feat_t>::const_iterator r 
             const float val = l.desc[i] - r->desc[i];
             sum += ( val * val );
         }
-        return sqrtf( sum );
+        return dist_loc_t( sqrtf( sum ), r );
     }
     else
     {
@@ -182,7 +182,7 @@ float feat_t::compareBestMatch( ostream& ostr, ostream* dstr, const vector<feat_
     }
     else
     {
-        for( auto it=distance.begin(); it!=distances.end(); it++ )
+        for( auto it=distances.begin(); it!=distances.end(); it++ )
         {
             const feat_t& r = *it->second;
 
@@ -199,7 +199,7 @@ float feat_t::compareBestMatch( ostream& ostr, ostream* dstr, const vector<feat_
         }
     }
 
-    return *m;
+    return m->first;
 }
 
 void feat_t::setL2Distance( bool onoff )
