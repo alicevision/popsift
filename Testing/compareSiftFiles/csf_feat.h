@@ -10,12 +10,12 @@ typedef std::vector<float> desc_t;
 
 class feat_t
 {
-public:
-    /* indicator to compute descriptor distance as L2 (square root of sum of squares)
-     * or as average absolute difference.
+    /* Indicator to compute descriptor distance as L2 (square root of sum of squares)
+     * or as average absolute difference. Changed by setL2Distance().
      */
     static bool _use_l2_distance;
 
+public:
     float  x;
     float  y;
     float  sigma;
@@ -26,6 +26,10 @@ public:
 
     void print( std::ostream& ostr ) const;
 
+    /**
+     * Find best descriptors match between this and all descriptors in l_one.
+     * @note The distance metric is determined by _use_l2_distance.
+     */
     // Returns the descriptor distance of the best (closest) match, so that
     // callers can aggregate a pass/fail metric across all features.
     float compareBestMatch( std::ostream&              ostr,

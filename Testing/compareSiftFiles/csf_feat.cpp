@@ -135,16 +135,25 @@ float feat_t::compareBestMatch( ostream& ostr, ostream* dstr, const vector<feat_
 {
     const int l_one_sz = l_one.size();
 
-    vector<float> distances( l_one_sz );
+    // vector<float> distances( l_one_sz );
+    distances.reserve( l_one.size() );
 
     if( !minOnly ) ostr << "==========" << endl;
 
     const feat_t& left( *this );
 
+    std::transform( l_one.begin(), l_one.end(),
+                    std::back_inserter( distances ),
+                    [left](const feat_t& item) {
+                        return dist( left, item );
+                    });
+
+/*
     for( int j=0; j<l_one_sz; j++ )
     {
         distances[j] = dist( left, l_one[j] );
     }
+*/
 
     auto m = min_element( PAR_UNSEQ
                           distances.begin(),
@@ -165,6 +174,7 @@ float feat_t::compareBestMatch( ostream& ostr, ostream* dstr, const vector<feat_
                 ostr << "desc dist " << *it
                      << " MIN"
                      << " pixdist " << sqrtf( (x-r.x)*(x-r.x) + (y-r.y)*(y-r.y) )
+                     << " scaledist " << fabsf( sigma - r.sigma )
                      << " angledist " << fabsf( ori/M_PI2*360.0f - r.ori/M_PI2*360.0f );
 
                 if( dstr )
@@ -203,6 +213,7 @@ float feat_t::compareBestMatch( ostream& ostr, ostream* dstr, const vector<feat_
                 ostr << "     ";
             it++;
             ostr << " pixdist " << sqrtf( (x-r.x)*(x-r.x) + (y-r.y)*(y-r.y) )
+                 << " scaledist " << fabsf( sigma - r.sigma )
                  << " angledist " << fabsf( ori/M_PI2*360.0f - r.ori/M_PI2*360.0f )
                  << endl;
         }
