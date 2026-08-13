@@ -11,10 +11,11 @@
 
 #if ! POPSIFT_IS_DEFINED(POPSIFT_DISABLE_GRID_FILTER)
 
+#include "common/thrust_setup.h"
+
 #include <thrust/copy.h>
 #include <thrust/count.h>
 #include <thrust/device_vector.h>
-#include <thrust/execution_policy.h>
 #include <thrust/host_vector.h>
 #include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/discard_iterator.h>
@@ -22,16 +23,6 @@
 #include <thrust/sort.h>
 #include <thrust/transform.h>
 #include <thrust/transform_scan.h>
-#include <thrust/version.h>
-
-// The stream-bound parallel execution policy lives in thrust::cuda on NVIDIA
-// and thrust::hip on rocThrust. Fully qualified from the global namespace to
-// avoid colliding with popsift::cuda (debug_macros.h) inside namespace popsift.
-#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
-#define POPSIFT_THRUST_PAR ::thrust::hip::par
-#else
-#define POPSIFT_THRUST_PAR ::thrust::cuda::par
-#endif
 
 namespace popsift
 {

@@ -40,6 +40,7 @@ add_library(popsift
         popsift/common/warp_bitonic_sort.h
         popsift/common/excl_blk_prefix_sum.h
         popsift/common/vec_macros.h
+        popsift/common/thrust_setup.h
         popsift/common/clamp.h)
 
 if(USE_HIP)
