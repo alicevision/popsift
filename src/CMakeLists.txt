@@ -9,6 +9,7 @@ add_library(popsift
         popsift/s_image.cu popsift/s_image.h
         popsift/sift_pyramid.cu popsift/sift_pyramid.h
         popsift/sift_octave.cu popsift/sift_octave.h
+        popsift/sift_textures.h
         popsift/s_pyramid_build.cu
         popsift/s_pyramid_build_aa.cu popsift/s_pyramid_build_aa.h
         popsift/s_pyramid_build_ai.cu popsift/s_pyramid_build_ai.h

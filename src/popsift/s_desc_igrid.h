@@ -41,10 +41,7 @@ inline static bool start_ext_desc_igrid( const int octave, Octave& oct_obj )
     ext_desc_igrid
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
-          POPSIFT_LAYERED_SRC( oct_obj.getDataTexLinear( ).tex,
-                               oct_obj.getDataSurface( ),
-                               oct_obj.getWidth(),
-                               oct_obj.getHeight() ) );
+          oct_obj.getDataReadTexLinear( ) );
 
     POP_SYNC_CHK;
 

@@ -198,10 +198,7 @@ inline void Pyramid::downscale_from_prev_octave( int octave, cudaStream_t stream
 
     gauss::get_by_2_pick_every_second
         <<<h_grid,h_block,0,stream>>>
-        ( POPSIFT_LAYERED_SRC( prev_oct_obj.getDataTexPoint( ),
-                               prev_oct_obj.getDataSurface( ),
-                               prev_oct_obj.getWidth(),
-                               prev_oct_obj.getHeight() ),
+        ( prev_oct_obj.getDataReadTexPoint( ),
           prev_oct_obj.getWidth(),
           prev_oct_obj.getHeight(),
           _levels-PREV_LEVEL,
@@ -231,10 +228,7 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t 
 
             gauss::absoluteSourceInterpolated::horiz
                 <<<grid,block,0,stream>>>
-                ( POPSIFT_LAYERED_SRC( oct_obj.getDataTexLinear( ).tex,
-                                       oct_obj.getDataSurface( ),
-                                       oct_obj.getWidth(),
-                                       oct_obj.getHeight() ),
+                ( oct_obj.getDataReadTexLinear( ),
                   oct_obj.getIntermediateSurface( ),
                   level );
         }
@@ -250,10 +244,7 @@ inline void Pyramid::horiz_from_prev_level( int octave, int level, cudaStream_t 
 
             gauss::absoluteSource::horiz
                 <<<grid,block,0,stream>>>
-                ( POPSIFT_LAYERED_SRC( oct_obj.getDataTexPoint( ),
-                                       oct_obj.getDataSurface( ),
-                                       oct_obj.getWidth(),
-                                       oct_obj.getHeight() ),
+                ( oct_obj.getDataReadTexPoint( ),
                   oct_obj.getIntermediateSurface( ),
                   level );
         }
@@ -291,9 +282,7 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
 
             gauss::absoluteSourceInterpolated::vert
                 <<<grid,block,0,stream>>>
-                ( POPSIFT_LAYERED_SRC( oct_obj.getIntermDataTexLinear( ).tex,
-                                       oct_obj.getIntermediateSurface( ),
-                                       width, height ),
+                ( oct_obj.getIntermReadTexLinear( ),
                   oct_obj.getDataSurface( ),
                   level );
         }
@@ -307,9 +296,7 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
 
             gauss::absoluteSourceInterpolated::vert_abs0
                 <<<grid,block,0,stream>>>
-                ( POPSIFT_LAYERED_SRC( oct_obj.getIntermDataTexLinear( ).tex,
-                                       oct_obj.getIntermediateSurface( ),
-                                       width, height ),
+                ( oct_obj.getIntermReadTexLinear( ),
                   oct_obj.getDataSurface( ),
                   level );
         }
@@ -323,9 +310,7 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
 
             gauss::absoluteSource::vert
                 <<<grid,block,0,stream>>>
-                ( POPSIFT_LAYERED_SRC( oct_obj.getIntermDataTexPoint( ),
-                                       oct_obj.getIntermediateSurface( ),
-                                       width, height ),
+                ( oct_obj.getIntermReadTexPoint( ),
                   oct_obj.getDataSurface( ),
                   level );
         }
@@ -339,9 +324,7 @@ inline void Pyramid::vert_from_interm( int octave, int level, cudaStream_t strea
 
             gauss::absoluteSource::vert_abs0
                 <<<grid,block,0,stream>>>
-                ( POPSIFT_LAYERED_SRC( oct_obj.getIntermDataTexPoint( ),
-                                       oct_obj.getIntermediateSurface( ),
-                                       width, height ),
+                ( oct_obj.getIntermReadTexPoint( ),
                   oct_obj.getDataSurface( ),
                   level );
         }
@@ -377,9 +360,7 @@ inline void Pyramid::vert_all_from_interm( int octave, int start_level, int max_
 
             gauss::absoluteSourceInterpolated::vert_all_abs0
                 <<<grid,block,0,stream>>>
-                ( POPSIFT_LAYERED_SRC( oct_obj.getIntermDataTexLinear( ).tex,
-                                       oct_obj.getIntermediateSurface( ),
-                                       width, height ),
+                ( oct_obj.getIntermReadTexLinear( ),
                   oct_obj.getDataSurface( ),
                   start_level,
                   max_level );
@@ -394,9 +375,7 @@ inline void Pyramid::vert_all_from_interm( int octave, int start_level, int max_
 
             gauss::absoluteSource::vert_all_abs0
                 <<<grid,block,0,stream>>>
-                ( POPSIFT_LAYERED_SRC( oct_obj.getIntermDataTexPoint( ),
-                                       oct_obj.getIntermediateSurface( ),
-                                       width, height ),
+                ( oct_obj.getIntermReadTexPoint( ),
                   oct_obj.getDataSurface( ),
                   start_level,
                   max_level );
@@ -429,10 +408,7 @@ inline void Pyramid::dogs_from_blurred( int octave, int max_level, cudaStream_t 
 
     gauss::make_dog
         <<<grid,block,0,stream>>>
-        ( POPSIFT_LAYERED_SRC( oct_obj.getDataTexPoint( ),
-                               oct_obj.getDataSurface( ),
-                               oct_obj.getWidth(),
-                               oct_obj.getHeight() ),
+        ( oct_obj.getDataReadTexPoint( ),
           oct_obj.getDogSurface( ),
           oct_obj.getWidth(),
           oct_obj.getHeight(),

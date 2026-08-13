@@ -11,20 +11,12 @@
 #include "sift_conf.h"
 #include "sift_constants.h"
 #include "sift_extremum.h"
+#include "sift_textures.h"
 
 #include <iostream>
 #include <vector>
 
 namespace popsift {
-
-struct LinearTexture
-{
-    // Holds a texture object (assigned from cudaCreateTextureObject and consumed
-    // by tex2DLayered). On CUDA texture and surface handles are both unsigned
-    // long long so the original cudaSurfaceObject_t typing compiled; HIP uses
-    // distinct pointer types, so the correct texture type must be used here.
-    cudaTextureObject_t tex;
-};
 
 class Octave
 {
@@ -105,18 +97,6 @@ public:
         return _desc_done;
     }
 
-    inline LinearTexture getIntermDataTexLinear( ) {
-        return _intm_tex_linear;
-    }
-    inline cudaTextureObject_t getIntermDataTexPoint( ) const {
-        return _intm_tex_point;
-    }
-    inline LinearTexture getDataTexLinear( ) {
-        return _data_tex_linear;
-    }
-    inline cudaTextureObject_t getDataTexPoint( ) const {
-        return _data_tex_point;
-    }
     inline cudaSurfaceObject_t getDataSurface( ) const {
         return _data_surf;
     }
@@ -127,8 +107,25 @@ public:
     inline cudaSurfaceObject_t& getDogSurface( ) {
         return _dog_3d_surf;
     }
-    inline cudaTextureObject_t& getDogTexturePoint( ) {
-        return _dog_3d_tex_point;
+
+    /* The read handles the kernels take. A read handle names the array to read
+     * and the filtering to read it with, and it carries whatever else the
+     * platform needs to address that array (see sift_textures.h).
+     */
+    inline LayeredReadTex getDataReadTexPoint( ) const {
+        return makeLayeredReadTex( _data_tex_point, _data_surf, _w, _h );
+    }
+    inline LayeredReadTex getDataReadTexLinear( ) const {
+        return makeLayeredReadTex( _data_tex_linear.tex, _data_surf, _w, _h );
+    }
+    inline LayeredReadTex getIntermReadTexPoint( ) const {
+        return makeLayeredReadTex( _intm_tex_point, _intm_surf, _w, _h );
+    }
+    inline LayeredReadTex getIntermReadTexLinear( ) const {
+        return makeLayeredReadTex( _intm_tex_linear.tex, _intm_surf, _w, _h );
+    }
+    inline LayeredReadTex getDogReadTexPoint( ) const {
+        return makeLayeredReadTex( _dog_3d_tex_point, _dog_3d_surf, _w, _h );
     }
 
      /**

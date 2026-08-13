@@ -605,10 +605,7 @@ void Pyramid::find_extrema( const Config& conf )
         case Config::VLFeat :
                 find_extrema_in_dog<HEIGHT,Config::VLFeat>
                     <<<grid,block,0,oct_str>>>
-                    ( POPSIFT_LAYERED_SRC( oct_obj.getDogTexturePoint( ),
-                                           oct_obj.getDogSurface( ),
-                                           oct_obj.getWidth(),
-                                           oct_obj.getHeight() ),
+                    ( oct_obj.getDogReadTexPoint( ),
                       octave,
                       cols,
                       rows,
@@ -623,10 +620,7 @@ void Pyramid::find_extrema( const Config& conf )
         case Config::OpenCV :
                 find_extrema_in_dog<HEIGHT,Config::OpenCV>
                     <<<grid,block,0,oct_str>>>
-                    ( POPSIFT_LAYERED_SRC( oct_obj.getDogTexturePoint( ),
-                                           oct_obj.getDogSurface( ),
-                                           oct_obj.getWidth(),
-                                           oct_obj.getHeight() ),
+                    ( oct_obj.getDogReadTexPoint( ),
                       octave,
                       cols,
                       rows,
@@ -641,10 +635,7 @@ void Pyramid::find_extrema( const Config& conf )
         default :
                 find_extrema_in_dog<HEIGHT,Config::PopSift>
                     <<<grid,block,0,oct_str>>>
-                    ( POPSIFT_LAYERED_SRC( oct_obj.getDogTexturePoint( ),
-                                           oct_obj.getDogSurface( ),
-                                           oct_obj.getWidth(),
-                                           oct_obj.getHeight() ),
+                    ( oct_obj.getDogReadTexPoint( ),
                       octave,
                       cols,
                       rows,

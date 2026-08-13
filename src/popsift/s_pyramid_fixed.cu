@@ -262,10 +262,7 @@ inline void make_octave_sub( const Config& conf, ImageBase* base, Octave& oct_ob
         gauss::fixedSpan::absoluteTexAddress::octave_fixed
             <SHIFT,w_conf,h_conf,l_conf>
             <<<grid,block,0,stream>>>
-            ( POPSIFT_LAYERED_SRC( oct_obj.getDataTexPoint( ),
-                                   oct_obj.getDataSurface( ),
-                                   oct_obj.getWidth(),
-                                   oct_obj.getHeight() ),
+            ( oct_obj.getDataReadTexPoint( ),
               oct_obj.getDataSurface( ),
               oct_obj.getWidth(),
               oct_obj.getHeight(),

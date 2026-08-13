@@ -201,10 +201,7 @@ bool start_ext_desc_vlfeat( const int octave, Octave& oct_obj )
     ext_desc_vlfeat
         <<<grid,block,shared_size,oct_obj.getStream()>>>
         ( octave,
-          POPSIFT_LAYERED_SRC( oct_obj.getDataTexPoint( ),
-                               oct_obj.getDataSurface( ),
-                               oct_obj.getWidth(),
-                               oct_obj.getHeight() ),
+          oct_obj.getDataReadTexPoint( ),
           oct_obj.getWidth(),
           oct_obj.getHeight() );
 

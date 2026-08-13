@@ -411,10 +411,7 @@ void Pyramid::orientation( const Config& conf )
                 <<<grid,block,4*64*sizeof(float),oct_str>>>
                 ( octave,
                   hct.ext_ps[octave],
-                  POPSIFT_LAYERED_SRC( oct_obj.getDataTexPoint( ),
-                                       oct_obj.getDataSurface( ),
-                                       oct_obj.getWidth( ),
-                                       oct_obj.getHeight( ) ),
+                  oct_obj.getDataReadTexPoint( ),
                   oct_obj.getWidth( ),
                   oct_obj.getHeight( ) );
             POP_SYNC_CHK;

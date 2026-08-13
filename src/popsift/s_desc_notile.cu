@@ -149,10 +149,7 @@ bool start_ext_desc_notile( int octave, Octave& oct_obj )
     ext_desc_notile
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
-          POPSIFT_LAYERED_SRC( oct_obj.getDataTexLinear( ).tex,
-                               oct_obj.getDataSurface( ),
-                               oct_obj.getWidth(),
-                               oct_obj.getHeight() ) );
+          oct_obj.getDataReadTexLinear( ) );
     cudaDeviceSynchronize();
     cudaError_t err = cudaGetLastError( );
     POP_CUDA_FATAL_TEST(err, "cudaGetLastError failed: ");

@@ -40,10 +40,7 @@ inline static bool start_ext_desc_grid( const int octave, Octave& oct_obj )
     ext_desc_grid
         <<<grid,block,0,oct_obj.getStream()>>>
         ( octave,
-          POPSIFT_LAYERED_SRC( oct_obj.getDataTexPoint( ),
-                               oct_obj.getDataSurface( ),
-                               oct_obj.getWidth(),
-                               oct_obj.getHeight() ) );
+          oct_obj.getDataReadTexPoint( ) );
 
     POP_SYNC_CHK;
 
