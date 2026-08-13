@@ -221,13 +221,14 @@ void Octave::alloc_data_planes()
     _data_ext.height = _h;
     _data_ext.depth  = _levels;
 
-    // Observed on gfx90a (ROCm 7.2.1): layered images are incoherent across kernel
-    // launches (the layer dimension collapses to a single layer on read); filed as
-    // ROCm/clr#275 (the partial fix ROCm/rocm-systems#6683 covers only surf2DLayered).
-    // A non-layered 3D array with surf3D/tex3D access is coherent, so drop
-    // cudaArrayLayered on HIP. The blur levels are addressed by the z coordinate
-    // instead of the layer index. See cuda_to_hip.h and common/assist.h. CUDA keeps
-    // a real layered array.
+    // Observed on gfx90a and on gfx1100 (ROCm 7.2.1): a layered array written
+    // layer by layer through surf2DLayeredwrite reads back as a single layer for
+    // every layer index, because the write passed the layer index in the mipmap
+    // level slot. Filed as ROCm/clr#275; ROCm/rocm-systems#6683 corrects it, but
+    // that is not in ROCm 7.2.x. A non-layered 3D array with surf3D/tex3D access
+    // is coherent, so drop cudaArrayLayered on HIP. The blur levels are addressed
+    // by the z coordinate instead of the layer index. See cuda_to_hip.h,
+    // sift_textures.h and common/assist.h. CUDA keeps a real layered array.
 #if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
     err = cudaMalloc3DArray( &_data, &_data_desc, _data_ext, cudaArraySurfaceLoadStore );
 #else

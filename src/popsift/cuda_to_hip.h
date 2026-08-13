@@ -132,12 +132,15 @@
 #define cudaBoundaryModeClamp     hipBoundaryModeClamp
 #define cudaBoundaryModeTrap      hipBoundaryModeTrap
 
-// HIP layered-image coherency is broken on gfx90a/CDNA2 (observed ROCm 7.2.1),
-// filed as ROCm/clr#275 (the partial fix ROCm/rocm-systems#6683 covers only
-// surf2DLayered): after a layered array is written layer-by-layer via
-// surf2DLayeredwrite, a read in a later kernel launch (tex2DLayered OR
-// surf2DLayeredread, host hipMemcpy3D too) returns a single (last-written) layer's
-// data for EVERY layer index -- the layer dimension is effectively collapsed.
+// HIP layered images are broken on gfx90a/CDNA2 and on gfx1100/RDNA3 (observed
+// ROCm 7.2.1), filed as ROCm/clr#275: after a layered array is written
+// layer-by-layer via surf2DLayeredwrite, a read in a later kernel launch
+// (tex2DLayered OR surf2DLayeredread, host hipMemcpy3D too) returns a single
+// (last-written) layer's data for EVERY layer index -- the layer dimension is
+// effectively collapsed. The defect is in the write: surf2DLayeredwrite passed
+// the layer index in the mipmap level slot, so every layer landed in the same
+// slot. ROCm/rocm-systems#6683 corrects that, and with it every read path above
+// returns correct per-layer data, but it is not in ROCm 7.2.x.
 // A standalone reproducer confirms it and also
 // confirms a NON-layered 3D array (surf3Dwrite/surf3Dread/tex3D) is fully
 // coherent across launches. So on HIP the pyramid arrays are allocated as
