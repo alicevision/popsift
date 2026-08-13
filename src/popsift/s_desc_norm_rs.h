@@ -48,10 +48,10 @@ void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, bool 
 
     float sum = descr.x + descr.y + descr.z + descr.w;
 
-    // 32-lane reduction over threadIdx.x; confine to a width-32 sub-group on a
-    // 64-lane wavefront (normalize block is (32,32), one descriptor per row).
-    // CUDA unchanged.
-#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    // The normalize block is (32,32) and each threadIdx.y row holds one
+    // descriptor. The shuffle width is that row width, not the hardware warp
+    // size: on a 64-lane wavefront two rows share a wavefront, and an
+    // unrestricted reduction and lane-0 broadcast would mix the two descriptors.
     sum += popsift::shuffle_down( sum, 16, 32 );
     sum += popsift::shuffle_down( sum,  8, 32 );
     sum += popsift::shuffle_down( sum,  4, 32 );
@@ -59,50 +59,25 @@ void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, bool 
     sum += popsift::shuffle_down( sum,  1, 32 );
 
     sum = popsift::shuffle( sum,  0, 32 );
-#else
-    sum += popsift::shuffle_down( sum, 16 );
-    sum += popsift::shuffle_down( sum,  8 );
-    sum += popsift::shuffle_down( sum,  4 );
-    sum += popsift::shuffle_down( sum,  2 );
-    sum += popsift::shuffle_down( sum,  1 );
 
-    sum = popsift::shuffle( sum,  0 );
-#endif
+    // RootSift takes sqrt(bin/sum). A descriptor bin cannot be negative, so a
+    // non-positive sum means an all-zero descriptor, which stays all-zero
+    // instead of dividing. The per-bin test keeps a bin that came out slightly
+    // negative (round-to-nearest weight accumulation on platforms without the
+    // round-toward-+inf intrinsics) out of the square root.
+    const float inv = ( sum > 0.0f ) ? __fdividef( 1.0f, sum ) : 0.0f;
 
-#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
-    // RootSift takes sqrt(bin/sum). The fmaxf(.,0) below clamps a bin that came out
-    // slightly negative from the descriptor accumulation's round-toward-+inf
-    // intrinsics (mapped to round-to-nearest in cuda_to_hip.h; a negative bin is
-    // unphysical). The divisor is gated at a small threshold so a degenerate
-    // near-zero sum is treated as an all-zero descriptor: an all-flat window
-    // (sum==0) normalizes to 0, and a tiny subnormal sum can no longer make 1/sum
-    // overflow to +inf (which would normalize a positive bin to +inf). CUDA, where
-    // the directed-rounding intrinsics exist and bins stay non-negative, is unchanged.
-    const float inv = ( sum > 1e-20f ) ? __fdividef( 1.0f, sum ) : 0.0f;
-    float val;
-    val = scalbnf( __fsqrt_rn( fmaxf( descr.x * inv, 0.0f ) ), d_consts.norm_multi );
-    descr.x = val;
-    val = scalbnf( __fsqrt_rn( fmaxf( descr.y * inv, 0.0f ) ), d_consts.norm_multi );
-    descr.y = val;
-    val = scalbnf( __fsqrt_rn( fmaxf( descr.z * inv, 0.0f ) ), d_consts.norm_multi );
-    descr.z = val;
-    val = scalbnf( __fsqrt_rn( fmaxf( descr.w * inv, 0.0f ) ), d_consts.norm_multi );
-    descr.w = val;
-#else
-    float val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.x, sum ) ),
-                   d_consts.norm_multi );
-    descr.x = val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.y, sum ) ),
-                   d_consts.norm_multi );
-    descr.y = val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.z, sum ) ),
-                   d_consts.norm_multi );
-    descr.z = val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.w, sum ) ),
-                   d_consts.norm_multi );
-    descr.w = val;
-#endif
+    if( inv <= 0.0f )
+    {
+        descr.x = descr.y = descr.z = descr.w = 0.0f;
+    }
+    else
+    {
+        descr.x = descr.x <= 0.0f ? 0.0f : scalbnf( __fsqrt_rn( descr.x * inv ), d_consts.norm_multi );
+        descr.y = descr.y <= 0.0f ? 0.0f : scalbnf( __fsqrt_rn( descr.y * inv ), d_consts.norm_multi );
+        descr.z = descr.z <= 0.0f ? 0.0f : scalbnf( __fsqrt_rn( descr.z * inv ), d_consts.norm_multi );
+        descr.w = descr.w <= 0.0f ? 0.0f : scalbnf( __fsqrt_rn( descr.w * inv ), d_consts.norm_multi );
+    }
 
     if( ! ignoreme ) {
         float4* out4 = (float4*)dst_desc;
