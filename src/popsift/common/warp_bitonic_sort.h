@@ -57,32 +57,20 @@ private:
     __device__ inline
     int shiftit( const int my_index, const int shift, const int direction, const bool increasing )
     {
-        // This is a 32-lane bitonic step. On a 64-lane wavefront ori_par runs as
-        // a single 32-thread block (lanes 0-31), and sort64 holds 2 elements per
-        // lane; the shuffles must stay inside a 32-lane group, so force width 32
-        // on HIP (a no-op on CUDA's 32-lane warp) and key the swap direction off
-        // the in-group lane id.
-#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
-        const int  lane_id     = threadIdx.x & 31;
+        // This is a 32-lane bitonic step: the caller launches a 32-thread block
+        // and sort64 holds 2 elements per thread. The shuffle width is that
+        // network width, not the hardware warp size, so a 64-lane wavefront does
+        // not exchange elements across the two halves of the sorting network.
         const T    my_val      = _array[my_index];
         const T    other_val   = popsift::shuffle_xor( my_val, 1 << shift, 32 );
-#else
-        const int  lane_id     = threadIdx.x;
-        const T    my_val      = _array[my_index];
-        const T    other_val   = popsift::shuffle_xor( my_val, 1 << shift );
-#endif
-        const bool reverse     = ( lane_id & ( 1 << direction ) );
-        const bool id_less     = ( ( lane_id & ( 1 << shift ) ) == 0 );
+        const bool reverse     = ( threadIdx.x & ( 1 << direction ) );
+        const bool id_less     = ( ( threadIdx.x & ( 1 << shift ) ) == 0 );
         const bool my_more     = id_less ? ( my_val > other_val )
                                          : ( my_val < other_val );
         const bool must_swap   = ! ( my_more ^ reverse ^ increasing );
 
         int lane = must_swap ? ( 1 << shift ) : 0;
-#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
         return popsift::shuffle_xor( my_index, lane, 32 );
-#else
-        return popsift::shuffle_xor( my_index, lane );
-#endif
     }
 
     __device__ inline

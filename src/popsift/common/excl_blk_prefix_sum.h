@@ -91,16 +91,12 @@ private:
             int self = (valid) ? _reader.get(cell) : 0;
 
             // This loop is an exclusive prefix sum for one warp. The block is
-            // (32,blockDim.y), one warp per threadIdx.y row. On a 64-lane
-            // wavefront two rows share a wavefront, so the scan shuffle must be
-            // confined to a width-32 sub-group (threadIdx.x is the in-row lane id)
-            // or odd rows pull partial sums from the wrong row. CUDA: unchanged.
+            // (32,blockDim.y), one row of 32 threads per threadIdx.y. The
+            // shuffle width is that row width, not the hardware warp size: on a
+            // 64-lane wavefront two rows share a wavefront and an unrestricted
+            // shuffle would pull partial sums from the wrong row.
             for( int s=0; s<5; s++ ) {
-#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
                 const int add = popsift::shuffle_up( ews+self, 1<<s, 32 );
-#else
-                const int add = popsift::shuffle_up( ews+self, 1<<s );
-#endif
                 ews += threadIdx.x < (1<<s) ? 0 : add;
             }
 
@@ -117,11 +113,7 @@ private:
                 int self = sum[threadIdx.x];
 
                 for( int s=0; s<5; s++ ) {
-#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
                     const int add = popsift::shuffle_up( ebs+self, 1<<s, 32 );
-#else
-                    const int add = popsift::shuffle_up( ebs+self, 1<<s );
-#endif
                     ebs += threadIdx.x < (1<<s) ? 0 : add;
                 }
 

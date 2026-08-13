@@ -33,13 +33,11 @@ __global__ void horiz(LayeredReadTex src_point_texture, cudaSurfaceObject_t dst_
     g    = filter[span];
     out += ( A + B ) * g;
 
-    // Horizontal Gauss tap exchange via warp shuffles. The block is (32,blockDim.y):
-    // each threadIdx.y row is an independent 32-lane group convolving one image
-    // row. On a 64-lane wavefront two rows share a wavefront, so the shuffles must
-    // be confined to a width-32 sub-group (threadIdx.x is already the in-row lane
-    // id since blockDim.x==32) or a lane would pull a neighbour from the wrong
-    // image row and corrupt the pyramid. CUDA: width 32 is the whole warp.
-#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    // Horizontal Gauss tap exchange via warp shuffles. The block is
+    // (32,blockDim.y) and each threadIdx.y row convolves one image row. The
+    // shuffle width is that row width, not the hardware warp size: on a 64-lane
+    // wavefront two rows share a wavefront and a lane would otherwise pull a
+    // neighbour from the wrong image row.
     int shiftval = 0;
     for( int offset=span-1; offset>0; offset-- ) {
         shiftval += 1;
@@ -52,20 +50,6 @@ __global__ void horiz(LayeredReadTex src_point_texture, cudaSurfaceObject_t dst_
         g = filter[offset];
         out += ( D + E ) * g;
     }
-#else
-    int shiftval = 0;
-    for( int offset=span-1; offset>0; offset-- ) {
-        shiftval += 1;
-        const float D1 = popsift::shuffle_down( A, shiftval );
-        const float D2 = popsift::shuffle_up  ( C, span - shiftval );
-        const float D  = threadIdx.x < (32 - shiftval) ? D1 : D2;
-        const float E1 = popsift::shuffle_up  ( B, shiftval );
-        const float E2 = popsift::shuffle_down( C, span - shiftval );
-        const float E  = threadIdx.x > shiftval        ? E1 : E2;
-        g = filter[offset];
-        out += ( D + E ) * g;
-    }
-#endif
 
     surf2DLayeredwrite( out, dst_data, off_x*4, off_y, dst_level, cudaBoundaryModeZero );
 }

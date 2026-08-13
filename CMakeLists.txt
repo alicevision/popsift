@@ -116,9 +116,9 @@ if(USE_HIP)
   set(CMAKE_HIP_STANDARD_REQUIRED ON)
   set(CMAKE_HIP_SEPARABLE_COMPILATION ON)
 
-  # HIP has __shfl_down etc. unconditionally; assist.h selects the _sync
-  # spelling on this flag and cuda_to_hip.h maps _sync to the mask-free builtin.
-  set(PopSift_HAVE_SHFL_DOWN_SYNC   1)
+  # HIP provides the mask-free __shfl_down etc., i.e. the spelling assist.h
+  # selects when this flag is off.
+  set(PopSift_HAVE_SHFL_DOWN_SYNC   0)
 else()
   ###################
   #  CUDA

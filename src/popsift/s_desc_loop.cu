@@ -124,12 +124,10 @@ void ext_desc_loop_sub( const float         ang,
     dpt[0] += dpt[8];
 
     /* reduction here */
-    // 32-lane reduction over threadIdx.x. The block is (32,4,4): each (y,z) pair
-    // is its own 32-thread group, so on a 64-lane wavefront (two groups per
-    // wavefront) the shuffles must be confined to a width-32 sub-group, else the
-    // reduction and the lane-0 broadcast leak across the group boundary and
-    // corrupt half the descriptors (NaN). On CUDA width 32 is the whole warp.
-#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    // The block is (32,4,4) and each (y,z) pair reduces its own 32 threads. The
+    // shuffle width is that group width, not the hardware warp size: on a 64-lane
+    // wavefront two groups share a wavefront, and an unrestricted reduction and
+    // lane-0 broadcast would leak across the group boundary.
     for (int i = 0; i < 8; i++) {
         dpt[i] += popsift::shuffle_down( dpt[i], 16, 32 );
         dpt[i] += popsift::shuffle_down( dpt[i], 8, 32 );
@@ -138,16 +136,6 @@ void ext_desc_loop_sub( const float         ang,
         dpt[i] += popsift::shuffle_down( dpt[i], 1, 32 );
         dpt[i]  = popsift::shuffle     ( dpt[i], 0, 32 );
     }
-#else
-    for (int i = 0; i < 8; i++) {
-        dpt[i] += popsift::shuffle_down( dpt[i], 16 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 8 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 4 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 2 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 1 );
-        dpt[i]  = popsift::shuffle     ( dpt[i], 0 );
-    }
-#endif
 
     if( threadIdx.x < 8 ) {
         features[tile+threadIdx.x] = dpt[threadIdx.x];

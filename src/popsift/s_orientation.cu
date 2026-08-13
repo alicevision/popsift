@@ -227,7 +227,7 @@ void ori_par( const int           octave,
     // All threads retrieve the yval of thread 0, the largest
     // of all yvals.
     const float best_val = yval[best_index.x];
-    const float yval_ref = 0.8f * popsift::shuffle( best_val, 0 );
+    const float yval_ref = 0.8f * popsift::shuffle( best_val, 0, 32 );
     const bool  valid    = ( best_val >= yval_ref );
     bool        written  = false;
 

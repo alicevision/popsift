@@ -30,12 +30,11 @@ inline float octave_fixed_horiz( float fval, const float* filter )
      * input  fval of thread N is extracted from image index N-4
      * output fval of thread N should be filtered sum from N-4 to N+4
      */
-    // Horizontal fixed-span Gauss via warp shuffles. block.x==32 and the block
-    // packs multiple rows (threadIdx.y/z); on a 64-lane wavefront confine the
-    // shuffles to a width-32 sub-group so a lane does not pull a neighbour from
-    // another row. CUDA: width 32 is the whole warp, unchanged.
+    // Horizontal fixed-span Gauss via warp shuffles. block.x is 32 and the block
+    // packs several rows in threadIdx.y/z. The shuffle width is that row width,
+    // not the hardware warp size: on a 64-lane wavefront two rows share a
+    // wavefront and a lane would otherwise pull a neighbour from another row.
     float out = fval * filter[0];
-#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
     #pragma unroll
     for( int i=1; i<=SHIFT; i++ ) {
         float val  = popsift::shuffle_up( fval, i, 32 ) + popsift::shuffle_down( fval, i, 32 );
@@ -43,15 +42,6 @@ inline float octave_fixed_horiz( float fval, const float* filter )
     }
 
     fval = popsift::shuffle_down( out, SHIFT, 32 );
-#else
-    #pragma unroll
-    for( int i=1; i<=SHIFT; i++ ) {
-        float val  = popsift::shuffle_up( fval, i ) + popsift::shuffle_down( fval, i );
-        out += val * filter[i];
-    }
-
-    fval = popsift::shuffle_down( out, SHIFT );
-#endif
 
     return fval;
 }

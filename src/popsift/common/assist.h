@@ -42,6 +42,10 @@ template<typename T> __device__ inline T shuffle_up  ( T variable, int delta, in
 template<typename T> __device__ inline T shuffle_down( T variable, int delta, int ws ) { return __shfl_down_sync( 0xffffffff, variable, delta, ws ); }
 template<typename T> __device__ inline T shuffle_xor ( T variable, int delta, int ws ) { return __shfl_xor_sync ( 0xffffffff, variable, delta, ws ); }
 #else
+/* The mask-free builtins. This is the pre-CUDA-9 spelling, and it is also the
+ * spelling HIP provides, where the width parameter may be up to the 64-lane
+ * wavefront size.
+ */
 template<typename T> __device__ inline T shuffle     ( T variable, int src   ) { return __shfl     ( variable, src   ); }
 template<typename T> __device__ inline T shuffle_up  ( T variable, int delta ) { return __shfl_up  ( variable, delta ); }
 template<typename T> __device__ inline T shuffle_down( T variable, int delta ) { return __shfl_down( variable, delta ); }

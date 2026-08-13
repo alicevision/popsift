@@ -114,9 +114,8 @@ void ext_desc_iloop_sub( const float         ang,
     dpt[0] += dpt[8];
 
     /* reduction here */
-    // 32-lane reduction over threadIdx.x; confine the shuffles to a width-32
-    // sub-group on a 64-lane wavefront (see s_desc_loop.cu). CUDA unchanged.
-#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    // Reduction over the 32 threads of one descriptor tile; the shuffle width is
+    // that tile width, not the hardware warp size (see s_desc_loop.cu).
     for (int i = 0; i < 8; i++) {
         dpt[i] += popsift::shuffle_down( dpt[i], 16, 32 );
         dpt[i] += popsift::shuffle_down( dpt[i], 8, 32 );
@@ -125,16 +124,6 @@ void ext_desc_iloop_sub( const float         ang,
         dpt[i] += popsift::shuffle_down( dpt[i], 1, 32 );
         dpt[i]  = popsift::shuffle     ( dpt[i], 0, 32 );
     }
-#else
-    for (int i = 0; i < 8; i++) {
-        dpt[i] += popsift::shuffle_down( dpt[i], 16 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 8 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 4 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 2 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 1 );
-        dpt[i]  = popsift::shuffle     ( dpt[i], 0 );
-    }
-#endif
 
     if( threadIdx.x < 8 ) {
         features[tile+threadIdx.x] = dpt[threadIdx.x];
