@@ -280,15 +280,16 @@ void Octave::alloc_data_tex()
     tex_desc.readMode         = cudaReadModeElementType; // read as float
     tex_desc.filterMode       = cudaFilterModeLinear; // hardware bilinear (CUDA)
 #if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
-    // Observed on gfx90a (ROCm 7.2.1): hipCreateTextureObject rejects hardware
-    // linear filtering on element-read float arrays ("operation not supported").
-    // Create the texture with point filtering and do bilinear interpolation in
-    // software in readTex(). Empirical on this device/ROCm; re-verify on RDNA.
+    // Observed on gfx90a (ROCm 7.2.1): creating a texture with hardware linear
+    // filtering over an element-read float array fails with "operation not
+    // supported"; gfx1100 accepts it, so this is per device. Create the texture
+    // with point filtering and interpolate in software in readTex(), which keeps
+    // one build correct on either device.
     tex_desc.filterMode       = cudaFilterModePoint;
 #endif
 
     err = cudaCreateTextureObject( &_data_tex_linear.tex, &res_desc, &tex_desc, nullptr );
-    POP_CUDA_FATAL_TEST(err, "Could not create Blur data point texture: ");
+    POP_CUDA_FATAL_TEST(err, "Could not create Blur data linear texture: ");
 }
 
 void Octave::free_data_tex()
@@ -371,7 +372,7 @@ void Octave::alloc_interm_tex()
 #endif
 
     err = cudaCreateTextureObject( &_intm_tex_linear.tex, &res_desc, &tex_desc, nullptr );
-    POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate point texture: ");
+    POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate linear texture: ");
 }
 
 void Octave::free_interm_tex()
