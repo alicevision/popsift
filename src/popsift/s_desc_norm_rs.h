@@ -61,11 +61,14 @@ void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, bool 
     sum = popsift::shuffle( sum,  0, 32 );
 
     // RootSift takes sqrt(bin/sum). A descriptor bin cannot be negative, so a
-    // non-positive sum means an all-zero descriptor, which stays all-zero
-    // instead of dividing. The per-bin test keeps a bin that came out slightly
-    // negative (round-to-nearest weight accumulation on platforms without the
+    // sum that is not clearly positive means a degenerate descriptor, which
+    // stays all-zero instead of dividing. The test is against a small threshold
+    // rather than against zero because a subnormal sum makes the reciprocal
+    // overflow to infinity, which would normalize a positive bin to infinity.
+    // The per-bin test below keeps a bin that came out slightly negative
+    // (round-to-nearest weight accumulation on platforms without the
     // round-toward-+inf intrinsics) out of the square root.
-    const float inv = ( sum > 0.0f ) ? __fdividef( 1.0f, sum ) : 0.0f;
+    const float inv = ( sum > 1e-20f ) ? __fdividef( 1.0f, sum ) : 0.0f;
 
     if( inv <= 0.0f )
     {
