@@ -19,10 +19,12 @@
 #include <thrust/host_vector.h>
 #include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/discard_iterator.h>
+#include <thrust/iterator/zip_iterator.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
 #include <thrust/transform.h>
 #include <thrust/transform_scan.h>
+#include <thrust/tuple.h>
 
 namespace popsift
 {
@@ -334,4 +336,3 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 }; // namespace popsift
 
 #endif // not defined(DISABLE_GRID_FILTER)
-
