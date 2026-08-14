@@ -105,8 +105,9 @@ if(USE_HIP)
   ###################
   #  HIP (AMD)
   ###################
-  # rocThrust supplies the thrust::cuda::par compatibility namespace, so the
-  # Thrust code in s_filtergrid.cu compiles unchanged on ROCm.
+  # rocThrust is the AMD build of Thrust. Its stream-bound execution policy is
+  # in a different namespace than the NVIDIA one, which is what
+  # src/popsift/common/thrust_setup.h hides from the Thrust callers.
   find_package(rocthrust REQUIRED CONFIG)
 
   set(PopSift_CXX_STANDARD 17)
