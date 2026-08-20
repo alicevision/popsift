@@ -47,3 +47,5 @@ oxford
 
 # Downloaded archives for tests.
 *.tgz
+
+build-hip/

@@ -15,6 +15,8 @@ PopSift compiles and works with NVidia cards of compute capability >= 3.0 (inclu
 
 CUDA SDK 11 does no longer support compute capability 3.0. 3.5 is still supported with deprecation warnings.
 
+PopSift also runs on AMD GPUs through ROCm/HIP (validated on gfx90a and gfx1100, and on Windows gfx1151); see the `USE_HIP` build option below.
+
 ## Dependencies
 
 PopSift depends on:
@@ -45,6 +47,42 @@ Some build options are available:
 * `PopSift_BUILD_EXAMPLES` (default: `ON`) enable building the applications that showcase the use of the library.
 
 * `BUILD_SHARED_LIBS` (default: `ON`) controls the type of library to build (`ON` for shared libraries, `OFF` for static)
+
+* `USE_HIP` (default: `OFF`) builds for AMD GPUs through ROCm/HIP instead of CUDA (requires a ROCm installation); see "Building for AMD GPUs (ROCm/HIP)" below.
+
+### Building for AMD GPUs (ROCm/HIP)
+
+With a ROCm installation, configure with `-DUSE_HIP=ON` to build the GPU code through HIP instead of CUDA. The CUDA build path is unchanged when `USE_HIP=OFF` (the default).
+
+```shell
+cmake .. -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx90a \
+  -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
+  -DCMAKE_PREFIX_PATH=/opt/rocm
+make
+```
+
+Point `-DCMAKE_PREFIX_PATH` at the ROCm install prefix (`/opt/rocm` for a default install) so CMake can locate the `hip` and `rocThrust` packages when ROCm is not already on the search path.
+
+Set the target architecture with `-DCMAKE_HIP_ARCHITECTURES` (e.g. `gfx90a`, `gfx1100`); pass a semicolon-separated list such as `"gfx90a;gfx1100"` to emit a fat binary.
+
+#### Windows (gfx1151 / TheRock ROCm)
+
+Tested with the ROCm wheels from [TheRock](https://github.com/ROCm/TheRock) (see its README for installing the Windows wheels). The steps below assume `<rocm>` is that install prefix and that `clang` from it is on `PATH`:
+
+```shell
+cmake .. -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx1151 ^
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang -DCMAKE_HIP_COMPILER=clang ^
+  -DCMAKE_PREFIX_PATH=<rocm> -DPopSift_BUILD_EXAMPLES=OFF ^
+  -DCMAKE_LINKER_TYPE=LLDFIX ^
+  -DCMAKE_C_USING_LINKER_LLDFIX=-fuse-ld=lld ^
+  -DCMAKE_CXX_USING_LINKER_LLDFIX=-fuse-ld=lld ^
+  -DCMAKE_HIP_USING_LINKER_LLDFIX=-fuse-ld=lld
+cmake --build . --config Release
+```
+
+The `CMAKE_LINKER_TYPE=LLDFIX` block works around the `-fgpu-rdc` device link: CMake otherwise emits `-fuse-ld=lld-link`, which AMD clang rejects under `--hip-link`. At runtime, copy a matching `amdhip64` and `amd_comgr` from `<rocm>` next to the executable (a System32 Adrenalin-driver runtime can be device-library mismatched).
+
+On the gfx1151 APU, `maxTexture2DLayered` is smaller than on gfx90a, so the default upscale can overflow for large images; use native-resolution downsampling (`Config::setDownsampling(0)`) or cap the input size.
 
 ## Usage
 

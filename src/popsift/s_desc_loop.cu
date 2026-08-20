@@ -19,7 +19,7 @@ __device__ static inline
 void ext_desc_loop_sub( const float         ang,
                         const Extremum*     ext,
                         float* __restrict__ features,
-                        cudaTextureObject_t layer_tex,
+                        LayeredReadTex      layer_tex,
                         const int           width,
                         const int           height )
 {
@@ -124,13 +124,17 @@ void ext_desc_loop_sub( const float         ang,
     dpt[0] += dpt[8];
 
     /* reduction here */
+    // The block is (32,4,4) and each (y,z) pair reduces its own 32 threads. The
+    // shuffle width is that group width, not the hardware warp size: on a 64-lane
+    // wavefront two groups share a wavefront, and an unrestricted reduction and
+    // lane-0 broadcast would leak across the group boundary.
     for (int i = 0; i < 8; i++) {
-        dpt[i] += popsift::shuffle_down( dpt[i], 16 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 8 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 4 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 2 );
-        dpt[i] += popsift::shuffle_down( dpt[i], 1 );
-        dpt[i]  = popsift::shuffle     ( dpt[i], 0 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 16, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 8, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 4, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 2, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 1, 32 );
+        dpt[i]  = popsift::shuffle     ( dpt[i], 0, 32 );
     }
 
     if( threadIdx.x < 8 ) {
@@ -138,7 +142,7 @@ void ext_desc_loop_sub( const float         ang,
     }
 }
 
-__global__ void ext_desc_loop(int octave, cudaTextureObject_t layer_tex, int w, int h)
+__global__ void ext_desc_loop(int octave, LayeredReadTex layer_tex, int w, int h)
 {
     const int   o_offset =  dct.ori_ps[octave] + blockIdx.x;
     Descriptor* desc     = &dbuf.desc           [o_offset];

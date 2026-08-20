@@ -11,10 +11,11 @@
 
 #if ! POPSIFT_IS_DEFINED(POPSIFT_DISABLE_GRID_FILTER)
 
+#include "common/thrust_setup.h"
+
 #include <thrust/copy.h>
 #include <thrust/count.h>
 #include <thrust/device_vector.h>
-#include <thrust/execution_policy.h>
 #include <thrust/host_vector.h>
 #include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/discard_iterator.h>
@@ -24,7 +25,6 @@
 #include <thrust/transform.h>
 #include <thrust/transform_scan.h>
 #include <thrust/tuple.h>
-#include <thrust/version.h>
 
 namespace popsift
 {
@@ -131,12 +131,12 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
             cudaStream_t oct_str = _octaves[o].getStream();
 
             // fill a continuous device array with octave of all initial extrema
-            thrust::fill(     thrust::cuda::par.on(oct_str),
+            thrust::fill(     POPSIFT_THRUST_PAR.on(oct_str),
                               octave_index.begin() + sum,
                               octave_index.begin() + sum + ocount,
                               o );
             // fill a continuous device array with index within octave of all initial extrema
-            thrust::sequence( thrust::cuda::par.on(oct_str),
+            thrust::sequence( POPSIFT_THRUST_PAR.on(oct_str),
                               iext_index.begin() + sum,
                               iext_index.begin() + sum + ocount );
             sum += ocount;

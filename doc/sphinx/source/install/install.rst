@@ -33,6 +33,8 @@ Software
 
 The core library depends only on Cuda >= 7.0
 
+PopSift also builds for AMD GPUs through ROCm/HIP instead of CUDA, requiring ROCm 7.2 or newer; see the ``USE_HIP`` CMake option below.
+
 The library includes a few sample applications that show how to use the library.
 They require
 
@@ -172,6 +174,8 @@ CMake configuration can be controlled by changing the values of the following va
 * :code:`PopSift_BUILD_EXAMPLES:BOOL=ON` to enable/disable the building of applications
 
 * :code:`PopSift_BUILD_DOC:BOOL=OFF` to enable/disable building this documentation and the Doxygen one.
+
+* :code:`USE_HIP:BOOL=OFF` to build for AMD GPUs with ROCm/HIP instead of CUDA. Set the target GPU architecture with :code:`CMAKE_HIP_ARCHITECTURES` (for example :code:`gfx90a` for CDNA2 / MI200, or :code:`gfx1100` for RDNA3). Requires a ROCm installation (7.2 or newer) providing HIP.
 
 For example, if you do not want to build the applications, you have to pass :code:`-DPopSift_BUILD_EXAMPLES:BOOL=OFF` and so on.
 

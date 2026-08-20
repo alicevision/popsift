@@ -48,27 +48,39 @@ void NormalizeRootSift::normalize( const float* src_desc, float* dst_desc, bool 
 
     float sum = descr.x + descr.y + descr.z + descr.w;
 
-    sum += popsift::shuffle_down( sum, 16 );
-    sum += popsift::shuffle_down( sum,  8 );
-    sum += popsift::shuffle_down( sum,  4 );
-    sum += popsift::shuffle_down( sum,  2 );
-    sum += popsift::shuffle_down( sum,  1 );
+    // The normalize block is (32,32) and each threadIdx.y row holds one
+    // descriptor. The shuffle width is that row width, not the hardware warp
+    // size: on a 64-lane wavefront two rows share a wavefront, and an
+    // unrestricted reduction and lane-0 broadcast would mix the two descriptors.
+    sum += popsift::shuffle_down( sum, 16, 32 );
+    sum += popsift::shuffle_down( sum,  8, 32 );
+    sum += popsift::shuffle_down( sum,  4, 32 );
+    sum += popsift::shuffle_down( sum,  2, 32 );
+    sum += popsift::shuffle_down( sum,  1, 32 );
 
-    sum = popsift::shuffle( sum,  0 );
+    sum = popsift::shuffle( sum,  0, 32 );
 
-    float val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.x, sum ) ),
-                   d_consts.norm_multi );
-    descr.x = val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.y, sum ) ),
-                   d_consts.norm_multi );
-    descr.y = val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.z, sum ) ),
-                   d_consts.norm_multi );
-    descr.z = val;
-    val = scalbnf( __fsqrt_rn( __fdividef( descr.w, sum ) ),
-                   d_consts.norm_multi );
-    descr.w = val;
+    // RootSift takes sqrt(bin/sum). A descriptor bin cannot be negative, so a
+    // sum that is not clearly positive means a degenerate descriptor, which
+    // stays all-zero instead of dividing. The test is against a small threshold
+    // rather than against zero because a subnormal sum makes the reciprocal
+    // overflow to infinity, which would normalize a positive bin to infinity.
+    // The per-bin test below keeps a bin that came out slightly negative
+    // (round-to-nearest weight accumulation on platforms without the
+    // round-toward-+inf intrinsics) out of the square root.
+    const float inv = ( sum > 1e-20f ) ? __fdividef( 1.0f, sum ) : 0.0f;
+
+    if( inv <= 0.0f )
+    {
+        descr.x = descr.y = descr.z = descr.w = 0.0f;
+    }
+    else
+    {
+        descr.x = descr.x <= 0.0f ? 0.0f : scalbnf( __fsqrt_rn( descr.x * inv ), d_consts.norm_multi );
+        descr.y = descr.y <= 0.0f ? 0.0f : scalbnf( __fsqrt_rn( descr.y * inv ), d_consts.norm_multi );
+        descr.z = descr.z <= 0.0f ? 0.0f : scalbnf( __fsqrt_rn( descr.z * inv ), d_consts.norm_multi );
+        descr.w = descr.w <= 0.0f ? 0.0f : scalbnf( __fsqrt_rn( descr.w * inv ), d_consts.norm_multi );
+    }
 
     if( ! ignoreme ) {
         float4* out4 = (float4*)dst_desc;

@@ -58,19 +58,25 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
          + descr.y * descr.y
          + descr.z * descr.z
          + descr.w * descr.w;
-    norm += popsift::shuffle_down( norm, 16 );
-    norm += popsift::shuffle_down( norm,  8 );
-    norm += popsift::shuffle_down( norm,  4 );
-    norm += popsift::shuffle_down( norm,  2 );
-    norm += popsift::shuffle_down( norm,  1 );
+    // The normalize block is (32,32) and each threadIdx.y row holds one
+    // descriptor. The shuffle width is that row width, not the hardware warp
+    // size: on a 64-lane wavefront two rows share a wavefront, and an
+    // unrestricted reduction and lane-0 broadcast would mix the two descriptors.
+    norm += popsift::shuffle_down( norm, 16, 32 );
+    norm += popsift::shuffle_down( norm,  8, 32 );
+    norm += popsift::shuffle_down( norm,  4, 32 );
+    norm += popsift::shuffle_down( norm,  2, 32 );
+    norm += popsift::shuffle_down( norm,  1, 32 );
 
     if( threadIdx.x == 0 ) {
-        // compute 1 / sqrt(sum) in round-to-nearest even mode in thread 0
-        norm = __frsqrt_rn( norm );
+        // compute 1 / sqrt(sum) in round-to-nearest even mode in thread 0.
+        // A sum of squares cannot be negative, and it is only zero for an
+        // all-zero descriptor, which stays all-zero instead of scaling by inf.
+        norm = ( norm > 0.0f ) ? __frsqrt_rn( norm ) : 0.0f;
     }
 
     // spread the inverted norm from thread 0 to all threads in the warp
-    norm = popsift::shuffle( norm,  0 );
+    norm = popsift::shuffle( norm,  0, 32 );
 
     // quasi-normalize all 128 floats
     descr.x = min( descr.x*norm, 0.2f );
@@ -86,18 +92,18 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc, const bool 
          + descr.y * descr.y
          + descr.z * descr.z
          + descr.w * descr.w;
-    norm += popsift::shuffle_down( norm, 16 );
-    norm += popsift::shuffle_down( norm,  8 );
-    norm += popsift::shuffle_down( norm,  4 );
-    norm += popsift::shuffle_down( norm,  2 );
-    norm += popsift::shuffle_down( norm,  1 );
+    norm += popsift::shuffle_down( norm, 16, 32 );
+    norm += popsift::shuffle_down( norm,  8, 32 );
+    norm += popsift::shuffle_down( norm,  4, 32 );
+    norm += popsift::shuffle_down( norm,  2, 32 );
+    norm += popsift::shuffle_down( norm,  1, 32 );
 
     if( threadIdx.x == 0 ) {
-        norm = __frsqrt_rn( norm ); // inverse square root
+        norm = ( norm > 0.0f ) ? __frsqrt_rn( norm ) : 0.0f; // inverse square root
         norm = scalbnf( norm, d_consts.norm_multi );
     }
 
-    norm = popsift::shuffle( norm,  0 );
+    norm = popsift::shuffle( norm,  0, 32 );
 
     descr.x = descr.x * norm;
     descr.y = descr.y * norm;
