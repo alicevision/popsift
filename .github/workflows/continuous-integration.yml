@@ -36,7 +36,7 @@ jobs:
       CTEST_OUTPUT_ON_FAILURE: 1
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
 
       - name: Make scripts executable
         run: chmod +x ./.github/scripts/*.sh
@@ -61,19 +61,19 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        cuda_version: ["12.5.1", "12.9.0"]
+        cuda_version: ["12.5.1", "13.2.0"]
 
     env:
       VCPKG_SRC_DIR: ${{ github.workspace }}\vcpkg
       VCPKG_INSTALLED_DIR: ${{ github.workspace }}\vcpkg\vcpkg_installed
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Cache CUDA installation
       - name: Cache CUDA installation
         id: cache-cuda
-        uses: actions/cache@v3
+        uses: actions/cache@v6
         with:
           path: |
             C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA
@@ -84,7 +84,7 @@ jobs:
 
       - name: Install CUDA
         if: steps.cache-cuda.outputs.cache-hit != 'true'
-        uses: Jimver/cuda-toolkit@v0.2.24
+        uses: Jimver/cuda-toolkit@v0.2.36
         with:
           cuda: ${{ matrix.cuda_version }}
           method: 'network'
