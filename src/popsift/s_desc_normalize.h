@@ -7,9 +7,9 @@
  */
 #pragma once
 
-#include "sift_extremum.h"
 #include "s_desc_norm_l2.h"
 #include "s_desc_norm_rs.h"
+#include "sift_extremum.h"
 
 template<class T>
 __global__

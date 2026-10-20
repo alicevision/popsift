@@ -1,0 +1,45 @@
+#!/bin/bash
+
+cd @CMAKE_CURRENT_SOURCE_DIR@
+if [ ! -f reference.tgz ]
+then
+  echo -n "Fetching reference values. "
+  wget http://heim.ifi.uio.no/griff/LADIO/files/reference.tgz
+  echo "Done."
+fi
+
+echo "Making directory @CMAKE_SOURCE_DIR@/oxford"
+mkdir -p @CMAKE_SOURCE_DIR@/oxford
+echo "Changing to directory @CMAKE_SOURCE_DIR@/oxford"
+cd @CMAKE_SOURCE_DIR@/oxford
+
+for dataset in boat bikes trees graf wall bark leuven ubc
+do
+  if [ ! -d $dataset ]
+  then
+    echo "Directory $dataset does not exist - creating"
+    mkdir $dataset
+  else
+    echo -n "Directory $dataset exists. "
+  fi
+  cd $dataset
+  if [ ! -f img1.pgm ] &&  [ ! -f img1.ppm ]
+  then
+    echo "Image img1 in $dataset does not exist"
+    if [ ! -r $dataset.tar.gz ]
+    then
+      echo "tarfile does not exist, downloading"
+      wget http://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/$dataset.tar.gz
+    else
+      echo -n "Tarfile exists. "
+    fi
+    echo "Unpacking tarfile."
+    tar zxf $dataset.tar.gz
+    rm -f $dataset.tar.gz
+  else
+    echo "File img1.pgm exists."
+    rm -f $dataset.tar.gz
+  fi
+  cd ..
+done
+

@@ -6,15 +6,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #pragma once
-#include "sift_pyramid.h"
-#include "sift_octave.h"
-#include "sift_extremum.h"
 #include "common/debug_macros.h"
-
+#include "sift_extremum.h"
+#include "sift_octave.h"
+#include "sift_pyramid.h"
 
 namespace popsift
 {
 
-bool start_ext_desc_notile( const int octave, Octave& oct_obj );
+bool start_ext_desc_notile( int octave, Octave& oct_obj );
 
 }; // namespace popsift

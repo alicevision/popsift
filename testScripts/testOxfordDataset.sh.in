@@ -1,0 +1,159 @@
+#!/bin/bash
+
+cd @CMAKE_BINARY_DIR@
+
+if [ ! -d reference ]
+then
+  echo "Extracting reference images."
+  tar zxf @CMAKE_CURRENT_SOURCE_DIR@/reference.tgz
+  echo "Done."
+fi
+
+echo "Making directory @CMAKE_BINARY_DIR@/oxford"
+mkdir -p @CMAKE_BINARY_DIR@/oxford
+echo "Changing to directory @CMAKE_BINARY_DIR@/oxford"
+cd @CMAKE_BINARY_DIR@/oxford
+
+echo "The command line is $*"
+
+if [ $# -gt 0 ]
+then
+  dataset_list=$*
+else
+  dataset_list="boat bikes trees graf wall bark leuven ubc"
+fi
+
+for dataset in $dataset_list
+do
+  echo "Looking for dataset $dataset"
+  mkdir -p $dataset
+  cd $dataset
+  for img in img1 img2 img3 img4 img5 img6
+  do
+    if [ -f @PopSift_TESTFILE_PATH@/$dataset/$img.pgm ]
+    then
+      imgfile=@PopSift_TESTFILE_PATH@/$dataset/$img.pgm
+    elif [ -f @PopSift_TESTFILE_PATH@/$dataset/$img.ppm ]
+    then
+      imgfile=@PopSift_TESTFILE_PATH@/$dataset/$img.ppm
+    else
+      continue
+    fi
+    echo "Looking for image file $imgfile"
+    if [ -d output-$img ]
+    then
+      echo "Directory output-$img exists. Skipping."
+      continue
+    fi
+    @CMAKE_RUNTIME_OUTPUT_DIRECTORY@/popsift-demo --log --gauss-mode vlfeat --desc-mode loop --popsift-mode --root-sift --downsampling -1 -i $imgfile
+    if [ $? != 0 ]
+    then
+      echo "Running popsift on $imgfile failed."
+      echo "Stopping."
+      exit
+    fi
+    rm -rf output-$img
+    mkdir -p output-$img/dir-octave
+    mkdir -p output-$img/dir-dog
+
+    echo -n "Moving ... "
+    echo -n "Image pyramid. "
+    mv dir-octave/* output-$img/dir-octave/
+    echo    "DoG pyramid. "
+    mv dir-dog/* output-$img/dir-dog/
+
+    echo -n "Sorting ... "
+    echo -n "Keypoints with descriptors. "
+    sort -n output-features.txt > output-$img/features.txt
+    echo -n "Keypoints. "
+    sort -n dir-fpt/desc-pyramid.txt > output-$img/keypoints.txt
+    echo    "Descriptors. "
+    sort -n dir-desc/desc-pyramid.txt > output-$img/descriptors.txt
+    rm -rf dir-desc dir-dog dir-dog-dump dir-dog-txt dir-fpt dir-octave dir-octave-dump output-features.txt
+  done
+  cd ..
+done
+
+for dataset in $dataset_list
+do
+  for img in img1 img2 img3 img4 img5 img6
+  do
+    if [ -d $dataset/output-$img ]
+    then
+      echo -n "Compare $dataset $img with reference. "
+
+      echo -n "Image pyramid "
+      cd @CMAKE_BINARY_DIR@/oxford/$dataset/output-$img/dir-octave
+      bad_image_matches=0
+      for i in *
+      do
+      	cmp @CMAKE_BINARY_DIR@/reference/$dataset/output-$img/dir-octave/$i $i
+	if [ $? != 0 ]
+	then
+          if [ $bad_image_matches == 0 ]
+          then
+	    echo ""
+	  fi
+	  echo "pyramid compare: @CMAKE_BINARY_DIR@/reference/$dataset/output-$img/dir-octave/$i and $i differ"
+	  bad_image_matches=1
+	fi
+      done
+      if [ $bad_image_matches == 0 ] ; then echo -n "OK. "; fi
+      cd @CMAKE_BINARY_DIR@/oxford
+
+      echo -n "DoG pyramid "
+      cd @CMAKE_BINARY_DIR@/oxford/$dataset/output-$img/dir-dog
+      bad_image_matches=0
+      for i in *
+      do
+      	cmp @CMAKE_BINARY_DIR@/reference/$dataset/output-$img/dir-dog/$i $i
+	if [ $? != 0 ]
+	then
+          if [ $bad_image_matches == 0 ]
+          then
+	    echo ""
+	  fi
+	  echo "DoG compare: @CMAKE_BINARY_DIR@/reference/$dataset/output-$img/dir-dog/$i and $i differ"
+	  bad_image_matches=1
+	fi
+      done
+      if [ $bad_image_matches == 0 ] ; then echo -n "OK. "; fi
+      cd @CMAKE_BINARY_DIR@/oxford
+
+      echo ""
+    fi
+  done
+done
+
+for dataset in $dataset_list
+do
+  # cd @CMAKE_BINARY_DIR@/oxford
+  for img in img1 img2 img3 img4 img5 img6
+  do
+    dir_prefix=@CMAKE_BINARY_DIR@/oxford/$dataset/output-$img
+    if [ -d $dataset/output-$img ]
+    then
+
+      echo -n "Compare $dataset $img with reference. "
+
+      echo -n "Features "
+      cmp -s @CMAKE_BINARY_DIR@/reference/$dataset/output-$img/features.txt $dir_prefix/features.txt
+      if [ $? == 1 ]
+      then
+        echo "BAD. "
+	echo cmp "@CMAKE_BINARY_DIR@/reference/$dataset/output-$img/features.txt $dir_prefix/features.txt"
+	diff @CMAKE_BINARY_DIR@/reference/$dataset/output-$img/features.txt $dir_prefix/features.txt | wc -l
+      else echo -n "OK. " ; fi
+
+      echo -n "Keypoints "
+      cmp -s @CMAKE_BINARY_DIR@/reference/$dataset/output-$img/keypoints.txt $dir_prefix/keypoints.txt
+      if [ $? == 1 ] ; then echo -n "BAD. " ; else echo -n "OK. " ; fi
+
+      echo -n "Descriptors "
+      cmp -s @CMAKE_BINARY_DIR@/reference/$dataset/output-$img/descriptors.txt $dir_prefix/descriptors.txt
+      if [ $? == 1 ] ; then echo -n "BAD. " ; else echo -n "OK. " ; fi
+
+      echo ""
+    fi
+  done
+done

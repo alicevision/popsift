@@ -36,8 +36,11 @@
 #
 ################################################################################
 
-
 @PACKAGE_INIT@
 
-include("${CMAKE_CURRENT_LIST_DIR}/@targets_export_name@.cmake")
+include(CMakeFindDependencyMacro)
+find_dependency(Threads REQUIRED)
+find_dependency(CUDAToolkit REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/@popsift_targets_export_name@.cmake")
 check_required_components("@PROJECT_NAME@")
