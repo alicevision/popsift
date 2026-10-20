@@ -39,7 +39,7 @@ using namespace std;
  *       This implies that a keypoint that has changed octave
  *       in subpixelic refinement is going to be sampled from
  *       the wrong level of the octave.
- *       Unfortunately, we cannot implement getDataTexPoint()
+ *       Unfortunately, we cannot implement getDataReadTexPoint()
  *       as a layered 2D texture to fix this issue, because that
  *       would require to store blur levels in cudaArrays, which
  *       are hard to write. Alternatively, we could keep a

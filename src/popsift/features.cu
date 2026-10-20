@@ -175,11 +175,14 @@ l2_in_t0( const float4* lptr, const float4* rptr )
 	        + mval.y * mval.y
 	        + mval.z * mval.z
 	        + mval.w * mval.w;
-    res += shuffle_down( res, 16 );
-    res += shuffle_down( res,  8 );
-    res += shuffle_down( res,  4 );
-    res += shuffle_down( res,  2 );
-    res += shuffle_down( res,  1 );
+    // Reduction over the 32 threads of compute_distance's block. The shuffle
+    // width is that block width, not the hardware warp size, so a 64-lane
+    // wavefront does not sample its inactive upper half.
+    res += shuffle_down( res, 16, 32 );
+    res += shuffle_down( res,  8, 32 );
+    res += shuffle_down( res,  4, 32 );
+    res += shuffle_down( res,  2, 32 );
+    res += shuffle_down( res,  1, 32 );
     return res;
 }
 

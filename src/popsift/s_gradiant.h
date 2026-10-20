@@ -57,7 +57,7 @@ void get_gradiant( float&              grad,
                    float&              theta,
                    const int           x,
                    const int           y,
-                   cudaTextureObject_t layer,
+                   LayeredReadTex      layer,
                    const int           level )
 {
     float dx = readTex( layer, x+1.0f, y, level )
@@ -77,7 +77,7 @@ void get_gradiant32( float&              grad,
                      float&              theta,
                      const int           x,
                      const int           y,
-                     cudaTextureObject_t layer,
+                     LayeredReadTex      layer,
                      const int           level )
 {
     const int idx = threadIdx.x;
@@ -106,7 +106,7 @@ void get_gradiant( float&              grad,
                    float               y,
                    float               cos_t,
                    float               sin_t,
-                   cudaTextureObject_t texLinear,
+                   LayeredReadTex      texLinear,
                    int                 level )
 {
     float dx = readTex( texLinear, x+cos_t, y+sin_t, level )

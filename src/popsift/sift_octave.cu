@@ -221,10 +221,22 @@ void Octave::alloc_data_planes()
     _data_ext.height = _h;
     _data_ext.depth  = _levels;
 
+    // Observed on gfx90a and on gfx1100 (ROCm 7.2.1): a layered array written
+    // layer by layer through surf2DLayeredwrite reads back as a single layer for
+    // every layer index, because the write passed the layer index in the mipmap
+    // level slot. Filed as ROCm/clr#275; ROCm/rocm-systems#6683 corrects it, but
+    // that is not in ROCm 7.2.x. A non-layered 3D array with surf3D/tex3D access
+    // is coherent, so drop cudaArrayLayered on HIP. The blur levels are addressed
+    // by the z coordinate instead of the layer index. See cuda_to_hip.h,
+    // sift_textures.h and common/assist.h. CUDA keeps a real layered array.
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    err = cudaMalloc3DArray( &_data, &_data_desc, _data_ext, cudaArraySurfaceLoadStore );
+#else
     err = cudaMalloc3DArray( &_data,
                              &_data_desc,
                              _data_ext,
                              cudaArrayLayered | cudaArraySurfaceLoadStore);
+#endif
     POP_CUDA_FATAL_TEST(err, "Could not allocate Blur level array: ");
 }
 
@@ -266,10 +278,18 @@ void Octave::alloc_data_tex()
     tex_desc.addressMode[1]   = cudaAddressModeClamp;
     tex_desc.addressMode[2]   = cudaAddressModeClamp;
     tex_desc.readMode         = cudaReadModeElementType; // read as float
-    tex_desc.filterMode       = cudaFilterModeLinear; // no interpolation
+    tex_desc.filterMode       = cudaFilterModeLinear; // hardware bilinear (CUDA)
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    // Observed on gfx90a (ROCm 7.2.1): creating a texture with hardware linear
+    // filtering over an element-read float array fails with "operation not
+    // supported"; gfx1100 accepts it, so this is per device. Create the texture
+    // with point filtering and interpolate in software in readTex(), which keeps
+    // one build correct on either device.
+    tex_desc.filterMode       = cudaFilterModePoint;
+#endif
 
     err = cudaCreateTextureObject( &_data_tex_linear.tex, &res_desc, &tex_desc, nullptr );
-    POP_CUDA_FATAL_TEST(err, "Could not create Blur data point texture: ");
+    POP_CUDA_FATAL_TEST(err, "Could not create Blur data linear texture: ");
 }
 
 void Octave::free_data_tex()
@@ -300,10 +320,15 @@ void Octave::alloc_interm_array()
     _intm_ext.height = _h;
     _intm_ext.depth  = _levels;
 
+    // Non-layered 3D array on HIP (see alloc_data_planes()).
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    err = cudaMalloc3DArray( &_intm, &_intm_desc, _intm_ext, cudaArraySurfaceLoadStore );
+#else
     err = cudaMalloc3DArray( &_intm,
                              &_intm_desc,
                              _intm_ext,
                              cudaArrayLayered | cudaArraySurfaceLoadStore);
+#endif
     POP_CUDA_FATAL_TEST(err, "Could not allocate Intermediate layered array: ");
 }
 
@@ -339,10 +364,15 @@ void Octave::alloc_interm_tex()
     err = cudaCreateTextureObject( &_intm_tex_point, &res_desc, &tex_desc, nullptr );
     POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate point texture: ");
 
-    tex_desc.filterMode       = cudaFilterModeLinear; // no interpolation
+    tex_desc.filterMode       = cudaFilterModeLinear; // hardware bilinear (CUDA)
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    // See alloc_data_tex(): HIP rejects linear filtering on element-read float
+    // arrays, so use point filtering here and interpolate in software in readTex().
+    tex_desc.filterMode       = cudaFilterModePoint;
+#endif
 
     err = cudaCreateTextureObject( &_intm_tex_linear.tex, &res_desc, &tex_desc, nullptr );
-    POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate point texture: ");
+    POP_CUDA_FATAL_TEST(err, "Could not create Blur intermediate linear texture: ");
 }
 
 void Octave::free_interm_tex()
@@ -373,10 +403,15 @@ void Octave::alloc_dog_array()
         _dog_3d_ext.height = _h;
         _dog_3d_ext.depth = _levels - 1;
 
+        // Non-layered 3D array on HIP (see alloc_data_planes()).
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+        err = cudaMalloc3DArray(&_dog_3d, &_dog_3d_desc, _dog_3d_ext, cudaArraySurfaceLoadStore);
+#else
         err = cudaMalloc3DArray(&_dog_3d,
             &_dog_3d_desc,
             _dog_3d_ext,
             cudaArrayLayered | cudaArraySurfaceLoadStore);
+#endif
         POP_CUDA_FATAL_TEST(err, "Could not allocate 3D DoG array: ");
 }
 

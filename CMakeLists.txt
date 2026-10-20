@@ -1,26 +1,38 @@
 # First-order language CUDA requires at least CMake 3.18
 cmake_minimum_required(VERSION 3.24)
 
-# Default seletion of CUDA Compute Capabilities.
-# This must be called before project() or cmake sets it to the oldest non-deprecated CC
-# "all" and "all-major" work for Intel and perhaps for ARM with discrete GPUs, but not Tegra and Jetson.
-if(EXISTS "/etc/nv_tegra_release")
-  # The CC list for Tegras and Jetson will require manual updates
-  set(CMAKE_CUDA_ARCHITECTURES "53;62;72;87"
-      CACHE
-      STRING "Which CUDA CCs to support: native, all, all-major or an explicit list delimited by semicolons")
-else()
-  # The CC list for discrete GPUs will require CMake updates
-  set(CMAKE_CUDA_ARCHITECTURES "all-major"
-      CACHE
-      STRING "Which CUDA CCs to support: native, all, all-major or an explicit list delimited by semicolons")
+# USE_HIP routes the .cu translation units through the HIP toolchain for AMD
+# GPUs. Everything else keeps its plain
+# CUDA spelling; cuda_to_hip.h (force-included for HIP in src/CMakeLists.txt)
+# does the symbol translation. The NVIDIA path (USE_HIP=OFF) is unchanged.
+option(USE_HIP "Build with HIP for AMD GPUs instead of CUDA" OFF)
+
+if(NOT USE_HIP)
+  # Default seletion of CUDA Compute Capabilities.
+  # This must be called before project() or cmake sets it to the oldest non-deprecated CC
+  # "all" and "all-major" work for Intel and perhaps for ARM with discrete GPUs, but not Tegra and Jetson.
+  if(EXISTS "/etc/nv_tegra_release")
+    # The CC list for Tegras and Jetson will require manual updates
+    set(CMAKE_CUDA_ARCHITECTURES "53;62;72;87"
+        CACHE
+        STRING "Which CUDA CCs to support: native, all, all-major or an explicit list delimited by semicolons")
+  else()
+    # The CC list for discrete GPUs will require CMake updates
+    set(CMAKE_CUDA_ARCHITECTURES "all-major"
+        CACHE
+        STRING "Which CUDA CCs to support: native, all, all-major or an explicit list delimited by semicolons")
+  endif()
 endif()
 
-project(PopSift VERSION 0.10.1 LANGUAGES CXX CUDA)
+if(USE_HIP)
+  project(PopSift VERSION 0.10.1 LANGUAGES CXX HIP)
+else()
+  project(PopSift VERSION 0.10.1 LANGUAGES CXX CUDA)
 
-# Policy to support CUDA as a first-order language for CMake.
-# Since CMake 3.18. See https://cmake.org/cmake/help/latest/policy/CMP0104.html
-cmake_policy(SET CMP0104 NEW)
+  # Policy to support CUDA as a first-order language for CMake.
+  # Since CMake 3.18. See https://cmake.org/cmake/help/latest/policy/CMP0104.html
+  cmake_policy(SET CMP0104 NEW)
+endif()
 
 # Set build path as a folder named as the platform (linux, windows, darwin...) plus the processor type
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
@@ -75,70 +87,95 @@ if(BUILD_SHARED_LIBS)
   # Auto-build dll exports on Windows
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-  set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
+  if(NOT USE_HIP)
+    set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
+  endif()
 else()
   message(STATUS "BUILD_SHARED_LIBS OFF")
 
-  set(CMAKE_CUDA_RUNTIME_LIBRARY Static)
+  if(NOT USE_HIP)
+    set(CMAKE_CUDA_RUNTIME_LIBRARY Static)
+  endif()
 endif()
 
 # Require threads because of std::thread.
 find_package(Threads REQUIRED)
 
-###################
-#  CUDA
-###################
-include(CheckLanguage)
-check_language(CUDA)
+if(USE_HIP)
+  ###################
+  #  HIP (AMD)
+  ###################
+  # rocThrust is the AMD build of Thrust. Its stream-bound execution policy is
+  # in a different namespace than the NVIDIA one, which is what
+  # src/popsift/common/thrust_setup.h hides from the Thrust callers.
+  find_package(rocthrust REQUIRED CONFIG)
 
-# Use this if necessary: "cmake -DCUDAToolkit_ROOT=/some/path"
-# target_link_libraries(binary_linking_to_cudart PRIVATE CUDA::cudart)
-find_package(CUDAToolkit)
+  set(PopSift_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD ${PopSift_CXX_STANDARD})
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_HIP_STANDARD ${PopSift_CXX_STANDARD})
+  set(CMAKE_HIP_STANDARD_REQUIRED ON)
+  set(CMAKE_HIP_SEPARABLE_COMPILATION ON)
 
-message(STATUS "CUDA Version is ${CUDAToolkit_VERSION}")
-set(CUDA_VERSION ${CUDAToolkit_VERSION})
-
-if(PopSift_ERRCHK_AFTER_KERNEL)
-  message(STATUS "Synchronizing and checking errors after every kernel call")
-  list(APPEND CUDA_NVCC_FLAGS "-DERRCHK_AFTER_KERNEL")
-endif()
-
-# This may not be required any more.
-set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
-
-# default stream per-thread implies that each host thread has one non-synchronizing 0-stream
-# currently, the code requires legacy mode
-list(APPEND CUDA_NVCC_FLAGS "--default-stream;legacy")
-# set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;per-thread")
-
-if(CUDA_VERSION VERSION_GREATER_EQUAL "7.5")
-  if(PopSift_NVCC_WARNINGS)
-    list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;-warn-lmem-usage")
-    list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;-warn-spills")
-    list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;--warn-on-local-memory-usage")
-    list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;--warn-on-spills")
-  endif()
-endif()
-
-set(PopSift_CXX_STANDARD 17) # Thrust/CUB requires C++14 starting with CUDA SDK 11
-if(CUDA_VERSION_MAJOR LESS_EQUAL 8)
-  set(PopSift_CXX_STANDARD 11)
-endif()
-
-if(NOT MSVC)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++${PopSift_CXX_STANDARD}")
-      list(APPEND CUDA_NVCC_FLAGS "-std=c++${PopSift_CXX_STANDARD}")
-endif()
-set(CMAKE_CXX_STANDARD ${PopSift_CXX_STANDARD})
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_STANDARD ${PopSift_CXX_STANDARD})
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-
-
-if(CUDA_VERSION VERSION_GREATER_EQUAL "9.0")
-  set(PopSift_HAVE_SHFL_DOWN_SYNC   1)
-else()
+  # HIP provides the mask-free __shfl_down etc., i.e. the spelling assist.h
+  # selects when this flag is off.
   set(PopSift_HAVE_SHFL_DOWN_SYNC   0)
+else()
+  ###################
+  #  CUDA
+  ###################
+  include(CheckLanguage)
+  check_language(CUDA)
+
+  # Use this if necessary: "cmake -DCUDAToolkit_ROOT=/some/path"
+  # target_link_libraries(binary_linking_to_cudart PRIVATE CUDA::cudart)
+  find_package(CUDAToolkit)
+
+  message(STATUS "CUDA Version is ${CUDAToolkit_VERSION}")
+  set(CUDA_VERSION ${CUDAToolkit_VERSION})
+
+  if(PopSift_ERRCHK_AFTER_KERNEL)
+    message(STATUS "Synchronizing and checking errors after every kernel call")
+    list(APPEND CUDA_NVCC_FLAGS "-DERRCHK_AFTER_KERNEL")
+  endif()
+
+  # This may not be required any more.
+  set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+
+  # default stream per-thread implies that each host thread has one non-synchronizing 0-stream
+  # currently, the code requires legacy mode
+  list(APPEND CUDA_NVCC_FLAGS "--default-stream;legacy")
+  # set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS};--default-stream;per-thread")
+
+  if(CUDA_VERSION VERSION_GREATER_EQUAL "7.5")
+    if(PopSift_NVCC_WARNINGS)
+      list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;-warn-lmem-usage")
+      list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;-warn-spills")
+      list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;--warn-on-local-memory-usage")
+      list(APPEND CUDA_NVCC_FLAGS_RELEASE "-Xptxas;--warn-on-spills")
+    endif()
+  endif()
+
+  set(PopSift_CXX_STANDARD 17) # Thrust/CUB requires C++14 starting with CUDA SDK 11
+  if(CUDA_VERSION_MAJOR LESS_EQUAL 8)
+    set(PopSift_CXX_STANDARD 11)
+  endif()
+
+  if(NOT MSVC)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++${PopSift_CXX_STANDARD}")
+        list(APPEND CUDA_NVCC_FLAGS "-std=c++${PopSift_CXX_STANDARD}")
+  endif()
+  set(CMAKE_CXX_STANDARD ${PopSift_CXX_STANDARD})
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CUDA_STANDARD ${PopSift_CXX_STANDARD})
+  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
+
+  if(CUDA_VERSION VERSION_GREATER_EQUAL "9.0")
+    set(PopSift_HAVE_SHFL_DOWN_SYNC   1)
+  else()
+    set(PopSift_HAVE_SHFL_DOWN_SYNC   0)
+  endif()
 endif()
 
 if(NOT PopSift_USE_GRID_FILTER)

@@ -30,14 +30,18 @@ inline float octave_fixed_horiz( float fval, const float* filter )
      * input  fval of thread N is extracted from image index N-4
      * output fval of thread N should be filtered sum from N-4 to N+4
      */
+    // Horizontal fixed-span Gauss via warp shuffles. block.x is 32 and the block
+    // packs several rows in threadIdx.y/z. The shuffle width is that row width,
+    // not the hardware warp size: on a 64-lane wavefront two rows share a
+    // wavefront and a lane would otherwise pull a neighbour from another row.
     float out = fval * filter[0];
     #pragma unroll
     for( int i=1; i<=SHIFT; i++ ) {
-        float val  = popsift::shuffle_up( fval, i ) + popsift::shuffle_down( fval, i );
+        float val  = popsift::shuffle_up( fval, i, 32 ) + popsift::shuffle_down( fval, i, 32 );
         out += val * filter[i];
     }
 
-    fval = popsift::shuffle_down( out, SHIFT );
+    fval = popsift::shuffle_down( out, SHIFT, 32 );
 
     return fval;
 }
@@ -47,7 +51,7 @@ namespace absoluteTexAddress {
 
 template<int SHIFT>
 __device__
-inline float octave_fixed_vert( cudaTextureObject_t src_data, int idx, int idy, int level, const float* filter )
+inline float octave_fixed_vert( LayeredReadTex src_data, int idx, int idy, int level, const float* filter )
 {
     /* Input thread N takes as input the (idx,idy) position of the pixel that it
      * will eventually write (The 2*SHIFT rightmost threads will not write anything).
@@ -68,7 +72,7 @@ inline float octave_fixed_vert( cudaTextureObject_t src_data, int idx, int idy, 
 
 template<int SHIFT, int WIDTH, int HEIGHT, int LEVELS>
 __global__
-void octave_fixed( cudaTextureObject_t src_data,
+void octave_fixed( LayeredReadTex      src_data,
                    cudaSurfaceObject_t dst_data,
                    const int           w,
                    const int           h,
@@ -258,7 +262,7 @@ inline void make_octave_sub( const Config& conf, ImageBase* base, Octave& oct_ob
         gauss::fixedSpan::absoluteTexAddress::octave_fixed
             <SHIFT,w_conf,h_conf,l_conf>
             <<<grid,block,0,stream>>>
-            ( oct_obj.getDataTexPoint( ),
+            ( oct_obj.getDataReadTexPoint( ),
               oct_obj.getDataSurface( ),
               oct_obj.getWidth(),
               oct_obj.getHeight(),

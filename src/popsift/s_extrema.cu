@@ -22,24 +22,45 @@ template<int HEIGHT>
 __device__ static inline
 uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
 {
-    uint32_t mask = popsift::ballot( indicator ); // bitfield of warps with results
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    // warpSize-generic (wave32 and wave64): one ballot per wavefront, the leader
+    // (lane 0) does a single atomicAdd of the set-bit count, and each thread's write
+    // slot is that base plus an exclusive prefix of the set bits below its lane. The
+    // lane is the block's linear thread index modulo warpSize, so on wave64 two
+    // blockDim=(32,HEIGHT) rows share a 64-lane wavefront and on wave32 each row is
+    // its own 32-lane wavefront; either way every row feeds the same octave counter.
+    // __ballot is 64-bit (unsigned long long); on wave32 the upper 32 bits are 0.
+    const int lane = ( threadIdx.y * blockDim.x + threadIdx.x ) % warpSize;
+    const unsigned long long ballot = __ballot( indicator );
+    // lane is in [0, warpSize-1] (<= 63), so 1ull<<lane is always in range.
+    const unsigned long long lane_mask = ( 1ull << lane ) - 1ull;
 
-    int ct = __popc( mask );          // horizontal reduce
-
-    int write_index;
-    if( threadIdx.x == 0 ) {
-        // atomicAdd returns the old value, we consider this the based
-        // index for this thread's write operation
-        write_index = atomicAdd( extrema_counter, ct );
+    int write_index = 0;
+    if( lane == 0 ) {
+        write_index = atomicAdd( extrema_counter, __popcll( ballot ) );
     }
-    // broadcast from thread 0 to all threads in warp
-    write_index = popsift::shuffle( write_index, 0 );
-
-    // this thread's offset: count only bits below the bit of the own
-    // thread index; this provides the 0 result and every result up to ct
-    write_index += __popc( mask & ((1 << threadIdx.x) - 1) );
+    // broadcast the base from the wavefront leader (lane 0) over the real wavefront
+    write_index = __shfl( write_index, 0, warpSize );
+    // exclusive prefix: count set bits strictly below this lane in the wavefront
+    write_index += __popcll( ballot & lane_mask );
 
     return write_index;
+#else
+    // CUDA: a warp is 32 lanes; threadIdx.y selects the (independent) warp.
+    const int      lane = threadIdx.x;
+    const uint32_t mask = popsift::ballot( indicator );
+
+    int ct = __popc( mask );
+
+    int write_index;
+    if( lane == 0 ) {
+        write_index = atomicAdd( extrema_counter, ct );
+    }
+    write_index = popsift::shuffle( write_index, 0 );
+    write_index += __popc( mask & ((1u << lane) - 1) );
+
+    return write_index;
+#endif
 }
 
 __device__
@@ -54,7 +75,7 @@ inline void extremum_cmp( float val, float f, uint32_t& gt, uint32_t& lt, uint32
 
 __device__
 static
-inline bool is_extremum( cudaTextureObject_t obj,
+inline bool is_extremum( LayeredReadTex obj,
                          int x, int y, int z )
 {
     uint32_t gt = 0;
@@ -297,7 +318,7 @@ public:
 };
 
 template<int sift_mode>
-__device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
+__device__ inline bool find_extrema_in_dog_sub(LayeredReadTex dog,
                                                int debug_octave,
                                                int width,
                                                int height,
@@ -504,7 +525,7 @@ __device__ inline bool find_extrema_in_dog_sub(cudaTextureObject_t dog,
 
 template<int HEIGHT, int sift_mode>
 __global__
-void find_extrema_in_dog( cudaTextureObject_t dog,
+void find_extrema_in_dog( LayeredReadTex      dog,
                           int                 octave,
                           int                 width,
                           int                 height,
@@ -584,7 +605,7 @@ void Pyramid::find_extrema( const Config& conf )
         case Config::VLFeat :
                 find_extrema_in_dog<HEIGHT,Config::VLFeat>
                     <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexturePoint( ),
+                    ( oct_obj.getDogReadTexPoint( ),
                       octave,
                       cols,
                       rows,
@@ -599,7 +620,7 @@ void Pyramid::find_extrema( const Config& conf )
         case Config::OpenCV :
                 find_extrema_in_dog<HEIGHT,Config::OpenCV>
                     <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexturePoint( ),
+                    ( oct_obj.getDogReadTexPoint( ),
                       octave,
                       cols,
                       rows,
@@ -614,7 +635,7 @@ void Pyramid::find_extrema( const Config& conf )
         default :
                 find_extrema_in_dog<HEIGHT,Config::PopSift>
                     <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexturePoint( ),
+                    ( oct_obj.getDogReadTexPoint( ),
                       octave,
                       cols,
                       rows,

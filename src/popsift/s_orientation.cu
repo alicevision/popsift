@@ -68,7 +68,7 @@ inline static float smoothe( const float* const src, const int bin )
 __global__
 void ori_par( const int           octave,
               const int           ext_ct_prefix_sum,
-              cudaTextureObject_t layer,
+              LayeredReadTex      layer,
               const int           w,
               const int           h )
 {
@@ -114,7 +114,11 @@ void ori_par( const int           octave,
     int loops = wx * hy;
 
     __syncthreads();
-    for( int i = threadIdx.x; popsift::any(i < loops); i += blockDim.x )
+    // ori_par runs as a 32-thread block (one logical warp); restrict the loop
+    // guard to this thread's own 32-lane group so a 64-lane wavefront does not
+    // poll a second, unrelated row. Group 0 == the only row here; on CUDA this
+    // is the plain whole-warp any().
+    for( int i = threadIdx.x; popsift::any_group(i < loops, 0); i += blockDim.x )
     {
         if( i < loops ) {
             int yy = i / wx + ymin;
@@ -189,7 +193,7 @@ void ori_par( const int           octave,
     // sub-cell refinement of the histogram cell index, yielding the angle
     // not necessary to initialize, every cell is computed
 
-    for( int bin = threadIdx.x; popsift::any( bin < ORI_NBINS ); bin += blockDim.x ) {
+    for( int bin = threadIdx.x; popsift::any_group( bin < ORI_NBINS, 0 ); bin += blockDim.x ) {
         const int prev = bin == 0 ? ORI_NBINS-1 : bin-1;
         const int next = bin == ORI_NBINS-1 ? 0 : bin+1;
 
@@ -223,7 +227,7 @@ void ori_par( const int           octave,
     // All threads retrieve the yval of thread 0, the largest
     // of all yvals.
     const float best_val = yval[best_index.x];
-    const float yval_ref = 0.8f * popsift::shuffle( best_val, 0 );
+    const float yval_ref = 0.8f * popsift::shuffle( best_val, 0, 32 );
     const bool  valid    = ( best_val >= yval_ref );
     bool        written  = false;
 
@@ -240,7 +244,7 @@ void ori_par( const int           octave,
         }
     }
 
-    int angles = __popc( popsift::ballot( written ) );
+    int angles = __popc( popsift::ballot_group( written, 0 ) );
     if( threadIdx.x == 0 ) {
         ext->xpos    = iext->xpos;
         ext->ypos    = iext->ypos;
@@ -407,7 +411,7 @@ void Pyramid::orientation( const Config& conf )
                 <<<grid,block,4*64*sizeof(float),oct_str>>>
                 ( octave,
                   hct.ext_ps[octave],
-                  oct_obj.getDataTexPoint( ),
+                  oct_obj.getDataReadTexPoint( ),
                   oct_obj.getWidth( ),
                   oct_obj.getHeight( ) );
             POP_SYNC_CHK;
