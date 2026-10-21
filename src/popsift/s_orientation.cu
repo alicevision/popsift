@@ -98,7 +98,7 @@ void ori_par( const int           octave,
     const int32_t rad  = (int)roundf((3.0f * sigw));
 
     const float factor = __fdividef( -0.5f, (sigw * sigw) );
-    const int sq_thres  = rad * rad;
+    const float sq_thres  = float(rad * rad);
 
     // int xmin = max(1,     (int)floor(x - rad));
     // int xmax = min(w - 2, (int)floor(x + rad));
@@ -133,27 +133,29 @@ void ori_par( const int           octave,
                           layer,
                           level );
 
-            float dx = xx - x;
-            float dy = yy - y;
+            const float dx = xx - x;
+            const float dy = yy - y;
 
-            int sq_dist  = dx * dx + dy * dy;
+            // The keypoint has a subpixel position, so the distance is
+            // fractional. It used to be truncated to int, which distorted
+            // the Gaussian weight.
+            const float sq_dist = dx * dx + dy * dy;
             if (sq_dist <= sq_thres)
             {
                 float weight = grad * expf(sq_dist * factor);
 
-                // int bidx = (int)rintf( __fdividef( ORI_NBINS * (theta + M_PI), M_PI2 ) );
-                int bidx = (int)roundf( __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) );
+                // Like VLFeat: bin b is centred on the angle
+                // 2*pi*(b+0.5)/ORI_NBINS - pi, and each gradient is split
+                // linearly between the two bins whose centres enclose it.
+                float fbin = __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) - 0.5f;
+                // fbin is in [-0.5, 35.5]: round down, not towards zero
+                int   b0   = __float2int_rd( fbin );
+                float frac = fbin - float(b0);
+                b0 = (b0 < 0) ? b0 + ORI_NBINS : ( (b0 >= ORI_NBINS) ? b0 - ORI_NBINS : b0 );
+                int   b1   = (b0 == ORI_NBINS-1) ? 0 : b0 + 1;
 
-                if( bidx > ORI_NBINS ) {
-                    printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
-                }
-                if( bidx < 0 ) {
-                    printf("Crashing: bin %d theta %f :-)\n", bidx, theta);
-                }
-
-                bidx = (bidx == ORI_NBINS) ? 0 : bidx;
-
-                atomicAdd( &hist[bidx], weight );
+                atomicAdd( &hist[b0], weight * (1.0f - frac) );
+                atomicAdd( &hist[b1], weight * frac );
             }
         }
     }
@@ -235,7 +237,8 @@ void ori_par( const int           octave,
 
     if( threadIdx.x < ORIENTATION_MAX_COUNT ) {
         if( valid ) {
-            float chosen_bin = refined_angle[best_index.x];
+            // + 0.5 because bin b is centred on 2*pi*(b+0.5)/ORI_NBINS - pi
+            float chosen_bin = refined_angle[best_index.x] + 0.5f;
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             // float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
             float th = ::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
