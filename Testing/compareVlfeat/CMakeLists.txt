@@ -131,3 +131,18 @@ endforeach()
 
 message(STATUS "VLFeat comparison: ${_popsift_test_count} tests, PopSift runs on "
                "${_popsift_gpu_backend} (labels gpu;${_popsift_gpu_backend})")
+
+# --- Unit tests of popsift-compareSiftFiles ----------------------------------
+
+foreach(_case IN ITEMS identical shifted missing empty orientation-wrap
+                       same-position max-avg-dist)
+  add_test(NAME compareSiftFiles/${_case}
+           COMMAND "${Python3_EXECUTABLE}"
+                   "${CMAKE_CURRENT_SOURCE_DIR}/../compareSiftFiles/test_compare_sift_files.py"
+                   --tool "$<TARGET_FILE:popsift-compareSiftFiles>"
+                   --work-dir "${CMAKE_CURRENT_BINARY_DIR}/unit"
+                   ${_case})
+  set_tests_properties(compareSiftFiles/${_case} PROPERTIES
+                       FIXTURES_REQUIRED POPSIFT_BINS
+                       LABELS "cpu;unit")
+endforeach()
