@@ -64,6 +64,35 @@ def read_rows(path):
         return list(csv.DictReader(f))
 
 
+# The columns of matched.csv that the explorer and the match inspector use.
+MATCH_COLUMNS = ("a_x", "a_y", "a_sigma", "a_ori_deg",
+                 "b_x", "b_y", "b_sigma", "b_ori_deg",
+                 "pos_dist", "scale_ratio", "ori_diff_deg", "desc_dist")
+MATCH_INDEX_COLUMNS = ("a_index", "b_index")
+MATCHES_NPZ = "matches.npz"
+
+
+def matches_from_csv(path):
+    """The MATCH_COLUMNS and MATCH_INDEX_COLUMNS of a matched.csv as numpy
+    arrays (float32 and int32), keyed by column name."""
+    rows = read_rows(path)
+    out = {c: np.array([float(r[c]) for r in rows], dtype=np.float32)
+           for c in MATCH_COLUMNS}
+    out.update({c: np.array([int(r[c]) for r in rows], dtype=np.int32)
+                for c in MATCH_INDEX_COLUMNS})
+    return out
+
+
+def read_matches(match_dir):
+    """The matched pairs of a match folder: from matches.npz, which the
+    explorer package holds instead of the CSV files, or from matched.csv."""
+    npz = os.path.join(match_dir, MATCHES_NPZ)
+    if os.path.exists(npz):
+        with np.load(npz) as data:
+            return {k: data[k] for k in data.files}
+    return matches_from_csv(os.path.join(match_dir, "matched.csv"))
+
+
 def glyphs(ax, xs, ys, sigmas, oris_deg, color, scale=GLYPH_SCALE, lw=1.0,
            picker=None):
     """Draws SIFT glyphs and returns the artists."""
@@ -151,12 +180,12 @@ def log_axis(ax, which, bottom, top):
 
 
 def render_cdfs(out_png, title, series, match_radius=1.0):
-    """Writes cumulative distributions of descriptor and position distances.
+    """Writes cumulative distributions of descriptor and pixel distances.
 
     series is a list of (label, rows) where rows is match_stats.read_rows()
     output, possibly merged over images. Left: descriptor distance of the
-    geometrically matched pairs, solid for pairs with the same pose, dashed
-    for all. Right: position distance from each keypoint to the keypoint
+    matched pairs, solid for pairs with the same pose, dashed
+    for all. Right: pixel distance from each keypoint to the keypoint
     with the most similar descriptor in the other run, solid a in b, dashed
     b in a, on a logarithmic axis from 0.01 px (smaller distances are drawn
     at 0.01 px); the grey line is the smallest match radius.
@@ -175,12 +204,12 @@ def render_cdfs(out_png, title, series, match_radius=1.0):
         _ecdf(right, [max(float(r["pos_dist"]), 0.01) for r in rows["nn_b"]],
               color=color, linestyle="--",
               label=f"{prefix}b in a ({len(rows['nn_b'])})")
-    left.set_title("Descriptor distance of geometrically matched keypoints",
+    left.set_title("Descriptor distance (L2) of matched keypoints",
                    fontsize=10)
-    left.set_xlabel("descriptor distance")
-    right.set_title("Position distance to the most similar descriptor",
+    left.set_xlabel("descriptor distance (L2)")
+    right.set_title("Pixel distance to the most similar descriptor",
                     fontsize=10)
-    right.set_xlabel("position distance (px), below 0.01 drawn at 0.01")
+    right.set_xlabel("pixel distance (px), below 0.01 drawn at 0.01")
     log_axis(right, "x", 0.01, 1.2 * max(
         [float(r["pos_dist"]) for _, rows in series
          for r in rows["nn_a"] + rows["nn_b"]], default=1.0))

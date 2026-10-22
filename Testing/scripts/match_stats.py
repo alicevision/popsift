@@ -12,10 +12,20 @@ report.md. It decides nothing: pass/fail limits are applied by the caller
     precision = matched / features of a   (share of a's features confirmed)
     same pose = matched pairs within SAME_POSE_PX and SAME_POSE_DEG; their
                 descriptors should be nearly identical
-    NN agreement a (b) = share of the geometrically matched features of a (b)
-                whose descriptor nearest neighbour is their geometric match;
-                anything below 1 means that the most similar descriptor
-                belongs to a keypoint somewhere else
+    descriptor distance = L2 distance of two 128-value descriptors in byte
+                units (0-255 per value)
+    nearest-descriptor agreement a (b) = share of the matched keypoints of
+                a (b) whose most similar descriptor in the other run is their
+                matched keypoint; anything below 1 means that the most
+                similar descriptor belongs to a keypoint somewhere else
+    nearest descriptor in place a (b) = keypoints of a (b) whose most similar
+                descriptor in the other run belongs to a keypoint within the
+                matching radius max(1 px, 0.5 sigma); "distinctive" ones also
+                pass Lowe's ratio test, most similar < 0.8 * second most
+                similar descriptor distance
+
+Metric names carry their unit: _px pixels, _deg degrees, _l2 descriptor
+distance.
 
 Standard library only, Python 3.8 or newer.
 """
@@ -31,6 +41,12 @@ import os
 SAME_POSE_PX = 0.25
 SAME_POSE_DEG = 2.0
 
+# The matching radius, max(MATCH_RADIUS_MIN_PX, MATCH_RADIUS_SIGMA * sigma),
+# as popsift-compareSiftFiles uses it by default, and Lowe's ratio.
+MATCH_RADIUS_MIN_PX = 1.0
+MATCH_RADIUS_SIGMA = 0.5
+LOWE_RATIO = 0.8
+
 # The files of a match folder, by source name.
 SOURCES = {
     "matched": "matched.csv",
@@ -41,41 +57,44 @@ SOURCES = {
 _DESC_EDGES = [0, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, math.inf]
 _NN_POS_EDGES = [0, 0.1, 0.5, 1, 2, 5, 10, 50, 100, 500, math.inf]
 
-# Quantities as named in summary.json and report.md: the source rows
-# ("same_pose" is a subset of "matched"), the column, a label and the
-# histogram bin edges.
+# Quantities as named in summary.json and summary.csv, with their unit in the
+# name (px: pixels, deg: degrees, l2: L2 distance of descriptors in byte
+# units): the source rows ("same_pose" is a subset of "matched"), the column,
+# a label for readers and the histogram bin edges.
 METRICS = {
-    "pos_dist":     ("matched", "pos_dist", "position distance (px)",
+    "pos_dist_px":  ("matched", "pos_dist", "pixel distance (px)",
                      [0, 0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, math.inf]),
-    "dx":           ("matched", "dx", "translation x (px)",
+    "dx_px":        ("matched", "dx", "offset x, b - a (px)",
                      [-math.inf, -1, -0.5, -0.1, -0.01, 0.01, 0.1, 0.5, 1, math.inf]),
-    "dy":           ("matched", "dy", "translation y (px)",
+    "dy_px":        ("matched", "dy", "offset y, b - a (px)",
                      [-math.inf, -1, -0.5, -0.1, -0.01, 0.01, 0.1, 0.5, 1, math.inf]),
     "scale_ratio":  ("matched", "scale_ratio", "scale ratio (b/a)",
                      [0, 0.8, 0.9, 0.95, 0.99, 1.01, 1.05, 1.1, 1.25, math.inf]),
-    "ori_diff":     ("matched", "ori_diff_deg", "rotation difference b-a (deg)",
+    "ori_diff_deg": ("matched", "ori_diff_deg", "rotation difference, b - a (deg)",
                      [-180, -45, -10, -5, -1, -0.1, 0.1, 1, 5, 10, 45, 180]),
-    "abs_ori_diff": ("matched", "ori_diff_deg", "|rotation difference| (deg)",
+    "abs_ori_diff_deg":
+                    ("matched", "ori_diff_deg", "|rotation difference| (deg)",
                      [0, 0.1, 0.5, 1, 2, 5, 10, 20, 45, 90, 180]),
-    "desc_dist":    ("matched", "desc_dist", "descriptor distance", _DESC_EDGES),
-    "same_pose_desc_dist":
-                    ("same_pose", "desc_dist",
-                     "descriptor distance, same pose", _DESC_EDGES),
-    "nn_a_pos_dist":
-                    ("nn_a", "pos_dist",
-                     "a to its descriptor NN in b, position distance (px)",
-                     _NN_POS_EDGES),
-    "nn_b_pos_dist":
-                    ("nn_b", "pos_dist",
-                     "b to its descriptor NN in a, position distance (px)",
-                     _NN_POS_EDGES),
-    "nn_a_desc_dist":
-                    ("nn_a", "desc_dist",
-                     "a to its descriptor NN in b, descriptor distance",
+    "desc_dist_l2": ("matched", "desc_dist", "descriptor distance (L2)",
                      _DESC_EDGES),
-    "nn_b_desc_dist":
+    "same_pose_desc_dist_l2":
+                    ("same_pose", "desc_dist",
+                     "descriptor distance (L2), same pose", _DESC_EDGES),
+    "nn_a_pos_dist_px":
+                    ("nn_a", "pos_dist",
+                     "a to the most similar descriptor in b: pixel distance (px)",
+                     _NN_POS_EDGES),
+    "nn_b_pos_dist_px":
+                    ("nn_b", "pos_dist",
+                     "b to the most similar descriptor in a: pixel distance (px)",
+                     _NN_POS_EDGES),
+    "nn_a_desc_dist_l2":
+                    ("nn_a", "desc_dist",
+                     "a to the most similar descriptor in b: descriptor distance (L2)",
+                     _DESC_EDGES),
+    "nn_b_desc_dist_l2":
                     ("nn_b", "desc_dist",
-                     "b to its descriptor NN in a, descriptor distance",
+                     "b to the most similar descriptor in a: descriptor distance (L2)",
                      _DESC_EDGES),
 }
 
@@ -108,19 +127,32 @@ def metric_values(rows, key):
     """The values of a metric from read_rows() output."""
     source, column = METRICS[key][0], METRICS[key][1]
     values = [float(r[column]) for r in rows[source]]
-    if key == "abs_ori_diff":
+    if key == "abs_ori_diff_deg":
         values = [abs(x) for x in values]
     return values
 
 
 def _nn_agreement(nn_rows):
-    """Share of the queries with a geometric match whose descriptor nearest
+    """Share of the queries with a matched keypoint whose descriptor nearest
     neighbour is that match, and the number of such queries."""
     with_geo = [r for r in nn_rows if int(r["geo_index"]) >= 0]
     if not with_geo:
         return None, 0
     agree = sum(1 for r in with_geo if r["n_index"] == r["geo_index"])
     return agree / len(with_geo), len(with_geo)
+
+
+def _nn_in_place(nn_rows):
+    """The number of queries whose descriptor nearest neighbour is within the
+    matching radius, and how many of them also pass Lowe's ratio test."""
+    in_place = [r for r in nn_rows
+                if float(r["pos_dist"]) <= max(
+                    MATCH_RADIUS_MIN_PX,
+                    MATCH_RADIUS_SIGMA * float(r["q_sigma"]))]
+    distinctive = sum(1 for r in in_place
+                      if float(r["desc_dist"])
+                      < LOWE_RATIO * float(r["second_desc_dist"]))
+    return len(in_place), distinctive
 
 
 def _merge_rows(per_image):
@@ -187,10 +219,16 @@ def _stats(rows, n_a, n_b):
     n_m = len(rows["matched"])
     agree_a, _ = _nn_agreement(rows["nn_a"])
     agree_b, _ = _nn_agreement(rows["nn_b"])
+    in_place_a, distinctive_a = _nn_in_place(rows["nn_a"])
+    in_place_b, distinctive_b = _nn_in_place(rows["nn_b"])
     return {
         "counts": {"a": n_a, "b": n_b, "matched": n_m,
                    "only_a": n_a - n_m, "only_b": n_b - n_m,
-                   "same_pose": len(rows["same_pose"])},
+                   "same_pose": len(rows["same_pose"]),
+                   "nn_in_place_a": in_place_a,
+                   "nn_distinctive_a": distinctive_a,
+                   "nn_in_place_b": in_place_b,
+                   "nn_distinctive_b": distinctive_b},
         "recall": n_m / n_b if n_b else None,
         "precision": n_m / n_a if n_a else None,
         "nn_agreement_a": agree_a,
@@ -225,8 +263,8 @@ def set_stats(per_image):
         "nn_agreement_a": spread(lambda s: s["nn_agreement_a"]),
         "nn_agreement_b": spread(lambda s: s["nn_agreement_b"]),
         **{f"{k}_median": spread(lambda s, k=k: s["metrics"][k]["median"])
-           for k in ("pos_dist", "abs_ori_diff", "desc_dist",
-                     "same_pose_desc_dist")},
+           for k in ("pos_dist_px", "abs_ori_diff_deg", "desc_dist_l2",
+                     "same_pose_desc_dist_l2")},
     }
     return total
 
@@ -250,15 +288,15 @@ def check_limits(stats, min_recall=None, min_precision=None,
     if on(min_precision) and stats["precision"] is not None \
             and stats["precision"] < min_precision:
         problems.append(f"precision {stats['precision']:.3f} < {min_precision}")
-    median = stats["metrics"]["desc_dist"]["median"]
+    median = stats["metrics"]["desc_dist_l2"]["median"]
     if on(max_desc_dist) and median is not None and median > max_desc_dist:
-        problems.append(f"median descriptor distance {median:.3f} > "
+        problems.append(f"median descriptor distance (L2) {median:.3f} > "
                         f"{max_desc_dist}")
     for side in ("a", "b"):
         agree = stats[f"nn_agreement_{side}"]
         if on(min_nn_agreement) and agree is not None \
                 and agree < min_nn_agreement:
-            problems.append(f"NN agreement {side} {agree:.3f} < "
+            problems.append(f"nearest-descriptor agreement {side} {agree:.3f} < "
                             f"{min_nn_agreement}")
     return problems
 
@@ -277,23 +315,24 @@ def one_line(stats):
     """A short console summary of image or set statistics."""
     c = stats["counts"]
     m = stats["metrics"]
-    return (f"{c['a']} vs {c['b']} features, {c['matched']} matched "
+    return (f"{c['a']} vs {c['b']} keypoints, {c['matched']} matched "
             f"(recall {_fmt(stats['recall'])}, precision "
-            f"{_fmt(stats['precision'])}), median position "
-            f"{_fmt(m['pos_dist']['median'])} px, median |rotation| "
-            f"{_fmt(m['abs_ori_diff']['median'], 2)} deg, median descriptor "
-            f"{_fmt(m['desc_dist']['median'], 2)} (same pose "
-            f"{_fmt(m['same_pose_desc_dist']['median'], 2)}), NN agreement "
+            f"{_fmt(stats['precision'])}), median pixel distance "
+            f"{_fmt(m['pos_dist_px']['median'])} px, median |rotation| "
+            f"{_fmt(m['abs_ori_diff_deg']['median'], 2)} deg, median "
+            f"descriptor distance (L2) {_fmt(m['desc_dist_l2']['median'], 2)} "
+            f"(same pose {_fmt(m['same_pose_desc_dist_l2']['median'], 2)}), "
+            f"nearest-descriptor agreement "
             f"{_fmt(stats['nn_agreement_a'])} / "
             f"{_fmt(stats['nn_agreement_b'])}")
 
 
-_CSV_METRICS = ("pos_dist", "abs_ori_diff", "ori_diff", "scale_ratio",
-                "desc_dist", "same_pose_desc_dist", "nn_a_pos_dist",
-                "nn_b_pos_dist")
+_CSV_METRICS = ("pos_dist_px", "abs_ori_diff_deg", "ori_diff_deg",
+                "scale_ratio", "desc_dist_l2", "same_pose_desc_dist_l2",
+                "nn_a_pos_dist_px", "nn_b_pos_dist_px")
 
 CSV_COLUMNS = (
-    ["image", "features_a", "features_b", "matched", "same_pose", "recall",
+    ["image", "keypoints_a", "keypoints_b", "matched", "same_pose", "recall",
      "precision", "nn_agreement_a", "nn_agreement_b"]
     + [f"{k}_{q}" for k in _CSV_METRICS
        for q in ("mean", "median", "p90", "max")]
@@ -336,17 +375,35 @@ def write_report(report_dir, run_a, run_b, set_name, images, total):
         "run_b": run_b,
         "set": set_name,
         "definitions": {
-            "recall": "matched / features of run_b",
-            "precision": "matched / features of run_a",
-            "ori_diff": "orientation of b minus orientation of a, wrapped "
-                        "to [-180, 180) degrees",
-            "same_pose": f"matched pairs with position distance <= "
-                         f"{SAME_POSE_PX} px and |ori_diff| <= "
+            "matched": f"a keypoint of run_a and one of run_b at most "
+                       f"max({MATCH_RADIUS_MIN_PX:g} px, "
+                       f"{MATCH_RADIUS_SIGMA:g} sigma) apart, with scales "
+                       f"within a factor 1.5; paired one to one, closest "
+                       f"first",
+            "recall": "matched / keypoints of run_b",
+            "precision": "matched / keypoints of run_a",
+            "pos_dist_px": "distance between the centres of two keypoints "
+                           "in pixels of the input image",
+            "ori_diff_deg": "orientation of b minus orientation of a, "
+                            "wrapped to [-180, 180) degrees",
+            "desc_dist_l2": "L2 (Euclidean) distance between two 128-value "
+                            "descriptors, in byte units (0-255 per value)",
+            "same_pose": f"matched pairs with pixel distance <= "
+                         f"{SAME_POSE_PX} px and |ori_diff_deg| <= "
                          f"{SAME_POSE_DEG} deg",
-            "nn_agreement_a": "share of the matched features of run_a whose "
-                              "descriptor nearest neighbour in run_b is their "
-                              "geometric match",
+            "nn_agreement_a": "nearest-descriptor agreement: share of the "
+                              "matched keypoints of run_a whose most similar "
+                              "descriptor in run_b is their matched keypoint",
             "nn_agreement_b": "the same for run_b in run_a",
+            "nn_in_place_a": "keypoints of run_a whose most similar "
+                             "descriptor in run_b belongs to a keypoint "
+                             "within the matching radius",
+            "nn_distinctive_a": f"those of nn_in_place_a that also pass "
+                                f"Lowe's ratio test: most similar < "
+                                f"{LOWE_RATIO:g} * second most similar "
+                                f"descriptor distance",
+            "nn_in_place_b": "the same for run_b in run_a",
+            "nn_distinctive_b": "the same for run_b in run_a",
         },
         "set_stats": _public(total),
         "images": [
@@ -368,12 +425,14 @@ def write_report(report_dir, run_a, run_b, set_name, images, total):
 
 def _markdown(report_dir, run_a, run_b, set_name, images, total):
     out = [f"# {run_a} vs {run_b} on {set_name}", ""]
-    out.append(f"a = `{run_a}`, b = `{run_b}`. Recall = matched / features "
-               "of b, precision = matched / features of a. Rotation "
-               "difference is b - a. Same pose = matched pairs at most "
-               f"{SAME_POSE_PX} px and {SAME_POSE_DEG} deg apart. NN agreement "
-               "a = share of the matched features of a whose most similar "
-               "descriptor in b is their geometric match (b likewise).")
+    out.append(f"a = `{run_a}`, b = `{run_b}`. Recall = matched / keypoints "
+               "of b, precision = matched / keypoints of a. Rotation "
+               "difference is b - a. Descriptor distance is the L2 distance "
+               "of the 128 descriptor values in byte units (0-255). Same "
+               f"pose = matched pairs at most {SAME_POSE_PX} px and "
+               f"{SAME_POSE_DEG} deg apart. Nearest-descriptor agreement a = "
+               "share of the matched keypoints of a whose most similar "
+               "descriptor in b is their matched keypoint (b likewise).")
     out.append("")
     out.append("## Set")
     out.append("")
@@ -391,13 +450,15 @@ def _markdown(report_dir, run_a, run_b, set_name, images, total):
     out.append("Spread over images (min / median / max):")
     out.append("")
     for k, label in (("recall", "recall"), ("precision", "precision"),
-                     ("nn_agreement_a", "NN agreement a"),
-                     ("nn_agreement_b", "NN agreement b"),
-                     ("pos_dist_median", "median position distance"),
-                     ("abs_ori_diff_median", "median |rotation difference|"),
-                     ("desc_dist_median", "median descriptor distance"),
-                     ("same_pose_desc_dist_median",
-                      "median descriptor distance, same pose")):
+                     ("nn_agreement_a", "nearest-descriptor agreement a"),
+                     ("nn_agreement_b", "nearest-descriptor agreement b"),
+                     ("pos_dist_px_median", "median pixel distance (px)"),
+                     ("abs_ori_diff_deg_median",
+                      "median |rotation difference| (deg)"),
+                     ("desc_dist_l2_median",
+                      "median descriptor distance (L2)"),
+                     ("same_pose_desc_dist_l2_median",
+                      "median descriptor distance (L2), same pose")):
         s = sp[k]
         out.append(f"- {label}: {_fmt(s['min'])} / {_fmt(s['median'])} / "
                    f"{_fmt(s['max'])}")
@@ -408,9 +469,10 @@ def _markdown(report_dir, run_a, run_b, set_name, images, total):
     out.append("## Images")
     out.append("")
     out.append("| Image | a | b | matched | recall | precision | "
-               "median pos (px) | median \\|rot\\| (deg) | mean rot (deg) | "
-               "median desc | same pose | median desc, same pose | "
-               "NN agreement a | NN agreement b |")
+               "median pixel dist. (px) | median \\|rot\\| (deg) | "
+               "mean rot (deg) | median desc. dist. (L2) | same pose | "
+               "median desc. dist. (L2), same pose | "
+               "nearest-desc. agreement a | nearest-desc. agreement b |")
     out.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
                "---: | ---: | ---: | ---: | ---: | ---: |")
     for im in images:
@@ -419,12 +481,12 @@ def _markdown(report_dir, run_a, run_b, set_name, images, total):
         m = s["metrics"]
         out.append(f"| {im['name']} | {c['a']} | {c['b']} | {c['matched']} | "
                    f"{_fmt(s['recall'])} | {_fmt(s['precision'])} | "
-                   f"{_fmt(m['pos_dist']['median'])} | "
-                   f"{_fmt(m['abs_ori_diff']['median'], 2)} | "
-                   f"{_fmt(m['ori_diff']['mean'], 2)} | "
-                   f"{_fmt(m['desc_dist']['median'], 2)} | "
+                   f"{_fmt(m['pos_dist_px']['median'])} | "
+                   f"{_fmt(m['abs_ori_diff_deg']['median'], 2)} | "
+                   f"{_fmt(m['ori_diff_deg']['mean'], 2)} | "
+                   f"{_fmt(m['desc_dist_l2']['median'], 2)} | "
                    f"{c['same_pose']} | "
-                   f"{_fmt(m['same_pose_desc_dist']['median'], 2)} | "
+                   f"{_fmt(m['same_pose_desc_dist_l2']['median'], 2)} | "
                    f"{_fmt(s['nn_agreement_a'])} | "
                    f"{_fmt(s['nn_agreement_b'])} |")
     out.append("")
