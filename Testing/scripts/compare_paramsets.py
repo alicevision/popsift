@@ -109,18 +109,20 @@ def main(argv=None):
                 print(f"\n==================== [{index}/{len(files)}] {label} "
                       "====================", flush=True)
                 stem = os.path.splitext(rel)[0]
-                image_dir = os.path.join(set_dir,
-                                         f"{index:04d}-{pc.safe_name(stem)}")
+                image_dir = os.path.join(set_dir, pc.safe_name(stem))
                 os.makedirs(image_dir, exist_ok=True)
                 pgm = pc.prepare_input(src, image_dir)
                 runs = {s: runner.run(s, pgm, image_dir) for s in specs}
                 for s, r in runs.items():
                     if r is None:
                         failures.append(f"{label}: {s} failed")
+                    elif r is pc.SKIP:
+                        failures.append(f"{label}: {s} skipped, no usable GPU")
                     else:
                         counts[s].append(r.count)
+                runs = {s: r for s, r in runs.items() if r is not pc.SKIP}
                 for a, b in pairs:
-                    if runs[a] is None or runs[b] is None:
+                    if runs.get(a) is None or runs.get(b) is None:
                         continue
                     allow_empty = bool(expectations.get(
                         os.path.normpath(rel), {}).get("allow_empty"))

@@ -40,6 +40,7 @@ file(GENERATE OUTPUT "${_popsift_tools_json}" CONTENT
 "{
   \"popsift_demo\": \"$<TARGET_FILE:popsift-demo>\",
   \"compare_sift_files\": \"$<TARGET_FILE:popsift-compareSiftFiles>\",
+  \"gpu_probe\": \"$<TARGET_FILE:popsift-gpu-probe>\",
   \"vlfeat_sift\": \"${PopSift_VLFEAT_SIFT_BIN}\",
   \"paramsets\": \"${_popsift_paramsets}\",
   \"work_dir\": \"${CMAKE_CURRENT_BINARY_DIR}/run\",
@@ -55,28 +56,78 @@ ${_image_sets_json}
 # generators.
 add_test(NAME popsift_bins_build
          COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}
-                 --target popsift-demo --target popsift-compareSiftFiles
+                 --target popsift-demo popsift-gpu-probe popsift-compareSiftFiles
                  --config "$<CONFIG>")
 set_tests_properties(popsift_bins_build PROPERTIES FIXTURES_SETUP POPSIFT_BINS)
 
-# One comparison per test image set, labelled with the set name, so that
-# e.g. 'ctest -L oxford/boat' runs one set. A set that is downloaded by
-# CTest adds its download fixture.
+if(USE_HIP)
+  set(_popsift_gpu_backend hip)
+else()
+  set(_popsift_gpu_backend cuda)
+endif()
+
+set(_popsift_compare "${Python3_EXECUTABLE}" "${_popsift_scripts_dir}/popsift_compare.py"
+                     --tools "${_popsift_tools_json}")
+set(_popsift_limits --max-avg-dist "${PopSift_VLFEAT_MAX_AVG_DESC_DIST}"
+                    --min-recall "${PopSift_VLFEAT_MIN_RECALL}"
+                    --min-precision "${PopSift_VLFEAT_MIN_PRECISION}"
+                    --max-desc-dist "${PopSift_VLFEAT_MAX_DESC_DIST}"
+                    --min-nn-agreement "${PopSift_VLFEAT_MIN_NN_AGREEMENT}")
+
+# Every image of every set gets three tests, e.g. for oxford/boat/img1:
+#   run-vlfeat/oxford/boat/img1    VLFeat on the image (label cpu)
+#   run-popsift/oxford/boat/img1   PopSift with the parameter set
+#                                  vlfeat-emulation (labels gpu and cuda or
+#                                  hip), one at a time, skipped without a GPU
+#   compare/oxford/boat/img1       the comparison of the two (label cpu),
+#                                  skipped if the PopSift run was skipped
+# and every set one report/<set> after its comparisons. All are labelled with
+# the set name, so that e.g. 'ctest -L oxford/boat' runs one set. A set that
+# is downloaded by CTest adds its download fixture to the runs.
+set(_popsift_test_count 0)
 foreach(_set IN LISTS PopSift_TEST_IMAGE_SETS)
   string(MAKE_C_IDENTIFIER "${_set}" _id)
-  set(_fixtures VLFEAT POPSIFT_BINS ${PopSift_TEST_IMAGE_SET_${_id}_FIXTURE})
-  add_test(NAME vlfeat-comparison/${_set}
-           COMMAND "${Python3_EXECUTABLE}" "${_popsift_scripts_dir}/popsift_compare.py"
-                   --tools "${_popsift_tools_json}"
-                   --images "${_set}"
-                   --max-avg-dist "${PopSift_VLFEAT_MAX_AVG_DESC_DIST}"
-                   --min-recall "${PopSift_VLFEAT_MIN_RECALL}"
-                   --min-precision "${PopSift_VLFEAT_MIN_PRECISION}"
-                   --max-desc-dist "${PopSift_VLFEAT_MAX_DESC_DIST}"
-                   --min-nn-agreement "${PopSift_VLFEAT_MIN_NN_AGREEMENT}"
+  set(_download ${PopSift_TEST_IMAGE_SET_${_id}_FIXTURE})
+  foreach(_img IN LISTS PopSift_TEST_IMAGE_SET_${_id}_IMAGES)
+    string(REGEX REPLACE "\\.[^./]*$" "" _name "${_img}")
+    string(MAKE_C_IDENTIFIER "${_set}/${_name}" _iid)
+    set(_args --images "${_set}" --image "${_img}")
+
+    add_test(NAME run-vlfeat/${_set}/${_name}
+             COMMAND ${_popsift_compare} ${_args} --step run vlfeat)
+    set_tests_properties(run-vlfeat/${_set}/${_name} PROPERTIES
+                         FIXTURES_SETUP RUN_VLFEAT_${_iid}
+                         FIXTURES_REQUIRED "VLFEAT;${_download}"
+                         LABELS "cpu;vlfeat;${_set}")
+
+    add_test(NAME run-popsift/${_set}/${_name}
+             COMMAND ${_popsift_compare} ${_args} --step run vlfeat-emulation)
+    set_tests_properties(run-popsift/${_set}/${_name} PROPERTIES
+                         FIXTURES_SETUP RUN_POPSIFT_${_iid}
+                         FIXTURES_REQUIRED "POPSIFT_BINS;${_download}"
+                         RESOURCE_LOCK gpu
+                         SKIP_RETURN_CODE 77
+                         LABELS "gpu;${_popsift_gpu_backend};vlfeat;${_set}")
+
+    add_test(NAME compare/${_set}/${_name}
+             COMMAND ${_popsift_compare} ${_args} --step compare ${_popsift_limits}
+                     vlfeat-emulation vlfeat)
+    set_tests_properties(compare/${_set}/${_name} PROPERTIES
+                         FIXTURES_REQUIRED "POPSIFT_BINS;RUN_VLFEAT_${_iid};RUN_POPSIFT_${_iid};REPORT_${_id}"
+                         SKIP_RETURN_CODE 77
+                         LABELS "cpu;vlfeat;${_set}")
+    math(EXPR _popsift_test_count "${_popsift_test_count} + 3")
+  endforeach()
+
+  add_test(NAME report/${_set}
+           COMMAND ${_popsift_compare} --images "${_set}" --step report
                    vlfeat-emulation vlfeat)
-  set_tests_properties(vlfeat-comparison/${_set} PROPERTIES
-                       FIXTURES_REQUIRED "${_fixtures}"
-                       LABELS "gpu;vlfeat;${_set}")
+  set_tests_properties(report/${_set} PROPERTIES
+                       FIXTURES_CLEANUP REPORT_${_id}
+                       SKIP_RETURN_CODE 77
+                       LABELS "cpu;vlfeat;${_set}")
+  math(EXPR _popsift_test_count "${_popsift_test_count} + 1")
 endforeach()
 
+message(STATUS "VLFeat comparison: ${_popsift_test_count} tests, PopSift runs on "
+               "${_popsift_gpu_backend} (labels gpu;${_popsift_gpu_backend})")

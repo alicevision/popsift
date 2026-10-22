@@ -22,6 +22,9 @@ if(_popsift_compare_vlfeat)
   # Compile comparison tool
   add_subdirectory(compareSiftFiles)
 
+  # Tells the GPU tests whether there is a GPU
+  add_subdirectory(gpuProbe)
+
   # Create ctest checks
   add_subdirectory(compareVlfeat)
 endif()

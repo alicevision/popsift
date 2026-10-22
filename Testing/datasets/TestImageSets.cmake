@@ -20,6 +20,9 @@
 #   PopSift_TEST_IMAGE_SET_<id>_DIR         folder searched for images
 #   PopSift_TEST_IMAGE_SET_<id>_FIXTURE     CTest fixture that downloads the
 #                                           set, empty if none is needed
+#   PopSift_TEST_IMAGE_SET_<id>_IMAGES      its images, relative to the folder;
+#                                           without extension for downloaded
+#                                           sets, which may be .pgm or .ppm
 # where <id> is string(MAKE_C_IDENTIFIER) of the name.
 
 set(PopSift_TEST_DATASETS "" CACHE STRING
@@ -66,9 +69,10 @@ get_filename_component(PopSift_TESTDATA_DIR "${PopSift_TESTDATA_DIR}" ABSOLUTE
 set(PopSift_TEST_IMAGE_SETS "")
 set(_popsift_set_report "")
 
-# Collects the .pgm/.ppm files below a folder into ${out}.
+# Collects the .pgm/.ppm files below a folder into ${out}, relative to it.
 function(_popsift_glob_images dir out)
-  file(GLOB_RECURSE _imgs "${dir}/*.pgm" "${dir}/*.ppm" "${dir}/*.PGM" "${dir}/*.PPM")
+  file(GLOB_RECURSE _imgs RELATIVE "${dir}" "${dir}/*.pgm" "${dir}/*.ppm" "${dir}/*.PGM" "${dir}/*.PPM")
+  list(SORT _imgs)
   set(${out} "${_imgs}" PARENT_SCOPE)
 endfunction()
 
@@ -84,11 +88,12 @@ macro(_popsift_report name status detail)
 endmacro()
 
 # Registers a usable set.
-macro(_popsift_add_set name dir fixture)
+macro(_popsift_add_set name dir fixture images)
   string(MAKE_C_IDENTIFIER "${name}" _id)
   list(APPEND PopSift_TEST_IMAGE_SETS "${name}")
   set(PopSift_TEST_IMAGE_SET_${_id}_DIR "${dir}")
   set(PopSift_TEST_IMAGE_SET_${_id}_FIXTURE "${fixture}")
+  set(PopSift_TEST_IMAGE_SET_${_id}_IMAGES "${images}")
 endmacro()
 
 # Reads Testing/datasets/<name>.cmake into _ds_* variables.
@@ -112,7 +117,7 @@ set(_popsift_handcrafted_dir "${CMAKE_CURRENT_LIST_DIR}/../testImages")
 get_filename_component(_popsift_handcrafted_dir "${_popsift_handcrafted_dir}" ABSOLUTE)
 _popsift_glob_images("${_popsift_handcrafted_dir}" _imgs)
 list(LENGTH _imgs _count)
-_popsift_add_set(handcrafted "${_popsift_handcrafted_dir}" "")
+_popsift_add_set(handcrafted "${_popsift_handcrafted_dir}" "" "${_imgs}")
 _popsift_report(handcrafted "present" "${_count} images, Testing/testImages")
 
 # --- downloadable sets --------------------------------------------------------
@@ -188,7 +193,7 @@ foreach(_name IN LISTS _popsift_selected)
   endif()
 
   if(NOT _missing)
-    _popsift_add_set("${_name}" "${_dest}" "")
+    _popsift_add_set("${_name}" "${_dest}" "" "${_ds_images}")
     _popsift_report("${_name}" "present" "${_dest}")
   elseif(PopSift_TESTDATA_DOWNLOAD AND BUILD_TESTING)
     # CTest fetches it before the first test that uses it.
@@ -197,7 +202,7 @@ foreach(_name IN LISTS _popsift_selected)
                          FIXTURES_SETUP TESTDATA_${_id}
                          LABELS "testdata;${_name}"
                          TIMEOUT 3600)
-    _popsift_add_set("${_name}" "${_dest}" "TESTDATA_${_id}")
+    _popsift_add_set("${_name}" "${_dest}" "TESTDATA_${_id}" "${_ds_images}")
     _popsift_report("${_name}" "missing" "ctest downloads it (${_size_text})")
   else()
     _popsift_report("${_name}" "missing" "skipped: build target popsift_testdata, or set -DPopSift_TESTDATA_DOWNLOAD=ON (${_size_text})")
@@ -211,7 +216,7 @@ if(NOT PopSift_TEST_IMAGES_OOT_DIR STREQUAL "")
   _popsift_glob_images("${_custom_dir}" _imgs)
   list(LENGTH _imgs _count)
   if(_count GREATER 0)
-    _popsift_add_set(custom "${_custom_dir}" "")
+    _popsift_add_set(custom "${_custom_dir}" "" "${_imgs}")
     _popsift_report(custom "present" "${_count} images, ${_custom_dir}")
   else()
     _popsift_report(custom "missing" "skipped: no .pgm/.ppm files in ${_custom_dir}")

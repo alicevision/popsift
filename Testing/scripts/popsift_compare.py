@@ -4,20 +4,21 @@
 A run is either 'vlfeat' (VLFeat's sift CLI) or the name of a parameter set
 from Testing/paramsets.json, which is passed to popsift-demo.
 
-For every image, both runs get their own work directory. The outputs are
-sorted, and popsift-compareSiftFiles compares the first run against the
-second: it pairs their features by position, scale and orientation, and
-writes matched.csv, only_a.csv and only_b.csv, plus the descriptor nearest
-neighbour of every feature in the other run (desc_nn_a.csv, desc_nn_b.csv).
-Every command is printed, and
-each image ends with a one-line verdict. A report with statistics per image
-and for the set (summary.csv, summary.json, report.md) is written to
-<work dir>/<set>/report_<a>__vs__<b>/. With numpy and matplotlib installed,
-each image and the report also get cdf.png, and each image unmatched.png.
+For every image, both runs get their own work directory
+(<work dir>/<set>/<image>/<run>/). The outputs are sorted, and
+popsift-compareSiftFiles compares the first run against the second: it pairs
+their features by position, scale and orientation, and writes matched.csv,
+only_a.csv and only_b.csv, plus the descriptor nearest neighbour of every
+feature in the other run (desc_nn_a.csv, desc_nn_b.csv). Every command is
+printed, and each image ends with a one-line verdict. A report with
+statistics per image and for the set (summary.csv, summary.json, report.md)
+is written to <work dir>/<set>/report_<a>__vs__<b>/. With numpy and
+matplotlib installed, each image and the report also get cdf.png, and each
+image unmatched.png.
 
 Nothing fails on the statistics unless limits are given (--min-recall,
---min-precision, --max-desc-dist, --min-nn-agreement); without them an image only fails if a run
-crashes, or exactly one run finds no features.
+--min-precision, --max-desc-dist, --min-nn-agreement); without them an image
+only fails if a run crashes, or exactly one run finds no features.
 
 The paths to the binaries, the parameter sets and the image sets come from
 the popsift-testing.json file that CMake writes into the build directory.
@@ -25,7 +26,14 @@ the popsift-testing.json file that CMake writes into the build directory.
     popsift_compare.py --tools <build>/popsift-testing.json \\
                        --images handcrafted vlfeat-emulation vlfeat
 
-The exit code is 0 if every image passed, 1 otherwise.
+--image limits this to one image. --step does one step of it, which is how
+the CTest tests use the script: 'run' runs one run on one image, 'compare'
+compares the earlier runs of one image, and 'report' writes the set report
+from the images compared so far.
+
+PopSift runs need a GPU; popsift-gpu-probe tells whether there is one. The
+exit code is 0 if every image passed, 77 if nothing could be done for lack
+of a GPU, and 1 otherwise.
 """
 
 from __future__ import annotations
@@ -249,15 +257,16 @@ def to_gray_pgm(src, dest):
                 for x, y, z in zip(r, g, b)]
     if maxval != 255:
         data = [(v * 255 + maxval // 2) // maxval for v in data]
-    tmp = dest + ".tmp"
+    tmp = f"{dest}.{os.getpid()}.tmp"  # runs of one image may convert at once
     with open(tmp, "wb") as f:
         f.write(b"P5\n%d %d\n255\n" % (width, height))
         f.write(bytes(data))
     os.replace(tmp, dest)
 
 
-def prepare_input(src, image_dir):
-    """Returns a binary 8-bit PGM of src: src itself if it already is one."""
+def input_path(src, image_dir):
+    """The binary 8-bit PGM that the runs read: src itself if it is one,
+    else the converted copy in image_dir."""
     if src.lower().endswith(".pgm"):
         with open(src, "rb") as f:
             head = f.read(64)
@@ -265,8 +274,14 @@ def prepare_input(src, image_dir):
         fields = re.sub(rb"#[^\n]*\n", b" ", head).split()
         if len(fields) >= 4 and fields[0] == b"P5" and fields[3] == b"255":
             return src
-    dest = os.path.join(image_dir, "input.pgm")
-    if not os.path.exists(dest) or os.path.getmtime(dest) < os.path.getmtime(src):
+    return os.path.join(image_dir, "input.pgm")
+
+
+def prepare_input(src, image_dir):
+    """Returns input_path(), converting src first if needed."""
+    dest = input_path(src, image_dir)
+    if dest != src and (not os.path.exists(dest)
+                        or os.path.getmtime(dest) < os.path.getmtime(src)):
         print(f"-- Converting {os.path.basename(src)} to an 8-bit PGM", flush=True)
         to_gray_pgm(src, dest)
     return dest
@@ -320,6 +335,25 @@ class RunResult:
         self.workdir = workdir
 
 
+SORTED_FEATURES = "features-sorted.txt"
+SKIPPED_MARKER = "skipped.txt"
+
+
+def run_dir(image_dir, spec):
+    return os.path.join(image_dir, safe_name(spec))
+
+
+def load_run(spec, image_dir):
+    """The RunResult of an earlier run on this image, or None."""
+    workdir = run_dir(image_dir, spec)
+    path = os.path.join(workdir, SORTED_FEATURES)
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8", errors="replace") as f:
+        count = sum(1 for line in f if line.strip())
+    return RunResult(spec, path, count, None, workdir)
+
+
 class Runner:
     """Runs vlfeat or popsift parameter sets on images, once per pair."""
 
@@ -327,35 +361,69 @@ class Runner:
         self.tools = tools
         self.paramsets = load_paramsets(tools["paramsets"])
         self._cache = {}
+        self._gpu = None
 
-    def check(self, specs):
+    def check(self, specs, compare=True):
         """Fails early if a run cannot work, before any image is processed."""
-        needed = {"compare_sift_files"}
+        needed = {"compare_sift_files"} if compare else set()
         for spec in specs:
             if spec == "vlfeat":
                 needed.add("vlfeat_sift")
             else:
                 resolve_paramset(self.paramsets, spec)
-                needed.add("popsift_demo")
+                needed.update(("popsift_demo", "gpu_probe"))
         hints = {
             "vlfeat_sift": "cmake --build <build> --target vlfeat_sift",
             "popsift_demo": "cmake --build <build> --target popsift-demo",
+            "gpu_probe": "cmake --build <build> --target popsift-gpu-probe",
             "compare_sift_files":
                 "cmake --build <build> --target popsift-compareSiftFiles",
         }
         for key in sorted(needed):
-            path = self.tools[key]
+            path = self.tools.get(key, "")
             if not os.path.isfile(path):
-                raise CompareError(f"{path} does not exist. Build it with: "
-                                   f"{hints[key]}")
+                raise CompareError(f"{path or key} does not exist. Build it "
+                                   f"with: {hints[key]}")
+
+    def gpu_available(self):
+        """Runs popsift-gpu-probe once. Returns (usable, its message)."""
+        if self._gpu is None:
+            try:
+                proc = subprocess.run([self.tools["gpu_probe"]],
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.STDOUT)
+            except OSError as e:
+                raise CompareError(f"cannot run {self.tools['gpu_probe']}: "
+                                   f"{e.strerror}")
+            message = proc.stdout.decode("utf-8", "replace").strip()
+            if proc.returncode not in (0, SKIP):
+                raise CompareError(f"popsift-gpu-probe failed with exit code "
+                                   f"{proc.returncode}: {message}")
+            self._gpu = (proc.returncode == 0, message)
+        return self._gpu
 
     def run(self, spec, pgm, image_dir):
+        """Runs spec on pgm. Returns a RunResult, None if the run failed,
+        or SKIP if spec needs a GPU and there is none."""
         cache_key = (spec, pgm)
         if cache_key in self._cache:
             return self._cache[cache_key]
-        workdir = os.path.join(image_dir, safe_name(spec))
+        workdir = run_dir(image_dir, spec)
         os.makedirs(workdir, exist_ok=True)
+        # Nothing of an earlier run may be mistaken for this one's result.
+        for name in (SORTED_FEATURES, SKIPPED_MARKER):
+            if os.path.exists(os.path.join(workdir, name)):
+                os.remove(os.path.join(workdir, name))
         print(f"-- {spec}", flush=True)
+        if spec != "vlfeat":
+            usable, message = self.gpu_available()
+            if not usable:
+                print(f"   skipped: {message}", flush=True)
+                with open(os.path.join(workdir, SKIPPED_MARKER), "w",
+                          encoding="utf-8") as f:
+                    f.write(message + "\n")
+                self._cache[cache_key] = SKIP
+                return SKIP
         if spec == "vlfeat":
             raw = os.path.join(workdir, "vlfeat.sift")
             cmd = [self.tools["vlfeat_sift"], "--verbose",
@@ -375,7 +443,7 @@ class Runner:
                   + ("" if os.path.exists(raw) else ", no feature file")
                   + (":\n" + tail if tail else ""), flush=True)
         else:
-            sorted_path = os.path.join(workdir, "features-sorted.txt")
+            sorted_path = os.path.join(workdir, SORTED_FEATURES)
             count = sort_features(raw, sorted_path)
             print(f"   {count} features in {seconds:.2f}s", flush=True)
             result = RunResult(spec, sorted_path, count, seconds, workdir)
@@ -387,9 +455,7 @@ class Runner:
 
         allow_empty accepts two runs that both found no features.
         """
-        outdir = os.path.join(image_dir,
-                              f"{safe_name(a.spec)}__vs__{safe_name(b.spec)}")
-        os.makedirs(outdir, exist_ok=True)
+        outdir = clear_compare_dir(image_dir, a.spec, b.spec)
         print(f"-- compare {a.spec} against {b.spec}", flush=True)
         cmd = [self.tools["compare_sift_files"],
                "--max-avg-dist", str(max_avg_dist),
@@ -409,6 +475,27 @@ class Runner:
         if os.path.exists(os.path.join(outdir, "matched.csv")):
             stats = match_stats.image_stats(outdir)
         return CompareResult(code == 0, avg, outdir, stats)
+
+
+# The files of popsift-compareSiftFiles --match-dir.
+MATCH_FILES = ("matched.csv", "only_a.csv", "only_b.csv",
+               "desc_nn_a.csv", "desc_nn_b.csv")
+
+
+def compare_dir(image_dir, spec_a, spec_b):
+    return os.path.join(image_dir,
+                        f"{safe_name(spec_a)}__vs__{safe_name(spec_b)}")
+
+
+def clear_compare_dir(image_dir, spec_a, spec_b):
+    """Creates compare_dir() and removes the match files of an earlier
+    comparison, which the set report would otherwise pick up."""
+    outdir = compare_dir(image_dir, spec_a, spec_b)
+    os.makedirs(outdir, exist_ok=True)
+    for name in MATCH_FILES:
+        if os.path.exists(os.path.join(outdir, name)):
+            os.remove(os.path.join(outdir, name))
+    return outdir
 
 
 class CompareResult:
@@ -432,35 +519,140 @@ def load_plotting():
     return sift_plots
 
 
-# --- command line -------------------------------------------------------------
+# --- one image set ------------------------------------------------------------
 
-def compare_image_set(tools, images, run_a, run_b, work_dir, max_avg_dist,
-                      limits=None, plots=True):
-    name, folder = resolve_images(tools, images)
-    runner = Runner(tools)
-    runner.check([run_a, run_b])
-    files = find_images(folder)
-    if not files:
-        raise CompareError(f"no .pgm/.ppm images found under {folder}")
-    expectations = load_expectations(folder)
-    set_dir = os.path.join(work_dir, safe_name(name.replace("/", "_")))
-    print(f"Comparing {run_a} against {run_b} on {len(files)} image(s) "
-          f"of '{name}' in {folder}")
-    print(f"Work directory: {set_dir}")
-    limits = limits or {}
+# Exit code of a step that could not run for lack of a GPU. CTest reports
+# such tests as skipped (SKIP_RETURN_CODE).
+SKIP = 77
+
+
+class ImageSet:
+    """The images of a set and where their outputs go."""
+
+    def __init__(self, tools, images, work_dir):
+        self.name, self.folder = resolve_images(tools, images)
+        self.dir = os.path.join(work_dir,
+                                safe_name(self.name.replace("/", "_")))
+        self.expectations = load_expectations(self.folder)
+
+    def files(self):
+        files = find_images(self.folder)
+        if not files:
+            raise CompareError(f"no .pgm/.ppm images found under {self.folder}")
+        return files
+
+    def find(self, key):
+        """The image named key: its path relative to the set, with or
+        without extension, or its file name without extension."""
+        files = self.files()
+        found = [f for f in files
+                 if key in (self.rel(f), os.path.splitext(self.rel(f))[0],
+                            os.path.splitext(os.path.basename(f))[0])]
+        if len(found) != 1:
+            what = "no image" if not found else "several images"
+            raise CompareError(f"{what} named '{key}' in {self.folder}")
+        return found[0]
+
+    def rel(self, src):
+        return os.path.relpath(src, self.folder)
+
+    def image_dir(self, src):
+        """The work directory of one image, named after it."""
+        return os.path.join(self.dir,
+                            safe_name(os.path.splitext(self.rel(src))[0]))
+
+    def allow_empty(self, src):
+        expect = self.expectations.get(os.path.normpath(self.rel(src)), {})
+        return bool(expect.get("allow_empty"))
+
+    def report_dir(self, run_a, run_b):
+        return os.path.join(self.dir,
+                            f"report_{safe_name(run_a)}__vs__{safe_name(run_b)}")
+
+
+def compare_image(runner, imgset, src, a, b, max_avg_dist, limits, plotting):
+    """Compares the runs a and b of one image and prints the verdict.
+
+    Returns the report entry of the image (None if the comparison produced
+    no statistics) and whether it passed.
+    """
+    rel = imgset.rel(src)
+    image_dir = imgset.image_dir(src)
+    pgm = input_path(src, image_dir)
+    res = runner.compare(a, b, image_dir, max_avg_dist, imgset.allow_empty(src))
+    problems = []
+    entry = None
+    if res.stats is not None:
+        problems = match_stats.check_limits(res.stats, **limits)
+        entry = {"name": rel, "input": pgm, "match_dir": res.match_dir,
+                 "stats": res.stats}
+        if plotting is not None:
+            plotting.render_unmatched(
+                pgm, res.match_dir,
+                os.path.join(res.match_dir, "unmatched.png"),
+                label_a=a.spec, label_b=b.spec)
+            plotting.render_cdfs(
+                os.path.join(res.match_dir, "cdf.png"),
+                f"{rel}: a = {a.spec}, b = {b.spec}",
+                [(rel, res.stats["_rows"])])
+    passed = res.passed and not problems
+    verdict = "PASSED" if passed else "FAILED"
+    detail = match_stats.one_line(res.stats) if res.stats else \
+        f"{a.count} vs {b.count} features"
+    print(f"{verdict} {rel}: {detail}")
+    for p in problems:
+        print(f"   limit: {p}")
+    if not passed:
+        print(f"   details: {res.match_dir}")
+    return entry, passed
+
+
+def write_set_report(imgset, run_a, run_b, reported, plotting):
+    """Writes the report of the set over the reported images."""
+    report_dir = imgset.report_dir(run_a, run_b)
+    total = match_stats.set_stats([r["stats"] for r in reported])
+    if plotting is not None:
+        os.makedirs(report_dir, exist_ok=True)
+        plotting.render_cdfs(
+            os.path.join(report_dir, "cdf.png"),
+            f"{imgset.name}, {len(reported)} image(s): a = {run_a}, b = {run_b}",
+            [(imgset.name, total["_rows"])])
+    match_stats.write_report(report_dir, run_a, run_b, imgset.name, reported,
+                             total)
+    print(f"Set: {match_stats.one_line(total)}")
+    print(f"Report: {report_dir}/report.md (also summary.csv, summary.json)")
+
+
+def plotting_or_note(plots):
     plotting = load_plotting() if plots else None
     if plots and plotting is None:
         print("Note: install numpy and matplotlib (Testing/analysis/"
               "requirements.txt) to get unmatched.png and cdf.png.")
+    return plotting
+
+
+def compare_image_set(tools, images, run_a, run_b, work_dir, max_avg_dist,
+                      limits=None, plots=True, only=None):
+    """Runs and compares a and b on every image of a set, or only on the
+    image named only. Writes the set report."""
+    imgset = ImageSet(tools, images, work_dir)
+    runner = Runner(tools)
+    runner.check([run_a, run_b])
+    files = [imgset.find(only)] if only else imgset.files()
+    print(f"Comparing {run_a} against {run_b} on {len(files)} image(s) "
+          f"of '{imgset.name}' in {imgset.folder}")
+    print(f"Work directory: {imgset.dir}")
+    limits = limits or {}
+    plotting = plotting_or_note(plots)
 
     failed = []
+    skipped = []
     reported = []
     for index, src in enumerate(files, 1):
-        rel = os.path.relpath(src, folder)
+        rel = imgset.rel(src)
         print(f"\n==================== [{index}/{len(files)}] {rel} "
               "====================", flush=True)
-        stem = os.path.splitext(rel)[0]
-        image_dir = os.path.join(set_dir, f"{index:04d}-{safe_name(stem)}")
+        image_dir = imgset.image_dir(src)
         os.makedirs(image_dir, exist_ok=True)
         try:
             pgm = prepare_input(src, image_dir)
@@ -470,60 +662,123 @@ def compare_image_set(tools, images, run_a, run_b, work_dir, max_avg_dist,
             continue
         a = runner.run(run_a, pgm, image_dir)
         b = runner.run(run_b, pgm, image_dir)
+        if SKIP in (a, b):
+            print(f"SKIPPED {rel}: no usable GPU")
+            skipped.append(rel)
+            continue
         if a is None or b is None:
             print(f"FAILED {rel}: a run did not produce features "
                   f"(see {image_dir})")
             failed.append(rel)
             continue
-        expect = expectations.get(os.path.normpath(rel), {})
-        res = runner.compare(a, b, image_dir, max_avg_dist,
-                             bool(expect.get("allow_empty")))
-        problems = []
-        if res.stats is not None:
-            problems = match_stats.check_limits(res.stats, **limits)
-            reported.append({"name": rel, "input": pgm,
-                             "match_dir": res.match_dir, "stats": res.stats})
-            if plotting is not None:
-                plotting.render_unmatched(
-                    pgm, res.match_dir,
-                    os.path.join(res.match_dir, "unmatched.png"),
-                    label_a=run_a, label_b=run_b)
-                plotting.render_cdfs(
-                    os.path.join(res.match_dir, "cdf.png"),
-                    f"{rel}: a = {run_a}, b = {run_b}",
-                    [(rel, res.stats["_rows"])])
-        passed = res.passed and not problems
-        verdict = "PASSED" if passed else "FAILED"
-        detail = match_stats.one_line(res.stats) if res.stats else \
-            f"{a.count} vs {b.count} features"
-        print(f"{verdict} {rel}: {detail}")
-        for p in problems:
-            print(f"   limit: {p}")
+        entry, passed = compare_image(runner, imgset, src, a, b, max_avg_dist,
+                                      limits, plotting)
+        if entry is not None:
+            reported.append(entry)
         if not passed:
             failed.append(rel)
 
     print("\n==================== Summary ====================")
     if reported:
-        report_dir = os.path.join(
-            set_dir, f"report_{safe_name(run_a)}__vs__{safe_name(run_b)}")
-        total = match_stats.set_stats([r["stats"] for r in reported])
-        if plotting is not None:
-            os.makedirs(report_dir, exist_ok=True)
-            plotting.render_cdfs(
-                os.path.join(report_dir, "cdf.png"),
-                f"{name}, {len(reported)} image(s): a = {run_a}, b = {run_b}",
-                [(name, total["_rows"])])
-        match_stats.write_report(report_dir, run_a, run_b, name, reported,
-                                 total)
-        print(f"Set: {match_stats.one_line(total)}")
-        print(f"Report: {report_dir}/report.md (also summary.csv, "
-              "summary.json)")
-    print(f"{len(files) - len(failed)} of {len(files)} image(s) passed")
+        write_set_report(imgset, run_a, run_b, reported, plotting)
+    done = len(files) - len(skipped)
+    if done:
+        print(f"{done - len(failed)} of {done} image(s) passed"
+              + (f", {len(skipped)} skipped for lack of a GPU" if skipped else ""))
+    else:
+        print(f"All {len(skipped)} image(s) skipped for lack of a GPU")
     for rel in failed:
         print(f"  failed: {rel}")
     if failed:
-        print(f"Details are in the per-image folders under {set_dir}")
-    return 0 if not failed else 1
+        print(f"Details are in the per-image folders under {imgset.dir}")
+        return 1
+    return SKIP if skipped and not done else 0
+
+
+# --- single steps, one CTest test each ----------------------------------------
+
+def step_run(tools, images, key, spec, work_dir):
+    """Runs one spec on one image."""
+    imgset = ImageSet(tools, images, work_dir)
+    runner = Runner(tools)
+    runner.check([spec], compare=False)
+    src = imgset.find(key)
+    rel = imgset.rel(src)
+    image_dir = imgset.image_dir(src)
+    os.makedirs(image_dir, exist_ok=True)
+    print(f"Running {spec} on {rel} of '{imgset.name}'")
+    print(f"Work directory: {run_dir(image_dir, spec)}")
+    result = runner.run(spec, prepare_input(src, image_dir), image_dir)
+    if result is SKIP:
+        print(f"SKIPPED {spec} on {rel}: no usable GPU")
+        return SKIP
+    if result is None:
+        print(f"FAILED {spec} on {rel}: no features written, see "
+              f"{os.path.join(run_dir(image_dir, spec), 'log.txt')}")
+        return 1
+    print(f"PASSED {spec} on {rel}: {result.count} features in "
+          f"{result.seconds:.2f}s")
+    return 0
+
+
+def step_compare(tools, images, key, run_a, run_b, work_dir, max_avg_dist,
+                 limits, plots):
+    """Compares the earlier runs a and b of one image."""
+    imgset = ImageSet(tools, images, work_dir)
+    runner = Runner(tools)
+    runner.check([], compare=True)
+    src = imgset.find(key)
+    rel = imgset.rel(src)
+    image_dir = imgset.image_dir(src)
+    print(f"Comparing {run_a} against {run_b} on {rel} of '{imgset.name}'")
+    clear_compare_dir(image_dir, run_a, run_b)
+    runs = []
+    for spec in (run_a, run_b):
+        run = load_run(spec, image_dir)
+        if run is None:
+            workdir = run_dir(image_dir, spec)
+            if os.path.exists(os.path.join(workdir, SKIPPED_MARKER)):
+                print(f"SKIPPED {rel}: the {spec} run was skipped for lack "
+                      "of a GPU")
+                return SKIP
+            print(f"FAILED {rel}: the {spec} run left no features in "
+                  f"{workdir}; it failed or did not run")
+            return 1
+        runs.append(run)
+    _, passed = compare_image(runner, imgset, src, runs[0], runs[1],
+                              max_avg_dist, limits, plotting_or_note(plots))
+    return 0 if passed else 1
+
+
+def step_report(tools, images, run_a, run_b, work_dir, plots):
+    """Writes the set report from the image comparisons that exist."""
+    imgset = ImageSet(tools, images, work_dir)
+    files = find_images(imgset.folder)
+    if not files:
+        # The download of the set failed, which its own test reports.
+        print(f"SKIPPED: no images in {imgset.folder}")
+        return SKIP
+    reported = []
+    missing = []
+    for src in files:
+        image_dir = imgset.image_dir(src)
+        match_dir = compare_dir(image_dir, run_a, run_b)
+        if not os.path.exists(os.path.join(match_dir, "matched.csv")):
+            missing.append(imgset.rel(src))
+            continue
+        reported.append({"name": imgset.rel(src),
+                         "input": input_path(src, image_dir),
+                         "match_dir": match_dir,
+                         "stats": match_stats.image_stats(match_dir)})
+    print(f"Report of {run_a} against {run_b} on '{imgset.name}': "
+          f"{len(reported)} compared image(s)")
+    for rel in missing:
+        print(f"  not compared: {rel}")
+    if not reported:
+        print("SKIPPED: no image of the set was compared")
+        return SKIP
+    write_set_report(imgset, run_a, run_b, reported, plotting_or_note(plots))
+    return 0
 
 
 def main(argv=None):
@@ -536,6 +791,14 @@ def main(argv=None):
     parser.add_argument("--images", required=True,
                         help="a configured image set (e.g. handcrafted, "
                              "oxford/boat) or a folder of .pgm/.ppm files")
+    parser.add_argument("--image",
+                        help="only this image of the set: its path in the "
+                             "set, with or without extension")
+    parser.add_argument("--step", choices=("run", "compare", "report"),
+                        help="do one step only: 'run' one run on --image, "
+                             "'compare' the earlier runs a and b of --image, "
+                             "or 'report' on the compared images of the set. "
+                             "Default: all of them")
     parser.add_argument("--work-dir",
                         help="where outputs go (default: work_dir from --tools)")
     parser.add_argument("--max-avg-dist", type=float, default=-1.0,
@@ -558,9 +821,16 @@ def main(argv=None):
                              "neighbour (negative: off)")
     parser.add_argument("--no-plots", action="store_true",
                         help="do not write unmatched.png and cdf.png")
-    parser.add_argument("run_a", help="the run under test (a)")
-    parser.add_argument("run_b", help="the reference it is compared with (b)")
+    parser.add_argument("runs", nargs="+", metavar="run",
+                        help="the run under test (a) and the reference it is "
+                             "compared with (b); only one run with --step run")
     args = parser.parse_args(argv)
+
+    wanted = 1 if args.step == "run" else 2
+    if len(args.runs) != wanted:
+        parser.error(f"expected {wanted} run(s), got {len(args.runs)}")
+    if args.step in ("run", "compare") and not args.image:
+        parser.error(f"--step {args.step} needs --image")
 
     try:
         tools = load_tools(args.tools)
@@ -569,9 +839,18 @@ def main(argv=None):
                   "min_precision": args.min_precision,
                   "max_desc_dist": args.max_desc_dist,
                   "min_nn_agreement": args.min_nn_agreement}
-        return compare_image_set(tools, args.images, args.run_a, args.run_b,
-                                 work_dir, args.max_avg_dist, limits,
-                                 plots=not args.no_plots)
+        plots = not args.no_plots
+        if args.step == "run":
+            return step_run(tools, args.images, args.image, args.runs[0],
+                            work_dir)
+        if args.step == "compare":
+            return step_compare(tools, args.images, args.image, *args.runs,
+                                work_dir, args.max_avg_dist, limits, plots)
+        if args.step == "report":
+            return step_report(tools, args.images, *args.runs, work_dir,
+                               plots)
+        return compare_image_set(tools, args.images, *args.runs, work_dir,
+                                 args.max_avg_dist, limits, plots, args.image)
     except CompareError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
