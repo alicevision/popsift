@@ -137,18 +137,18 @@ def main(argv=None):
 
         print("\n==================== Summary ====================")
         print(f"Outputs: {work_dir}")
-        print("\nFeatures per image (mean):")
+        print("\nKeypoints per image (mean):")
         for s in specs:
             c = counts[s]
             mean = f"{sum(c) / len(c):.0f}" if c else "-"
             print(f"  {s:24} {mean:>8}   ({len(c)} image(s))")
-        print("\nMatched features of A vs B, pooled over all images "
+        print("\nMatched keypoints of A vs B, pooled over all images "
               "(recall = matched/B, precision = matched/A; rotation is B - A):")
         label_w = max(len(f"{a} vs {b}") for a, b in pairs)
         print(f"  {'':{label_w}}  {'recall':>7} {'precis.':>7} "
-              f"{'med pos':>8} {'med |rot|':>9} {'mean rot':>8} "
-              f"{'med desc':>8} {'same pose':>9} {'NN agr a':>8} "
-              f"{'NN agr b':>8}")
+              f"{'med px':>8} {'med |rot|':>9} {'mean rot':>8} "
+              f"{'med desc':>8} {'same pose':>9} {'agree a':>8} "
+              f"{'agree b':>8}")
         plotting = pc.load_plotting()
         series = []
         for a, b in pairs:
@@ -162,11 +162,11 @@ def main(argv=None):
             f = match_stats._fmt
             print(f"  {pair:{label_w}}  {f(total['recall']):>7} "
                   f"{f(total['precision']):>7} "
-                  f"{f(m['pos_dist']['median']):>8} "
-                  f"{f(m['abs_ori_diff']['median'], 2):>9} "
-                  f"{f(m['ori_diff']['mean'], 2):>8} "
-                  f"{f(m['desc_dist']['median'], 2):>8} "
-                  f"{f(m['same_pose_desc_dist']['median'], 2):>9} "
+                  f"{f(m['pos_dist_px']['median']):>8} "
+                  f"{f(m['abs_ori_diff_deg']['median'], 2):>9} "
+                  f"{f(m['ori_diff_deg']['mean'], 2):>8} "
+                  f"{f(m['desc_dist_l2']['median'], 2):>8} "
+                  f"{f(m['same_pose_desc_dist_l2']['median'], 2):>9} "
                   f"{f(total['nn_agreement_a']):>8} "
                   f"{f(total['nn_agreement_b']):>8}")
             report_dir = os.path.join(
@@ -179,11 +179,13 @@ def main(argv=None):
                 series.append((pair, total["_rows"]))
             match_stats.write_report(report_dir, a, b, args.images, entries,
                                      total)
-        print("  (med desc, same pose: median descriptor distance of matched "
-              "pairs at most\n   "
-              f"{match_stats.SAME_POSE_PX} px and {match_stats.SAME_POSE_DEG} "
-              "deg apart; NN agr: share of matched features whose most\n"
-              "   similar descriptor in the other run is their match)")
+        print("  (med px: median pixel distance; med desc: median descriptor "
+              "distance (L2);\n   same pose: the same for matched pairs at "
+              f"most {match_stats.SAME_POSE_PX} px and "
+              f"{match_stats.SAME_POSE_DEG} deg apart;\n   agree: "
+              "nearest-descriptor agreement, the share of matched keypoints "
+              "whose most\n   similar descriptor in the other run is their "
+              "match)")
         print(f"\nReports: {work_dir}/report_<A>__vs__<B>/report.md")
         if len(series) > 1:
             out = os.path.join(work_dir, "cdf_all_pairs.png")

@@ -78,6 +78,19 @@ bool writeMatchFiles( const std::string&            dir,
                       const std::vector<feat_t>&    l_b,
                       const std::vector<MatchPair>& pairs );
 
+/** Writes desc_bins.csv into dir: for every one of the 128 descriptor
+ * elements, the number of matched pairs, the sum of the differences b - a and
+ * the sum of their absolute values. Once over all pairs ("matched") and once
+ * over the pairs at most same_pose_px and same_pose_deg apart ("same_pose").
+ * @return false if the file cannot be written
+ */
+bool writeDescBinsFile( const std::string&            dir,
+                        const std::vector<feat_t>&    l_a,
+                        const std::vector<feat_t>&    l_b,
+                        const std::vector<MatchPair>& pairs,
+                        float                         same_pose_px,
+                        float                         same_pose_deg );
+
 /** Signed orientation difference b - a in degrees, wrapped to [-180,180).
  */
 float signedAngleDiffDegrees( float ori_a, float ori_b );

@@ -13,8 +13,8 @@ feature in the other run (desc_nn_a.csv, desc_nn_b.csv). Every command is
 printed, and each image ends with a one-line verdict. A report with
 statistics per image and for the set (summary.csv, summary.json, report.md)
 is written to <work dir>/<set>/report_<a>__vs__<b>/. With numpy and
-matplotlib installed, each image and the report also get cdf.png, and each
-image unmatched.png.
+matplotlib installed, each image and the report also get cdf.png, sorted.png
+and descriptor_bins.png, and each image unmatched.png and image_heatmap.png.
 
 Nothing fails on the statistics unless limits are given (--min-recall,
 --min-precision, --max-desc-dist, --min-nn-agreement); without them an image
@@ -461,7 +461,9 @@ class Runner:
                "--max-avg-dist", str(max_avg_dist),
                "-o", os.path.join(outdir, "comparison.txt"),
                "-d", os.path.join(outdir, "descriptor-distances.txt"),
-               "--match-dir", outdir] \
+               "--match-dir", outdir,
+               "--same-pose-px", str(match_stats.SAME_POSE_PX),
+               "--same-pose-deg", str(match_stats.SAME_POSE_DEG)] \
             + (["--allow-empty"] if allow_empty else []) \
             + [a.features, b.features]
         code, output, _ = run_command(cmd, outdir,
@@ -591,10 +593,15 @@ def compare_image(runner, imgset, src, a, b, max_avg_dist, limits, plotting):
                 pgm, res.match_dir,
                 os.path.join(res.match_dir, "unmatched.png"),
                 label_a=a.spec, label_b=b.spec)
-            plotting.render_cdfs(
-                os.path.join(res.match_dir, "cdf.png"),
-                f"{rel}: a = {a.spec}, b = {b.spec}",
-                [(rel, res.stats["_rows"])])
+            title = f"{rel}: a = {a.spec}, b = {b.spec}"
+            plotting.render_cdfs(os.path.join(res.match_dir, "cdf.png"),
+                                 title, [(rel, res.stats["_rows"])])
+            render_differences(plotting, res.match_dir, title,
+                               res.stats["_rows"],
+                               [plotting.read_desc_bins(res.match_dir)])
+            plotting.render_image_heatmap(
+                pgm, plotting.read_matches(res.match_dir),
+                os.path.join(res.match_dir, "image_heatmap.png"), title)
     passed = res.passed and not problems
     verdict = "PASSED" if passed else "FAILED"
     detail = match_stats.one_line(res.stats) if res.stats else \
@@ -607,16 +614,29 @@ def compare_image(runner, imgset, src, a, b, max_avg_dist, limits, plotting):
     return entry, passed
 
 
+def render_differences(plotting, out_dir, title, rows, desc_bins):
+    """Writes sorted.png and, if desc_bins.csv exists, descriptor_bins.png
+    (the plots of the 2021 comparison scripts) into out_dir."""
+    plotting.render_sorted(os.path.join(out_dir, "sorted.png"), title, rows)
+    bins = plotting.merge_desc_bins(desc_bins)
+    if bins:
+        plotting.render_desc_bins(
+            os.path.join(out_dir, "descriptor_bins.png"), title, bins)
+
+
 def write_set_report(imgset, run_a, run_b, reported, plotting):
     """Writes the report of the set over the reported images."""
     report_dir = imgset.report_dir(run_a, run_b)
     total = match_stats.set_stats([r["stats"] for r in reported])
     if plotting is not None:
         os.makedirs(report_dir, exist_ok=True)
-        plotting.render_cdfs(
-            os.path.join(report_dir, "cdf.png"),
-            f"{imgset.name}, {len(reported)} image(s): a = {run_a}, b = {run_b}",
-            [(imgset.name, total["_rows"])])
+        title = (f"{imgset.name}, {len(reported)} image(s): a = {run_a}, "
+                 f"b = {run_b}")
+        plotting.render_cdfs(os.path.join(report_dir, "cdf.png"), title,
+                             [(imgset.name, total["_rows"])])
+        render_differences(plotting, report_dir, title, total["_rows"],
+                           [plotting.read_desc_bins(r["match_dir"])
+                            for r in reported])
     match_stats.write_report(report_dir, run_a, run_b, imgset.name, reported,
                              total)
     print(f"Set: {match_stats.one_line(total)}")
@@ -627,7 +647,7 @@ def plotting_or_note(plots):
     plotting = load_plotting() if plots else None
     if plots and plotting is None:
         print("Note: install numpy and matplotlib (Testing/analysis/"
-              "requirements.txt) to get unmatched.png and cdf.png.")
+              "requirements.txt) to get the plots.")
     return plotting
 
 
@@ -820,7 +840,7 @@ def main(argv=None):
                              "geometric match as descriptor nearest "
                              "neighbour (negative: off)")
     parser.add_argument("--no-plots", action="store_true",
-                        help="do not write unmatched.png and cdf.png")
+                        help="do not write the plots")
     parser.add_argument("runs", nargs="+", metavar="run",
                         help="the run under test (a) and the reference it is "
                              "compared with (b); only one run with --step run")

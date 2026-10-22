@@ -41,26 +41,35 @@ of a, the feature of b with the most similar descriptor (`desc_nn_a.csv`), and
 the same for b in a (`desc_nn_b.csv`). `match_stats.py` turns them into
 statistics:
 
-- counts, recall (matched / features of b) and precision (matched / features
-  of a),
-- position distance, dx, dy, scale ratio, rotation difference (b - a) and
-  descriptor distance of the matched pairs, each with mean, median, p90, p99,
-  max and a histogram,
+- counts, recall (matched / keypoints of b) and precision (matched /
+  keypoints of a),
+- pixel distance, offset x and y, scale ratio, rotation difference (b - a)
+  and descriptor distance of the matched pairs, each with mean, median, p90,
+  p99, max and a histogram,
 - the descriptor distance of the matched pairs with the same pose (at most
   0.25 px and 2 degrees apart), whose descriptors should be nearly identical,
-- the position distance from every feature to its descriptor nearest
-  neighbour in the other run, and the NN agreement: the share of matched
-  features whose descriptor nearest neighbour is their geometric match.
-  A feature whose most similar descriptor belongs to a keypoint elsewhere
-  points to a serious descriptor problem.
+- the pixel distance from every keypoint to the keypoint with the most
+  similar descriptor in the other run, and the nearest-descriptor agreement:
+  the share of matched keypoints whose most similar descriptor is their
+  geometric match. A keypoint whose most similar descriptor belongs to a
+  keypoint elsewhere points to a serious descriptor problem.
+
+Descriptor distance is always the L2 (Euclidean) distance of the 128
+descriptor values in byte units (0-255 per value). In `summary.csv` and
+`summary.json` every quantity carries its unit in its name: `_px` for pixels,
+`_deg` for degrees and `_l2` for descriptor distances, e.g. `pos_dist_px`,
+`ori_diff_deg`, `desc_dist_l2`. `Testing/analysis/glossary.md` explains all
+terms.
 
 Per set, the statistics are pooled over all images and also given as the
 spread (min / median / max) of the per-image values. The set report goes to
 `<work dir>/<set>/report_<a>__vs__<b>/` as `summary.csv`, `summary.json` and
 `report.md`, and a one-line summary per image and per set is printed.
 When numpy and matplotlib are installed (`Testing/analysis/requirements.txt`),
-every image folder and the report also get `cdf.png`, and every image folder
-`unmatched.png`, see `Testing/analysis/README.md`. `--no-plots` skips them.
+every image folder and the report also get `cdf.png`, `sorted.png` and
+`descriptor_bins.png`, and every image folder `unmatched.png` and
+`image_heatmap.png`, see `Testing/analysis/README.md`. `--no-plots` skips
+them.
 
 An image fails when a run crashes or when exactly one run finds no features.
 An image where neither run finds features also fails, unless the set's folder
@@ -77,8 +86,8 @@ a negative value (the default) disables a limit:
 | --- | --- |
 | `--min-recall R` | recall < R |
 | `--min-precision P` | precision < P |
-| `--max-desc-dist D` | median descriptor distance of the matched pairs > D |
-| `--min-nn-agreement N` | NN agreement of a or of b < N |
+| `--max-desc-dist D` | median descriptor distance (L2) of the matched pairs > D |
+| `--min-nn-agreement N` | nearest-descriptor agreement of a or of b < N |
 | `--max-avg-dist D` | average best-match descriptor distance > D |
 
 `--image <name>` restricts the script to one image of the set (its path in
@@ -102,9 +111,10 @@ python3 Testing/scripts/compare_paramsets.py --build build \
 python3 Testing/scripts/compare_paramsets.py --build build --list
 ```
 
-It prints the mean number of features per set and, per pair, recall,
-precision, the median position, rotation and descriptor differences of
-the matched features and the NN agreement, pooled over all images. Each pair
+It prints the mean number of keypoints per set and, per pair, recall,
+precision, the median pixel distance, rotation difference and descriptor
+distance of the matched keypoints and the nearest-descriptor agreement,
+pooled over all images. Each pair
 gets a report folder `<work dir>/report_<a>__vs__<b>/` like the one of
 `popsift_compare.py`, and with matplotlib `<work dir>/cdf_all_pairs.png` shows
 the distributions of all pairs in one plot. The
