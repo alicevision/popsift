@@ -25,6 +25,9 @@ asks `popsift-gpu-probe` whether there is a usable GPU. Without one it is
 skipped, and so are its comparison and, if nothing was compared, the
 report. The configure output names the GPU backend.
 
+`compareSiftFiles/<case>` (labels `cpu`, `unit`) test
+`popsift-compareSiftFiles` itself on small hand-made feature files.
+
 The VLFeat reference is built by `Testing/vlfeat`, see its README.
 
 The tests run `Testing/scripts/popsift_compare.py` one step at a time, with
