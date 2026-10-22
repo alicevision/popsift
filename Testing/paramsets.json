@@ -1,0 +1,37 @@
+{
+  "_comment": [
+    "Named parameter sets for popsift-demo, used by Testing/scripts.",
+    "Write every option as --name or --name=value. 'base' inherits the",
+    "options of another set; an option given again replaces the inherited",
+    "one. Sets marked 'abstract' only serve as a base. Input and output",
+    "options (-i, --log, --dont-write) are added by the scripts."
+  ],
+
+  "vlfeat-emulation": {
+    "description": "The flags that come closest to VLFeat's sift CLI defaults. Used by the vlfeat-comparison tests.",
+    "args": ["--pgmread-loading", "--vlfeat-mode", "--desc-mode=vlfeat",
+             "--write-as-uchar", "--write-as-orientation",
+             "--norm-multi=9", "--norm-mode=classic", "--threshold=0"]
+  },
+
+  "test-sh": {
+    "abstract": true,
+    "description": "Base configuration to testing filter grids",
+    "args": ["--popsift-mode", "--gauss-mode=relative", "--octaves=8",
+             "--threshold=0.04", "--edge-threshold=10.0", "--initial-blur=0.5",
+             "--filter-max-extrema=2000", "--filter-grid=2", "--filter-sort=down",
+             "--write-as-uchar", "--norm-multi=9"]
+  },
+  "loop":   { "base": "test-sh", "description": "test-sh with --desc-mode=loop",   "args": ["--desc-mode=loop"] },
+  "iloop":  { "base": "test-sh", "description": "test-sh with --desc-mode=iloop",  "args": ["--desc-mode=iloop"] },
+  "grid":   { "base": "test-sh", "description": "test-sh with --desc-mode=grid",   "args": ["--desc-mode=grid"] },
+  "igrid":  { "base": "test-sh", "description": "test-sh with --desc-mode=igrid",  "args": ["--desc-mode=igrid"] },
+  "notile": { "base": "test-sh", "description": "test-sh with --desc-mode=notile", "args": ["--desc-mode=notile"] },
+  "vlfeatlike": { "base": "test-sh", "description": "test-sh with --desc-mode=vlfeat", "args": ["--desc-mode=vlfeat"] },
+
+  "oxford-legacy": {
+    "description": "forced upsampling example",
+    "args": ["--popsift-mode", "--gauss-mode=vlfeat", "--desc-mode=loop",
+             "--root-sift", "--downsampling=-1"]
+  }
+}
