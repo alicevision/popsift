@@ -18,4 +18,7 @@ include(datasets/TestImageSets.cmake)
 if(_popsift_compare_vlfeat)
   # Fetch, patch and build the VLFeat reference (target vlfeat_sift)
   add_subdirectory(vlfeat)
+
+  # Compile comparison tool
+  add_subdirectory(compareSiftFiles)
 endif()
