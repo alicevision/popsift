@@ -22,8 +22,8 @@ Adding a set to the JSON file needs no code. A run can carry overrides:
 
 ## popsift_compare.py
 
-Compares one run against another on every image of a set, the way the
-`vlfeat-comparison/<set>` tests do:
+Compares one run against another on every image of a set, as the CTest
+tests of `Testing/compareVlfeat` do one image and one step at a time:
 
 ```
 python3 Testing/scripts/popsift_compare.py --tools build/popsift-testing.json \
@@ -80,6 +80,13 @@ a negative value (the default) disables a limit:
 | `--max-desc-dist D` | median descriptor distance of the matched pairs > D |
 | `--min-nn-agreement N` | NN agreement of a or of b < N |
 | `--max-avg-dist D` | average best-match descriptor distance > D |
+
+`--image <name>` restricts the script to one image of the set (its path in
+the set, with or without extension). `--step run|compare|report` does one
+step: run one run on one image, compare the earlier runs of one image, or
+write the set report from the images compared so far. PopSift runs are
+skipped when `popsift-gpu-probe` finds no usable GPU; the exit code is then
+77, which CTest shows as skipped.
 
 ## compare_paramsets.py
 
