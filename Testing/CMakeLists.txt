@@ -21,4 +21,7 @@ if(_popsift_compare_vlfeat)
 
   # Compile comparison tool
   add_subdirectory(compareSiftFiles)
+
+  # Create ctest checks
+  add_subdirectory(compareVlfeat)
 endif()
