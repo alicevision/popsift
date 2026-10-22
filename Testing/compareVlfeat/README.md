@@ -46,6 +46,9 @@ all tests and prints the verdict of every failed test. The reports are in
 `build/Testing/compareVlfeat/run/<set>/report_vlfeat-emulation__vs__vlfeat/`.
 `-L handcrafted` instead of `-DPopSift_TEST_DATASETS=...` is a quick check.
 
+`-DPopSift_TEST_WITH_VL_ATAN2=ON` builds PopSift with VLFeat's fast atan2
+approximation. For testing and not meant for normal use.
+
 ## Prerequisites
 
 - Python 3.8
@@ -79,6 +82,7 @@ all tests and prints the verdict of every failed test. The reports are in
 `report.md` to read, `summary.csv` and `summary.json` for scripts. The
 quantities are explained in `Testing/scripts/README.md`. With numpy and
 matplotlib installed, the report and each image folder also have `cdf.png`,
-each image folder `unmatched.png`, and
+`sorted.png` and `descriptor_bins.png`, each image folder `unmatched.png`
+and `image_heatmap.png`, and
 `Testing/analysis/inspect_matches.py` opens the report interactively, see
 `Testing/analysis/README.md`. `ctest -V` shows the per-image verdicts and the set summary.

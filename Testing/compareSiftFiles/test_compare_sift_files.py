@@ -182,6 +182,13 @@ def case_max_avg_dist(c):
     c.check(code == 0, f"exit code 0 without a limit (got {code})")
     c.check("Average best-match descriptor distance: 6" in output,
             "average best-match descriptor distance 6 is printed")
+    bins = {(r["subset"], int(r["element"])): r for r in c.rows("desc_bins.csv")}
+    c.check(len(bins) == 256, f"desc_bins.csv has 2 x 128 rows (got {len(bins)})")
+    first = [bins.get((s, 0), {}).get("sum_diff") for s in ("matched", "same_pose")]
+    c.check(first == ["30", "30"],
+            f"element 0 sums to 5 x 6 = 30 in both subsets (got {first})")
+    rest = {float(r["sum_abs_diff"]) for (s, i), r in bins.items() if i > 0}
+    c.check(rest == {0.0}, f"all other elements sum to 0 (got {sorted(rest)[:5]})")
     code, output = c.run(BASE, b, "--max-avg-dist", "7")
     c.check(code == 0, f"passes with --max-avg-dist 7 (got {code})")
     code, output = c.run(BASE, b, "--max-avg-dist", "5")

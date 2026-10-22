@@ -8,10 +8,13 @@ compare_paramsets.py. The window shows one input image. Every matched pair
 whose difference exceeds the slider value is drawn with both glyphs (run a
 in orange, run b in blue) and a line joining their centres.
 
-    slider          threshold: pixels, degrees or descriptor distance
-    mode buttons    position / rotation / descriptor difference
+    slider          threshold: pixels, degrees or descriptor distance (L2)
+    mode buttons    pixel distance / rotation / descriptor distance
     < and >         previous / next image (also the left and right arrow keys)
-    click           prints the matched.csv row of the nearest drawn pair
+    click           prints the values of the nearest drawn pair
+
+The matched pairs come from matched.csv, or from matches.npz in the
+explorer package.
 
 Needs numpy and matplotlib (Testing/analysis/requirements.txt).
 """
@@ -20,27 +23,31 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import sys
 
 import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.collections import LineCollection
 from matplotlib.widgets import Button, RadioButtons, Slider
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import sift_plots as sp  # noqa: E402
 
+# Mode label: the matched.csv column, slider range and start value, and how
+# the title names the threshold.
 MODES = {
-    "position (px)": ("pos_dist", 0.0, 5.0, 0.5),
-    "rotation (deg)": ("ori_diff_deg", 0.0, 180.0, 2.0),
-    "descriptor dist.": ("desc_dist", 0.0, 200.0, 20.0),
+    "pixel dist. (px)": ("pos_dist", 0.0, 5.0, 0.5, "{:.2f} px in pixel distance"),
+    "rotation (deg)": ("ori_diff_deg", 0.0, 180.0, 2.0,
+                       "{:.1f} deg in rotation"),
+    "descr. dist. (L2)": ("desc_dist", 0.0, 200.0, 20.0,
+                          "{:.1f} in descriptor distance (L2)"),
 }
-UNITS = {"pos_dist": " px", "ori_diff_deg": " deg", "desc_dist": ""}
 
 
 class Viewer:
-    def __init__(self, report_dir):
+    def __init__(self, report_dir, index=0, mode=None):
         with open(os.path.join(report_dir, "summary.json"),
                   encoding="utf-8") as f:
             self.summary = json.load(f)
@@ -48,17 +55,17 @@ class Viewer:
         self.images = self.summary["images"]
         if not self.images:
             raise SystemExit(f"{report_dir}: the report has no images")
-        self.index = 0
-        self.mode = next(iter(MODES))
-        self.drawn = []  # rows currently drawn, for clicks
+        self.index = index
+        self.mode = mode if mode in MODES else next(iter(MODES))
+        self.drawn = None  # indices of the pairs currently drawn, for clicks
 
         self.fig = plt.figure(figsize=(10, 8))
         self.ax = self.fig.add_axes([0.05, 0.16, 0.9, 0.78])
-        key, lo, hi, init = MODES[self.mode]
+        _, lo, hi, init, _ = MODES[self.mode]
         self.slider = Slider(self.fig.add_axes([0.42, 0.06, 0.45, 0.03]),
                              "threshold", lo, hi, valinit=init)
         self.radio = RadioButtons(self.fig.add_axes([0.02, 0.01, 0.22, 0.12]),
-                                  list(MODES))
+                                  list(MODES), active=list(MODES).index(self.mode))
         self.prev_btn = Button(self.fig.add_axes([0.42, 0.01, 0.06, 0.04]), "<")
         self.next_btn = Button(self.fig.add_axes([0.49, 0.01, 0.06, 0.04]), ">")
 
@@ -76,13 +83,12 @@ class Viewer:
     def load(self):
         entry = self.images[self.index]
         self.image = sp.read_pgm(self.path(entry["input"]))
-        self.rows = sp.read_rows(os.path.join(self.path(entry["match_dir"]),
-                                              "matched.csv"))
+        self.m = sp.read_matches(self.path(entry["match_dir"]))
         self.draw()
 
     def set_mode(self, label):
         self.mode = label
-        _, lo, hi, init = MODES[label]
+        _, lo, hi, init, _ = MODES[label]
         self.slider.valmin, self.slider.valmax = lo, hi
         self.slider.ax.set_xlim(lo, hi)
         self.slider.set_val(init)  # redraws
@@ -97,44 +103,45 @@ class Viewer:
         elif event.key == "left":
             self.step(-1)
 
-    def value(self, row):
+    def values(self):
         key = MODES[self.mode][0]
-        v = float(row[key])
-        return abs(v) if key == "ori_diff_deg" else v
+        v = self.m[key]
+        return np.abs(v) if key == "ori_diff_deg" else v
 
     def draw(self):
         ax = self.ax
         ax.clear()
         sp.show_image(ax, self.image)
         thr = self.slider.val
-        self.drawn = [r for r in self.rows if self.value(r) > thr]
-        if self.drawn:
+        m = self.m
+        self.drawn = np.nonzero(self.values() > thr)[0]
+        d = self.drawn
+        if len(d):
             for side, color in (("b", sp.COLOR_B), ("a", sp.COLOR_A)):
-                sp.glyphs(ax, [float(r[f"{side}_x"]) for r in self.drawn],
-                          [float(r[f"{side}_y"]) for r in self.drawn],
-                          [float(r[f"{side}_sigma"]) for r in self.drawn],
-                          [float(r[f"{side}_ori_deg"]) for r in self.drawn],
+                sp.glyphs(ax, m[f"{side}_x"][d], m[f"{side}_y"][d],
+                          m[f"{side}_sigma"][d], m[f"{side}_ori_deg"][d],
                           color)
-            for r in self.drawn:
-                ax.plot([float(r["a_x"]), float(r["b_x"])],
-                        [float(r["a_y"]), float(r["b_y"])],
-                        color="white", linewidth=0.8)
+            ax.add_collection(LineCollection(
+                np.stack([np.stack([m["a_x"][d], m["a_y"][d]], axis=1),
+                          np.stack([m["b_x"][d], m["b_y"][d]], axis=1)],
+                         axis=1),
+                colors="white", linewidths=0.8))
         entry = self.images[self.index]
-        key = MODES[self.mode][0]
-        unit = UNITS[key]
         ax.set_title(f"[{self.index + 1}/{len(self.images)}] {entry['name']}: "
-                     f"{len(self.drawn)} of {len(self.rows)} matched pairs "
-                     f"differ by more than {thr:.2f}{unit} in {key}\n"
+                     f"{len(d)} of {len(m['a_x'])} matched pairs differ by "
+                     f"more than {MODES[self.mode][4].format(thr)}\n"
                      f"{self.summary['run_a']} (orange) vs "
                      f"{self.summary['run_b']} (blue)", fontsize=10)
         self.fig.canvas.draw_idle()
 
     def on_click(self, event):
-        if event.inaxes is not self.ax or not self.drawn:
+        if event.inaxes is not self.ax or self.drawn is None \
+                or not len(self.drawn):
             return
-        best = min(self.drawn, key=lambda r: math.hypot(
-            float(r["a_x"]) - event.xdata, float(r["a_y"]) - event.ydata))
-        print(", ".join(f"{k}={v}" for k, v in best.items()), flush=True)
+        m, d = self.m, self.drawn
+        best = d[np.argmin(np.hypot(m["a_x"][d] - event.xdata,
+                                    m["a_y"][d] - event.ydata))]
+        print(", ".join(f"{k}={m[k][best]:g}" for k in m), flush=True)
 
 
 def main(argv=None):

@@ -64,6 +64,12 @@ int main( int argc, char* argv[] )
             cerr << "Cannot write the match files into " << param.match_dir << endl;
             return EXIT_FAILURE;
         }
+        if( ! writeDescBinsFile( param.match_dir, l_one, l_two, pairs,
+                                 param.same_pose_px, param.same_pose_deg ) )
+        {
+            cerr << "Cannot write desc_bins.csv into " << param.match_dir << endl;
+            return EXIT_FAILURE;
+        }
         const string base = param.match_dir + "/";
         if( ! writeNearestFile( base + "desc_nn_a.csv", l_one, l_two,
                                 nearest, pairs, true )

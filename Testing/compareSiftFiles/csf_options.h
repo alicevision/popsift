@@ -20,6 +20,8 @@ struct Parameters
     float                    match_radius_sigma;
     float                    match_radius_min;
     float                    match_max_scale_ratio;
+    float                    same_pose_px;
+    float                    same_pose_deg;
 };
 
 void parseargs( int argc, char** argv, Parameters& param );
