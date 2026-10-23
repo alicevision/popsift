@@ -218,3 +218,44 @@ bool writeMatchFiles( const string&            dir,
     return writeUnmatched( base + "only_a.csv", l_a, used_a )
         && writeUnmatched( base + "only_b.csv", l_b, used_b );
 }
+
+bool writeDescBinsFile( const string&            dir,
+                        const vector<feat_t>&    l_a,
+                        const vector<feat_t>&    l_b,
+                        const vector<MatchPair>& pairs,
+                        float                    same_pose_px,
+                        float                    same_pose_deg )
+{
+    // [subset][element]: subset 0 is all matched pairs, 1 the same pose
+    long   count[2]             = { 0, 0 };
+    double sum[2][DescSize]     = {};
+    double sum_abs[2][DescSize] = {};
+    for( const MatchPair& p : pairs )
+    {
+        const bool same = p.pos_dist <= same_pose_px && fabsf( p.ori_diff ) <= same_pose_deg;
+        for( int s = 0; s < ( same ? 2 : 1 ); s++ )
+        {
+            count[s]++;
+            for( int i = 0; i < DescSize; i++ )
+            {
+                const double d = l_b[p.b].desc[i] - l_a[p.a].desc[i];
+                sum[s][i]     += d;
+                sum_abs[s][i] += fabs( d );
+            }
+        }
+    }
+
+    const string base = dir.empty() ? string() : dir + "/";
+    FILE* f = fopen( ( base + "desc_bins.csv" ).c_str(), "w" );
+    if( !f ) return false;
+    fprintf( f, "subset,element,pairs,sum_diff,sum_abs_diff\n" );
+    const char* names[2] = { "matched", "same_pose" };
+    for( int s = 0; s < 2; s++ )
+    {
+        for( int i = 0; i < DescSize; i++ )
+        {
+            fprintf( f, "%s,%d,%ld,%.9g,%.9g\n", names[s], i, count[s], sum[s][i], sum_abs[s][i] );
+        }
+    }
+    return fclose( f ) == 0;
+}

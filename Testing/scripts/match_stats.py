@@ -463,9 +463,12 @@ def _markdown(report_dir, run_a, run_b, set_name, images, total):
         out.append(f"- {label}: {_fmt(s['min'])} / {_fmt(s['median'])} / "
                    f"{_fmt(s['max'])}")
     out.append("")
-    if os.path.exists(os.path.join(report_dir, "cdf.png")):
-        out.append("![Cumulative distributions](cdf.png)")
-        out.append("")
+    for png, alt in (("cdf.png", "Cumulative distributions"),
+                     ("sorted.png", "Sorted differences"),
+                     ("descriptor_bins.png", "Descriptor differences per bin")):
+        if os.path.exists(os.path.join(report_dir, png)):
+            out.append(f"![{alt}]({png})")
+            out.append("")
     out.append("## Images")
     out.append("")
     out.append("| Image | a | b | matched | recall | precision | "

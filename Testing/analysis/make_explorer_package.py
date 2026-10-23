@@ -12,10 +12,9 @@ folder below it goes into the package with the images it covers:
         README.md, glossary.md, requirements.txt
         data/                                            the work dir layout
             <set>/report_<a>__vs__<b>/   summary.json, summary.csv,
-                                         report.md, cdf.png
+                                         report.md and the set's plots
             <set>/<image>/input.pgm      the image the runs read
-            <set>/<image>/<a>__vs__<b>/  unmatched.png, cdf.png and
-                                         matches.npz
+            <set>/<image>/<a>__vs__<b>/  the image's plots and matches.npz
 
 matches.npz holds the matched pairs as float32 and int32 arrays (numpy's
 format records the byte order), instead of the CSV files. The CSV files and
@@ -43,8 +42,10 @@ import sift_plots as sp  # noqa: E402
 
 TOOLS = ("explorer.py", "inspect_matches.py", "sift_plots.py", "glossary.md",
          "requirements.txt")
-REPORT_FILES = ("summary.json", "summary.csv", "report.md", "cdf.png")
-IMAGE_FILES = ("unmatched.png", "cdf.png")
+REPORT_FILES = ("summary.json", "summary.csv", "report.md", "cdf.png",
+                "sorted.png", "descriptor_bins.png")
+IMAGE_FILES = ("unmatched.png", "cdf.png", "sorted.png", "descriptor_bins.png",
+               "image_heatmap.png")
 
 PACKAGE_README = """# PopSift vs VLFeat explorer
 

@@ -51,8 +51,9 @@ void parseargs( int argc, char** argv, Parameters& param )
                           "input is always an error." )
             ("match-dir", value<std::string>(&param.match_dir),
                           "Pair the features of the two files by position, scale and\n"
-                          "orientation, and write matched.csv, only_a.csv and\n"
-                          "only_b.csv into this directory (a = first file)." )
+                          "orientation, and write matched.csv, only_a.csv,\n"
+                          "only_b.csv and desc_bins.csv into this directory\n"
+                          "(a = first file)." )
             ("match-radius-sigma", value<float>(&param.match_radius_sigma)->default_value(0.5f),
                           "Matching: maximum position distance as a multiple of the\n"
                           "first feature's sigma ..." )
@@ -60,6 +61,10 @@ void parseargs( int argc, char** argv, Parameters& param )
                           "... but at least this many pixels." )
             ("match-max-scale-ratio", value<float>(&param.match_max_scale_ratio)->default_value(1.5f),
                           "Matching: maximum ratio between the two sigmas." )
+            ("same-pose-px", value<float>(&param.same_pose_px)->default_value(0.25f),
+                          "desc_bins.csv: matched pairs at most this many pixels ..." )
+            ("same-pose-deg", value<float>(&param.same_pose_deg)->default_value(2.0f),
+                          "... and degrees apart have the same pose." )
             ;
     }
 

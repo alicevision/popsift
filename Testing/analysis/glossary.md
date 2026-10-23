@@ -67,6 +67,10 @@ similar descriptor distance is less than 0.8 times the second most similar.
 An application that applies Lowe's test keeps these pairs; the others are
 correct but rejected as ambiguous.
 
+**Descriptor cells and bins.** The descriptor divides the area around the
+keypoint into 4 x 4 cells, and the gradient directions in every cell into 8
+bins of 45 degrees. Each of the 128 values is one bin of one cell.
+
 **Median, p90, p99.** Half, 90% and 99% of the values are at most this large.
 
 **CDF** (cumulative distribution). For every value on the x axis, the share

@@ -66,8 +66,10 @@ spread (min / median / max) of the per-image values. The set report goes to
 `<work dir>/<set>/report_<a>__vs__<b>/` as `summary.csv`, `summary.json` and
 `report.md`, and a one-line summary per image and per set is printed.
 When numpy and matplotlib are installed (`Testing/analysis/requirements.txt`),
-every image folder and the report also get `cdf.png`, and every image folder
-`unmatched.png`, see `Testing/analysis/README.md`. `--no-plots` skips them.
+every image folder and the report also get `cdf.png`, `sorted.png` and
+`descriptor_bins.png`, and every image folder `unmatched.png` and
+`image_heatmap.png`, see `Testing/analysis/README.md`. `--no-plots` skips
+them.
 
 An image fails when a run crashes or when exactly one run finds no features.
 An image where neither run finds features also fails, unless the set's folder

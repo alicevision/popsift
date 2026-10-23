@@ -26,9 +26,35 @@ and by `compare_paramsets.py` into every report folder plus
   so the solid curve should rise steeply near 0.
 - Right: pixel distance from every keypoint to the keypoint with the most
   similar descriptor in the other run, solid for a in b, dashed for b in a,
-  on a log scale beyond 0.1 px. The grey line is the smallest match radius
+  on a log scale from 0.01 px (smaller distances are drawn at 0.01 px). The
+  grey line is the smallest match radius
   (1 px). Every keypoint right of it has its most similar descriptor at a
   different place, which indicates a serious descriptor problem.
+
+## sorted.png, descriptor_bins.png and image_heatmap.png
+
+The plots of the 2021 comparison scripts, redone on the match files.
+`popsift_compare.py` writes `sorted.png` and `descriptor_bins.png` into every
+image folder and the report folder (pooled over the images of the set), and
+`image_heatmap.png` into every image folder. All logarithmic axes are
+logarithmic over their whole range; values outside are drawn at the ends.
+
+- `sorted.png`: left, for every keypoint of a, the descriptor distance (L2)
+  to the most similar descriptor of b (line) and to the second most similar
+  (dots), sorted by the first. The gap between the two is what Lowe's ratio
+  test relies on. Middle and right: the pixel distances and the rotation
+  differences of the matched pairs, sorted.
+- `descriptor_bins.png`: the 128 descriptor values as 8 orientation bins over
+  the 4 x 4 cells of the descriptor, in VLFeat's order, with the mean
+  difference b - a per value. Rows: mean absolute and mean signed difference
+  of the pairs with the same pose, and mean absolute difference of all
+  matched pairs. In the signed row, orange means a is larger, blue b. The
+  sums come from `desc_bins.csv`, which `popsift-compareSiftFiles` writes.
+- `image_heatmap.png`: the matched pairs in cells over the input image, by
+  the position of a's keypoint: the share of pairs whose rotation differs by
+  more than 2 degrees, and the 90th percentile of the rotation difference and
+  of the descriptor distance. Differences that depend on the location, such
+  as the handling of the image border, show up here.
 
 ## unmatched.png
 

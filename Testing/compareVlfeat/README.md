@@ -82,6 +82,7 @@ approximation. For testing and not meant for normal use.
 `report.md` to read, `summary.csv` and `summary.json` for scripts. The
 quantities are explained in `Testing/scripts/README.md`. With numpy and
 matplotlib installed, the report and each image folder also have `cdf.png`,
-each image folder `unmatched.png`, and
+`sorted.png` and `descriptor_bins.png`, each image folder `unmatched.png`
+and `image_heatmap.png`, and
 `Testing/analysis/inspect_matches.py` opens the report interactively, see
 `Testing/analysis/README.md`. `ctest -V` shows the per-image verdicts and the set summary.

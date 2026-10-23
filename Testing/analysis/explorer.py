@@ -12,6 +12,9 @@ comparison run, e.g. <build>/Testing/compareVlfeat/run.
     tabs            Image: key figures and distributions of one image
                     Rotation vs descriptor: how a rotation difference
                     affects the descriptor distance
+                    Sorted: the sorted differences of the image and the set
+                    Heatmaps: differences by place in the image and by
+                    descriptor bin (these two use the right column too)
                     Set: key figures of the whole set
                     Glossary: what the terms mean
     right           keypoints that only one side found; the button opens
@@ -40,7 +43,10 @@ sys.path.insert(0, HERE)
 import inspect_matches as im  # noqa: E402
 import sift_plots as sp  # noqa: E402
 
-TABS = ("Image", "Rotation vs descriptor", "Set", "Glossary")
+TABS = ("Image", "Rotation vs descriptor", "Sorted", "Heatmaps", "Set",
+        "Glossary")
+# Tabs that use the right column too.
+WIDE_TABS = ("Sorted", "Heatmaps")
 BACKGROUND = "#f4f4f2"
 SELECTED = "#dbe9f7"
 MUTED = "#666666"
@@ -129,13 +135,14 @@ class Explorer:
         self.ax_images = self.panel([0.01, 0.03, 0.19, 0.45])
         self.tab_buttons = []
         for k, name in enumerate(TABS):
-            b = Button(self.fig.add_axes([0.215 + k * 0.105, 0.885, 0.1,
+            b = Button(self.fig.add_axes([0.215 + k * 0.129, 0.885, 0.124,
                                           0.035]), name)
             b.on_clicked(lambda _, n=name: self.set_tab(n))
             self.tab_buttons.append(b)
-        self.ax_unmatched = self.fig.add_axes([0.655, 0.27, 0.335, 0.62])
-        self.fig.text(0.655, 0.235, "Open the match inspector for pairs that "
-                      "differ in", fontsize=9)
+        self.ax_unmatched = self.fig.add_axes([0.655, 0.27, 0.335, 0.60])
+        inspector_text = self.fig.text(
+            0.655, 0.235, "Open the match inspector for pairs that differ in",
+            fontsize=9)
         self.radio = RadioButtons(self.fig.add_axes([0.655, 0.10, 0.335,
                                                      0.12]),
                                   list(im.MODES), active=1)
@@ -143,6 +150,8 @@ class Explorer:
                                "Open match inspector for this image",
                                color=SELECTED)
         self.open_btn.on_clicked(lambda _: self.open_viewer())
+        self.right_column = [self.ax_unmatched, inspector_text,
+                             self.radio.ax, self.open_btn.ax]
         self.fig.canvas.mpl_connect("button_press_event", self.on_click)
         self.fig.canvas.mpl_connect("key_press_event", self.on_key)
         self.select(0, 0)
@@ -258,9 +267,14 @@ class Explorer:
         self.content = []
         {"Image": self.draw_image_tab,
          "Rotation vs descriptor": self.draw_scatter_tab,
+         "Sorted": self.draw_sorted_tab,
+         "Heatmaps": self.draw_heatmaps_tab,
          "Set": self.draw_set_tab,
          "Glossary": self.draw_glossary_tab}[self.tab]()
-        self.draw_unmatched()
+        for artist in self.right_column:
+            artist.set_visible(self.tab not in WIDE_TABS)
+        if self.tab not in WIDE_TABS:
+            self.draw_unmatched()
         self.fig.canvas.draw_idle()
 
     def add(self, rect, **kwargs):
@@ -369,6 +383,34 @@ class Explorer:
         ax.set_title(f"{self.report.set} / {self.entry['name']}: "
                      f"{len(rot)} matched pairs\nA rotated keypoint has a "
                      f"rotated descriptor. {note}", fontsize=10)
+
+    def show_png(self, rect, path):
+        ax = self.add(rect)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        if os.path.exists(path):
+            ax.imshow(plt.imread(path))
+        else:
+            ax.set_facecolor("white")
+            ax.text(0.5, 0.5, f"no {os.path.basename(path)} here; it comes "
+                    "with the plots of a newer comparison run", ha="center",
+                    transform=ax.transAxes)
+        return ax
+
+    def draw_sorted_tab(self):
+        rep = self.report
+        self.show_png([0.215, 0.455, 0.775, 0.415],
+                      os.path.join(rep.path(self.entry["match_dir"]),
+                                   "sorted.png"))
+        self.show_png([0.215, 0.03, 0.775, 0.415],
+                      os.path.join(rep.dir, "sorted.png"))
+
+    def draw_heatmaps_tab(self):
+        match_dir = self.report.path(self.entry["match_dir"])
+        self.show_png([0.215, 0.44, 0.775, 0.43],
+                      os.path.join(match_dir, "image_heatmap.png"))
+        self.show_png([0.215, 0.03, 0.775, 0.40],
+                      os.path.join(match_dir, "descriptor_bins.png"))
 
     def draw_set_tab(self):
         rep = self.report
