@@ -45,6 +45,8 @@ option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code
 option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
 option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
+option(PopSift_TEST_WITH_VL_ATAN2 "Compute gradient angles with VLFeat's fast
+       atan2 approximation instead of atan2f. Only for comparing with VLFeat." OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE AND NOT MSVC)
@@ -227,6 +229,7 @@ message(STATUS "Grid filtering: " ${PopSift_USE_GRID_FILTER})
 message(STATUS "Additional warning for CUDA nvcc: " ${PopSift_NVCC_WARNINGS})
 message(STATUS "Install path: " ${CMAKE_INSTALL_PREFIX})
 message(STATUS "Testing step: " ${PopSift_USE_TEST_CMD})
+message(STATUS "VLFeat's fast atan2 for gradient angles: " ${PopSift_TEST_WITH_VL_ATAN2})
 
 message(STATUS "CMAKE_CUDA_COMPILER = ${CMAKE_CUDA_COMPILER}")
 message(STATUS "CMAKE_CUDA_COMPILER_ID = ${CMAKE_CUDA_COMPILER_ID}")
