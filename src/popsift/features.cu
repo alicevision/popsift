@@ -110,16 +110,16 @@ void FeaturesHost::unpin( )
     cudaHostUnregister( _ori );
 }
 
-void FeaturesHost::print( std::ostream& ostr, bool write_as_uchar ) const
+void FeaturesHost::print( std::ostream& ostr, bool write_as_uchar, bool write_as_ori ) const
 {
     for( int i=0; i<size(); i++ ) {
-        _ext[i].print( ostr, write_as_uchar );
+        _ext[i].print( ostr, write_as_uchar, write_as_ori );
     }
 }
 
 std::ostream& operator<<( std::ostream& ostr, const FeaturesHost& feature )
 {
-    feature.print( ostr, false );
+    feature.print( ostr, false, false );
     return ostr;
 }
 
@@ -310,16 +310,25 @@ void FeaturesDev::match( FeaturesDev* other )
  * Feature
  *************************************************************/
 
-void Feature::print( std::ostream& ostr, bool write_as_uchar ) const
+void Feature::print( std::ostream& ostr, bool write_as_uchar, bool write_as_ori ) const
 {
     float sigval =  1.0f / ( sigma * sigma );
 
     for( int ori=0; ori<num_ori; ori++ ) {
-        ostr << xpos << " " << ypos << " "
-             << sigval << " 0 " << sigval << " ";
+        if( write_as_ori ) {
+            ostr << xpos << " " << ypos << " "
+                 << sigma << " " << orientation[ori] << " ";
+        } else {
+            ostr << xpos << " " << ypos << " "
+                 << sigval << " 0 " << sigval << " ";
+        }
         if( write_as_uchar ) {
+            /* Rounded down, because the VLFeat CLI writes (vl_uint8)(512.0 * d).
+             * Rounding to nearest (roundf) would be more accurate and may be
+             * preferable, but floorf keeps the output comparable with VLFeat.
+             */
             for( int i=0; i<128; i++ ) {
-                ostr << roundf(desc[ori]->features[i]) << " ";
+                ostr << floorf(desc[ori]->features[i]) << " ";
             }
         } else {
             ostr << std::setprecision(3);
@@ -334,7 +343,7 @@ void Feature::print( std::ostream& ostr, bool write_as_uchar ) const
 
 std::ostream& operator<<( std::ostream& ostr, const Feature& feature )
 {
-    feature.print( ostr, false );
+    feature.print( ostr, false, false );
     return ostr;
 }
 

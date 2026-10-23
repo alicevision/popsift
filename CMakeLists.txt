@@ -44,7 +44,12 @@ option(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after e
 option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
 option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
-option(PopSift_USE_TEST_CMD "Add testing step for functional verification" OFF)
+option(PopSift_TEST_WITH_VLFEAT "Fetch, patch and build VLFeat, and add a ctest
+       comparing its SIFT output against PopSift's. Requires BUILD_TESTING.
+       The fetch/patch/build only happens when ctest actually runs or the
+       vlfeat_sift target is built, not at configure or normal build time." OFF)
+option(PopSift_TEST_WITH_VL_ATAN2 "Compute gradient angles with VLFeat's fast
+       atan2 approximation instead of atan2f. Only for comparing with VLFeat." OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE AND NOT MSVC)
@@ -191,15 +196,14 @@ if(PopSift_BUILD_DOCS)
   add_subdirectory(doc)
 endif()
 
-set(PopSift_TESTFILE_PATH "popsift-samples/datasets/sample/big_set/" CACHE STRING "Base directory where your test files are stored")
-if(PopSift_USE_TEST_CMD)
-  if(NOT IS_ABSOLUTE("${PopSift_TESTFILE_PATH}"))
-    get_filename_component(PopSift_TESTFILES "${PopSift_TESTFILE_PATH}" ABSOLUTE)
-    set(PopSift_TESTFILE_PATH "${PopSift_TESTFILES}")
-  endif()
-
-  add_subdirectory(testScripts)
+# Defines BUILD_TESTING (default ON) and enables CTest. It must come before
+# Testing is added. When PopSift is part of another project, that project
+# decides about BUILD_TESTING.
+if(PROJECT_IS_TOP_LEVEL)
+  include(CTest)
 endif()
+
+add_subdirectory(Testing)
 
 ########### Add uninstall target ###############
 CONFIGURE_FILE(
@@ -226,15 +230,13 @@ message(STATUS "Synchronize and check CUDA error after every kernel: " ${PopSift
 message(STATUS "Grid filtering: " ${PopSift_USE_GRID_FILTER})
 message(STATUS "Additional warning for CUDA nvcc: " ${PopSift_NVCC_WARNINGS})
 message(STATUS "Install path: " ${CMAKE_INSTALL_PREFIX})
-message(STATUS "Testing step: " ${PopSift_USE_TEST_CMD})
+message(STATUS "VLFeat comparison ctest: " ${PopSift_TEST_WITH_VLFEAT})
+message(STATUS "VLFeat's fast atan2 for gradient angles: " ${PopSift_TEST_WITH_VL_ATAN2})
 
 message(STATUS "CMAKE_CUDA_COMPILER = ${CMAKE_CUDA_COMPILER}")
 message(STATUS "CMAKE_CUDA_COMPILER_ID = ${CMAKE_CUDA_COMPILER_ID}")
 message(STATUS "CMAKE_CUDA_COMPILER_VERSION = ${CMAKE_CUDA_COMPILER_VERSION}")
 message(STATUS "CMAKE_CUDA_ARCHITECTURES = ${CMAKE_CUDA_ARCHITECTURES}")
 
-if(PopSift_USE_TEST_CMD)
-  message(STATUS "Path for test input: " ${PopSift_TESTFILE_PATH})
-endif()
 message("\n******************************************")
 message("\n")

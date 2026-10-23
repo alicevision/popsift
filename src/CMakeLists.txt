@@ -111,6 +111,9 @@ endif()
 if(MSVC)
         target_compile_options(popsift PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>)
 endif()
+if(PopSift_TEST_WITH_VL_ATAN2)
+  target_compile_definitions(popsift PRIVATE PopSift_TEST_WITH_VL_ATAN2)
+endif()
 
 # build directory containing the automatically generated files
 set(popsift_generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")

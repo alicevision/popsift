@@ -8,9 +8,22 @@
 #include "common/debug_macros.h"
 #include "sift_conf.h"
 
+#include <cctype>
 #include <iostream>
 
 using namespace std;
+
+static bool isISame( const std::string& l, const std::string& r )
+{
+    if( l.length() != r.length() ) return false;
+
+    // Only short option names are compared, so int is long enough.
+    for( int i=0; i < (int)l.length(); i++ )
+        if( tolower(l[i]) != tolower(r[i]) )
+            return false;
+
+    return true;
+}
 
 namespace popsift
 {
@@ -211,10 +224,10 @@ void Config::setNormMode( Config::NormMode m )
 
 void Config::setNormMode( const std::string& m )
 {
-    if( m == "RootSift" ) setNormMode( Config::RootSift );
-    else if( m == "classic" ) setNormMode( Config::Classic );
+    if( isISame( m, "RootSift" ) ) setNormMode( Config::RootSift );
+    else if( isISame( m, "Classic" ) ) setNormMode( Config::Classic );
     else
-        POP_FATAL( string("Bad Normalization mode.\n") + getGaussModeUsage() );
+        POP_FATAL( string("Bad Normalization mode.\n") + getNormModeUsage() );
 }
 
 Config::NormMode Config::getNormModeDefault( )

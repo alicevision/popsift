@@ -16,6 +16,32 @@
 
 namespace popsift
 {
+#ifdef PopSift_TEST_WITH_VL_ATAN2
+/* VLFeat's vl_fast_atan2_f (vl/mathop.h), a polynomial approximation with
+ * an error of up to about 0.35 degrees.
+ * Meant for testing and found in TEST compile-time options.
+ */
+__device__ static inline
+float vl_fast_atan2_f( float y, float x )
+{
+    const float c3    = 0.1821f;
+    const float c1    = 0.9675f;
+    const float abs_y = fabsf( y ) + 1.19209290E-07F; // VL_EPSILON_F
+    float angle;
+    float r;
+    if( x >= 0 ) {
+        r     = ( x - abs_y ) / ( x + abs_y );
+        angle = (float)( M_PI / 4 );
+    } else {
+        r     = ( x + abs_y ) / ( abs_y - x );
+        angle = (float)( 3 * M_PI / 4 );
+    }
+    angle += ( c3 * r * r - c1 ) * r;
+    return ( y < 0 ) ? -angle : angle;
+}
+#define atan2f vl_fast_atan2_f
+#endif
+
 /*
  * We are wasting time by computing gradiants on demand several
  * times. We could precompute gradiants for all pixels once, as
@@ -119,3 +145,6 @@ void get_gradiant( float&              grad,
 
 }; // namespace popsift
 
+#ifdef PopSift_TEST_WITH_VL_ATAN2
+#undef atan2f
+#endif
