@@ -52,7 +52,7 @@ uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
 
     int ct = __popc( mask );
 
-    int write_index;
+    int write_index = 0;
     if( lane == 0 ) {
         write_index = atomicAdd( extrema_counter, ct );
     }
