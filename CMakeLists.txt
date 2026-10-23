@@ -48,6 +48,8 @@ option(PopSift_TEST_WITH_VLFEAT "Fetch, patch and build VLFeat, and add a ctest
        comparing its SIFT output against PopSift's. Requires BUILD_TESTING.
        The fetch/patch/build only happens when ctest actually runs or the
        vlfeat_sift target is built, not at configure or normal build time." OFF)
+option(PopSift_TEST_WITH_VL_ATAN2 "Compute gradient angles with VLFeat's fast
+       atan2 approximation instead of atan2f. Only for comparing with VLFeat." OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE AND NOT MSVC)
@@ -229,6 +231,7 @@ message(STATUS "Grid filtering: " ${PopSift_USE_GRID_FILTER})
 message(STATUS "Additional warning for CUDA nvcc: " ${PopSift_NVCC_WARNINGS})
 message(STATUS "Install path: " ${CMAKE_INSTALL_PREFIX})
 message(STATUS "VLFeat comparison ctest: " ${PopSift_TEST_WITH_VLFEAT})
+message(STATUS "VLFeat's fast atan2 for gradient angles: " ${PopSift_TEST_WITH_VL_ATAN2})
 
 message(STATUS "CMAKE_CUDA_COMPILER = ${CMAKE_CUDA_COMPILER}")
 message(STATUS "CMAKE_CUDA_COMPILER_ID = ${CMAKE_CUDA_COMPILER_ID}")

@@ -46,6 +46,9 @@ all tests and prints the verdict of every failed test. The reports are in
 `build/Testing/compareVlfeat/run/<set>/report_vlfeat-emulation__vs__vlfeat/`.
 `-L handcrafted` instead of `-DPopSift_TEST_DATASETS=...` is a quick check.
 
+`-DPopSift_TEST_WITH_VL_ATAN2=ON` builds PopSift with VLFeat's fast atan2
+approximation. For testing and not meant for normal use.
+
 ## Prerequisites
 
 - Python 3.8
