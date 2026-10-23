@@ -160,6 +160,12 @@ public:
      */
     inline __device__
     bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const;
+
+    /*
+     * return the refined Gaussian blur level.
+     */
+    inline __device__
+    int final_z_level( float sn, int level ) const;
 };
 
 template<>
@@ -210,6 +216,12 @@ public:
     bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         return true;
+    }
+
+    inline __device__
+    int final_z_level( float sn, int level ) const
+    {
+        return (int)roundf(sn);
     }
 };
 
@@ -263,6 +275,12 @@ public:
                    sn > maxlevel ) ? false
                                    : true );
     }
+
+    inline __device__
+    int final_z_level( float sn, int level ) const
+    {
+        return level;
+    }
 };
 
 template<>
@@ -314,6 +332,12 @@ public:
                    sn < -0.0f ||
                    sn > maxlevel ) ? false
                                    : true );
+    }
+
+    inline __device__
+    int final_z_level( float sn, int level ) const
+    {
+        return (int)roundf(sn);
     }
 };
 
@@ -514,7 +538,8 @@ __device__ inline bool find_extrema_in_dog_sub(LayeredReadTex dog,
 
     ec.xpos      = xn;
     ec.ypos      = yn;
-    ec.lpos      = (int)roundf(sn);
+    // ec.lpos      = (int)roundf(sn);
+    ec.lpos      = f.final_z_level(sn, level);
     ec.sigma     = d_consts.sigma0 * pow(d_consts.sigma_k, sn); // * 2;
     ec.cell      = floorf( yn / h_grid_divider ) * grid_width + floorf( xn / w_grid_divider );
         // const float sigma_k = powf(2.0f, 1.0f / levels );
