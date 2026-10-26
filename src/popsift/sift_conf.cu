@@ -11,18 +11,29 @@
 #include <cctype>
 #include <iostream>
 
+#include <string_view>
+#include <algorithm>
+#include <cctype>
+
 using namespace std;
 
-static bool isISame( const std::string& l, const std::string& r )
+/**
+ * @brief Performs a case-insensitive equality comparison between two strings.
+ * 
+ * @param l The first string view to compare.
+ * @param r The second string view to compare.
+ * 
+ * @retval true  If both strings have the same length and match case-insensitively, false otherwise
+ */
+static bool isISame(std::string_view l, std::string_view r) noexcept
 {
-    if( l.length() != r.length() ) return false;
+    if (l.length() != r.length()) return false;
 
-    // Only short option names are compared, so int is long enough.
-    for( int i=0; i < (int)l.length(); i++ )
-        if( tolower(l[i]) != tolower(r[i]) )
-            return false;
-
-    return true;
+    // Compares elements sequentially, early exit; GCC required -march=native to SIMDify it
+    return std::equal( l.begin(), l.end(), r.begin(),
+                       [](unsigned char a, unsigned char b) {
+                           return std::tolower(a) == std::tolower(b);
+                       });
 }
 
 namespace popsift
