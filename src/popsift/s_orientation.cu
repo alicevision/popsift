@@ -238,7 +238,7 @@ void ori_par( const int           octave,
     if( threadIdx.x < ORIENTATION_MAX_COUNT ) {
         if( valid ) {
             // + 0.5 because bin b is centred on 2*pi*(b+0.5)/ORI_NBINS - pi
-           float chosen_bin = refined_angle[best_index.x] + 0.5f;
+            float chosen_bin = refined_angle[best_index.x] + 0.5f;
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             // float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
             float th = ::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
