@@ -1,17 +1,19 @@
 cmake_minimum_required(VERSION 3.22)
 
+# Pick acpp or icpx as the C++ compiler if none was given. Must precede project().
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/SelectSyclCompiler.cmake")
+
 project(PopSift VERSION 1.0.0 LANGUAGES CXX)
 
 # ============================================================================
 # SYCL Compiler Detection
 # ============================================================================
-set(SYCL_IMPL "AUTO" CACHE STRING "SYCL implementation: AUTO, INTEL, LLVM, or ACPP")
 
 if(SYCL_IMPL STREQUAL "AUTO")
     if(CMAKE_CXX_COMPILER MATCHES "acpp")
         set(SYCL_IMPL "ACPP")
         message(STATUS "✓ Auto-detected: AdaptiveCpp")
-    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM")
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM" OR CMAKE_CXX_COMPILER MATCHES "icpx|icx")
         set(SYCL_IMPL "INTEL")
         message(STATUS "✓ Auto-detected: Intel DPC++")
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")

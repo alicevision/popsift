@@ -43,23 +43,32 @@ Optionally, for building example applications:
 
 ## Build
 
-To build PopSift-SYCL with DPC++:
+CMake looks for a SYCL compiler driver itself when you do not name one.
+It tries AdaptiveCpp's `acpp` first and Intel oneAPI's `icpx` (`icx` on
+Windows) second, in `PATH` and in the usual install locations
+(Homebrew, `/opt/AdaptiveCpp`, `/opt/intel/oneapi`, `Program Files`).
+Neither one is required.
 
 ```bash
 mkdir build && cd build
-cmake .. -DCMAKE_CXX_COMPILER=dpcpp
+cmake ..
 make
 make install
 ```
 
-To build PopSift-SYCL with AdaptiveCPP:
+To pick one implementation when both are installed, set `SYCL_IMPL`:
 
 ```bash
-mkdir build && cd build
-cmake .. -DCMAKE_CXX_COMPILER=acpp
-make
-make install
+cmake .. -DSYCL_IMPL=ACPP     # AdaptiveCpp only
+cmake .. -DSYCL_IMPL=INTEL    # Intel oneAPI DPC++ only
 ```
+
+For an installation in an unusual place, give its prefix with
+`-DAdaptiveCpp_ROOT=<prefix>` (or `-DAdaptiveCpp_DIR=<prefix>/lib/cmake/AdaptiveCpp`)
+or `-DONEAPI_ROOT=<prefix>`; sourcing oneAPI's `setvars.sh` also works.
+Naming the compiler directly, e.g. `-DCMAKE_CXX_COMPILER=acpp`, or setting
+`CXX`, still overrides the search. The compiler is fixed at the first
+configure, so switch implementations in a fresh build directory.
 
 ## Implementation Highlights
 
