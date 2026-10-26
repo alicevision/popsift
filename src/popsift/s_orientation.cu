@@ -147,12 +147,12 @@ void ori_par( const int           octave,
                 // Like VLFeat: bin b is centred on the angle
                 // 2*pi*(b+0.5)/ORI_NBINS - pi, and each gradient is split
                 // linearly between the two bins whose centres enclose it.
-                float fbin = __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) - 0.5f;
+                const float fbin = __fdividef( float(ORI_NBINS) * (theta + M_PI), M_PI2 ) - 0.5f;
                 // fbin is in [-0.5, 35.5]: round down, not towards zero
                 int   b0   = __float2int_rd( fbin );
-                float frac = fbin - float(b0);
+                const float frac = fbin - float(b0);
                 b0 = (b0 < 0) ? b0 + ORI_NBINS : ( (b0 >= ORI_NBINS) ? b0 - ORI_NBINS : b0 );
-                int   b1   = (b0 == ORI_NBINS-1) ? 0 : b0 + 1;
+                const int   b1   = (b0 == ORI_NBINS-1) ? 0 : b0 + 1;
 
                 atomicAdd( &hist[b0], weight * (1.0f - frac) );
                 atomicAdd( &hist[b1], weight * frac );
@@ -238,7 +238,7 @@ void ori_par( const int           octave,
     if( threadIdx.x < ORIENTATION_MAX_COUNT ) {
         if( valid ) {
             // + 0.5 because bin b is centred on 2*pi*(b+0.5)/ORI_NBINS - pi
-            float chosen_bin = refined_angle[best_index.x] + 0.5f;
+           float chosen_bin = refined_angle[best_index.x] + 0.5f;
             if( chosen_bin >= ORI_NBINS ) chosen_bin -= ORI_NBINS;
             // float th = __fdividef(M_PI2 * chosen_bin , ORI_NBINS) - M_PI;
             float th = ::fmaf( M_PI2 * chosen_bin, 1.0f/ORI_NBINS, - M_PI );
