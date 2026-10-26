@@ -8,9 +8,31 @@
 #include "common/debug_macros.h"
 #include "sift_conf.h"
 
+#include <algorithm>
+#include <cctype>
 #include <iostream>
+#include <string_view>
 
 using namespace std;
+
+/**
+ * @brief Performs a case-insensitive equality comparison between two strings.
+ * 
+ * @param l The first string view to compare.
+ * @param r The second string view to compare.
+ * 
+ * @retval true  If both strings have the same length and match case-insensitively, false otherwise
+ */
+static bool isISame(std::string_view l, std::string_view r) noexcept
+{
+    if (l.length() != r.length()) return false;
+
+    // Compares elements sequentially, early exit; GCC required -march=native to SIMDify it
+    return std::equal( l.begin(), l.end(), r.begin(),
+                       [](unsigned char a, unsigned char b) {
+                           return std::tolower(a) == std::tolower(b);
+                       });
+}
 
 namespace popsift
 {
@@ -114,10 +136,10 @@ void Config::setNormMode( Config::NormMode m )
 
 void Config::setNormMode( const std::string& m )
 {
-    if( m == "RootSift" ) setNormMode( Config::RootSift );
-    else if( m == "classic" ) setNormMode( Config::Classic );
+    if( isISame( m, "RootSift" ) ) setNormMode( Config::RootSift );
+    else if( isISame( m, "Classic" ) ) setNormMode( Config::Classic );
     else
-        POP_FATAL( string("Bad Normalization mode.\n") );
+        POP_FATAL( string("Bad Normalization mode.\n") + getNormModeUsage() );
 }
 
 Config::NormMode Config::getNormModeDefault( )
