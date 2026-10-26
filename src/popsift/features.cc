@@ -192,8 +192,12 @@ void Feature::print( std::ostream& ostr, bool write_as_uchar, bool write_as_ori 
                  << sigval << " 0 " << sigval << " ";
         }
         if( write_as_uchar ) {
+            /* Rounded down, because the VLFeat CLI writes (vl_uint8)(512.0 * d).
+             * Rounding to nearest would be more accurate and may be
+             * preferable, but floor keeps the output comparable with VLFeat.
+             */
             for( int i=0; i<128; i++ ) {
-                ostr << std::round(desc[ori]->features[i]) << " ";
+                ostr << std::floor(desc[ori]->features[i]) << " ";
             }
         } else {
             ostr << std::setprecision(3);

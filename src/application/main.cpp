@@ -96,7 +96,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         ("print-gauss-tables", bool_switch()->notifier([&](bool b) { if(b) config.setPrintGaussTables(); }), "A debug output printing Gauss filter size and tables")
         ("print-dev-info", bool_switch(&print_dev_info)->default_value(false), "A debug output printing CUDA device information")
         ("print-time-info", bool_switch(&print_time_info)->default_value(false), "A debug output printing image processing time after load()")
-        ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded to int.\n"
+        ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded down to int, like VLFeat.\n"
          "Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar")
         ("write-as-orientation", bool_switch(&write_as_ori)->default_value(false), "Output descriptors have the form\n"
          "'X Y sigma orientation value*' (vlfeat-like) instead of 'X Y sigma^2 0 sigma^2 value*'")
