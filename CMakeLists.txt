@@ -125,6 +125,36 @@ if(SYCL_IMPL STREQUAL "ACPP")
         message(STATUS "Configuring for AdaptiveCpp CUDA backend (${GPU_ARCH})")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --acpp-targets=cuda:${GPU_ARCH} -pthread")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --acpp-targets=cuda:${GPU_ARCH} -pthread")
+
+        # acpp only knows the CUDA path compiled into its config. Tell it where
+        # the toolkit is unless ACPP_CUDA_PATH is already set in the environment,
+        # which acpp reads itself. Not REQUIRED: without a hit acpp uses its default.
+        set(ACPP_CUDA_PATH "" CACHE PATH "CUDA toolkit root passed to acpp as --acpp-cuda-path")
+        if(NOT ACPP_CUDA_PATH AND NOT DEFINED ENV{ACPP_CUDA_PATH})
+            # Not find_package(CUDAToolkit): it runs FindThreads try_compiles
+            # with the acpp flags, which the pthread workaround below avoids.
+            find_program(NVCC_EXECUTABLE nvcc
+                         HINTS ${CUDAToolkit_ROOT} $ENV{CUDAToolkit_ROOT} $ENV{CUDA_PATH} $ENV{CUDA_HOME}
+                         PATH_SUFFIXES bin
+                         PATHS /usr/local/cuda/bin /opt/cuda/bin
+                         DOC "nvcc, used to locate the CUDA toolkit for acpp")
+            if(NVCC_EXECUTABLE)
+                # Follow symlinks such as /usr/bin/nvcc -> /usr/local/cuda-12.x/bin/nvcc
+                get_filename_component(_nvcc_real "${NVCC_EXECUTABLE}" REALPATH)
+                get_filename_component(_cuda_root "${_nvcc_real}" DIRECTORY)
+                get_filename_component(_cuda_root "${_cuda_root}" DIRECTORY)
+                if(NOT EXISTS "${_cuda_root}/nvvm/libdevice" AND EXISTS "/usr/lib/cuda/nvvm/libdevice")
+                    # Debian/Ubuntu nvidia-cuda-toolkit: nvcc in /usr/bin, toolkit in /usr/lib/cuda
+                    set(_cuda_root "/usr/lib/cuda")
+                endif()
+                set(ACPP_CUDA_PATH "${_cuda_root}" CACHE PATH "CUDA toolkit root passed to acpp as --acpp-cuda-path" FORCE)
+            endif()
+        endif()
+        if(ACPP_CUDA_PATH)
+            message(STATUS "AdaptiveCpp CUDA path: ${ACPP_CUDA_PATH}")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --acpp-cuda-path=${ACPP_CUDA_PATH}")
+            set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --acpp-cuda-path=${ACPP_CUDA_PATH}")
+        endif()
     endif()
   endif(APPLE)
     

@@ -66,6 +66,11 @@ cmake .. -DSYCL_IMPL=INTEL    # Intel oneAPI DPC++ only
 For an installation in an unusual place, give its prefix with
 `-DAdaptiveCpp_ROOT=<prefix>` (or `-DAdaptiveCpp_DIR=<prefix>/lib/cmake/AdaptiveCpp`)
 or `-DONEAPI_ROOT=<prefix>`; sourcing oneAPI's `setvars.sh` also works.
+For AdaptiveCpp's CUDA backend, CMake finds the CUDA toolkit through `nvcc`
+(in `PATH`, `CUDAToolkit_ROOT`, `CUDA_PATH`, `CUDA_HOME` or `/usr/local/cuda`)
+and passes it to acpp as `--acpp-cuda-path`. Override it with
+`-DACPP_CUDA_PATH=<toolkit root>`; an `ACPP_CUDA_PATH` environment variable is
+left for acpp to read.
 Naming the compiler directly, e.g. `-DCMAKE_CXX_COMPILER=acpp`, or setting
 `CXX`, still overrides the search. The compiler is fixed at the first
 configure, so switch implementations in a fresh build directory.
