@@ -155,7 +155,7 @@ static sycl::event compute_orientations_sycl(
             const float sigw = ORI_WINFACTOR_LOCAL * sig;
             const int rad = (int)sycl::round(3.0f * sigw);
             const float factor = -0.5f / (sigw * sigw);
-            const int sq_thres = rad * rad;
+            const float sq_thres = (float)(rad * rad);
             
             int xmin = sycl::max(1, (int)sycl::round(x) - rad);
             int xmax = sycl::min(width - 2, (int)sycl::round(x) + rad);
@@ -167,7 +167,10 @@ static sycl::event compute_orientations_sycl(
                 for(int xx = xmin; xx <= xmax; xx++) {
                     const float dx = xx - x;
                     const float dy = yy - y;
-                    const int sq_dist = (int)(dx * dx + dy * dy);
+                    // The keypoint has a subpixel position, so the distance is
+                    // fractional. It used to be truncated to int, which distorted
+                    // the Gaussian weight.
+                    const float sq_dist = dx * dx + dy * dy;
                     
                     if(sq_dist <= sq_thres) {
                         // Data layout: level * (height * pitch) + y * pitch + x
@@ -179,13 +182,20 @@ static sycl::event compute_orientations_sycl(
                         const float grad = sycl::sqrt(Dx * Dx + Dy * Dy);
                         const float theta = sycl::atan2(Dy, Dx);
                         
-                        const float weight = grad * sycl::exp((float)sq_dist * factor);
+                        const float weight = grad * sycl::exp(sq_dist * factor);
                         
-                        int bidx = (int)sycl::round(36.0f * (theta + M_PI) / M_PI2);
-                        bidx = (bidx == 36) ? 0 : bidx;
-                        bidx = sycl::clamp(bidx, 0, 35);
+                        // Like VLFeat: bin b is centred on the angle
+                        // 2*pi*(b+0.5)/36 - pi, and each gradient is split
+                        // linearly between the two bins whose centres enclose it.
+                        const float fbin = 36.0f * (theta + M_PI) / M_PI2 - 0.5f;
+                        // fbin is in [-0.5, 35.5]: round down, not towards zero
+                        int b0 = (int)sycl::floor(fbin);
+                        const float frac = fbin - (float)b0;
+                        b0 = (b0 < 0) ? b0 + 36 : ((b0 >= 36) ? b0 - 36 : b0);
+                        const int b1 = (b0 == 35) ? 0 : b0 + 1;
                         
-                        hist[bidx] += weight;
+                        hist[b0] += weight * (1.0f - frac);
+                        hist[b1] += weight * frac;
                     }
                 }
             }
@@ -264,7 +274,8 @@ static sycl::event compute_orientations_sycl(
                 }
                 
                 if(max_val >= acceptance_threshold && max_idx >= 0) {
-                    float chosen_bin = refined_angle[max_idx];
+                    // + 0.5 because bin b is centred on 2*pi*(b+0.5)/36 - pi
+                    float chosen_bin = refined_angle[max_idx] + 0.5f;
                     if(chosen_bin >= 36.0f) chosen_bin -= 36.0f;
                     float th = M_PI2 * chosen_bin / 36.0f - M_PI;
                     ext.orientation[angles] = th;
