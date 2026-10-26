@@ -401,7 +401,13 @@ sycl::event find_extrema_in_dog( const int3&    g,
                 InitialExtremum& ec = d_extrema[write_idx];
                 ec.xpos = xn;
                 ec.ypos = yn;
-                ec.lpos = (int)sycl::round(sn);
+                // VLFeat does not refine the blur level: the extremum stays
+                // in the level where it was detected.
+                if constexpr (sift_mode == Config::RefineInLevel) {
+                    ec.lpos = level;
+                } else {
+                    ec.lpos = (int)sycl::round(sn);
+                }
                 ec.sigma = c_sigma0 * sycl::pow(c_sigma_k, sn);
                 ec.cell = sycl::floor(yn / c_h_grid_div) * c_grid_width + sycl::floor(xn / c_w_grid_div);
                 ec.ignore = false;
