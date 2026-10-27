@@ -36,7 +36,7 @@ jobs:
       CTEST_OUTPUT_ON_FAILURE: 1
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
 
       - name: Make scripts executable
         run: chmod +x ./.github/scripts/*.sh
@@ -58,7 +58,7 @@ jobs:
           deps-install-dir: ${{ env.DEPS_INSTALL_DIR }}
 
   build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     strategy:
       matrix:
         cuda_version: ["12.5.1", "12.9.0"]
@@ -68,12 +68,12 @@ jobs:
       VCPKG_INSTALLED_DIR: ${{ github.workspace }}\vcpkg\vcpkg_installed
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Cache CUDA installation
       - name: Cache CUDA installation
         id: cache-cuda
-        uses: actions/cache@v3
+        uses: actions/cache@v6
         with:
           path: |
             C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA
@@ -145,7 +145,7 @@ jobs:
       # Cache vcpkg installation and dependencies
       - name: Cache vcpkg
         id: cache-vcpkg
-        uses: actions/cache@v3
+        uses: actions/cache@v6
         with:
           path: |
             ${{ env.VCPKG_SRC_DIR }}
