@@ -327,7 +327,7 @@ void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
     ExtremaRead r( extremum );
     ExtremaWrt  w( extremum );
     ExtremaTot  t( total_ori );
-    ExtremaWrtMap wrtm( feat_to_ext_map, max( d_consts.max_orientations, dbuf.ori_allocated ) );
+    ExtremaWrtMap wrtm( feat_to_ext_map, dbuf.ori_allocated);
     ExclusivePrefixSum::Block<ExtremaRead,ExtremaWrt,ExtremaTot,ExtremaWrtMap>( total_ext_ct, r, w, t, wrtm );
 
     __syncthreads();
@@ -356,8 +356,8 @@ void ori_prefix_sum( const int total_ext_ct, const int num_octaves )
             dct.ori_ps[o] = dct.ori_ps[o-1] + dct.ori_ct[o-1];
         }
 
-        dct.ori_total = dct.ori_ps[MAX_OCTAVES-1] + dct.ori_ct[MAX_OCTAVES-1];
-        dct.ext_total = dct.ext_ps[MAX_OCTAVES-1] + dct.ext_ct[MAX_OCTAVES-1];
+        dct.ori_total = min(dct.ori_ps[MAX_OCTAVES-1] + dct.ori_ct[MAX_OCTAVES-1], dbuf.ori_allocated);
+        dct.ext_total = min(dct.ext_ps[MAX_OCTAVES-1] + dct.ext_ct[MAX_OCTAVES-1], dbuf.ext_allocated);
     }
 }
 

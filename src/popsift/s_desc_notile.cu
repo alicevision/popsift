@@ -105,6 +105,7 @@ void ext_desc_notile( const int           octave,
 
     const int   o_offset =  dct.ori_ps[octave] + offset;
     if( offset >= num ) return;
+    if( o_offset >= dct.ori_total ) return;
 
     Descriptor* desc     = &dbuf.desc            [o_offset];
     const int   ext_idx  =  dobuf.feat_to_ext_map[o_offset];
