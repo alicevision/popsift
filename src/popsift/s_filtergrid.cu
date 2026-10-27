@@ -288,7 +288,9 @@ int Pyramid::extrema_filter_grid( const Config& conf, int ext_total )
 
         if( ocount > 0 ) {
             FunctionExtractIgnored fun_extract_ignore;
-#if THRUST_VERSION >= 200802
+// rocThrust reports CCCL-era version numbers (2.8.5 in ROCm 7.2) but has no
+// libcu++, so ::cuda::std::identity exists only on the NVIDIA side.
+#if THRUST_VERSION >= 200802 && !( defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__) )
             ::cuda::std::identity  fun_id;
 #else
             thrust::identity<int>  fun_id;
