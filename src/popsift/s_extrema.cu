@@ -35,10 +35,7 @@ uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
     // lane is in [0, warpSize-1] (<= 63), so 1ull<<lane is always in range.
     const unsigned long long lane_mask = ( 1ull << lane ) - 1ull;
 
-    int write_index = 0;
-    if( lane == 0 ) {
-        write_index = atomicAdd( extrema_counter, __popcll( ballot ) );
-    }
+    int write_index = ( lane == 0 ) ? atomicAdd( extrema_counter, __popcll( ballot ) ) : 0;
     // broadcast the base from the wavefront leader (lane 0) over the real wavefront
     write_index = __shfl( write_index, 0, warpSize );
     // exclusive prefix: count set bits strictly below this lane in the wavefront
@@ -52,10 +49,7 @@ uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
 
     int ct = __popc( mask );
 
-    int write_index;
-    if( lane == 0 ) {
-        write_index = atomicAdd( extrema_counter, ct );
-    }
+    int write_index = ( lane == 0 ) ? atomicAdd( extrema_counter, ct ) : 0;
     write_index = popsift::shuffle( write_index, 0 );
     write_index += __popc( mask & ((1u << lane) - 1) );
 
