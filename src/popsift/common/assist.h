@@ -89,6 +89,25 @@ __device__ inline unsigned int ballot_group( unsigned int pred, int ) { return p
 __device__ inline int any_group( unsigned int pred, int ) { return popsift::any( pred ); }
 #endif
 
+/* Broadcast lane 0's value to every lane of the warp (CUDA) or of the whole
+ * wavefront (HIP). On HIP this is __builtin_amdgcn_readlane, which the compiler
+ * knows reads lane 0 only: a value computed under `if( lane == 0 )` stays a
+ * lane-0 value, and nothing is assumed about the other lanes' inputs. With
+ * __shfl, clang marks the by-value argument noundef, so an argument left
+ * uninitialised on the other lanes let it assume lane == 0 and drop the branch
+ * (issue #193). It reads one 32-bit register. Segmented broadcasts
+ * (shuffle( v, 0, width ) with width < warpSize) are not this and keep shuffle.
+ */
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+template<typename T> __device__ inline T broadcast_lane0( T variable )
+{
+    static_assert( sizeof(T) == sizeof(int), "broadcast_lane0 moves one 32-bit value" );
+    return __builtin_bit_cast( T, __builtin_amdgcn_readlane( __builtin_bit_cast( int, variable ), 0 ) );
+}
+#else
+template<typename T> __device__ inline T broadcast_lane0( T variable ) { return popsift::shuffle( variable, 0 ); }
+#endif
+
 
 /* This computation is needed very frequently when a dim3 grid block is
  * initialized. It ensure that the tail is not forgotten.

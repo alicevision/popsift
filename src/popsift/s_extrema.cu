@@ -37,7 +37,7 @@ uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
 
     int write_index = ( lane == 0 ) ? atomicAdd( extrema_counter, __popcll( ballot ) ) : 0;
     // broadcast the base from the wavefront leader (lane 0) over the real wavefront
-    write_index = __shfl( write_index, 0, warpSize );
+    write_index = popsift::broadcast_lane0( write_index );
     // exclusive prefix: count set bits strictly below this lane in the wavefront
     write_index += __popcll( ballot & lane_mask );
 
@@ -50,7 +50,7 @@ uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
     int ct = __popc( mask );
 
     int write_index = ( lane == 0 ) ? atomicAdd( extrema_counter, ct ) : 0;
-    write_index = popsift::shuffle( write_index, 0 );
+    write_index = popsift::broadcast_lane0( write_index );
     write_index += __popc( mask & ((1u << lane) - 1) );
 
     return write_index;
