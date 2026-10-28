@@ -22,6 +22,10 @@ if(NOT USE_HIP)
         CACHE
         STRING "Which CUDA CCs to support: native, all, all-major or an explicit list delimited by semicolons")
   endif()
+else()
+    set(CMAKE_HIP_ARCHITECTURES "gfx90a;gfx1100"
+        CACHE
+        STRING "Which AMD GPU architectures to support, provide a list")
 endif()
 
 if(USE_HIP)
@@ -107,6 +111,10 @@ if(USE_HIP)
   ###################
   #  HIP (AMD)
   ###################
+  if(NOT DEFINED GPU_TARGETS)
+    set(GPU_TARGETS "${CMAKE_HIP_ARCHITECTURES}" CACHE STRING "AMD GPU targets for hip::device")
+  endif()
+
   # rocThrust is the AMD build of Thrust. Its stream-bound execution policy is
   # in a different namespace than the NVIDIA one, which is what
   # src/popsift/common/thrust_setup.h hides from the Thrust callers.

@@ -79,9 +79,7 @@ set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 if(USE_HIP)
   # CMAKE_HIP_ARCHITECTURES is already resolved by project(... LANGUAGES CXX HIP)
-  # in the top-level CMakeLists: it auto-detects the host GPU arch, honors an
-  # explicit -DCMAKE_HIP_ARCHITECTURES, and errors on a host with no GPU. Pass
-  # -DCMAKE_HIP_ARCHITECTURES to override.
+  # in the top-level.
   set_target_properties(popsift PROPERTIES
     HIP_ARCHITECTURES "${CMAKE_HIP_ARCHITECTURES}")
   # USE_HIP selects the HIP branch of cuda_to_hip.h. __HIP_PLATFORM_AMD__ is
@@ -157,10 +155,24 @@ include(CMakePackageConfigHelpers)
 # Note: major version number must be the same as requested
 write_basic_package_version_file("${popsift_cmake_version_config}" COMPATIBILITY SameMajorVersion)
 
+# The find_dependency() calls that Config.cmake.in needs for the GPU runtime.
+# The exported popsift target names CUDA::cudart or hip::host, so a consumer
+# must find the matching package. A static libpopsift also carries
+# roc::rocthrust as a link-only dependency, so that must be found too.
+if(USE_HIP)
+  set(popsift_gpu_dependencies "find_dependency(hip CONFIG)")
+  if(NOT BUILD_SHARED_LIBS)
+    string(APPEND popsift_gpu_dependencies "\nfind_dependency(rocthrust CONFIG)")
+  endif()
+else()
+  set(popsift_gpu_dependencies "find_dependency(CUDAToolkit)")
+endif()
+
 # Configure '<PROJECT-NAME>Config.cmake'
 # Use variables:
 #   * popsift_targets_export_name
 #   * PROJECT_NAME
+#   * popsift_gpu_dependencies
 configure_package_config_file("${PROJECT_SOURCE_DIR}/cmake/Config.cmake.in"
                               "${popsift_cmake_project_config}"
                               INSTALL_DESTINATION "${popsift_config_install_dir}")
