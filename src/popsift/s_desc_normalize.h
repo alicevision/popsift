@@ -23,11 +23,15 @@ void normalize_histogram( )
     // all of these threads are useless
     if( blockIdx.x * 32 >= num_orientations ) return;
 
-    offset = ( offset < num_orientations ) ? offset
-                                           : num_orientations-1;
-    Descriptor* desc = &descs[offset];
+    // Decided before the clamp below. Rows of the last block past the end
+    // are clamped onto the last descriptor so that their shuffles have data,
+    // and must not write it: computed after the clamp, ignoreme was never
+    // true, and those rows normalized the last descriptor a second time, in
+    // place, racing the row that owns it.
+    const bool ignoreme = ( offset >= num_orientations );
 
-    bool ignoreme = ( offset >= num_orientations );
+    offset = ignoreme ? num_orientations-1 : offset;
+    Descriptor* desc = &descs[offset];
 
     T::normalize( desc->features, ignoreme );
 }
