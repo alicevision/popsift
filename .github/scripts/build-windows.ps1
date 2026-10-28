@@ -53,7 +53,7 @@ function Configure-CMake {
     $vcpkgToolchain = "$VcpkgRoot/scripts/buildsystems/vcpkg.cmake"
     
     Set-Location $buildDir
-    cmake .. -G "Visual Studio 17 2022" -A x64 `
+    cmake .. -G "Visual Studio 18 2026" -A x64 `
       -DBUILD_SHARED_LIBS:BOOL=ON `
       -DCMAKE_GENERATOR_TOOLSET="cuda=$env:CUDA_PATH" `
       -DPopSift_USE_GRID_FILTER:BOOL=ON `
@@ -140,7 +140,7 @@ function Build-AsThirdParty {
     Get-ChildItem -Path $mainProjectVcpkgInstalled -Directory | ForEach-Object { Write-Host " - $($_.Name)" }
 
     Set-Location $thirdPartyDir
-    cmake ../src/application -G "Visual Studio 17 2022" -A x64 `
+    cmake ../src/application -G "Visual Studio 18 2026" -A x64 `
       -DBUILD_SHARED_LIBS:BOOL=ON `
       -DCMAKE_BUILD_TYPE=$BuildType `
       -DCMAKE_PREFIX_PATH="$installDir;$mainProjectVcpkgInstalled/x64-windows" `
