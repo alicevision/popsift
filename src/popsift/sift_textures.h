@@ -40,6 +40,9 @@ struct LinearTexture
  * and the level dimensions alongside the texture, which is what this type
  * carries.
  *
+ * The depth is the number of levels in the array, so that the read path can
+ * clamp the level the way a layered texture fetch clamps its layer index.
+ *
  * On CUDA the handle is the texture object itself and the read path is
  * unchanged.
  */
@@ -49,20 +52,21 @@ struct LayeredReadTex
     cudaSurfaceObject_t surf;
     int                 width;
     int                 height;
+    int                 depth;
 };
 
 inline LayeredReadTex makeLayeredReadTex( cudaTextureObject_t tex,
                                           cudaSurfaceObject_t surf,
-                                          int width, int height )
+                                          int width, int height, int depth )
 {
-    return LayeredReadTex{ tex, surf, width, height };
+    return LayeredReadTex{ tex, surf, width, height, depth };
 }
 #else
 using LayeredReadTex = cudaTextureObject_t;
 
 inline LayeredReadTex makeLayeredReadTex( cudaTextureObject_t tex,
                                           cudaSurfaceObject_t,
-                                          int, int )
+                                          int, int, int )
 {
     return tex;
 }
