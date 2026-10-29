@@ -7,61 +7,56 @@
  */
 #pragma once
 
+#include "s_image.h"
+#include "sift_conf.h"
+#include "sift_constants.h"
+#include "sift_extremum.h"
+#include "sift_textures.h"
+
 #include <iostream>
 #include <vector>
 
-#include "s_image.h"
-#include "sift_conf.h"
-#include "sift_extremum.h"
-#include "sift_constants.h"
-
 namespace popsift {
-
-struct LinearTexture
-{
-    cudaSurfaceObject_t tex;
-};
 
 class Octave
 {
-    int   _w;
-    int   _h;
-    int   _max_w;
-    int   _max_h;
-    float _w_grid_divider;
-    float _h_grid_divider;
-    int   _debug_octave_id;
-    int   _levels;
-    int   _gauss_group;
+    int   _w{};
+    int   _h{};
+    int   _max_w{};
+    int   _max_h{};
+    float _w_grid_divider{};
+    float _h_grid_divider{};
+    int   _debug_octave_id{};
+    int   _levels{};
+    int   _gauss_group{};
 
-    cudaArray_t           _data;
-    cudaChannelFormatDesc _data_desc;
-    cudaExtent            _data_ext;
-    cudaSurfaceObject_t   _data_surf;
-    cudaTextureObject_t   _data_tex_point;
-    LinearTexture         _data_tex_linear;
+    cudaArray_t           _data{};
+    cudaChannelFormatDesc _data_desc{};
+    cudaExtent            _data_ext{};
+    cudaSurfaceObject_t   _data_surf{};
+    cudaTextureObject_t   _data_tex_point{};
+    LinearTexture         _data_tex_linear{};
 
-    cudaArray_t           _intm;
-    cudaChannelFormatDesc _intm_desc;
-    cudaExtent            _intm_ext;
-    cudaSurfaceObject_t   _intm_surf;
-    cudaTextureObject_t   _intm_tex_point;
-    LinearTexture         _intm_tex_linear;
+    cudaArray_t           _intm{};
+    cudaChannelFormatDesc _intm_desc{};
+    cudaExtent            _intm_ext{};
+    cudaSurfaceObject_t   _intm_surf{};
+    cudaTextureObject_t   _intm_tex_point{};
+    LinearTexture         _intm_tex_linear{};
 
-    cudaArray_t           _dog_3d;
-    cudaChannelFormatDesc _dog_3d_desc;
-    cudaExtent            _dog_3d_ext;
-    cudaSurfaceObject_t   _dog_3d_surf;
-    cudaTextureObject_t   _dog_3d_tex_point;
-    LinearTexture         _dog_3d_tex_linear;
+    cudaArray_t           _dog_3d{};
+    cudaChannelFormatDesc _dog_3d_desc{};
+    cudaExtent            _dog_3d_ext{};
+    cudaSurfaceObject_t   _dog_3d_surf{};
+    cudaTextureObject_t   _dog_3d_tex_point{};
 
     // one CUDA stream per level
     // consider whether some of them can be removed
-    cudaStream_t _stream;
-    cudaEvent_t  _scale_done;
-    cudaEvent_t  _extrema_done;
-    cudaEvent_t  _ori_done;
-    cudaEvent_t  _desc_done;
+    cudaStream_t _stream{};
+    cudaEvent_t  _scale_done{};
+    cudaEvent_t  _extrema_done{};
+    cudaEvent_t  _ori_done{};
+    cudaEvent_t  _desc_done{};
 
 public:
     Octave( );
@@ -102,39 +97,45 @@ public:
         return _desc_done;
     }
 
-    inline LinearTexture getIntermDataTexLinear( ) {
-        return _intm_tex_linear;
-    }
-    inline cudaTextureObject_t getIntermDataTexPoint( ) {
-        return _intm_tex_point;
-    }
-    inline LinearTexture getDataTexLinear( ) {
-        return _data_tex_linear;
-    }
-    inline cudaTextureObject_t getDataTexPoint( ) {
-        return _data_tex_point;
-    }
-    inline cudaSurfaceObject_t getDataSurface( ) {
+    inline cudaSurfaceObject_t getDataSurface( ) const {
         return _data_surf;
     }
-    inline cudaSurfaceObject_t getIntermediateSurface( ) {
+    inline cudaSurfaceObject_t getIntermediateSurface( ) const {
         return _intm_surf;
     }
         
     inline cudaSurfaceObject_t& getDogSurface( ) {
         return _dog_3d_surf;
     }
-    inline cudaTextureObject_t& getDogTexturePoint( ) {
-        return _dog_3d_tex_point;
+
+    /* The read handles the kernels take. A read handle names the array to read
+     * and the filtering to read it with, and it carries whatever else the
+     * platform needs to address that array (see sift_textures.h).
+     */
+    inline LayeredReadTex getDataReadTexPoint( ) const {
+        return makeLayeredReadTex( _data_tex_point, _data_surf, _w, _h );
     }
-    inline LinearTexture& getDogTextureLinear( ) {
-        return _dog_3d_tex_linear;
+    inline LayeredReadTex getDataReadTexLinear( ) const {
+        return makeLayeredReadTex( _data_tex_linear.tex, _data_surf, _w, _h );
+    }
+    inline LayeredReadTex getIntermReadTexPoint( ) const {
+        return makeLayeredReadTex( _intm_tex_point, _intm_surf, _w, _h );
+    }
+    inline LayeredReadTex getIntermReadTexLinear( ) const {
+        return makeLayeredReadTex( _intm_tex_linear.tex, _intm_surf, _w, _h );
+    }
+    inline LayeredReadTex getDogReadTexPoint( ) const {
+        return makeLayeredReadTex( _dog_3d_tex_point, _dog_3d_surf, _w, _h );
     }
 
-    /**
-     * alloc() - allocates all GPU memories for one octave
-     * @param width in floats, not bytes!!!
-     */
+     /**
+      * @brief Allocates all GPU memories for one octave.
+      * @param conf
+      * @param width in floats
+      * @param height
+      * @param levels
+      * @param gauss_group
+      */
     void alloc( const Config& conf,
                 int           width,
                 int           height,

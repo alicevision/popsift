@@ -7,8 +7,8 @@
  */
 #pragma once
 
-#include "sift_constants.h"
 #include "sift_conf.h"
+#include "sift_constants.h"
 
 namespace popsift {
 
@@ -74,12 +74,13 @@ struct GaussInfo
      */
     GaussTable<GAUSS_LEVELS> abs_oN;
 
-    /* In theory, level 0 of octave 2 contains the same information
-     * whether it is constructed by downscaling and blurring the
-     * input image with sigma or by blurring the input image with 2*sigma
-     * and downscaling afterwards.
+    /* The dd table was meant for the creation of every top-level of
+     * every octave directly from the upscaling input image. This option
+     * has been removed because it didn't work well.
+     * As a consequence, the table dd needs only its first entry for
+     * Gaussian filtering of the first octave.
      */
-    GaussTable<MAX_OCTAVES> dd;
+    GaussTable<1> dd;
 
     __host__
     void clearTables( );
@@ -99,13 +100,10 @@ private:
 
     __host__
     static int vlFeatRelativeSpan( float sigma );
-
-    __host__
-    static int openCVSpan( float sigma );
 };
 
 extern __device__ __constant__ GaussInfo d_gauss;
-extern                         GaussInfo h_gauss;
+extern thread_local            GaussInfo h_gauss;
 
 /* init_filter must be called early to initialize the Gauss tables.
  */

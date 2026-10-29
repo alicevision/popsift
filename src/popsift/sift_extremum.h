@@ -7,14 +7,15 @@
  */
 #pragma once
 
+#include "sift_constants.h"
+
 #include <iostream>
 #include <vector>
 
-#include "sift_constants.h"
-
 namespace popsift {
 
-/* This is an internal data structure.
+/**
+ * @brief This is an internal data structure.
  * Separated from the final Extremum data structure to implement
  * grid filtering in a space-efficient manner. In grid filtering,
  * extrema are first found, after that some may be discarded in
@@ -25,14 +26,20 @@ struct InitialExtremum
 {
     float xpos;
     float ypos;
-    int   lpos;  // extremum refined into this level
-    float sigma; // scale;
-    int   cell;  // index into the grid for grid-based extrema filtering
-    bool  ignore; // true if this extremum has been filtered
-    int   write_index; // if any initial extrema are ignored, new index for Extremum
+    /// extremum refined into this level
+    int   lpos;
+    /// scale
+    float sigma;
+    /// index into the grid for grid-based extrema filtering
+    int   cell;
+    /// true if this extremum has been filtered
+    bool  ignore;
+    /// if any initial extrema are ignored, new index for Extremum
+    int   write_index;
 };
 
-/* This is an internal data structure.
+/**
+ * @brief This is an internal data structure.
  * For performance reasons, it would be appropriate to split
  * the first 4 values from the rest of this structure. Right
  * now, descriptor computation is a bigger concern.
@@ -41,16 +48,22 @@ struct Extremum
 {
     float xpos;
     float ypos;
-    int   lpos;  // extremum refined into this level
-    float sigma; // scale;
+    /// extremum refined into this level
+    int   lpos;
+    /// scale
+    float sigma;
 
-    int   octave;  // belonging to this octave
-    int   num_ori; // number of this extremum's orientations
-    int   idx_ori; // exclusive prefix sum of the layer's orientations
+    /// belonging to this octave
+    int   octave;
+    /// number of this extremum's orientations
+    int   num_ori;
+    /// exclusive prefix sum of the layer's orientations
+    int   idx_ori;
     float orientation[ORIENTATION_MAX_COUNT];
 };
 
-/* This is a data structure that is returned to a calling program.
+/**
+ * @brief This is a data structure that is returned to a calling program.
  * This is the SIFT descriptor itself.
  */
 struct Descriptor

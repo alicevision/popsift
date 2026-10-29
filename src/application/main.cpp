@@ -5,42 +5,37 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <cmath>
-#include <iomanip>
-#include <stdlib.h>
-#include <stdexcept>
-#include <list>
-#include <string>
-
-#include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
-
-#include <popsift/popsift.h>
-#include <popsift/features.h>
-#include <popsift/sift_conf.h>
 #include <popsift/common/device_prop.h>
+#include <popsift/features.h>
+#include <popsift/popsift.h>
+#include <popsift/sift_conf.h>
+#include <popsift/sift_config.h>
+#include <popsift/version.hpp>
+
+#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
+
+#include <cmath>
+#include <cstdlib>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <list>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
 #ifdef USE_DEVIL
 #include <devil_cpp_wrapper.hpp>
 #endif
 #include "pgmread.h"
 
-#ifdef USE_NVTX
-#include <nvToolsExtCuda.h>
-#else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
-#endif
-
 using namespace std;
 
 static bool print_dev_info  = false;
 static bool print_time_info = false;
 static bool write_as_uchar  = false;
+static bool write_as_ori    = false;
 static bool dont_write      = false;
 static bool pgmread_loading = false;
 static bool float_mode      = false;
@@ -79,10 +74,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         // "Choice of span (1-sided) for Gauss filters. Default is VLFeat-like computation depending on sigma. "
         // "Options are: vlfeat, relative, relative-all, opencv, fixed9, fixed15"
         ("desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
-        "Choice of descriptor extraction modes:\n"
-        "loop, iloop, grid, igrid, notile\n"
-	"Default is loop\n"
-        "loop is OpenCV-like horizontal scanning, computing only valid points, grid extracts only useful points but rounds them, iloop uses linear texture and rotated gradiant fetching. igrid is grid with linear interpolation. notile is like igrid but avoids redundant gradiant fetching.")
+         popsift::Config::getDescModeUsage())
         ("popsift-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::PopSift); }),
         "During the initial upscale, shift pixels by 1. In extrema refinement, steps up to 0.6, do not reject points when reaching max iterations, "
         "first contrast threshold is .8 * peak thresh. Shift feature coords octave 0 back to original pos.")
@@ -97,8 +89,6 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         "reject points when reaching max iterations, "
         "first contrast threshold is floor(.5 * peak thresh). "
         "Computed filter width are lower than VLFeat/PopSift")
-        ("direct-scaling", bool_switch()->notifier([&](bool b) { if(b) config.setScalingMode(popsift::Config::ScaleDirect); }),
-         "Direct each octave from upscaled orig instead of blurred level.")
         ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
         ( "norm-mode", value<std::string>()->notifier([&](const std::string& s) { config.setNormMode(s); }),
           popsift::Config::getNormModeUsage() )
@@ -115,8 +105,10 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
         ("print-gauss-tables", bool_switch()->notifier([&](bool b) { if(b) config.setPrintGaussTables(); }), "A debug output printing Gauss filter size and tables")
         ("print-dev-info", bool_switch(&print_dev_info)->default_value(false), "A debug output printing CUDA device information")
         ("print-time-info", bool_switch(&print_time_info)->default_value(false), "A debug output printing image processing time after load()")
-        ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded to int.\n"
+        ("write-as-uchar", bool_switch(&write_as_uchar)->default_value(false), "Output descriptors rounded down to int, like VLFeat.\n"
          "Scaling to sensible ranges is not automatic, should be combined with --norm-multi=9 or similar")
+        ("write-as-orientation", bool_switch(&write_as_ori)->default_value(false), "Output descriptors have the form\n"
+         "'X Y sigma orientation value*' (vlfeat-like) instead of 'X Y sigma^2 0 sigma^2 value*'")
         ("dont-write", bool_switch(&dont_write)->default_value(false), "Suppress descriptor output")
         ("pgmread-loading", bool_switch(&pgmread_loading)->default_value(false), "Use the old image loader instead of LibDevIL")
         ("float-mode", bool_switch(&float_mode)->default_value(false), "Upload image to GPU as float instead of byte")
@@ -135,7 +127,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
 
        if (vm.count("help")) {
            std::cout << all << '\n';
-           exit(1);
+           exit(EXIT_SUCCESS);
        }
 
         notify(vm); // Notify does processing (e.g., raise exceptions if required args are missing)
@@ -155,33 +147,32 @@ static void collectFilenames( list<string>& inputFiles, const boost::filesystem:
     std::copy( boost::filesystem::directory_iterator( inputFile ),
                boost::filesystem::directory_iterator(),
                std::back_inserter(vec) );
-    for( auto it = vec.begin(); it!=vec.end(); it++ ) {
-        if( boost::filesystem::is_regular_file( *it ) ) {
-            string s( it->c_str() );
-            inputFiles.push_back( s );
-        } else if( boost::filesystem::is_directory( *it ) ) {
-            collectFilenames( inputFiles, *it );
+    for (const auto& currPath : vec)
+    {
+        if( boost::filesystem::is_regular_file(currPath) )
+        {
+            inputFiles.push_back( currPath.string() );
+        }
+        else if( boost::filesystem::is_directory(currPath) )
+        {
+            collectFilenames( inputFiles, currPath);
         }
     }
 }
 
 SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 {
-    int w;
-    int h;
     SiftJob* job;
     unsigned char* image_data;
 
 #ifdef USE_DEVIL
-    if( not pgmread_loading )
+    if( ! pgmread_loading )
     {
         if( float_mode )
         {
             cerr << "Cannot combine float-mode test with DevIL image reader" << endl;
             exit( -1 );
         }
-
-        nvtxRangePushA( "load and convert image - devil" );
 
         ilImage img;
         if( img.Load( inputFile.c_str() ) == false ) {
@@ -192,13 +183,11 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
             cerr << "Failed converting image " << inputFile << " to unsigned greyscale image" << endl;
             exit( -1 );
         }
-        w = img.Width();
-        h = img.Height();
+        const auto w = img.Width();
+        const auto h = img.Height();
         cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
 
         image_data = img.GetData();
-
-        nvtxRangePop( ); // "load and convert image - devil"
 
         job = PopSift.enqueue( w, h, image_data );
 
@@ -207,16 +196,14 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     else
 #endif
     {
-        nvtxRangePushA( "load and convert image - pgmread" );
-
+        int w{};
+        int h{};
         image_data = readPGMfile( inputFile, w, h );
-        if( image_data == 0 ) {
-            exit( -1 );
+        if( image_data == nullptr ) {
+            exit( EXIT_FAILURE );
         }
 
-        nvtxRangePop( ); // "load and convert image - pgmread"
-
-        if( not float_mode )
+        if( ! float_mode )
         {
             // PopSift.init( w, h );
             job = PopSift.enqueue( w, h, image_data );
@@ -225,7 +212,7 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
         }
         else
         {
-            float* f_image_data = new float [w * h];
+            auto f_image_data = new float [w * h];
             for( int i=0; i<w*h; i++ )
             {
                 f_image_data[i] = float( image_data[i] ) / 256.0f;
@@ -248,26 +235,21 @@ void read_job( SiftJob* job, bool really_write )
          << endl;
 
     if( really_write ) {
-        nvtxRangePushA( "Writing features to disk" );
-
         std::ofstream of( "output-features.txt" );
-        feature_list->print( of, write_as_uchar );
+        feature_list->print( of, write_as_uchar, write_as_ori );
     }
     delete feature_list;
-
-    if( really_write ) {
-        nvtxRangePop( ); // Writing features to disk
-    }
 }
 
 int main(int argc, char **argv)
 {
-    cudaDeviceReset();
+    popsift::cuda::reset();
 
     popsift::Config config;
     list<string>   inputFiles;
-    string         inputFile = "";
-    const char*    appName   = argv[0];
+    string         inputFile{};
+
+    std::cout << "PopSift version: " << POPSIFT_VERSION_STRING << std::endl;
 
     try {
         parseargs( argc, argv, config, inputFile ); // Parse command line
@@ -275,7 +257,7 @@ int main(int argc, char **argv)
     }
     catch (std::exception& e) {
         std::cout << e.what() << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
 
     if( boost::filesystem::exists( inputFile ) ) {
@@ -284,13 +266,13 @@ int main(int argc, char **argv)
             collectFilenames( inputFiles, inputFile );
             if( inputFiles.empty() ) {
                 cerr << "No files in directory, nothing to do" << endl;
-                exit( 0 );
+                return EXIT_SUCCESS;
             }
         } else if( boost::filesystem::is_regular_file( inputFile ) ) {
             inputFiles.push_back( inputFile );
         } else {
             cout << "Input file is neither regular file nor directory, nothing to do" << endl;
-            exit( -1 );
+            return EXIT_FAILURE;
         }
     }
 
@@ -303,10 +285,9 @@ int main(int argc, char **argv)
                      float_mode ? PopSift::FloatImages : PopSift::ByteImages );
 
     std::queue<SiftJob*> jobs;
-    for( auto it = inputFiles.begin(); it!=inputFiles.end(); it++ ) {
-        inputFile = it->c_str();
-
-        SiftJob* job = process_image( inputFile, PopSift );
+    for(const auto& currFile : inputFiles)
+    {
+        SiftJob* job = process_image( currFile, PopSift );
         jobs.push( job );
     }
 
@@ -315,11 +296,13 @@ int main(int argc, char **argv)
         SiftJob* job = jobs.front();
         jobs.pop();
         if( job ) {
-            read_job( job, not dont_write );
+            read_job( job, ! dont_write );
             delete job;
         }
     }
 
     PopSift.uninit( );
+
+    return EXIT_SUCCESS;
 }
 

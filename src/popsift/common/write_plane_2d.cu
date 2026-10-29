@@ -7,9 +7,9 @@
  */
 #include "write_plane_2d.h"
 
-#include <iostream>
-#include <iomanip>
 #include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <limits>
 
 using namespace std;
@@ -17,7 +17,7 @@ using namespace std;
 namespace popsift {
 
 __host__
-void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
+void write_plane2D( const char* filename, bool onDevice, const Plane2D_float& f )
 {
     if( onDevice ) {
         // cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
@@ -32,7 +32,7 @@ void write_plane2D( const char* filename, bool onDevice, Plane2D_float& f )
 }
 
 __host__
-void write_plane2Dunscaled( const char* filename, bool onDevice, Plane2D_float& f, int offset )
+void write_plane2Dunscaled( const char* filename, bool onDevice, const Plane2D_float& f, int offset )
 {
     if( onDevice ) {
         // cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
@@ -47,7 +47,7 @@ void write_plane2Dunscaled( const char* filename, bool onDevice, Plane2D_float& 
 }
 
 __host__
-void write_plane2D( const char* filename, Plane2D_float& f )
+void write_plane2D( const char* filename, const Plane2D_float& f )
 {
     // cerr << "Enter " << __FUNCTION__ << endl;
 
@@ -107,7 +107,7 @@ void write_plane2D( const char* filename, Plane2D_float& f )
 }
 
 __host__
-void write_plane2Dunscaled( const char* filename, Plane2D_float& f, int offset )
+void write_plane2Dunscaled( const char* filename, const Plane2D_float& f, int offset )
 {
     int rows = f.getRows();
     int cols = f.getCols();
@@ -139,7 +139,7 @@ void write_plane2Dunscaled( const char* filename, Plane2D_float& f, int offset )
 }
 
 __host__
-void dump_plane2Dfloat( const char* filename, bool onDevice, Plane2D_float& f )
+void dump_plane2Dfloat( const char* filename, bool onDevice, const Plane2D_float& f )
 {
     if( onDevice ) {
         // cerr << __FILE__ << ":" << __LINE__ << ": copying from device" << endl;
@@ -154,7 +154,7 @@ void dump_plane2Dfloat( const char* filename, bool onDevice, Plane2D_float& f )
 }
 
 __host__
-void dump_plane2Dfloat( const char* filename, Plane2D_float& f )
+void dump_plane2Dfloat( const char* filename, const Plane2D_float& f )
 {
     int rows = f.getRows();
     int cols = f.getCols();
