@@ -161,13 +161,17 @@ float readTex( cudaTextureObject_t tex, float x, float y, float z )
  * [0,width-1]x[0,height-1] the way cudaAddressModeClamp clamps the textures this
  * read replaces (an out-of-range surface read returns 0, which would corrupt the
  * image borders), and the byte offset of the surface x coordinate is hidden. The
- * z coordinate is the blur level, i.e. the layer index of the CUDA build.
+ * z coordinate is the blur level, i.e. the layer index of the CUDA build; it is
+ * clamped into [0,depth-1] because a layered texture fetch clamps its layer
+ * index to the nearest layer (extremum refinement reads one level above and
+ * below the extremum, which can be past the first or last level).
  */
 __device__ static inline
 float texFetchClamped( const LayeredReadTex& s, int ix, int iy, int layer )
 {
     ix = std::clamp( ix, 0, s.width  - 1 );
     iy = std::clamp( iy, 0, s.height - 1 );
+    layer = std::clamp( layer, 0, s.depth - 1 );
     float v;
     surf3Dread( &v, s.surf, ix * 4, iy, layer );
     return v;
