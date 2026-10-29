@@ -1,0 +1,89 @@
+name: Continuous Integration for Linux (ROCm, HIP)
+
+# Compile-only coverage for the USE_HIP=ON path. GitHub-hosted runners have no
+# AMD GPU, so the GPU tests are built and run, but popsift-gpu-probe makes them
+# skip (exit 77).
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+    # Skip jobs when only documentation files are changed
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
+  # Allows manual triggering from GitHub UI or CLI
+  workflow_dispatch:
+  # Weekly build every Monday at 8:10 UTC
+  schedule:
+    - cron: "10 8 * * 1"
+
+jobs:
+  build-linux-rocm:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rocm: ["6.4"]
+        build-type: ["Debug"]
+
+    container:
+      image: rocm/dev-ubuntu-24.04:${{ matrix.rocm }}
+
+    env:
+      # No GPU on the runner, so the architecture cannot be auto-detected and
+      # must be given. These are the two the README lists as validated.
+      HIP_ARCHS: "gfx90a;gfx1100"
+      CTEST_OUTPUT_ON_FAILURE: 1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        # The rocm/dev images already carry the ROCm apt repository, hipcc and
+        # the HIP runtime, but not rocThrust/rocPRIM.
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            cmake ninja-build git \
+            rocthrust-dev rocprim-dev \
+            libboost-filesystem-dev libboost-program-options-dev \
+            libboost-system-dev libboost-thread-dev \
+            libdevil-dev python3
+          cmake --version
+          /opt/rocm/bin/hipcc --version
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DUSE_HIP=ON \
+            -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
+            -DCMAKE_PREFIX_PATH=/opt/rocm \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
+            -DBUILD_SHARED_LIBS=ON \
+            -DPopSift_BUILD_DOCS=OFF \
+            -DBUILD_TESTING=ON \
+            -DPopSift_TEST_WITH_VLFEAT=ON \
+            -DCMAKE_INSTALL_PREFIX="$PWD/install"
+
+      - name: Build and install
+        run: |
+          cmake --build build --parallel
+          cmake --install build
+
+      - name: Build an application against the installed PopSift
+        run: |
+          cmake -S src/application -B build_3rdparty -G Ninja \
+            -DUSE_HIP=ON \
+            -DGPU_TARGETS="$HIP_ARCHS" \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
+            -DCMAKE_PREFIX_PATH="$PWD/install;/opt/rocm"
+          cmake --build build_3rdparty --parallel
+
+
