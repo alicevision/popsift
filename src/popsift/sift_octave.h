@@ -113,19 +113,19 @@ public:
      * platform needs to address that array (see sift_textures.h).
      */
     inline LayeredReadTex getDataReadTexPoint( ) const {
-        return makeLayeredReadTex( _data_tex_point, _data_surf, _w, _h );
+        return makeLayeredReadTex( _data_tex_point, _data_surf, _w, _h, _levels );
     }
     inline LayeredReadTex getDataReadTexLinear( ) const {
-        return makeLayeredReadTex( _data_tex_linear.tex, _data_surf, _w, _h );
+        return makeLayeredReadTex( _data_tex_linear.tex, _data_surf, _w, _h, _levels );
     }
     inline LayeredReadTex getIntermReadTexPoint( ) const {
-        return makeLayeredReadTex( _intm_tex_point, _intm_surf, _w, _h );
+        return makeLayeredReadTex( _intm_tex_point, _intm_surf, _w, _h, _levels );
     }
     inline LayeredReadTex getIntermReadTexLinear( ) const {
-        return makeLayeredReadTex( _intm_tex_linear.tex, _intm_surf, _w, _h );
+        return makeLayeredReadTex( _intm_tex_linear.tex, _intm_surf, _w, _h, _levels );
     }
     inline LayeredReadTex getDogReadTexPoint( ) const {
-        return makeLayeredReadTex( _dog_3d_tex_point, _dog_3d_surf, _w, _h );
+        return makeLayeredReadTex( _dog_3d_tex_point, _dog_3d_surf, _w, _h, _levels - 1 );
     }
 
      /**
