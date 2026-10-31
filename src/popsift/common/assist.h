@@ -30,7 +30,6 @@ std::ostream& operator<<( std::ostream& ostr, const dim3& p );
 /*
  * Assistance with compatibility-breaking builtin function changes
  */
-#if POPSIFT_IS_DEFINED(POPSIFT_HAVE_SHFL_DOWN_SYNC)
 template<typename T> __device__ inline T shuffle     ( T variable, int src   ) { return __shfl_sync     ( 0xffffffff, variable, src   ); }
 template<typename T> __device__ inline T shuffle_up  ( T variable, int delta ) { return __shfl_up_sync  ( 0xffffffff, variable, delta ); }
 template<typename T> __device__ inline T shuffle_down( T variable, int delta ) { return __shfl_down_sync( 0xffffffff, variable, delta ); }
@@ -43,24 +42,6 @@ template<typename T> __device__ inline T shuffle     ( T variable, int src  , in
 template<typename T> __device__ inline T shuffle_up  ( T variable, int delta, int ws ) { return __shfl_up_sync  ( 0xffffffff, variable, delta, ws ); }
 template<typename T> __device__ inline T shuffle_down( T variable, int delta, int ws ) { return __shfl_down_sync( 0xffffffff, variable, delta, ws ); }
 template<typename T> __device__ inline T shuffle_xor ( T variable, int delta, int ws ) { return __shfl_xor_sync ( 0xffffffff, variable, delta, ws ); }
-#else
-/* The mask-free builtins. This is the pre-CUDA-9 spelling, and it is also the
- * spelling HIP provides, where the width parameter may be up to the 64-lane
- * wavefront size.
- */
-template<typename T> __device__ inline T shuffle     ( T variable, int src   ) { return __shfl     ( variable, src   ); }
-template<typename T> __device__ inline T shuffle_up  ( T variable, int delta ) { return __shfl_up  ( variable, delta ); }
-template<typename T> __device__ inline T shuffle_down( T variable, int delta ) { return __shfl_down( variable, delta ); }
-template<typename T> __device__ inline T shuffle_xor ( T variable, int delta ) { return __shfl_xor ( variable, delta ); }
-__device__ inline unsigned int ballot( unsigned int pred ) { return __ballot   ( pred ); }
-__device__ inline int any            ( unsigned int pred ) { return __any      ( pred ); }
-__device__ inline int all            ( unsigned int pred ) { return __all      ( pred ); }
-
-template<typename T> __device__ inline T shuffle     ( T variable, int src  , int ws ) { return __shfl     ( variable, src  , ws ); }
-template<typename T> __device__ inline T shuffle_up  ( T variable, int delta, int ws ) { return __shfl_up  ( variable, delta, ws ); }
-template<typename T> __device__ inline T shuffle_down( T variable, int delta, int ws ) { return __shfl_down( variable, delta, ws ); }
-template<typename T> __device__ inline T shuffle_xor ( T variable, int delta, int ws ) { return __shfl_xor ( variable, delta, ws ); }
-#endif
 
 #if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
 /* Wave64 sub-warp helpers.
