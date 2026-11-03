@@ -152,8 +152,7 @@ else()
     list(APPEND CUDA_NVCC_FLAGS "-DERRCHK_AFTER_KERNEL")
   endif()
 
-  # This may not be required any more.
-  set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+  set(CMAKE_CUDA_SEPARABLE_COMPILATION OFF)
 
   # default stream per-thread implies that each host thread has one non-synchronizing 0-stream
   # currently, the code requires legacy mode
