@@ -200,6 +200,8 @@ if(PopSift_BUILD_DOCS)
   add_subdirectory(doc)
 endif()
 
+add_subdirectory(Testing/compareSiftFiles)
+
 ########### Add uninstall target ###############
 CONFIGURE_FILE(
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"

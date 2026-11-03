@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Downloads the Oxford affine-covariant region sets for the PopSift tests.
+"""
+Downloads the Oxford affine-covariant region sets for the PopSift tests.
 
     python3 download_oxford.py <dir> [set ...]
 
@@ -18,7 +19,7 @@ import sys
 import tarfile
 import urllib.request
 
-URL = "https://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/{}.tar.gz"
+URL = ("https://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/{}.tar.gz")
 SHA256 = {
     "bark": "f631c09a0f43fc1e092203f32f8f27e2e43e59b524918255d45474c50c91ea4f",
     "bikes": "3b95c49accadfd71e63c2fa0f7602abcbadd87d7f53ff54eb1efb15210d19e0c",
@@ -32,15 +33,18 @@ SHA256 = {
 
 
 def has_images(folder):
+    """Tell whether a folder exists and holds .pgm or .ppm files."""
     return os.path.isdir(folder) and any(
         f.lower().endswith((".pgm", ".ppm")) for f in os.listdir(folder))
 
 
 def download(name, dest, url):
+    """Download the archive of a set, check it and unpack it into dest."""
     print(f"{name}: downloading {url}", flush=True)
     try:
-        with urllib.request.urlopen(url, timeout=120) as response:
-            data = response.read()
+	# main() accepts only http and https URLs.
+        with urllib.request.urlopen(url, timeout=120) as resp:  # nosec B310
+            data = resp.read()
     except OSError as e:
         sys.exit(f"{name}: cannot download {url}: {e}")
     if hashlib.sha256(data).hexdigest() != SHA256[name]:
@@ -56,6 +60,8 @@ def download(name, dest, url):
 
 
 def main():
+    """Download the sets named on the command line, or all of them."""
+
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("dir", help="test data folder (PopSift_TESTDATA_DIR)")
     parser.add_argument("sets", nargs="*", metavar="set",
@@ -67,6 +73,8 @@ def main():
     unknown = set(args.sets) - set(SHA256)
     if unknown:
         parser.error(f"unknown set: {', '.join(sorted(unknown))}")
+    if not args.url.startswith(("https://", "http://")):
+        parser.error("--url must be an http or https URL")
     for name in args.sets or sorted(SHA256):
         dest = os.path.join(args.dir, "oxford", name)
         if has_images(dest):
