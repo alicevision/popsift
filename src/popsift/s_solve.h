@@ -17,7 +17,8 @@
 #undef USE_GAUSSIAN_ELIMINATION
 
 #include <cuda_runtime.h>
-#include <stdio.h>
+
+#include <cstdio>
 
 #ifndef USE_GAUSSIAN_ELIMINATION
 

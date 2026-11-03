@@ -1,0 +1,59 @@
+name: Continuous Integration for Linux (CUDA)
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+    # Skip jobs when only documentation files are changed
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
+  # Allows manual triggering from GitHub UI or CLI
+  workflow_dispatch:
+  # Weekly build every Monday at 8:10 UTC
+  schedule:
+    - cron: "10 8 * * 1"
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["alicevision/popsift-deps:cuda11.8.0-ubuntu20.04", "alicevision/popsift-deps:cuda12.1.0-ubuntu22.04"]
+
+    container:
+      image: ${{ matrix.container }}
+
+    env:
+      DEPS_INSTALL_DIR: /opt/
+      CTEST_OUTPUT_ON_FAILURE: 1
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Make scripts executable
+        run: chmod +x ./.github/scripts/*.sh
+
+      - name: Build Release Configuration
+        uses: ./.github/actions/build-config
+        with:
+          build-type: 'Release'
+          platform: 'linux'
+          deps-install-dir: ${{ env.DEPS_INSTALL_DIR }}
+
+      - name: Build Debug Configuration
+        # Skip Debug build for CUDA 11.8 because of a strange seg fault at compilation time
+        if: ${{ !contains(matrix.container, 'cuda11.8.0') }}
+        uses: ./.github/actions/build-config
+        with:
+          build-type: 'Debug'
+          platform: 'linux'
+          deps-install-dir: ${{ env.DEPS_INSTALL_DIR }}
+

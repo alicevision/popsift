@@ -5,44 +5,38 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <cmath>
-#include <iomanip>
-#include <stdlib.h>
-#include <stdexcept>
-#include <list>
-#include <string>
-
-#include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
-
-#include <popsift/popsift.h>
-#include <popsift/features.h>
-#include <popsift/sift_conf.h>
 #include <popsift/common/device_prop.h>
+#include <popsift/features.h>
+#include <popsift/popsift.h>
+#include <popsift/sift_conf.h>
+#include <popsift/sift_config.h>
+#include <popsift/version.hpp>
+
+#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
+
+#include <cmath>
+#include <cstdlib>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <list>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
 #ifdef USE_DEVIL
 #include <devil_cpp_wrapper.hpp>
 #endif
 #include "pgmread.h"
 
-#ifdef USE_NVTX
-#include <nvToolsExtCuda.h>
-#else
-#define nvtxRangePushA(a)
-#define nvtxRangePop()
-#endif
-
 using namespace std;
 
-static bool print_dev_info  = false;
-static bool print_time_info = false;
-static bool write_as_uchar  = false;
-static bool dont_write      = false;
-static bool pgmread_loading = false;
+static bool print_dev_info  {false};
+static bool print_time_info {false};
+static bool write_as_uchar  {false};
+static bool dont_write      {false};
+static bool pgmread_loading {false};
 
 static void parseargs(int argc, char** argv, popsift::Config& config, string& lFile, string& rFile) {
     using namespace boost::program_options;
@@ -77,10 +71,7 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
         ( "gauss-mode", value<std::string>()->notifier([&](const std::string& s) { config.setGaussMode(s); }),
           popsift::Config::getGaussModeUsage() )
         ("desc-mode", value<std::string>()->notifier([&](const std::string& s) { config.setDescMode(s); }),
-        "Choice of descriptor extraction modes:\n"
-        "loop, iloop, grid, igrid, notile\n"
-	"Default is loop\n"
-        "loop is OpenCV-like horizontal scanning, computing only valid points, grid extracts only useful points but rounds them, iloop uses linear texture and rotated gradiant fetching. igrid is grid with linear interpolation. notile is like igrid but avoids redundant gradiant fetching.")
+         popsift::Config::getDescModeUsage() )
         ("popsift-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::PopSift); }),
         "During the initial upscale, shift pixels by 1. In extrema refinement, steps up to 0.6, do not reject points when reaching max iterations, "
         "first contrast threshold is .8 * peak thresh. Shift feature coords octave 0 back to original pos.")
@@ -95,8 +86,6 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& lF
         "reject points when reaching max iterations, "
         "first contrast threshold is floor(.5 * peak thresh). "
         "Computed filter width are lower than VLFeat/PopSift")
-        ("direct-scaling", bool_switch()->notifier([&](bool b) { if(b) config.setScalingMode(popsift::Config::ScaleDirect); }),
-         "Direct each octave from upscaled orig instead of blurred level.")
         ("norm-multi", value<int>()->notifier([&](int i) {config.setNormalizationMultiplier(i); }), "Multiply the descriptor by pow(2,<int>).")
         ( "norm-mode", value<std::string>()->notifier([&](const std::string& s) { config.setNormMode(s); }),
           popsift::Config::getNormModeUsage() )
@@ -151,26 +140,27 @@ static void collectFilenames( list<string>& inputFiles, const boost::filesystem:
     std::copy( boost::filesystem::directory_iterator( inputFile ),
                boost::filesystem::directory_iterator(),
                std::back_inserter(vec) );
-    for( auto it = vec.begin(); it!=vec.end(); it++ ) {
-        if( boost::filesystem::is_regular_file( *it ) ) {
-            string s( it->c_str() );
-            inputFiles.push_back( s );
-        } else if( boost::filesystem::is_directory( *it ) ) {
-            collectFilenames( inputFiles, *it );
+    for (const auto& currPath : vec)
+    {
+        if( boost::filesystem::is_regular_file(currPath) )
+        {
+            inputFiles.push_back( currPath.string() );
+
+        }
+        else if( boost::filesystem::is_directory(currPath) )
+        {
+            collectFilenames( inputFiles, currPath);
         }
     }
 }
 
 SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 {
-    int w;
-    int h;
     unsigned char* image_data;
     SiftJob* job;
 
-    nvtxRangePushA( "load and convert image" );
 #ifdef USE_DEVIL
-    if( not pgmread_loading )
+    if( ! pgmread_loading )
     {
         ilImage img;
         if( img.Load( inputFile.c_str() ) == false ) {
@@ -181,12 +171,10 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
             cerr << "Failed converting image " << inputFile << " to unsigned greyscale image" << endl;
             exit( -1 );
         }
-        w = img.Width();
-        h = img.Height();
+        const auto w = img.Width();
+        const auto h = img.Height();
         cout << "Loading " << w << " x " << h << " image " << inputFile << endl;
         image_data = img.GetData();
-
-        nvtxRangePop( );
 
         // PopSift.init( w, h );
         job = PopSift.enqueue( w, h, image_data );
@@ -196,12 +184,12 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
     else
 #endif
     {
+        int h{};
+        int w{};
         image_data = readPGMfile( inputFile, w, h );
-        if( image_data == 0 ) {
-            exit( -1 );
+        if( image_data == nullptr ) {
+            exit( EXIT_FAILURE );
         }
-
-        nvtxRangePop( );
 
         // PopSift.init( w, h );
         job = PopSift.enqueue( w, h, image_data );
@@ -214,12 +202,13 @@ SiftJob* process_image( const string& inputFile, PopSift& PopSift )
 
 int main(int argc, char **argv)
 {
-    cudaDeviceReset();
+    popsift::cuda::reset();
 
     popsift::Config config;
-    string         lFile = "";
-    string         rFile = "";
-    const char*    appName   = argv[0];
+    string         lFile{};
+    string         rFile{};
+
+    std::cout << "PopSift version: " << POPSIFT_VERSION_STRING << std::endl;
 
     try {
         parseargs( argc, argv, config, lFile, rFile ); // Parse command line
@@ -227,20 +216,20 @@ int main(int argc, char **argv)
     }
     catch (std::exception& e) {
         std::cout << e.what() << std::endl;
-        exit(1);
+        return EXIT_SUCCESS;
     }
 
     if( boost::filesystem::exists( lFile ) ) {
-        if( not boost::filesystem::is_regular_file( lFile ) ) {
+        if( ! boost::filesystem::is_regular_file( lFile ) ) {
             cout << "Input file " << lFile << " is not a regular file, nothing to do" << endl;
-            exit( -1 );
+            return EXIT_FAILURE;
         }
     }
 
     if( boost::filesystem::exists( rFile ) ) {
-        if( not boost::filesystem::is_regular_file( rFile ) ) {
+        if( ! boost::filesystem::is_regular_file( rFile ) ) {
             cout << "Input file " << rFile << " is not a regular file, nothing to do" << endl;
-            exit( -1 );
+            return EXIT_FAILURE;
         }
     }
 
@@ -267,5 +256,7 @@ int main(int argc, char **argv)
     delete rFeatures;
 
     PopSift.uninit( );
+
+    return EXIT_SUCCESS;
 }
 

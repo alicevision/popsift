@@ -1,0 +1,150 @@
+name: Continuous Integration for Windows (CUDA)
+
+# Compile-only builds of PopSift on Windows, one GPU architecture each.
+# GitHub's Windows runners have no GPU. The matrix below starts with a single
+# configuration: one CUDA/MSVC pair, Release only.
+#
+# The VS generator is avoided on purpose. windows-latest is now the
+# windows-2025-vs2026 image (Visual Studio 18), where "Visual Studio 17 2022"
+# does not exist and the CUDA MSBuild integration is not guaranteed to match.
+# Ninja plus an MSVC developer shell only needs cl.exe and nvcc.
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
+  workflow_dispatch:
+
+# A new push to the same PR cancels the run that is still going.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-cuda:
+    runs-on: windows-latest
+    name: build-windows-cuda (CUDA ${{ matrix.toolchain.cuda }}, MSVC ${{ matrix.toolchain.msvc }}, ${{ matrix.build-type }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each toolchain entry is a CUDA/MSVC pair that NVIDIA supports
+        # together.
+	# For a given CUDA SDK, check it's Installation Guide Windows.
+        # Add and remove pairs here; as needed.
+	# The runner image must support the MSVC toolset version you select.
+	# Officially: nvcc 12.9.2 works with MSVC compiler 192x and 193x
+	#             and maps to MSVC toolkit 14.2x or 14.3x
+	#             nvcc 13.4.2 works with MSVC compilers 192x, 193x and 195x
+	#             and maps to 14.2x, 14.3x and 14.5x
+        toolchain:
+          - { cuda: "12.9.0", msvc: "14.44" }
+        build-type: ["Release"]
+
+    env:
+      CUDA_VERSION: ${{ matrix.toolchain.cuda }}
+      MSVC_TOOLSET: ${{ matrix.toolchain.msvc }}
+      # Compiling for one architecture is enough to catch build breakages and
+      # is much faster than all-major.
+      CUDA_ARCHS: "75"
+      VCPKG_INSTALLED_DIR: ${{ github.workspace }}\vcpkg_installed
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_cache
+      # Plain file cache, saved by actions/cache below. The x-gha source that
+      # lukka/run-vcpkg configured is what failed before.
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\vcpkg_cache,readwrite
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The CUDA install takes about a minute; a cache restore a few seconds.
+      - name: Cache CUDA
+        id: cache-cuda
+        uses: actions/cache@v4
+        with:
+          path: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA
+          key: cuda-${{ runner.os }}-${{ env.CUDA_VERSION }}-nvcc-cudart-thrust
+
+      - name: Install CUDA
+        if: steps.cache-cuda.outputs.cache-hit != 'true'
+        uses: Jimver/cuda-toolkit@v0.2.24
+        with:
+          cuda: ${{ env.CUDA_VERSION }}
+          method: network
+          sub-packages: '["nvcc", "cudart", "thrust"]'
+          use-github-cache: false
+
+      - name: Use cached CUDA
+        if: steps.cache-cuda.outputs.cache-hit == 'true'
+        run: |
+          $v = ($env:CUDA_VERSION -split '\.')[0..1] -join '.'
+          $cuda = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v$v"
+          "CUDA_PATH=$cuda" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "$cuda\bin"      | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          toolset: ${{ env.MSVC_TOOLSET }}
+
+      - name: Cache vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-bin-${{ runner.os }}-${{ env.MSVC_TOOLSET }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-bin-${{ runner.os }}-${{ env.MSVC_TOOLSET }}-
+
+      - name: Configure
+        # The runner's preinstalled vcpkg (VCPKG_INSTALLATION_ROOT) installs
+        # the Boost packages from vcpkg.json in manifest mode.
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+          nvcc --version
+          cmake -S . -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} `
+            -DBUILD_SHARED_LIBS=ON `
+            -DCMAKE_CUDA_COMPILER="$env:CUDA_PATH/bin/nvcc.exe" `
+            -DCMAKE_CUDA_ARCHITECTURES="$env:CUDA_ARCHS" `
+            -DPopSift_BUILD_DOCS=OFF `
+            -DPopSift_BUILD_EXAMPLES=ON `
+            -DCMAKE_INSTALL_PREFIX="$env:GITHUB_WORKSPACE/install" `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build and install
+        run: |
+          cmake --build build --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --install build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build an application against the installed PopSift
+        # src/application has no vcpkg.json, so it reuses the packages that
+        # the main configure installed.
+        run: |
+          cmake -S src/application -B build_3rdparty -G Ninja `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} `
+            -DBUILD_SHARED_LIBS=ON `
+            -DCMAKE_PREFIX_PATH="$env:GITHUB_WORKSPACE/install" `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_MANIFEST_MODE=OFF `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build_3rdparty --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

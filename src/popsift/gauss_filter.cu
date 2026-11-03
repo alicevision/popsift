@@ -5,11 +5,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdio.h>
-#include <algorithm>
-
-#include "gauss_filter.h"
 #include "common/debug_macros.h"
+#include "gauss_filter.h"
+
+#include <algorithm>
+#include <cstdio>
 
 using namespace std;
 
@@ -18,7 +18,7 @@ namespace popsift {
 __device__ __constant__
 GaussInfo d_gauss;
 
-__align__(128) GaussInfo h_gauss;
+__align__(128) thread_local GaussInfo h_gauss;
 
 
 __global__
@@ -102,21 +102,19 @@ void print_gauss_filter_symbol( int columns )
     }
     printf("\n");
 
-    printf("    level 0-filters for direct downscaling\n");
+    printf("    level 0-filter for the creation of the first level of the first octave\n" );
 
-    for( int lvl=0; lvl<MAX_OCTAVES; lvl++ ) {
-        int span = d_gauss.dd.span[lvl] + d_gauss.dd.span[lvl] - 1;
+    int span = d_gauss.dd.span[0] + d_gauss.dd.span[0] - 1;
 
-        printf("      %d %d %2.6f: ", lvl, span, d_gauss.dd.sigma[lvl] );
-        int m = min( d_gauss.dd.span[lvl], columns );
-        for( int x=0; x<m; x++ ) {
-            printf("%0.8f ", d_gauss.dd.filter[lvl*GAUSS_ALIGN+x] );
-        }
-        if( m < d_gauss.dd.span[lvl] )
-            printf("...\n");
-        else
-            printf("\n");
+    printf("      %d %d %2.6f: ", 0, span, d_gauss.dd.sigma[0] );
+    int m = min( d_gauss.dd.span[0], columns );
+    for( int x=0; x<m; x++ ) {
+        printf("%0.8f ", d_gauss.dd.filter[x] );
     }
+    if( m < d_gauss.dd.span[0] )
+        printf("...\n");
+    else
+        printf("\n");
     printf("\n");
 }
 
@@ -130,17 +128,17 @@ void init_filter( const Config& conf,
 {
     if( sigma0 > 2.0 )
     {
-        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
-             << " Sigma > 2.0 is not supported. Re-size __constant__ array and recompile."
-             << endl;
-        exit( -__LINE__ );
+        stringstream ss;
+        ss << "ERROR: "
+           << " Sigma > 2.0 is not supported. Re-size __constant__ array and recompile.";
+        POP_FATAL(ss.str());
     }
     if( levels > GAUSS_LEVELS )
     {
-        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
-             << " More than " << GAUSS_LEVELS << " levels not supported. Re-size __constant__ array and recompile."
-             << endl;
-        exit( -__LINE__ );
+        stringstream ss;
+        ss << "ERROR: "
+           << " More than " << GAUSS_LEVELS << " levels not supported. Re-size __constant__ array and recompile.";
+        POP_FATAL(ss.str());
     }
 
     if( conf.ifPrintGaussTables() ) {
@@ -215,26 +213,17 @@ void init_filter( const Config& conf,
     h_gauss.abs_oN.computeBlurTable( &h_gauss );
 
     /* dd :
-     * The direct-downscaling kernels make use of the assumption that downscaling
-     * from MAX_LEVEL-3 is identical to applying 2*sigma on the identical image
-     * before downscaling, which would be identical to applying 1*sigma after
-     * downscaling.
-     * In reality, this is not true because images are not continuous, but we
-     * support the options because it is interesting. Perhaps it works for the later
-     * octaves, where it is also good for performance.
+     * A leftover from an attempt to create all top levels of all octaves from the
+     * input image.
      * dd is only for creating level 0 of all octave directly from the input image.
      */
-    for( int oct=0; oct<MAX_OCTAVES; oct++ ) {
-        // sigma * 2^i
-        float oct_sigma = scalbnf( sigma0, oct );
 
-        // subtract initial blur
-        float b = sqrt( fabs( oct_sigma * oct_sigma - initial_blur * initial_blur ) );
+    // subtract initial blur
+    const float sigma_o0_l0 = sqrt( fabs( sigma0 * sigma0 - initial_blur * initial_blur ) );
 
-        // sigma / 2^i
-        h_gauss.dd.sigma[oct] = scalbnf( b, -oct );
-        h_gauss.dd.computeBlurTable( &h_gauss );
-    }
+    // sigma / 2^i
+    h_gauss.dd.sigma[0] = sigma_o0_l0;
+    h_gauss.dd.computeBlurTable( &h_gauss );
 
     cudaError_t err;
     err = cudaMemcpyToSymbol( d_gauss,
@@ -284,17 +273,14 @@ int GaussInfo::getSpan( float sigma ) const
         return GaussInfo::vlFeatSpan( sigma );
     case Config::VLFeat_Relative :
         return GaussInfo::vlFeatRelativeSpan( sigma );
-    case Config::OpenCV_Compute :
-        return GaussInfo::openCVSpan( sigma );
     case Config::Fixed9 :
         return 5;
     case Config::Fixed15 :
         return 8;
     default :
-        cerr << __FILE__ << ":" << __LINE__ << ", ERROR: "
-             << " The mode for computing Gauss filter scan is invalid"
-             << endl;
-        exit( -__LINE__ );
+        stringstream ss;
+        ss << "ERROR: The mode for computing Gauss filter scan is invalid";
+        POP_FATAL(ss.str());
     }
 }
 
@@ -316,15 +302,6 @@ int GaussInfo::vlFeatRelativeSpan( float sigma )
     int spn = vlFeatSpan( sigma );
     if( ( spn & 1 ) == 0 ) spn += 1;
     return spn;
-}
-
-__host__
-int GaussInfo::openCVSpan( float sigma )
-{
-    int span = int( roundf( 2.0f * 4.0f * sigma + 1.0f ) ) | 1;
-    span >>= 1;
-    span  += 1;
-    return std::min<int>( span, GAUSS_ALIGN - 1 );
 }
 
 template<int LEVELS>
@@ -377,7 +354,7 @@ void GaussTable<LEVELS>::transformBlurTable( )
 {
     for( int level=0; level<LEVELS; level++ ) {
         i_span[level] = span[level];
-        if( not ( i_span[level] & 1 ) ) {
+        if( ! ( i_span[level] & 1 ) ) {
             i_span[level] += 1;
         }
     }

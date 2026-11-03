@@ -7,15 +7,41 @@
  */
 #pragma once
 
-#include <stdio.h>
-#include <inttypes.h>
-
-#include "common/plane_2d.h"
 #include "common/assist.h"
+#include "common/plane_2d.h"
 #include "sift_constants.h"
+
+#include <cinttypes>
+#include <cstdio>
 
 namespace popsift
 {
+#ifdef PopSift_TEST_WITH_VL_ATAN2
+/* VLFeat's vl_fast_atan2_f (vl/mathop.h), a polynomial approximation with
+ * an error of up to about 0.35 degrees.
+ * Meant for testing and found in TEST compile-time options.
+ */
+__device__ static inline
+float vl_fast_atan2_f( float y, float x )
+{
+    const float c3    = 0.1821f;
+    const float c1    = 0.9675f;
+    const float abs_y = fabsf( y ) + 1.19209290E-07F; // VL_EPSILON_F
+    float angle;
+    float r;
+    if( x >= 0 ) {
+        r     = ( x - abs_y ) / ( x + abs_y );
+        angle = (float)( M_PI / 4 );
+    } else {
+        r     = ( x + abs_y ) / ( abs_y - x );
+        angle = (float)( 3 * M_PI / 4 );
+    }
+    angle += ( c3 * r * r - c1 ) * r;
+    return ( y < 0 ) ? -angle : angle;
+}
+#define atan2f vl_fast_atan2_f
+#endif
+
 /*
  * We are wasting time by computing gradiants on demand several
  * times. We could precompute gradiants for all pixels once, as
@@ -57,13 +83,44 @@ void get_gradiant( float&              grad,
                    float&              theta,
                    const int           x,
                    const int           y,
-                   cudaTextureObject_t layer,
+                   LayeredReadTex      layer,
                    const int           level )
 {
     float dx = readTex( layer, x+1.0f, y, level )
              - readTex( layer, x-1.0f, y, level );
     float dy = readTex( layer, x, y+1.0f, level )
              - readTex( layer, x, y-1.0f, level );
+    grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
+    theta    = atan2f(dy, dx);
+}
+
+/* A version of get_gradiant that works for a (32,1,1) threadblock
+ * and pulls data to shared memory before computing. Data is pulled
+ * less frequently, meaning that we do not rely on the L1 cache.
+ */
+__device__ static inline
+void get_gradiant32( float&              grad,
+                     float&              theta,
+                     const int           x,
+                     const int           y,
+                     LayeredReadTex      layer,
+                     const int           level )
+{
+    const int idx = threadIdx.x;
+
+    __shared__ float x_array[34];
+
+    for( int i=idx; i<34; i += blockDim.x )
+    {
+        x_array[i] = readTex( layer, x+i-1.0f, y, level );
+    }
+    __syncthreads();
+
+    const float dx = x_array[idx+2]  - x_array[idx];
+
+    const float dy = readTex( layer, x+idx, y+1.0f, level )
+                   - readTex( layer, x+idx, y-1.0f, level );
+
     grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
     theta    = atan2f(dy, dx);
 }
@@ -75,7 +132,7 @@ void get_gradiant( float&              grad,
                    float               y,
                    float               cos_t,
                    float               sin_t,
-                   cudaTextureObject_t texLinear,
+                   LayeredReadTex      texLinear,
                    int                 level )
 {
     float dx = readTex( texLinear, x+cos_t, y+sin_t, level )
@@ -88,3 +145,6 @@ void get_gradiant( float&              grad,
 
 }; // namespace popsift
 
+#ifdef PopSift_TEST_WITH_VL_ATAN2
+#undef atan2f
+#endif

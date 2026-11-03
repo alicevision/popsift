@@ -5,42 +5,56 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <cuda_runtime.h>
-#include <texture_fetch_functions.h>
-#include <stdio.h>
-#include <iso646.h>
-
-#include "sift_pyramid.h"
-#include "sift_constants.h"
-#include "s_solve.h"
-#include "common/debug_macros.h"
 #include "common/assist.h"
 #include "common/clamp.h"
+#include "common/debug_macros.h"
+#include "s_solve.h"
+#include "sift_constants.h"
+#include "sift_pyramid.h"
+
+#include <cuda_runtime.h>
+
+#include <cstdio>
 
 namespace popsift{
 
 template<int HEIGHT>
 __device__ static inline
-uint32_t extrema_count( int indicator, int* extrema_counter )
+uint32_t extrema_count( unsigned int indicator, int* extrema_counter )
 {
-    uint32_t mask = __ballot( indicator ); // bitfield of warps with results
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+    // warpSize-generic (wave32 and wave64): one ballot per wavefront, the leader
+    // (lane 0) does a single atomicAdd of the set-bit count, and each thread's write
+    // slot is that base plus an exclusive prefix of the set bits below its lane. The
+    // lane is the block's linear thread index modulo warpSize, so on wave64 two
+    // blockDim=(32,HEIGHT) rows share a 64-lane wavefront and on wave32 each row is
+    // its own 32-lane wavefront; either way every row feeds the same octave counter.
+    // __ballot is 64-bit (unsigned long long); on wave32 the upper 32 bits are 0.
+    const int lane = ( threadIdx.y * blockDim.x + threadIdx.x ) % warpSize;
+    const unsigned long long ballot = __ballot( indicator );
+    // lane is in [0, warpSize-1] (<= 63), so 1ull<<lane is always in range.
+    const unsigned long long lane_mask = ( 1ull << lane ) - 1ull;
 
-    int ct = __popc( mask );          // horizontal reduce
-
-    int write_index;
-    if( threadIdx.x == 0 ) {
-        // atomicAdd returns the old value, we consider this the based
-        // index for this thread's write operation
-        write_index = atomicAdd( extrema_counter, ct );
-    }
-    // broadcast from thread 0 to all threads in warp
-    write_index = __shfl( write_index, 0 );
-
-    // this thread's offset: count only bits below the bit of the own
-    // thread index; this provides the 0 result and every result up to ct
-    write_index += __popc( mask & ((1 << threadIdx.x) - 1) );
+    int write_index = ( lane == 0 ) ? atomicAdd( extrema_counter, __popcll( ballot ) ) : 0;
+    // broadcast the base from the wavefront leader (lane 0) over the real wavefront
+    write_index = popsift::broadcast_lane0( write_index );
+    // exclusive prefix: count set bits strictly below this lane in the wavefront
+    write_index += __popcll( ballot & lane_mask );
 
     return write_index;
+#else
+    // CUDA: a warp is 32 lanes; threadIdx.y selects the (independent) warp.
+    const int      lane = threadIdx.x;
+    const uint32_t mask = popsift::ballot( indicator );
+
+    int ct = __popc( mask );
+
+    int write_index = ( lane == 0 ) ? atomicAdd( extrema_counter, ct ) : 0;
+    write_index = popsift::broadcast_lane0( write_index );
+    write_index += __popc( mask & ((1u << lane) - 1) );
+
+    return write_index;
+#endif
 }
 
 __device__
@@ -55,7 +69,7 @@ inline void extremum_cmp( float val, float f, uint32_t& gt, uint32_t& lt, uint32
 
 __device__
 static
-inline bool is_extremum( cudaTextureObject_t obj,
+inline bool is_extremum( LayeredReadTex obj,
                          int x, int y, int z )
 {
     uint32_t gt = 0;
@@ -124,7 +138,7 @@ class ModeFunctions
 {
 public:
     inline __device__
-    bool first_contrast_ok( const float val ) const;
+    bool first_contrast_ok( float val ) const;
 
     /* refine
      * returns -1 : break loop and fail
@@ -132,14 +146,20 @@ public:
      *          1 : break loop and succeed
      */
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it );
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it );
 
     /*
      * returns true  : values after refine make sense
      *         false : they do not
      */
     inline __device__
-    bool verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const;
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const;
+
+    /*
+     * return the refined Gaussian blur level.
+     */
+    inline __device__
+    int final_z_level( float sn, int level ) const;
 };
 
 template<>
@@ -147,13 +167,13 @@ class ModeFunctions<Config::OpenCV>
 {
 public:
     inline __device__
-    bool first_contrast_ok( const float val ) const
+    bool first_contrast_ok( float val ) const
     {
         return ( fabsf( val ) >= floorf( d_consts.threshold ) );
     }
 
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it ) const
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         // OpenCV mode is a special case because d remains unmodified.
         // Either we return 1, and n has not been modified.
@@ -187,9 +207,15 @@ public:
     }
 
     inline __device__
-    int verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         return true;
+    }
+
+    inline __device__
+    int final_z_level( float sn, int level ) const
+    {
+        return (int)roundf(sn);
     }
 };
 
@@ -204,7 +230,7 @@ public:
     }
 
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it ) const
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         if( last_it ) return 0;
 
@@ -232,7 +258,7 @@ public:
     }
 
     inline __device__
-    int verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         // reject if outside of image bounds or far outside DoG bounds
         return ( ( xn < 0.0f ||
@@ -242,6 +268,12 @@ public:
                    sn < 0.0f ||
                    sn > maxlevel ) ? false
                                    : true );
+    }
+
+    inline __device__
+    int final_z_level( float sn, int level ) const
+    {
+        return level;
     }
 };
 
@@ -256,7 +288,7 @@ public:
     }
 
     inline __device__
-    int refine( float3& d, int3& n, const int width, const int height, const int maxlevel, bool last_it ) const
+    int refine( float3& d, int3& n, int width, int height, int maxlevel, bool last_it ) const
     {
         if( last_it ) return 0;
 
@@ -284,7 +316,7 @@ public:
     }
 
     inline __device__
-    int verify( const float xn, const float yn, const float sn, const int width, const int height, const int maxlevel ) const
+    bool verify( float xn, float yn, float sn, int width, int height, int maxlevel ) const
     {
         // reject if outside of image bounds or far outside DoG bounds
         return ( ( xn < 0.0f ||
@@ -295,19 +327,24 @@ public:
                    sn > maxlevel ) ? false
                                    : true );
     }
+
+    inline __device__
+    int final_z_level( float sn, int level ) const
+    {
+        return (int)roundf(sn);
+    }
 };
 
 template<int sift_mode>
-__device__ inline
-bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
-                              int                 debug_octave,
-                              int                 width,
-                              int                 height,
-                              const uint32_t      maxlevel,
-                              const float         w_grid_divider,
-                              const float         h_grid_divider,
-                              const int           grid_width,
-                              InitialExtremum&    ec )
+__device__ inline bool find_extrema_in_dog_sub(LayeredReadTex dog,
+                                               int debug_octave,
+                                               int width,
+                                               int height,
+                                               uint32_t maxlevel,
+                                               float w_grid_divider,
+                                               float h_grid_divider,
+                                               int grid_width,
+                                               InitialExtremum& ec)
 {
     ec.xpos    = 0.0f;
     ec.ypos    = 0.0f;
@@ -342,9 +379,9 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
     const float val = readTex( dog, x, y, level );
 
     ModeFunctions<sift_mode> f;
-    if( not f.first_contrast_ok( val ) ) return false;
+    if( ! f.first_contrast_ok( val ) ) return false;
 
-    if( not is_extremum( dog, x-1, y-1, level-1 ) ) {
+    if( ! is_extremum( dog, x-1, y-1, level-1 ) ) {
         // if( debug_octave==0 && level==2 && x==14 && y==73 ) printf("But I fail\n");
         return false;
     }
@@ -423,7 +460,7 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
         b.y = -D.y;
         b.z = -D.z;
 
-        if( solve( A, b ) == false ) {
+        if(!solve(A, b)) {
             d.x = 0;
             d.y = 0;
             d.z = 0;
@@ -463,7 +500,7 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
     const float yn      = n.y + d.y;
     const float sn      = n.z + d.z;
 
-    if( not f.verify( xn, yn, sn, width, height, maxlevel ) ) {
+    if( ! f.verify( xn, yn, sn, width, height, maxlevel ) ) {
         return false;
     }
 
@@ -495,7 +532,8 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
 
     ec.xpos      = xn;
     ec.ypos      = yn;
-    ec.lpos      = (int)roundf(sn);
+    // ec.lpos      = (int)roundf(sn);
+    ec.lpos      = f.final_z_level(sn, level);
     ec.sigma     = d_consts.sigma0 * pow(d_consts.sigma_k, sn); // * 2;
     ec.cell      = floorf( yn / h_grid_divider ) * grid_width + floorf( xn / w_grid_divider );
         // const float sigma_k = powf(2.0f, 1.0f / levels );
@@ -506,10 +544,7 @@ bool find_extrema_in_dog_sub( cudaTextureObject_t dog,
 
 template<int HEIGHT, int sift_mode>
 __global__
-#ifdef NDEBUG
-__launch_bounds__(128,16)
-#endif
-void find_extrema_in_dog( cudaTextureObject_t dog,
+void find_extrema_in_dog( LayeredReadTex      dog,
                           int                 octave,
                           int                 width,
                           int                 height,
@@ -584,17 +619,12 @@ void Pyramid::find_extrema( const Config& conf )
 
         int*  num_blocks      = extrema_num_blocks;
 
-#ifdef USE_DOG_TEX_LINEAR
-#define getDogTexture getDogTextureLinear
-#else
-#define getDogTexture getDogTexturePoint
-#endif
         switch( conf.getSiftMode() )
         {
         case Config::VLFeat :
                 find_extrema_in_dog<HEIGHT,Config::VLFeat>
                     <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
+                    ( oct_obj.getDogReadTexPoint( ),
                       octave,
                       cols,
                       rows,
@@ -609,7 +639,7 @@ void Pyramid::find_extrema( const Config& conf )
         case Config::OpenCV :
                 find_extrema_in_dog<HEIGHT,Config::OpenCV>
                     <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
+                    ( oct_obj.getDogReadTexPoint( ),
                       octave,
                       cols,
                       rows,
@@ -624,7 +654,7 @@ void Pyramid::find_extrema( const Config& conf )
         default :
                 find_extrema_in_dog<HEIGHT,Config::PopSift>
                     <<<grid,block,0,oct_str>>>
-                    ( oct_obj.getDogTexture( ),
+                    ( oct_obj.getDogReadTexPoint( ),
                       octave,
                       cols,
                       rows,
@@ -637,7 +667,6 @@ void Pyramid::find_extrema( const Config& conf )
                 POP_SYNC_CHK;
                 break;
         }
-#undef getDogTexture
 
         cuda::event_record( oct_obj.getEventExtremaDone(), oct_str, __FILE__, __LINE__ );
     }
