@@ -7,7 +7,7 @@
  */
 #include "common/assist.h"
 #include "gauss_filter.h"
-#include "s_pyramid_build_ra.h"
+#include "sift_pyramid.h"
 #include "sift_constants.h"
 
 namespace popsift {
@@ -15,7 +15,7 @@ namespace gauss {
 namespace normalizedSource {
 
 __global__
-void horiz( cudaTextureObject_t src_linear_tex,
+static void horiz( cudaTextureObject_t src_linear_tex,
             cudaSurfaceObject_t dst_data,
             int                 dst_w,
             int                 dst_h,
@@ -49,7 +49,7 @@ void horiz( cudaTextureObject_t src_linear_tex,
 }
 
 __global__
-void horiz_level( cudaTextureObject_t src_linear_tex,
+static void horiz_level( cudaTextureObject_t src_linear_tex,
                   cudaSurfaceObject_t dst_data,
                   int                 dst_w,
                   int                 dst_h,
@@ -85,7 +85,7 @@ void horiz_level( cudaTextureObject_t src_linear_tex,
 }
 
 __global__
-void horiz_all( cudaTextureObject_t src_linear_tex,
+static void horiz_all( cudaTextureObject_t src_linear_tex,
                 cudaSurfaceObject_t dst_data,
                 int                 dst_w,
                 int                 dst_h,
@@ -124,5 +124,112 @@ void horiz_all( cudaTextureObject_t src_linear_tex,
 
 } // namespace normalizedSource
 } // namespace gauss
+
+__host__
+void Pyramid::horiz_from_input_image( const Config& conf, ImageBase* base, cudaStream_t stream )
+{
+    Octave&   oct_obj = _octaves[0];
+
+    const int width   = oct_obj.getWidth();
+    const int height  = oct_obj.getHeight();
+
+    dim3 block( 128, 1 );
+    dim3 grid;
+    grid.x  = grid_divide( width,  128 );
+    grid.y  = height;
+
+    const Config::SiftMode& mode = conf.getSiftMode();
+    float shift  = 0.5f;
+
+    if( mode == Config::PopSift || mode == Config::VLFeat ) {
+        shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() );
+    }
+
+    gauss::normalizedSource::horiz
+        <<<grid,block,0,stream>>>
+        ( base->getInputTexture(),
+          oct_obj.getIntermediateSurface(),
+          width,
+          height,
+          shift );
+
+    POP_SYNC_CHK;
+}
+
+__host__
+void Pyramid::horiz_level_from_input_image( const Config& conf, ImageBase* base, int octave, int level, cudaStream_t stream )
+{
+    if( octave != 0 )
+    {
+        POP_FATAL( "Unsupported parameter octave != 0" );
+    }
+
+    Octave&   oct_obj = _octaves[octave];
+
+    const int width   = oct_obj.getWidth();
+    const int height  = oct_obj.getHeight();
+
+    dim3 block( 128, 1 );
+    dim3 grid;
+    grid.x  = grid_divide( width,  128 );
+    grid.y  = height;
+
+    const Config::SiftMode& mode = conf.getSiftMode();
+    float shift  = 0.5f;
+
+    if( octave == 0 && ( mode == Config::PopSift || mode == Config::VLFeat ) ) {
+        shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() - octave );
+    }
+
+    gauss::normalizedSource::horiz_level
+        <<<grid,block,0,stream>>>
+        ( base->getInputTexture(),
+          oct_obj.getIntermediateSurface(),
+          width,
+          height,
+          octave,
+          level,
+          shift );
+
+    POP_SYNC_CHK;
+}
+
+__host__
+void Pyramid::horiz_all_from_input_image( const Config& conf, ImageBase* base, int octave, int startlevel, int maxlevel, cudaStream_t stream )
+{
+    if( octave != 0 )
+    {
+        POP_FATAL( "Unsupported parameter octave != 0" );
+    }
+
+    Octave&      oct_obj = _octaves[octave];
+
+    const int width  = oct_obj.getWidth();
+    const int height = oct_obj.getHeight();
+
+    dim3 block( 128, 1 );
+    dim3 grid;
+    grid.x  = grid_divide( width,  128 );
+    grid.y  = height;
+
+    const Config::SiftMode& mode = conf.getSiftMode();
+    float shift  = 0.5f;
+
+    if( mode == Config::PopSift || mode == Config::VLFeat ) {
+        shift  = 0.5f * powf( 2.0f, conf.getUpscaleFactor() );
+    }
+
+    gauss::normalizedSource::horiz_all
+        <<<grid,block,0,stream>>>
+        ( base->getInputTexture(),
+          oct_obj.getIntermediateSurface( ),
+          width,
+          height,
+          shift,
+          maxlevel );
+
+    POP_SYNC_CHK;
+}
+
 } // namespace popsift
 
