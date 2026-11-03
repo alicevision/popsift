@@ -1,0 +1,4 @@
+# Only needed for unmatched.png and inspect_matches.py.
+# The CTest comparison itself uses the Python standard library only.
+numpy
+matplotlib
