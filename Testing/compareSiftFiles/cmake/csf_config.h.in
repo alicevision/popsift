@@ -1,0 +1,7 @@
+#pragma once
+
+#define CSF_IS_DEFINED(F)   F() == 1
+#define CSF_IS_UNDEFINED(F) F() == 0
+
+#define CSF_HAVE_PAR_EXECUTION()      @Csf_HAVE_PAR_EXECUTION@
+
