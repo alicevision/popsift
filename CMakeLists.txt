@@ -48,6 +48,8 @@ option(PopSift_ERRCHK_AFTER_KERNEL     "Synchronize and check CUDA error after e
 option(PopSift_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
 option(PopSift_USE_GRID_FILTER "Switch off grid filtering to massively reduce compile time while debugging other things." ON)
 option(PopSift_NVCC_WARNINGS "Switch on several additional warning for CUDA nvcc" OFF)
+option(PopSift_TEST_WITH_VLFEAT "Fetch, patch and build VLFeat's sift CLI as the
+       reference for comparisons (target vlfeat_sift). Requires BUILD_TESTING." OFF)
 option(PopSift_TEST_WITH_VL_ATAN2 "Compute gradient angles with VLFeat's fast
        atan2 approximation instead of atan2f. Only for comparing with VLFeat." OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
@@ -200,7 +202,18 @@ if(PopSift_BUILD_DOCS)
   add_subdirectory(doc)
 endif()
 
-add_subdirectory(Testing/compareSiftFiles)
+# BUILD_TESTING is the variable that CTest also uses. When PopSift is part
+# of another project, that project decides about it.
+if(PROJECT_IS_TOP_LEVEL)
+  option(BUILD_TESTING "Build the tools for testing PopSift." OFF)
+endif()
+
+if(BUILD_TESTING)
+  add_subdirectory(Testing)
+elseif(PopSift_TEST_WITH_VLFEAT)
+  message(STATUS "PopSift_TEST_WITH_VLFEAT is ON but BUILD_TESTING is OFF: "
+                 "VLFeat is not configured.")
+endif()
 
 ########### Add uninstall target ###############
 CONFIGURE_FILE(
@@ -227,6 +240,8 @@ message(STATUS "Synchronize and check CUDA error after every kernel: " ${PopSift
 message(STATUS "Grid filtering: " ${PopSift_USE_GRID_FILTER})
 message(STATUS "Additional warning for CUDA nvcc: " ${PopSift_NVCC_WARNINGS})
 message(STATUS "Install path: " ${CMAKE_INSTALL_PREFIX})
+message(STATUS "Build testing tools: " ${BUILD_TESTING})
+message(STATUS "Build VLFeat reference: " ${PopSift_TEST_WITH_VLFEAT})
 message(STATUS "VLFeat's fast atan2 for gradient angles: " ${PopSift_TEST_WITH_VL_ATAN2})
 
 message(STATUS "CMAKE_CUDA_COMPILER = ${CMAKE_CUDA_COMPILER}")
