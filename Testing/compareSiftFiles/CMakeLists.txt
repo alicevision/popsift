@@ -39,10 +39,15 @@ set_target_properties(popsift-compareSiftFiles PROPERTIES
                       CXX_STANDARD 17
                       CXX_STANDARD_REQUIRED ON)
 
-# libstdc++ runs the parallel algorithms on TBB when its headers are
-# installed, and then needs TBB at link time. Without TBB they run serially.
-find_package(TBB QUIET CONFIG)
-if(TBB_FOUND)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckParallelExecution.cmake)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/csf_config.h.in
+               ${CMAKE_CURRENT_BINARY_DIR}/csf_config.h @ONLY)
+target_include_directories(popsift-compareSiftFiles PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
+# cmake/CheckParallelExecution.cmake has found TBB if libstdc++ needs it
+# for the parallel algorithms.
+if(Csf_HAVE_PAR_EXECUTION AND TBB_FOUND)
   target_link_libraries(popsift-compareSiftFiles PRIVATE TBB::tbb)
 endif()
 

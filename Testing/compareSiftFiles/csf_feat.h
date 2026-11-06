@@ -5,20 +5,15 @@
 #include <string>
 #include <vector>
 
-// Execution policy argument for the parallel algorithms. libstdc++ 9 runs
-// <execution> on TBB and does not compile without the TBB headers, so it
-// is not included there. Standard libraries without the parallel
-// algorithms (e.g. libc++ before 17) do not define __cpp_lib_execution.
-// In both cases the algorithms run sequentially.
-#if defined(__GLIBCXX__) && _GLIBCXX_RELEASE < 10 && !__has_include(<tbb/blocked_range.h>)
-#define PAR_UNSEQ
-#else
+#include "csf_config.h"
+
+// Execution policy argument for the parallel algorithms. Without them
+// (see cmake/CheckParallelExecution.cmake) the algorithms run sequentially.
+#if CSF_IS_DEFINED(CSF_HAVE_PAR_EXECUTION)
 #include <execution>
-#if defined(__cpp_lib_execution) && __cpp_lib_execution >= 201603L
 #define PAR_UNSEQ std::execution::par_unseq,
 #else
 #define PAR_UNSEQ
-#endif
 #endif
 
 const int DescSize = 128;
