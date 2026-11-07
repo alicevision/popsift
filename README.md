@@ -139,6 +139,11 @@ PopSift can be configured at runtime to use constants that affect its behaviours
 In particular, users can choose to generate results very similar to VLFeat or results that are closer (but not as close) to the SIFT implementation of the OpenCV extras.
 We acknowledge that there is at least one SIFT implementation that is vastly faster, but it makes considerable sacrifices in terms of accuracy and compatibility.
 
+## Testing
+
+PopSift can be compared with VLFeat, and parameter sets with each other, on
+the included test images and on your own. See [Testing/README.md](Testing/README.md).
+
 ## Continuous integration
 
 * ![Continuous Integration](https://github.com/alicevision/popsift/workflows/Continuous%20Integration/badge.svg?branch=master) master branch (Linux and Windows).
