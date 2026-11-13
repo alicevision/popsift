@@ -2,10 +2,9 @@
 
 Used by Testing/scripts/popsift_compare.py and compare_paramsets.py
 (agreement.png, unpaired.png, cdf.png, sorted.png, descriptor_bins.png and
-image_heatmap.png) and by inspect_matches.py. Keypoints are drawn with the
-classic SIFT glyph: a
-circle whose radius is proportional to the scale, and a line from the centre
-in the direction of the orientation. Image coordinates have y pointing down,
+image_heatmap.png) and by inspect_matches.py and explorer.py. Keypoints are
+drawn with the classic SIFT glyph: a circle whose radius is proportional to
+the scale, and a line from the centre in the direction of the orientation. Image coordinates have y pointing down,
 as in both PopSift's and VLFeat's output.
 """
 
@@ -106,7 +105,8 @@ def read_rows(path):
 
 
 # The columns of colocated.csv that the explorer and the pair inspector use,
-# and "level", the agreement column as an index into LEVELS.
+# and "level" and "best", the agreement and best_at_position columns as
+# indices into LEVELS.
 PAIR_COLUMNS = ("a_x", "a_y", "a_sigma", "a_ori_deg",
                 "b_x", "b_y", "b_sigma", "b_ori_deg",
                 "pos_dist", "scale_ratio", "ori_diff_deg", "desc_dist")
@@ -115,8 +115,9 @@ PAIRS_NPZ = "pairs.npz"
 
 
 def pairs_from_csv(path):
-    """The PAIR_COLUMNS, PAIR_INDEX_COLUMNS and level of a colocated.csv as
-    numpy arrays (float32 and int32), keyed by column name."""
+    """The PAIR_COLUMNS, PAIR_INDEX_COLUMNS, level and best of a
+    colocated.csv as numpy arrays (float32 and int32), keyed by column
+    name."""
     rows = read_rows(path)
     out = {c: np.array([float(r[c]) for r in rows], dtype=np.float32)
            for c in PAIR_COLUMNS}
@@ -124,6 +125,9 @@ def pairs_from_csv(path):
                 for c in PAIR_INDEX_COLUMNS})
     out["level"] = np.array([LEVELS.index(r["agreement"]) for r in rows],
                             dtype=np.int32)
+    out["best"] = np.array([LEVELS.index(r.get("best_at_position",
+                                               r["agreement"]))
+                            for r in rows], dtype=np.int32)
     return out
 
 
@@ -225,61 +229,59 @@ def log_axis(ax, which, bottom, top):
     ax.grid(True, which="minor", axis=which, alpha=0.2)
 
 
-def render_agreement(out_png, title, rows, counts, ori_tolerance=2.0,
-                     desc_tolerance=12.0):
-    """Writes the three agreement levels of the co-located pairs.
+def class_of_levels(level, best):
+    """The PAIR_CLASSES names of pairs given as arrays of LEVELS indices:
+    their agreement level and the best level at their position."""
+    level = np.asarray(level)
+    best = np.asarray(best)
+    names = np.where(level == 0, "orientation_differs", "descriptor_differs")
+    names = np.where(best > level, np.char.add(names, "_minor"), names)
+    return np.where(level == len(LEVELS) - 1, "agree", names)
 
-    Left: every co-located pair by its rotation difference and descriptor
-    distance (L2), coloured by agreement level, hollow where another keypoint
-    at the same position agrees further (a minor problem). The grey lines are the
-    tolerances, and the three regions are what a tester can conclude: right
-    of the orientation tolerance the orientation computation differs and the
-    descriptor cannot be judged; left of it and above the descriptor
-    tolerance the descriptor extraction is suspect; below it all agree.
-    Right: the keypoints of a and b split into unpaired, and co-located by
-    agreement level, minor ones hatched. rows is match_stats.read_rows() output and counts the
-    counts of match_stats.image_stats() or set_stats(), possibly merged over
-    images. Values outside an axis are drawn at its ends.
-    """
-    fig, (left, right) = plt.subplots(
-        1, 2, figsize=(14, 5.2), gridspec_kw={"width_ratios": [3, 2]})
-    pairs = rows["colocated"]
-    rot = np.array([abs(float(r["ori_diff_deg"])) for r in pairs])
-    desc = np.array([float(r["desc_dist"]) for r in pairs])
-    cls = np.array([pair_class(r) for r in pairs])
+
+def agreement_scatter(ax, rot, desc, cls, ori_tolerance=2.0,
+                      desc_tolerance=12.0):
+    """Draws co-located pairs by |rotation difference| (rot) and descriptor
+    distance (desc), coloured by their PAIR_CLASSES name (cls), with the
+    tolerances as grey lines and what a tester can conclude in each region.
+    Values outside an axis are drawn at its ends."""
+    rot, desc, cls = np.abs(np.asarray(rot)), np.asarray(desc), \
+        np.asarray(cls)
     rot_lo, desc_lo = 0.01, 0.1
     desc_hi = 1.2 * max([10 * desc_tolerance, *desc])
     for name, lv, minor, label in PAIR_CLASSES:
         sel = cls == name
-        left.plot(np.clip(rot[sel], rot_lo, 180.0),
-                  np.clip(desc[sel], desc_lo, desc_hi),
-                  "o" if minor else ".", markersize=3.5 if minor else 3,
-                  alpha=0.7, color=LEVEL_COLORS[lv],
-                  markerfacecolor="none" if minor else LEVEL_COLORS[lv],
-                  markeredgewidth=0.7, label=f"{label} ({int(sel.sum())})")
-    log_axis(left, "x", rot_lo, 180.0)
-    log_axis(left, "y", desc_lo, desc_hi)
-    left.axvline(ori_tolerance, color="grey", linewidth=0.8)
-    left.plot([rot_lo, ori_tolerance], [desc_tolerance, desc_tolerance],
-              color="grey", linewidth=0.8)
+        ax.plot(np.clip(rot[sel], rot_lo, 180.0),
+                np.clip(desc[sel], desc_lo, desc_hi),
+                "o" if minor else ".", markersize=3.5 if minor else 3,
+                alpha=0.7, color=LEVEL_COLORS[lv],
+                markerfacecolor="none" if minor else LEVEL_COLORS[lv],
+                markeredgewidth=0.7, label=f"{label} ({int(sel.sum())})")
+    log_axis(ax, "x", rot_lo, 180.0)
+    log_axis(ax, "y", desc_lo, desc_hi)
+    ax.axvline(ori_tolerance, color="grey", linewidth=0.8)
+    ax.plot([rot_lo, ori_tolerance], [desc_tolerance, desc_tolerance],
+            color="grey", linewidth=0.8)
     box = {"boxstyle": "round", "facecolor": "white", "alpha": 0.8,
            "edgecolor": "none"}
-    left.text(ori_tolerance * 1.15, desc_hi / 1.3,
-              "orientation differs:\ndescriptor cannot be judged",
-              fontsize=8, va="top", bbox=box)
-    left.text(rot_lo * 1.15, desc_hi / 1.3,
-              "same orientation,\ndescriptor differs:\nsuspect descriptor",
-              fontsize=8, va="top", bbox=box)
-    left.text(rot_lo * 1.15, desc_lo * 1.3, "all agree", fontsize=8,
-              va="bottom", bbox=box)
-    left.set_xlabel(f"|rotation difference| (deg), below {rot_lo:g} at "
-                    f"{rot_lo:g}; tolerance {ori_tolerance:g}")
-    left.set_ylabel(f"descriptor distance (L2), below {desc_lo:g} at "
-                    f"{desc_lo:g}; tolerance {desc_tolerance:g}")
-    left.set_title("Co-located pairs: rotation and descriptor difference",
-                   fontsize=10)
-    left.legend(fontsize=8, loc="lower right", framealpha=1)
+    ax.text(ori_tolerance * 1.15, desc_hi / 1.3,
+            "orientation differs:\ndescriptor cannot be judged",
+            fontsize=8, va="top", bbox=box)
+    ax.text(rot_lo * 1.15, desc_hi / 1.3,
+            "same orientation,\ndescriptor differs:\nsuspect descriptor",
+            fontsize=8, va="top", bbox=box)
+    ax.text(rot_lo * 1.15, desc_lo * 1.3, "all agree", fontsize=8,
+            va="bottom", bbox=box)
+    ax.set_xlabel(f"|rotation difference| (deg), below {rot_lo:g} at "
+                  f"{rot_lo:g}; tolerance {ori_tolerance:g}")
+    ax.set_ylabel(f"descriptor distance (L2), below {desc_lo:g} at "
+                  f"{desc_lo:g}; tolerance {desc_tolerance:g}")
+    ax.legend(fontsize=8, loc="lower right", framealpha=1)
 
+
+def agreement_bars(ax, counts, legend=True):
+    """Draws the keypoints of a and b as bars split into unpaired and the
+    PAIR_CLASSES, minor ones hatched. counts as in match_stats."""
     c = counts
     n = {"orientation_differs_minor": c["orientation_differs_minor"],
          "orientation_differs": c["orientation_differs"]
@@ -296,19 +298,48 @@ def render_agreement(out_png, title, rows, counts, ori_tolerance=2.0,
     min_labelled = 0.06 * max(c["a"], c["b"], 1)
     for label, color, minor, n_a, n_b in segments:
         widths = np.array([n_a, n_b], dtype=float)
-        right.barh([1, 0], widths, left=left_edge, label=label,
-                   color="white" if minor else color, edgecolor=color,
-                   hatch="////" if minor else None, linewidth=0)
+        ax.barh([1, 0], widths, left=left_edge, label=label,
+                color="white" if minor else color, edgecolor=color,
+                hatch="////" if minor else None, linewidth=0)
         for y, w, x in zip((1, 0), widths, left_edge):
             if w >= min_labelled:
-                right.text(x + w / 2, y, str(int(w)), ha="center",
-                           va="center", fontsize=8)
+                ax.text(x + w / 2, y, str(int(w)), ha="center",
+                        va="center", fontsize=8)
         left_edge += widths
-    right.set_yticks([1, 0], [f"a ({c['a']})", f"b ({c['b']})"])
-    right.set_xlabel("keypoints")
+    ax.set_yticks([1, 0], [f"a ({c['a']})", f"b ({c['b']})"])
+    ax.set_xlabel("keypoints")
+    if legend:
+        ax.legend(fontsize=8, loc="upper center",
+                  bbox_to_anchor=(0.5, -0.15), ncol=1, frameon=False)
+
+
+def render_agreement(out_png, title, rows, counts, ori_tolerance=2.0,
+                     desc_tolerance=12.0):
+    """Writes the three agreement levels of the co-located pairs.
+
+    Left: every co-located pair by its rotation difference and descriptor
+    distance (L2), coloured by agreement level, hollow where another keypoint
+    at the same position agrees further (a minor problem). The grey lines are
+    the tolerances, and the three regions are what a tester can conclude:
+    right of the orientation tolerance the orientation computation differs
+    and the descriptor cannot be judged; left of it and above the descriptor
+    tolerance the descriptor extraction is suspect; below it all agree.
+    Right: the keypoints of a and b split into unpaired, and co-located by
+    agreement level, minor ones hatched. rows is match_stats.read_rows()
+    output and counts the counts of match_stats.image_stats() or
+    set_stats(), possibly merged over images.
+    """
+    fig, (left, right) = plt.subplots(
+        1, 2, figsize=(14, 5.2), gridspec_kw={"width_ratios": [3, 2]})
+    pairs = rows["colocated"]
+    agreement_scatter(left, [float(r["ori_diff_deg"]) for r in pairs],
+                      [float(r["desc_dist"]) for r in pairs],
+                      [pair_class(r) for r in pairs],
+                      ori_tolerance, desc_tolerance)
+    left.set_title("Co-located pairs: rotation and descriptor difference",
+                   fontsize=10)
+    agreement_bars(right, counts)
     right.set_title("Keypoints by agreement level", fontsize=10)
-    right.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.15),
-                 ncol=1, frameon=False)
     fig.suptitle(title, fontsize=11)
     fig.tight_layout()
     fig.savefig(out_png, dpi=100)
