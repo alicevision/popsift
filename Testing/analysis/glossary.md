@@ -2,6 +2,12 @@
 
 Terms used in the reports and plots when PopSift is compared
 with VLFeat. a is the run under test (PopSift), b the reference (VLFeat).
+The same terms apply to any two runs, e.g. two PopSift builds, or another
+SIFT tool against PopSift.
+
+**Run.** One SIFT tool with one configuration on image sets. Its results
+are kept as a result store (`run.json` and one `.sift` file per image) and
+named by its run name, `<prefix>+<configuration>`.
 
 **Keypoint** (also feature). A point that SIFT finds in an image, with a
 position (x, y), a scale (sigma) and an orientation, plus a descriptor. SIFT
