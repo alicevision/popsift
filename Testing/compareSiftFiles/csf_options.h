@@ -16,12 +16,12 @@ struct Parameters
     bool                     briefinfo;
     float                    max_avg_desc_dist; // CTest pass/fail gate; <0 disables the check
     bool                     allow_empty;       // an input without features is not an error
-    std::string              match_directory;   // write matched.csv, only_a.csv, only_b.csv here
-    float                    match_radius_sigma;
-    float                    match_radius_min;
-    float                    match_max_scale_ratio;
-    float                    same_pose_px;
-    float                    same_pose_deg;
+    std::string              pair_directory;    // write colocated.csv, only_a.csv, only_b.csv, ... here
+    float                    pair_radius_sigma;
+    float                    pair_radius_min;
+    float                    pair_max_scale_ratio;
+    float                    ori_tolerance_deg;
+    float                    desc_tolerance;
 };
 
 void parseargs( int argc, char** argv, Parameters& param );

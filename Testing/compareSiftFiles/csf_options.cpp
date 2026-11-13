@@ -51,24 +51,25 @@ void parseargs( int argc, char** argv, Parameters& param )
             ;
 
         same_image.add_options()
-            ("match-dir", value<std::string>(&param.match_directory),
-                          "Pair the features of the two files by position, scale and "
-                          "orientation, and write matched.csv, only_a.csv, "
-                          "only_b.csv and desc_bins.csv into this directory "
-                          "(a = first file)." )
-            ("match-radius-sigma", value<float>(&param.match_radius_sigma)->default_value(0.5f),
-                          "Matching: maximum position distance as a multiple of the "
-                          "first feature's sigma ..." )
-            ("match-radius-min", value<float>(&param.match_radius_min)->default_value(1.0f),
-                          "... but at least this many pixels." )
-            ("match-max-scale-ratio", value<float>(&param.match_max_scale_ratio)->default_value(1.5f),
-                          "Matching: maximum ratio between the two sigmas." )
-            /* same-pose-px should be renamed fail-pix-dist */
-            ("same-pose-px", value<float>(&param.same_pose_px)->default_value(0.25f),
-                          "desc_bins.csv: matched pairs at most this many pixels ..." )
-            /* same-pose-deg shold be renamed fail-deg-dist */
-            ("same-pose-deg", value<float>(&param.same_pose_deg)->default_value(2.0f),
-                          "... and degrees apart have the same pose." )
+            ("pair-dir", value<std::string>(&param.pair_directory),
+                          "Pair the keypoints of the two files by position and scale, "
+                          "rate how far every pair agrees (position only, also "
+                          "orientation, also descriptor), and write colocated.csv, "
+                          "only_a.csv, only_b.csv, desc_bins.csv, desc_nn_a.csv and "
+                          "desc_nn_b.csv into this directory (a = first file)." )
+            ("pair-radius-sigma", value<float>(&param.pair_radius_sigma)->default_value(0.5f),
+                          "Co-located: maximum position distance as a multiple of the "
+                          "first keypoint's sigma ..." )
+            ("pair-radius-min", value<float>(&param.pair_radius_min)->default_value(1.0f),
+                          "... but at least this many pixels ..." )
+            ("pair-max-scale-ratio", value<float>(&param.pair_max_scale_ratio)->default_value(1.5f),
+                          "... and at most this ratio between the two sigmas." )
+            ("ori-tolerance-deg", value<float>(&param.ori_tolerance_deg)->default_value(2.0f),
+                          "Same orientation: co-located pairs whose orientations "
+                          "differ by at most this many degrees." )
+            ("desc-tolerance", value<float>(&param.desc_tolerance)->default_value(12.0f),
+                          "Similar descriptor: pairs with the same orientation whose "
+                          "descriptor distance is at most this." )
             ;
     }
 

@@ -42,38 +42,50 @@ static float distanceSum( ostream* outfile, const vector<feat_t>& l_A, const vec
 
 static bool writeFiles( const Parameters& param, const vector<NearestDesc>& nearest_A_B, const vector<feat_t>& l_A, const vector<feat_t>& l_B )
 {
-    if( param.match_directory.empty() ) return true;
+    if( param.pair_directory.empty() ) return true;
 
     vector<NearestDesc> nearest_B_A;
     nearestDescriptors( nearest_B_A, l_B, l_A );
 
-    MatchParams mp;
-    mp.radius_sigma    = param.match_radius_sigma;
-    mp.radius_min      = param.match_radius_min;
-    mp.max_scale_ratio = param.match_max_scale_ratio;
-    const vector<MatchPair> pairs = matchFeatures( l_A, l_B, mp );
-    if( ! writeMatchFiles( param.match_directory, l_A, l_B, pairs ) )
+    PairParams pp;
+    pp.radius_sigma      = param.pair_radius_sigma;
+    pp.radius_min        = param.pair_radius_min;
+    pp.max_scale_ratio   = param.pair_max_scale_ratio;
+    pp.ori_tolerance_deg = param.ori_tolerance_deg;
+    pp.desc_tolerance    = param.desc_tolerance;
+    vector<KeypointPair> pairs = matchKeypointsByPosition( l_A, l_B, pp );
+    classifyAgreement( pairs, l_A, l_B, pp );
+
+    if( ! writePairFiles( param.pair_directory, l_A, l_B, pairs ) )
     {
-            cerr << "Cannot write the match files into " << param.match_directory << endl;
+            cerr << "Cannot write the pair files into " << param.pair_directory << endl;
             return false;
     }
-    if( ! writeDescBinsFile( param.match_directory, l_A, l_B, pairs,
-                                 param.same_pose_px, param.same_pose_deg ) )
+    if( ! writeDescBinsFile( param.pair_directory, l_A, l_B, pairs ) )
     {
-            cerr << "Cannot write desc_bins.csv into " << param.match_directory << endl;
+            cerr << "Cannot write desc_bins.csv into " << param.pair_directory << endl;
             return false;
     }
-    const string base = param.match_directory + "/";
+    const string base = param.pair_directory + "/";
     if( ! writeNearestFile( base + "desc_nn_a.csv",
                             l_A, l_B, nearest_A_B, pairs, true ) ||
         ! writeNearestFile( base + "desc_nn_b.csv",
                             l_B, l_A, nearest_B_A, pairs, false ) )
     {
-            cerr << "Cannot write the descriptor nearest neighbours into " << param.match_directory << endl;
+            cerr << "Cannot write the descriptor nearest neighbours into " << param.pair_directory << endl;
             return false;
     }
-    cerr << "Matched " << pairs.size() << " of " << l_A.size() << " features in "
-         << param.input[0] << " and " << l_B.size() << " in " << param.input[1] << endl;
+
+    const auto at_least = [&]( Agreement level ) {
+        return count_if( pairs.begin(), pairs.end(),
+                         [level]( const KeypointPair& p ) { return p.level >= level; } );
+    };
+    cerr << "Co-located " << pairs.size() << " of " << l_A.size() << " keypoints in "
+         << param.input[0] << " and " << l_B.size() << " in " << param.input[1] << endl
+         << "  same orientation (<= " << pp.ori_tolerance_deg << " deg): "
+         << at_least( Agreement::Orientation ) << endl
+         << "  also similar descriptor (<= " << pp.desc_tolerance << "): "
+         << at_least( Agreement::Descriptor ) << endl;
 
     return true;
 }

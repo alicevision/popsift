@@ -5,7 +5,7 @@
 
 Each case writes two feature files (x y sigma orientation in radians, then
 128 descriptor values per line), runs the tool on them and checks its exit
-code and its match files. Every check is printed with its outcome; the exit
+code and its pair files. Every check is printed with its outcome; the exit
 code is 0 if all of them passed.
 """
 
@@ -52,11 +52,11 @@ class Case:
 
     def run(self, a, b, *options):
         """Runs the tool on the features a and b. Returns the exit code and output."""
-        match_dir = os.path.join(self.dir, "match")
-        os.makedirs(match_dir, exist_ok=True)
-        for name in os.listdir(match_dir):
-            os.remove(os.path.join(match_dir, name))
-        cmd = [self.tool, "--match-dir", match_dir,
+        pair_dir = os.path.join(self.dir, "pairs")
+        os.makedirs(pair_dir, exist_ok=True)
+        for name in os.listdir(pair_dir):
+            os.remove(os.path.join(pair_dir, name))
+        cmd = [self.tool, "--pair-dir", pair_dir,
                "-o", os.path.join(self.dir, "comparison.txt"),
                *options, self.write("a.sift", a), self.write("b.sift", b)]
         print("   " + " ".join(cmd))
@@ -68,8 +68,8 @@ class Case:
         return proc.returncode, output
 
     def rows(self, name):
-        """Return the rows of a match file as dicts, none if empty."""
-        path = os.path.join(self.dir, "match", name)
+        """Return the rows of a pair file as dicts, none if empty."""
+        path = os.path.join(self.dir, "pairs", name)
         if not os.path.exists(path):
             return []
         with open(path, newline="", encoding="utf-8") as f:
@@ -88,29 +88,36 @@ class Case:
                    f"{what} is {expected} (+-{tol}) for all {len(values)} "
                    f"pair(s)" + (f", got {bad[:5]}" if bad else ""))
 
-    def check_counts(self, matched, only_a, only_b):
-        """Check the number of rows of the three match files."""
-        got = (len(self.rows("matched.csv")), len(self.rows("only_a.csv")),
+    def check_counts(self, colocated, only_a, only_b):
+        """Check the number of rows of the three pair files."""
+        got = (len(self.rows("colocated.csv")), len(self.rows("only_a.csv")),
                len(self.rows("only_b.csv")))
-        self.check(got == (matched, only_a, only_b),
-                   f"{matched} matched, {only_a} only in a, {only_b} only in "
-                   f"b (got {got[0]}, {got[1]}, {got[2]})")
+        self.check(got == (colocated, only_a, only_b),
+                   f"{colocated} co-located, {only_a} only in a, {only_b} only "
+                   f"in b (got {got[0]}, {got[1]}, {got[2]})")
 
-    def column(self, name, file="matched.csv"):
-        """Return one column of a match file as floats."""
+    def agreement(self):
+        """Return the agreement column of colocated.csv by index of a."""
+        return {int(r["a_index"]): r["agreement"]
+                for r in self.rows("colocated.csv")}
+
+    def column(self, name, file="colocated.csv"):
+        """Return one column of a pair file as floats."""
         return [float(r[name]) for r in self.rows(file)]
 
 
 def case_identical(c):
-    """Check that identical inputs match completely, at distance 0."""
+    """Check that identical inputs agree completely, at distance 0."""
     code, output = c.run(BASE, BASE)
     c.check(code == 0, f"exit code 0 (got {code})")
     c.check_counts(5, 0, 0)
     c.check_close(c.column("pos_dist"), 0.0, 1e-6, "position distance")
     c.check_close(c.column("desc_dist"), 0.0, 1e-6, "descriptor distance")
     nn = c.rows("desc_nn_a.csv")
-    c.check(all(r["n_index"] == r["geo_index"] for r in nn),
-            "every descriptor nearest neighbour is the geometric match")
+    c.check(all(r["n_index"] == r["colocated_index"] for r in nn),
+            "every descriptor nearest neighbour is the co-located keypoint")
+    c.check(set(c.agreement().values()) == {"descriptor"},
+            "every pair agrees up to the descriptor")
     c.check("Average best-match descriptor distance: 0" in output,
             "average best-match descriptor distance 0 is printed")
 
@@ -165,7 +172,7 @@ def case_orientation_wrap(c):
     c.check(code == 0, f"exit code 0 (got {code})")
     c.check_counts(3, 0, 0)
     diffs = {int(r["a_index"]): float(r["ori_diff_deg"])
-             for r in c.rows("matched.csv")}
+             for r in c.rows("colocated.csv")}
     expected = {0: -1.0, 1: 1.0, 2: 0.0}
     c.check(all(abs(diffs.get(i, 999) - d) < 1e-3 for i, d in expected.items()),
             f"orientation differences (b - a) are {expected} (got {diffs})")
@@ -203,7 +210,8 @@ def case_max_avg_dist(c):
             "average best-match descriptor distance 6 is printed")
     bins = {(r["subset"], int(r["element"])): r for r in c.rows("desc_bins.csv")}
     c.check(len(bins) == 256, f"desc_bins.csv has 2 x 128 rows (got {len(bins)})")
-    first = [bins.get((s, 0), {}).get("sum_diff") for s in ("matched", "same_pose")]
+    first = [bins.get((s, 0), {}).get("sum_diff")
+             for s in ("colocated", "same_orientation")]
     c.check(first == ["30", "30"],
             f"element 0 sums to 5 x 6 = 30 in both subsets (got {first})")
     rest = {float(r["sum_abs_diff"]) for (s, i), r in bins.items() if i > 0}
@@ -215,7 +223,40 @@ def case_max_avg_dist(c):
             f"fails with --max-avg-dist 5 (exit code {code})")
 
 
+def case_agreement(c):
+    """Check the three agreement levels of co-located keypoints.
+
+    0: identical. 1: rotated by 30 degrees, so the orientation differs
+    whatever the descriptor. 2: same orientation, descriptor differs by 20 in
+    one value (L2 20). 3: same orientation, descriptor differs by 10 (L2 10).
+    4: a different descriptor and rotated by 1 degree.
+    """
+    b = [list(f) for f in BASE]
+    b[1][3] += math.radians(30.0)
+    b[2][4] += 20.0
+    b[3][4] += 10.0
+    b[4] = b[4][:3] + [b[4][3] + math.radians(1.0)] + \
+        feature(0, 0, 0, 0, 99)[4:]
+    code, output = c.run(BASE, b)
+    c.check(code == 0, f"exit code 0 (got {code})")
+    c.check_counts(5, 0, 0)
+    expected = {0: "descriptor", 1: "position", 2: "orientation",
+                3: "descriptor", 4: "orientation"}
+    got = c.agreement()
+    c.check(got == expected, f"agreement levels are {expected} (got {got})")
+    c.check("same orientation (<= 2 deg): 4" in output
+            and "also similar descriptor (<= 12): 2" in output,
+            "the counts of both levels are printed")
+    code, _ = c.run(BASE, b, "--ori-tolerance-deg", "45",
+                    "--desc-tolerance", "25")
+    got = c.agreement()
+    c.check(got[1] == "descriptor" and got[2] == "descriptor"
+            and got[4] == "orientation",
+            f"wider tolerances raise pairs 1 and 2 to descriptor (got {got})")
+
+
 CASES = {
+    "agreement": case_agreement,
     "identical": case_identical,
     "shifted": case_shifted,
     "missing": case_missing,

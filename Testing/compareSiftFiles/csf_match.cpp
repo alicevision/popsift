@@ -21,9 +21,20 @@ struct Candidate
 
 }
 
-vector<MatchPair> matchFeatures( const vector<feat_t>& l_a,
-                                 const vector<feat_t>& l_b,
-                                 const MatchParams&    param )
+const char* agreementName( Agreement level )
+{
+    switch( level )
+    {
+    case Agreement::Position:    return "position";
+    case Agreement::Orientation: return "orientation";
+    case Agreement::Descriptor:  return "descriptor";
+    }
+    return "?";
+}
+
+vector<KeypointPair> matchKeypointsByPosition( const vector<feat_t>& l_a,
+                                               const vector<feat_t>& l_b,
+                                               const PairParams&     param )
 {
     // Indices of l_b sorted by x, so that the candidates of a feature are
     // found by a range search instead of a scan over all of l_b.
@@ -69,18 +80,36 @@ vector<MatchPair> matchFeatures( const vector<feat_t>& l_a,
 
     vector<bool>      used_a( l_a.size(), false );
     vector<bool>      used_b( l_b.size(), false );
-    vector<MatchPair> pairs;
+    vector<KeypointPair> pairs;
     for( const Candidate& c : cand )
     {
         if( used_a[c.a] || used_b[c.b] ) continue;
         used_a[c.a] = true;
         used_b[c.b] = true;
-        pairs.push_back( MatchPair{ c.a, c.b, c.pos_dist, c.ori_diff } );
+        pairs.push_back( KeypointPair{ c.a, c.b, c.pos_dist, c.ori_diff,
+                                       NAN, Agreement::Position } );
     }
 
     sort( pairs.begin(), pairs.end(),
-          []( const MatchPair& l, const MatchPair& r ) { return l.a < r.a; } );
+          []( const KeypointPair& l, const KeypointPair& r ) { return l.a < r.a; } );
     return pairs;
+}
+
+void classifyAgreement( vector<KeypointPair>& pairs,
+                        const vector<feat_t>& l_a,
+                        const vector<feat_t>& l_b,
+                        const PairParams&     param )
+{
+    for( KeypointPair& p : pairs )
+    {
+        p.desc_dist = descDistance( l_a[p.a], l_b[p.b] );
+        p.level     = Agreement::Position;
+        if( fabsf( p.ori_diff ) <= param.ori_tolerance_deg )
+        {
+            p.level = ( p.desc_dist <= param.desc_tolerance ) ? Agreement::Descriptor
+                                                              : Agreement::Orientation;
+        }
+    }
 }
 
 void nearestDescriptors( std::vector<NearestDesc>& nearest,
@@ -124,7 +153,7 @@ static void writeFeature( FILE* f, int index, const feat_t& ft )
     fprintf( f, "%d,%.6g,%.6g,%.6g,%.6g", index, ft.x, ft.y, ft.sigma, ft.ori * RAD2DEG );
 }
 
-static bool writeUnmatched( const string& path, const vector<feat_t>& l, const vector<bool>& used )
+static bool writeUnpaired( const string& path, const vector<feat_t>& l, const vector<bool>& used )
 {
     FILE* f = fopen( path.c_str(), "w" );
     if( !f ) return false;
@@ -138,25 +167,25 @@ static bool writeUnmatched( const string& path, const vector<feat_t>& l, const v
     return fclose( f ) == 0;
 }
 
-bool writeNearestFile( const string&              path,
-                       const vector<feat_t>&      l_query,
-                       const vector<feat_t>&      l_other,
-                       const vector<NearestDesc>& nearest,
-                       const vector<MatchPair>&   pairs,
-                       bool                       pairs_query_first )
+bool writeNearestFile( const string&               path,
+                       const vector<feat_t>&       l_query,
+                       const vector<feat_t>&       l_other,
+                       const vector<NearestDesc>&  nearest,
+                       const vector<KeypointPair>& pairs,
+                       bool                        pairs_query_first )
 {
-    vector<int> geo( l_query.size(), -1 );
-    for( const MatchPair& p : pairs )
+    vector<int> colocated( l_query.size(), -1 );
+    for( const KeypointPair& p : pairs )
     {
-        if( pairs_query_first ) geo[p.a] = p.b;
-        else                    geo[p.b] = p.a;
+        if( pairs_query_first ) colocated[p.a] = p.b;
+        else                    colocated[p.b] = p.a;
     }
 
     FILE* f = fopen( path.c_str(), "w" );
     if( !f ) return false;
     fprintf( f, "q_index,q_x,q_y,q_sigma,q_ori_deg,"
                 "n_index,n_x,n_y,n_sigma,n_ori_deg,"
-                "desc_dist,second_desc_dist,pos_dist,ori_diff_deg,geo_index\n" );
+                "desc_dist,second_desc_dist,pos_dist,ori_diff_deg,colocated_index\n" );
     for( int iq = 0; iq < int(l_query.size()); iq++ )
     {
         const NearestDesc& n = nearest[iq];
@@ -170,27 +199,27 @@ bool writeNearestFile( const string&              path,
                  n.dist, n.second,
                  fq.l2PixDist(fn), // sqrtf( (fn.x-fq.x)*(fn.x-fq.x) + (fn.y-fq.y)*(fn.y-fq.y) ),
                  fq.signedAngleDiffDegrees(fn),
-                 geo[iq] );
+                 colocated[iq] );
     }
     return fclose( f ) == 0;
 }
 
-bool writeMatchFiles( const string&            dir,
-                      const vector<feat_t>&    l_a,
-                      const vector<feat_t>&    l_b,
-                      const vector<MatchPair>& pairs )
+bool writePairFiles( const string&               dir,
+                     const vector<feat_t>&       l_a,
+                     const vector<feat_t>&       l_b,
+                     const vector<KeypointPair>& pairs )
 {
     const string base = dir.empty() ? string() : dir + "/";
 
-    FILE* f = fopen( ( base + "matched.csv" ).c_str(), "w" );
+    FILE* f = fopen( ( base + "colocated.csv" ).c_str(), "w" );
     if( !f ) return false;
     fprintf( f, "a_index,a_x,a_y,a_sigma,a_ori_deg,"
                 "b_index,b_x,b_y,b_sigma,b_ori_deg,"
-                "dx,dy,pos_dist,scale_ratio,ori_diff_deg,desc_dist\n" );
+                "dx,dy,pos_dist,scale_ratio,ori_diff_deg,desc_dist,agreement\n" );
 
     vector<bool> used_a( l_a.size(), false );
     vector<bool> used_b( l_b.size(), false );
-    for( const MatchPair& p : pairs )
+    for( const KeypointPair& p : pairs )
     {
         const feat_t& fa = l_a[p.a];
         const feat_t& fb = l_b[p.b];
@@ -199,32 +228,32 @@ bool writeMatchFiles( const string&            dir,
         writeFeature( f, p.a, fa );
         fprintf( f, "," );
         writeFeature( f, p.b, fb );
-        fprintf( f, ",%.6g,%.6g,%.6g,%.6g,%.6g,%.6g\n",
+        fprintf( f, ",%.6g,%.6g,%.6g,%.6g,%.6g,%.6g,%s\n",
                  fb.x - fa.x, fb.y - fa.y, p.pos_dist,
                  fa.sigma > 0.0f ? fb.sigma / fa.sigma : 0.0f,
                  p.ori_diff,
-                 descDistance( fa, fb ) );
+                 p.desc_dist,
+                 agreementName( p.level ) );
     }
     if( fclose( f ) != 0 ) return false;
 
-    return writeUnmatched( base + "only_a.csv", l_a, used_a )
-        && writeUnmatched( base + "only_b.csv", l_b, used_b );
+    return writeUnpaired( base + "only_a.csv", l_a, used_a )
+        && writeUnpaired( base + "only_b.csv", l_b, used_b );
 }
 
-bool writeDescBinsFile( const string&            dir,
-                        const vector<feat_t>&    l_a,
-                        const vector<feat_t>&    l_b,
-                        const vector<MatchPair>& pairs,
-                        float                    same_pose_px,
-                        float                    same_pose_deg )
+bool writeDescBinsFile( const string&               dir,
+                        const vector<feat_t>&       l_a,
+                        const vector<feat_t>&       l_b,
+                        const vector<KeypointPair>& pairs )
 {
-    // [subset][element]: subset 0 is all matched pairs, 1 the same pose
+    // [subset][element]: subset 0 is all co-located pairs, 1 those with the
+    // same orientation
     long   count[2]             = { 0, 0 };
     double sum[2][DescSize]     = {};
     double sum_abs[2][DescSize] = {};
-    for( const MatchPair& p : pairs )
+    for( const KeypointPair& p : pairs )
     {
-        const bool same = p.pos_dist <= same_pose_px && fabsf( p.ori_diff ) <= same_pose_deg;
+        const bool same = p.level != Agreement::Position;
         for( int s = 0; s < ( same ? 2 : 1 ); s++ )
         {
             count[s]++;
@@ -241,7 +270,7 @@ bool writeDescBinsFile( const string&            dir,
     FILE* f = fopen( ( base + "desc_bins.csv" ).c_str(), "w" );
     if( !f ) return false;
     fprintf( f, "subset,element,pairs,sum_diff,sum_abs_diff\n" );
-    const char* names[2] = { "matched", "same_pose" };
+    const char* names[2] = { "colocated", "same_orientation" };
     for( int s = 0; s < 2; s++ )
     {
         for( int i = 0; i < DescSize; i++ )
