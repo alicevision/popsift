@@ -62,8 +62,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
 # set(CMAKE_BUILD_TYPE Debug)
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-  set(CMAKE_BUILD_TYPE Release)
-  message(STATUS "Build type not set, building in Release configuration")
+  # Testers inspect the code when a comparison points to a bug, which is
+  # easier in Debug. BUILD_TESTING is declared further down, but it is known
+  # here when it was given on the command line or in an earlier run.
+  if(BUILD_TESTING)
+    set(CMAKE_BUILD_TYPE Debug)
+  else()
+    set(CMAKE_BUILD_TYPE Release)
+  endif()
+  message(STATUS "Build type not set, building in ${CMAKE_BUILD_TYPE} configuration")
   # Set the possible values of build type for cmake-gui
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 else()
@@ -209,6 +216,8 @@ if(PROJECT_IS_TOP_LEVEL)
 endif()
 
 if(BUILD_TESTING)
+  # Lets ctest run the tests that Testing defines, from the build directory.
+  enable_testing()
   add_subdirectory(Testing)
 elseif(PopSift_TEST_WITH_VLFEAT)
   message(STATUS "PopSift_TEST_WITH_VLFEAT is ON but BUILD_TESTING is OFF: "

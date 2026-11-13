@@ -2,14 +2,17 @@
 
 The tools in this folder compare the keypoints and descriptors that PopSift
 finds with those of VLFeat, or of one PopSift parameter set with another.
-They are built when `BUILD_TESTING` is ON and are run by hand.
+They are built when `BUILD_TESTING` is ON. They can be run by hand, and with
+`PopSift_TEST_WITH_VLFEAT` also by CTest, which compares PopSift with VLFeat
+on every test image (see [`compareVlfeat`](compareVlfeat/README.md)).
 
 ## Configure options
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `BUILD_TESTING` | OFF | Builds `popsift-compareSiftFiles` and `popsift-gpu-probe`, finds the test image sets and writes `popsift-testing-config.json` into the build directory. |
-| `PopSift_TEST_WITH_VLFEAT` | OFF | Also downloads, patches and builds VLFeat's `sift` CLI as the reference (needs `BUILD_TESTING`). |
+| `BUILD_TESTING` | OFF | Builds `popsift-compareSiftFiles` and `popsift-gpu-probe`, finds the test image sets, writes `popsift-testing-config.json` into the build directory, and adds the unit tests of `popsift-compareSiftFiles` to CTest. |
+| `PopSift_TEST_WITH_VLFEAT` | OFF | Also downloads, patches and builds VLFeat's `sift` CLI as the reference, and adds the CTest comparison of PopSift with VLFeat (needs `BUILD_TESTING`). |
+| `PopSift_TEST_COMPARE_LIMITS` | empty | Limits that make the CTest comparisons fail, see [`compareVlfeat`](compareVlfeat/README.md). |
 | `PopSift_TESTDATA_DIR` | `$POPSIFT_TESTDATA_DIR` | Folder of your own test images. Every folder below it that holds .pgm or .ppm files becomes an image set. |
 
 ```sh
@@ -32,6 +35,7 @@ prints the available parameter sets and image sets.
 | Folder | Content |
 | --- | --- |
 | [`compareSiftFiles`](compareSiftFiles) | `popsift-compareSiftFiles`, which pairs the features of two descriptor files by position, scale and orientation, and by descriptor |
+| [`compareVlfeat`](compareVlfeat/README.md) | the CTest tests that compare PopSift with VLFeat |
 | [`vlfeat`](vlfeat/README.md) | the patched VLFeat `sift` CLI that serves as the reference |
 | [`datasets`](datasets/README.md) | how image sets are found, and a download script for the Oxford sets |
 | [`testImages`](testImages) | small hand-made images, the set `handcrafted` |

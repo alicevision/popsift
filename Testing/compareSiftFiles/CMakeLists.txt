@@ -55,6 +55,29 @@ endif()
 # How to make sure this happens?
 
 #############################################################
+# unit tests, run by ctest
+#############################################################
+
+if(BUILD_TESTING)
+  find_package(Python3 3.8 COMPONENTS Interpreter)
+  if(Python3_Interpreter_FOUND)
+    foreach(_case IN ITEMS agreement best-at-position identical shifted missing empty
+                           orientation-wrap same-position max-avg-dist)
+      add_test(NAME compareSiftFiles/${_case}
+               COMMAND "${Python3_EXECUTABLE}"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/test_compare_sift_files.py"
+                       --tool "$<TARGET_FILE:popsift-compareSiftFiles>"
+                       --work-dir "${CMAKE_CURRENT_BINARY_DIR}/unit"
+                       ${_case})
+      set_tests_properties(compareSiftFiles/${_case} PROPERTIES
+                           LABELS "cpu;unit")
+    endforeach()
+  else()
+    message(STATUS "No Python 3.8 or newer: no unit tests of popsift-compareSiftFiles")
+  endif()
+endif()
+
+#############################################################
 # installation
 #############################################################
 

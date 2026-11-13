@@ -1,5 +1,5 @@
-# Tools for testing PopSift. Only added when BUILD_TESTING is ON.
-# See README.md in this folder.
+# Tools and CTest tests for testing PopSift. Only added when BUILD_TESTING
+# is ON. See README.md in this folder.
 
 add_subdirectory(compareSiftFiles)
 
@@ -20,7 +20,8 @@ include(datasets/TestImageSets.cmake)
 # Tells the scripts in scripts/ where the binaries, the parameter sets and the
 # image sets are. An empty path means that the binary is not built. A build
 # directory has one such file: with a multi-config generator (Visual Studio,
-# Xcode, Ninja Multi-Config) it holds the paths of the Release configuration.
+# Xcode, Ninja Multi-Config) it holds the paths of the Debug configuration,
+# which is easier to step through when a comparison points to a bug.
 
 set(_image_sets_json "")
 foreach(_set IN LISTS PopSift_TEST_IMAGE_SETS)
@@ -44,7 +45,7 @@ endif()
 
 get_property(_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(_multi_config)
-  set(_tools_json_condition "$<CONFIG:Release>")
+  set(_tools_json_condition "$<CONFIG:Debug>")
 else()
   set(_tools_json_condition 1)
 endif()
@@ -65,3 +66,10 @@ ${_image_sets_json}
 }
 "
      CONDITION "${_tools_json_condition}")
+
+# --- CTest -------------------------------------------------------------------
+
+if(PopSift_TEST_WITH_VLFEAT)
+  # PopSift against VLFeat on every image of every set
+  add_subdirectory(compareVlfeat)
+endif()

@@ -62,7 +62,12 @@ statistics:
 - the three indicators: recall (co-located / keypoints of b) and precision
   (co-located / keypoints of a), orientation agreement (same orientation /
   co-located) and descriptor agreement (similar descriptor / same
-  orientation), with the counts of every level,
+  orientation), with the counts of every level. The pairs whose orientation
+  or descriptor differs are also counted separately when another keypoint
+  at the same position (SIFT gives one position several orientations)
+  agrees further (`orientation_differs_minor`, `descriptor_differs_minor`,
+  from the `best_at_position` column of `colocated.csv`): these are minor
+  problems,
 - pixel distance, offset x and y, scale ratio, rotation difference (b - a)
   and descriptor distance of the co-located pairs, each with mean, median,
   p90, p99, max and a histogram,
