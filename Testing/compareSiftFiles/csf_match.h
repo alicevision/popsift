@@ -52,6 +52,14 @@ enum class Agreement
  */
 const char* agreementName( Agreement level );
 
+/* SIFT gives one position and scale several orientations, each its own
+ * keypoint. When one pair at a position agrees further than another, the
+ * other one is a minor problem: an orientation or descriptor that only one
+ * run has, or that the greedy pairing did not pair with its counterpart.
+ * KeypointPair::best_at_position is the highest level of all pairs whose
+ * keypoint of a has the same position and scale.
+ */
+
 /** One pair of co-located keypoints, indices into the two keypoint lists.
  */
 struct KeypointPair
@@ -60,8 +68,9 @@ struct KeypointPair
     int       b;
     float     pos_dist;
     float     ori_diff;  // b - a in degrees, wrapped to [-180,180)
-    float     desc_dist; // descDistance(), set by classifyAgreement()
-    Agreement level;     // set by classifyAgreement()
+    float     desc_dist;        // descDistance(), set by classifyAgreement()
+    Agreement level;            // set by classifyAgreement()
+    Agreement best_at_position; // set by classifyAgreement()
 };
 
 /** Pairs the keypoints of l_a and l_b by position and scale, not by
@@ -79,7 +88,9 @@ std::vector<KeypointPair> matchKeypointsByPosition( const std::vector<feat_t>& l
 
 /** Sets desc_dist and level of every pair: Orientation if the orientations
  * differ by at most param.ori_tolerance_deg, Descriptor if in addition the
- * descriptor distance is at most param.desc_tolerance.
+ * descriptor distance is at most param.desc_tolerance. Then best_at_position,
+ * the highest level among the pairs whose keypoint of a has exactly the same
+ * position and scale.
  */
 void classifyAgreement( std::vector<KeypointPair>& pairs,
                         const std::vector<feat_t>& l_a,

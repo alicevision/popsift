@@ -2,7 +2,9 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <map>
 #include <numeric>
+#include <tuple>
 
 #include "csf_match.h"
 
@@ -87,7 +89,8 @@ vector<KeypointPair> matchKeypointsByPosition( const vector<feat_t>& l_a,
         used_a[c.a] = true;
         used_b[c.b] = true;
         pairs.push_back( KeypointPair{ c.a, c.b, c.pos_dist, c.ori_diff,
-                                       NAN, Agreement::Position } );
+                                       NAN, Agreement::Position,
+                                       Agreement::Position } );
     }
 
     sort( pairs.begin(), pairs.end(),
@@ -109,6 +112,24 @@ void classifyAgreement( vector<KeypointPair>& pairs,
             p.level = ( p.desc_dist <= param.desc_tolerance ) ? Agreement::Descriptor
                                                               : Agreement::Orientation;
         }
+    }
+
+    // The orientations of one SIFT keypoint share position and scale
+    // exactly, so the key needs no tolerance.
+    using Position = tuple<float, float, float>;
+    map<Position, Agreement> best;
+    const auto key = [&]( const KeypointPair& p ) {
+        const feat_t& fa = l_a[p.a];
+        return Position{ fa.x, fa.y, fa.sigma };
+    };
+    for( const KeypointPair& p : pairs )
+    {
+        auto it = best.emplace( key( p ), p.level ).first;
+        it->second = max( it->second, p.level );
+    }
+    for( KeypointPair& p : pairs )
+    {
+        p.best_at_position = best[key( p )];
     }
 }
 
@@ -215,7 +236,8 @@ bool writePairFiles( const string&               dir,
     if( !f ) return false;
     fprintf( f, "a_index,a_x,a_y,a_sigma,a_ori_deg,"
                 "b_index,b_x,b_y,b_sigma,b_ori_deg,"
-                "dx,dy,pos_dist,scale_ratio,ori_diff_deg,desc_dist,agreement\n" );
+                "dx,dy,pos_dist,scale_ratio,ori_diff_deg,desc_dist,agreement,"
+                "best_at_position\n" );
 
     vector<bool> used_a( l_a.size(), false );
     vector<bool> used_b( l_b.size(), false );
@@ -228,12 +250,13 @@ bool writePairFiles( const string&               dir,
         writeFeature( f, p.a, fa );
         fprintf( f, "," );
         writeFeature( f, p.b, fb );
-        fprintf( f, ",%.6g,%.6g,%.6g,%.6g,%.6g,%.6g,%s\n",
+        fprintf( f, ",%.6g,%.6g,%.6g,%.6g,%.6g,%.6g,%s,%s\n",
                  fb.x - fa.x, fb.y - fa.y, p.pos_dist,
                  fa.sigma > 0.0f ? fb.sigma / fa.sigma : 0.0f,
                  p.ori_diff,
                  p.desc_dist,
-                 agreementName( p.level ) );
+                 agreementName( p.level ),
+                 agreementName( p.best_at_position ) );
     }
     if( fclose( f ) != 0 ) return false;
 

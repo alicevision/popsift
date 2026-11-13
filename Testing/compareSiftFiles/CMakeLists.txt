@@ -61,7 +61,7 @@ endif()
 if(BUILD_TESTING)
   find_package(Python3 3.8 COMPONENTS Interpreter)
   if(Python3_Interpreter_FOUND)
-    foreach(_case IN ITEMS agreement identical shifted missing empty
+    foreach(_case IN ITEMS agreement best-at-position identical shifted missing empty
                            orientation-wrap same-position max-avg-dist)
       add_test(NAME compareSiftFiles/${_case}
                COMMAND "${Python3_EXECUTABLE}"

@@ -255,8 +255,42 @@ def case_agreement(c):
             f"wider tolerances raise pairs 1 and 2 to descriptor (got {got})")
 
 
+def case_best_at_position(c):
+    """Check best_at_position, the best level among the orientations of one
+    position.
+
+    Position 0 has three orientations: the first agrees, the second has a
+    different descriptor, the third is rotated by 30 degrees in b. All three
+    have the best level descriptor. Position 1 has one keypoint whose
+    descriptor differs, so its best level is orientation.
+    """
+    a = [BASE[0][:3] + [math.radians(ori)] + feature(0, 0, 0, 0, 20 + k)[4:]
+         for k, ori in enumerate((10.0, 100.0, 200.0))] + [BASE[1]]
+    b = [list(f) for f in a]
+    b[1][4] += 20.0
+    b[2][3] += math.radians(30.0)
+    b[3][4] += 20.0
+    code, output = c.run(a, b)
+    c.check(code == 0, f"exit code 0 (got {code})")
+    c.check_counts(4, 0, 0)
+    rows = {int(r["a_index"]): (r["agreement"], r["best_at_position"])
+            for r in c.rows("colocated.csv")}
+    expected = {0: ("descriptor", "descriptor"),
+                1: ("orientation", "descriptor"),
+                2: ("position", "descriptor"),
+                3: ("orientation", "orientation")}
+    c.check(rows == expected,
+            f"agreement and best_at_position are {expected} (got {rows})")
+    c.check("orientation differs, but another keypoint at the same "
+            "position agrees: 1" in output
+            and "descriptor differs, but another keypoint at the same "
+            "position agrees: 2" in output,
+            "the pairs with a better pair at their position are counted")
+
+
 CASES = {
     "agreement": case_agreement,
+    "best-at-position": case_best_at_position,
     "identical": case_identical,
     "shifted": case_shifted,
     "missing": case_missing,

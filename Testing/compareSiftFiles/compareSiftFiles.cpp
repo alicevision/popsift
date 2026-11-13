@@ -80,12 +80,23 @@ static bool writeFiles( const Parameters& param, const vector<NearestDesc>& near
         return count_if( pairs.begin(), pairs.end(),
                          [level]( const KeypointPair& p ) { return p.level >= level; } );
     };
+    // Pairs below level whose position has a pair that reaches it.
+    const auto minor = [&]( Agreement level ) {
+        return count_if( pairs.begin(), pairs.end(),
+                         [level]( const KeypointPair& p ) {
+                             return p.level < level && p.best_at_position >= level;
+                         } );
+    };
     cerr << "Co-located " << pairs.size() << " of " << l_A.size() << " keypoints in "
          << param.input[0] << " and " << l_B.size() << " in " << param.input[1] << endl
          << "  same orientation (<= " << pp.ori_tolerance_deg << " deg): "
          << at_least( Agreement::Orientation ) << endl
          << "  also similar descriptor (<= " << pp.desc_tolerance << "): "
-         << at_least( Agreement::Descriptor ) << endl;
+         << at_least( Agreement::Descriptor ) << endl
+         << "  orientation differs, but another keypoint at the same position agrees: "
+         << minor( Agreement::Orientation ) << endl
+         << "  descriptor differs, but another keypoint at the same position agrees: "
+         << minor( Agreement::Descriptor ) << endl;
 
     return true;
 }
