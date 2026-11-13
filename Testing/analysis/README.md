@@ -105,8 +105,53 @@ whose difference exceeds a threshold, both glyphs joined by a white line.
 
 `glossary.md` explains the terms of the reports and plots.
 
+## explorer.py
+
+```shell
+python3 Testing/analysis/explorer.py build/Testing/run
+```
+
+One window for all reports of a run. On the left, the image sets and their
+images with the share of co-located keypoints and the share of co-located
+pairs where orientation and descriptor agree; click to select, the arrow
+keys step through the images, page up and down through the sets. The tabs:
+
+- Image: the key figures of the selected image, with the three indicators
+  of `glossary.md` (co-located, same orientation, similar descriptor) and
+  the minor problems, and the distributions of rotation difference and
+  descriptor distance (L2) with the tolerances.
+- Agreement: the content of the image's `agreement.png`, drawn from the
+  pairs, so that the toolbar can zoom into a region of the plot.
+- Sorted and Heatmaps: `sorted.png` of the image and of the set, and the
+  image's `image_heatmap.png` and `descriptor_bins.png`.
+- Set: the key figures of the whole set, its `cdf.png` and its
+  `agreement.png`.
+- Glossary: `glossary.md`.
+
+On the Image, Agreement and Glossary tabs, the right column shows
+`unpaired.png`, and a button opens `inspect_matches.py` for the image in its
+own window. `--save <png>` (with `--set`, `--image`, `--tab`) writes the
+window to a file instead of opening it.
+
+## Explorer package for testers
+
+```shell
+python3 Testing/analysis/make_explorer_package.py build/Testing/run \
+        -o popsift-explorer.zip
+```
+
+Packs the explorer, the pair inspector, `glossary.md` and the results of a
+run into one zip file that needs only Python with numpy and matplotlib: the
+reports with their plots, the input images, and per image the plots and
+`pairs.npz`, the co-located pairs as compressed float32 and int32 arrays for
+the explorer and the inspector. The CSV files and the feature files stay out,
+which makes the package a fraction of the size of the work dir. After
+unpacking, `python3 explorer.py` opens it.
+
 ## sift_plots.py
 
 The drawing functions used by the scripts and the inspector, for your own
 scripts:
-`read_pgm`, `glyphs`, `show_image`, `read_pairs` and `render_unpaired`.
+`read_pgm`, `glyphs`, `show_image`, `read_pairs`, `render_unpaired`, and
+`agreement_scatter` and `agreement_bars`, the two halves of
+`agreement.png`.
