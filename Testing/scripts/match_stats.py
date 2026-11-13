@@ -417,8 +417,12 @@ def _public(stats):
     return {k: v for k, v in stats.items() if not k.startswith("_")}
 
 
-def write_report(report_dir, run_a, run_b, set_name, images, total):
+def write_report(report_dir, run_a, run_b, set_name, images, total,
+                 runs=None):
     """Writes summary.csv, summary.json and report.md into report_dir.
+
+    runs holds the run.json manifests of the stores of a and b, as
+    {"a": ..., "b": ...}, if known.
 
     images is a list of dicts with 'name', 'input' (image path), 'pair_dir'
     and 'stats' (image_stats() result); total is set_stats() of them.
@@ -436,6 +440,7 @@ def write_report(report_dir, run_a, run_b, set_name, images, total):
     summary = {
         "run_a": run_a,
         "run_b": run_b,
+        "runs": _runs(runs),
         "set": set_name,
         "tolerances": {"ori_tolerance_deg": ORI_TOLERANCE_DEG,
                        "desc_tolerance_l2": DESC_TOLERANCE_L2},
@@ -506,7 +511,8 @@ def write_report(report_dir, run_a, run_b, set_name, images, total):
 
     with open(os.path.join(report_dir, "report.md"), "w",
               encoding="utf-8") as f:
-        f.write(_markdown(report_dir, run_a, run_b, set_name, images, total))
+        f.write(_markdown(report_dir, run_a, run_b, set_name, images, total,
+                          runs))
 
 
 def _agreement_table(stats):
@@ -539,7 +545,38 @@ def _agreement_table(stats):
     ]
 
 
-def _markdown(report_dir, run_a, run_b, set_name, images, total):
+def _runs(runs):
+    """The manifests of the runs a and b without their list of image sets,
+    which says nothing about this report."""
+    if not runs:
+        return None
+    return {side: {k: v for k, v in (m or {}).items() if k != "image_sets"}
+            for side, m in runs.items()}
+
+
+def _runs_markdown(runs):
+    out = ["## Runs", "", "| | a | b |", "| --- | --- | --- |"]
+    keys = ("label", "name", "tool", "configuration", "version", "device",
+            "host", "created", "command")
+    a, b = runs["a"], runs["b"]
+    for k in keys:
+        if a.get(k) or b.get(k):
+            out.append(f"| {k} | {_cell(a.get(k))} | {_cell(b.get(k))} |")
+    build = sorted(set(a.get("build") or {}) | set(b.get("build") or {}))
+    for k in build:
+        va, vb = (m.get("build", {}).get(k) for m in (a, b))
+        out.append(f"| {k} | {_cell(va)} | {_cell(vb)} |")
+    out.append("")
+    return out
+
+
+def _cell(value):
+    if value is None or value == "":
+        return "-"
+    return f"`{value}`".replace("|", "\\|")
+
+
+def _markdown(report_dir, run_a, run_b, set_name, images, total, runs=None):
     out = [f"# {run_a} vs {run_b} on {set_name}", ""]
     out.append(f"a = `{run_a}`, b = `{run_b}`. Keypoints are paired by "
                "position and scale only (co-located). Recall = co-located / "
@@ -555,6 +592,8 @@ def _markdown(report_dir, run_a, run_b, set_name, images, total):
                "keypoints of a whose most similar descriptor in b is their "
                "co-located keypoint (b likewise).")
     out.append("")
+    if runs and runs.get("a") and runs.get("b"):
+        out.extend(_runs_markdown(runs))
     out.append("## Set")
     out.append("")
     out.append(f"{total['images']} images. " + one_line(total) + ".")

@@ -12,9 +12,9 @@ Every image of every set gets three tests, for example for
 
 | Test | Does | Labels |
 | --- | --- | --- |
-| `run-vlfeat/oxford/boat/img1` | runs VLFeat on the image | `cpu` |
-| `run-popsift/oxford/boat/img1` | runs `popsift-demo` with the parameter set `popsift-vlfeat` | `gpu`, and `cuda` or `hip` |
-| `compare/oxford/boat/img1` | compares the two runs and prints a one-line verdict | `cpu` |
+| `run-vlfeat/oxford/boat/img1` | runs VLFeat on the image, into the store `vlfeat` | `cpu` |
+| `run-popsift/oxford/boat/img1` | runs `popsift-demo` with the parameter set `popsift-vlfeat`, into the store `popsift-vlfeat` | `gpu`, and `cuda` or `hip` |
+| `compare/oxford/boat/img1` | compares the two stores and prints a one-line verdict | `cpu` |
 
 and every set gets `report/<set>`, which writes the set report after the
 comparisons of the set. All of them are labelled `vlfeat` and with the set
@@ -27,13 +27,20 @@ first asks `popsift-gpu-probe` whether there is a usable GPU. Without one it
 is skipped, and so are its comparison and, if nothing was compared, the
 report.
 
-The tests run `Testing/scripts/popsift_compare.py` one step at a time
-(`--step run|compare|report`), with the same work directory and reports as
-a manual run, see `Testing/scripts/README.md`.
+The run tests call `Testing/scripts/collect_run.py`, which keeps the results
+as result stores in `<build>/Testing/stores`. The comparisons and reports
+call `Testing/scripts/popsift_compare.py` one step at a time
+(`--step compare|report`), with the same work directory and reports as a
+manual run, see `Testing/scripts/README.md`. After a reconfigure with other
+build options, the run tests replace the stores of the earlier
+configuration. To keep them for a comparison of two builds, collect them
+under a prefix with `collect_run.py` instead.
 
-Two more groups of tests do not need a GPU: `compareSiftFiles/<case>`
+Three more groups of tests do not need a GPU: `compareSiftFiles/<case>`
 (labels `cpu`, `unit`) tests `popsift-compareSiftFiles` on small hand-made
-feature files, and `vlfeat_sift_smoke` checks the patched VLFeat `sift`.
+feature files, `scripts/result_store` (labels `cpu`, `unit`) tests the
+result stores of the scripts, and `vlfeat_sift_smoke` checks the patched
+VLFeat `sift`.
 
 ## Running it
 

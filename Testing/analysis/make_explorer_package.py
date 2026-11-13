@@ -50,10 +50,11 @@ REPORT_FILES = ("summary.json", "summary.csv", "report.md", "agreement.png",
 IMAGE_FILES = ("agreement.png", "unpaired.png", "cdf.png", "sorted.png",
                "descriptor_bins.png", "image_heatmap.png")
 
-PACKAGE_README = """# PopSift vs VLFeat explorer
+PACKAGE_README = """# PopSift comparison explorer
 
-Results of comparing PopSift's SIFT keypoints and descriptors with VLFeat's,
-on the test images in data/. Start the explorer with
+Results of comparing the SIFT keypoints and descriptors of two runs, such as
+PopSift and VLFeat, on the test images in data/. The report.md files name
+the runs, their tools and build options. Start the explorer with
 
     python3 explorer.py
 

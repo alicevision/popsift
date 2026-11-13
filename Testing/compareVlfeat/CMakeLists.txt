@@ -33,13 +33,18 @@ endif()
 set(_compare "${Python3_EXECUTABLE}"
              "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/popsift_compare.py"
              --tools "${CMAKE_BINARY_DIR}/popsift-testing-config.json")
+set(_collect "${Python3_EXECUTABLE}"
+             "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/collect_run.py"
+             --tools "${CMAKE_BINARY_DIR}/popsift-testing-config.json")
 set(_paramset popsift-vlfeat)
 
 # Every image of every set gets three tests, e.g. for oxford/boat/img1:
-#   run-vlfeat/oxford/boat/img1    VLFeat on the image (label cpu)
+#   run-vlfeat/oxford/boat/img1    VLFeat on the image (label cpu), into
+#                                  the result store vlfeat
 #   run-popsift/oxford/boat/img1   PopSift with the parameter set
 #                                  popsift-vlfeat (labels gpu and cuda or
-#                                  hip), one at a time, skipped without a GPU
+#                                  hip), one at a time, skipped without a
+#                                  GPU, into the result store popsift-vlfeat
 #   compare/oxford/boat/img1       the comparison of the two (label cpu),
 #                                  skipped if the PopSift run was skipped
 # and every set one report/<set> after its comparisons. All carry the set
@@ -53,13 +58,13 @@ foreach(_set IN LISTS PopSift_TEST_IMAGE_SETS)
     set(_args --images "${_set}" --image "${_img}")
 
     add_test(NAME run-vlfeat/${_set}/${_name} ${_configurations}
-             COMMAND ${_compare} ${_args} --step run vlfeat)
+             COMMAND ${_collect} ${_args} --replace vlfeat)
     set_tests_properties(run-vlfeat/${_set}/${_name} PROPERTIES
                          FIXTURES_SETUP RUN_VLFEAT_${_iid}
                          LABELS "cpu;vlfeat;${_set}")
 
     add_test(NAME run-popsift/${_set}/${_name} ${_configurations}
-             COMMAND ${_compare} ${_args} --step run ${_paramset})
+             COMMAND ${_collect} ${_args} --replace ${_paramset})
     set_tests_properties(run-popsift/${_set}/${_name} PROPERTIES
                          FIXTURES_SETUP RUN_POPSIFT_${_iid}
                          RESOURCE_LOCK gpu
