@@ -1,0 +1,124 @@
+name: CUDA functional test (simulated H100)
+
+# Optional, non-required check. The hosted runners have no GPU, so this builds
+# PopSift for CUDA and runs popsift-demo on a synthetic image on a simulated
+# NVIDIA H100 (https://github.com/pantheongpu/pantheonsim). A simulator cannot
+# reproduce hardware-specific behavior or timing, so it complements real-GPU
+# testing and does not replace it.
+
+# It is too heavy to run on every push to a PR that is still in progress, so
+# it only runs on demand: when the "ready" label is added to a pull request,
+# on later pushes to a pull request that carries that label, or manually from
+# the Actions tab (workflow_dispatch).
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+    paths:
+      - "src/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/gpu-sim.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  cuda-sim:
+    name: CUDA 13.0, simulated H100
+    # Adding some other label to a "ready" PR does not start a new run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.pull_request.labels.*.name, 'ready') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'ready'))
+    # Job-level, so that skipped runs (e.g. another label was added) do not
+    # cancel a run that is in progress.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up the simulated GPU and CUDA toolkit
+        uses: pantheongpu/setup-pantheonsim@ca87fe3143b29166822b923d6050945c5179408c # v0.1.5
+        with:
+          gpu: nvidia/h100
+          cuda-toolkit: "13.0"
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build \
+            libboost-filesystem-dev libboost-program-options-dev libboost-system-dev
+
+      # The simulator runs PTX only (90-virtual) and needs a shared CUDA
+      # runtime, which PopSift uses when built as a shared library (the default).
+      - name: Configure project
+        run: |
+          cmake -B build -S . -GNinja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CUDA_COMPILER=/usr/local/cuda-13.0/bin/nvcc \
+                -DCUDAToolkit_ROOT=/usr/local/cuda-13.0 \
+                -DCMAKE_CUDA_ARCHITECTURES=90-virtual \
+                -DBUILD_SHARED_LIBS=ON \
+                -DPopSift_BUILD_DOCS=OFF
+
+      - name: Build project
+        run: cmake --build build -j3
+
+      # The Oxford test (PopSift_USE_TEST_CMD) downloads a dataset and only
+      # prints descriptors, so this uses a generated 512x512 image of random
+      # Gaussian blobs instead. Every descriptor mode must find the same
+      # 212 keypoints (270 descriptors, since some keypoints have several
+      # orientations). The "loop" and "vlfeat" modes do not use texture
+      # interpolation, so their output must also match, bit for bit, what an
+      # RTX 3060 produces. The interpolating modes (iloop, grid, igrid,
+      # notile) round their texture weights differently from the hardware
+      # filter, so only keypoint positions and counts are checked there.
+      - name: Generate test image
+        run: |
+          python3 - <<'PY'
+          import random, math
+          random.seed(7)
+          W = H = 512
+          img = [[128.0] * W for _ in range(H)]
+          for _ in range(400):
+              cx, cy = random.random() * W, random.random() * H
+              s, a = random.uniform(2, 14), random.uniform(-90, 90)
+              for y in range(int(max(0, cy - 3 * s)), int(min(H, cy + 3 * s + 1))):
+                  for x in range(int(max(0, cx - 3 * s)), int(min(W, cx + 3 * s + 1))):
+                      img[y][x] += a * math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * s * s))
+          pix = bytes(max(0, min(255, int(v))) for row in img for v in row)
+          open("synth.pgm", "wb").write(b"P5\n512 512\n255\n" + pix)
+          PY
+
+      - name: Run popsift-demo on the simulated GPU
+        run: |
+          declare -A golden=(
+            [loop]=fa55cfe109d591187b70f68da9ff38c8
+            [vlfeat]=70e59dd5a263424560d452b7e8d409ec
+          )
+          for mode in loop iloop grid igrid notile vlfeat; do
+            echo "::group::desc-mode=$mode"
+            vgpu run build/Linux-x86_64/popsift-demo --popsift-mode \
+              --gauss-mode=relative --desc-mode=$mode --norm-multi=9 \
+              --write-as-uchar -i synth.pgm 2>&1 | tee out-$mode.log
+            grep -q "Number of feature points: 212 number of feature descriptors: 270" out-$mode.log
+            lines=$(wc -l < output-features.txt)
+            sum=$(sort output-features.txt | md5sum | cut -d' ' -f1)
+            echo "descriptor lines: $lines, md5: $sum"
+            [ "$lines" = 270 ]
+            sort -n output-features.txt | cut -d' ' -f1-4 | md5sum > pos-$mode.md5
+            if [ -n "${golden[$mode]:-}" ]; then
+              [ "$sum" = "${golden[$mode]}" ]
+            fi
+            mv output-features.txt features-$mode.txt
+            echo "::endgroup::"
+          done
+          # keypoint positions are identical in every mode
+          [ "$(cat pos-*.md5 | sort -u | wc -l)" = 1 ]
