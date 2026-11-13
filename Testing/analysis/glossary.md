@@ -37,6 +37,15 @@ pair agrees beyond position and scale. Each level includes the ones before:
 The descriptor is judged in absolute terms against the descriptor of the
 co-located keypoint, not by whether it is the most similar one in the image.
 
+**Best at the position** (`best_at_position` in `colocated.csv`). SIFT
+gives one position and scale several orientations, each its own keypoint.
+This is the highest agreement level among all pairs whose keypoint of a has
+the same position and scale. A pair whose orientation or descriptor differs
+while another pair at its position agrees further is a minor problem
+(`orientation_differs_minor`, `descriptor_differs_minor`): an orientation
+or a descriptor that only one run has, while the extremum and at least one
+orientation and descriptor agree. The others are the ones to investigate.
+
 **Only PopSift / only VLFeat** (only_a / only_b, unpaired). Keypoints that
 one run found and the other did not, at least not close enough to be
 co-located.
