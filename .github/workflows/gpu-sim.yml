@@ -6,18 +6,19 @@ name: CUDA functional test (simulated H100)
 # reproduce hardware-specific behavior or timing, so it complements real-GPU
 # testing and does not replace it.
 
+# It is too heavy to run on every push to a PR that is still in progress, so
+# it only runs on demand: when the "ready" label is added to a pull request,
+# on later pushes to a pull request that carries that label, or manually from
+# the Actions tab (workflow_dispatch).
 on:
   workflow_dispatch:
   pull_request:
+    types: [labeled, synchronize, reopened]
     paths:
       - "src/**"
       - "cmake/**"
       - "CMakeLists.txt"
       - ".github/workflows/gpu-sim.yml"
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -25,6 +26,16 @@ permissions:
 jobs:
   cuda-sim:
     name: CUDA 13.0, simulated H100
+    # Adding some other label to a "ready" PR does not start a new run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.pull_request.labels.*.name, 'ready') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'ready'))
+    # Job-level, so that skipped runs (e.g. another label was added) do not
+    # cancel a run that is in progress.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-24.04
     timeout-minutes: 90
 
