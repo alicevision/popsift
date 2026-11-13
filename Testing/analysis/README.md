@@ -32,6 +32,12 @@ agreement levels of the co-located keypoints (see `glossary.md`):
 - Right: the keypoints of a and of b split into unpaired and the three
   levels.
 
+  In both, pairs whose orientation or descriptor differs while another
+  keypoint at the same position agrees further are drawn hollow (left) or
+  hatched (right). They are a minor problem: one run has an orientation or
+  descriptor more or less than the other at a position where both agree
+  otherwise. Filled ones are the ones to investigate.
+
 ## cdf.png
 
 Written by `popsift_compare.py` into every image folder and the report folder,

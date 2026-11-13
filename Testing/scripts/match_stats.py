@@ -245,6 +245,14 @@ def _share(part, whole):
     return part / whole if whole else None
 
 
+def _minor(rows, level):
+    """The co-located pairs of the level whose position has a pair that
+    agrees further."""
+    rank = LEVELS.index(level)
+    return sum(1 for r in rows["colocated"] if r["agreement"] == level
+               and LEVELS.index(r["best_at_position"]) > rank)
+
+
 def _stats(rows, n_a, n_b):
     n_c = len(rows["colocated"])
     n_o = len(rows["same_orientation"])
@@ -259,6 +267,8 @@ def _stats(rows, n_a, n_b):
                    "same_orientation": n_o, "similar_descriptor": n_d,
                    "orientation_differs": n_c - n_o,
                    "descriptor_differs": n_o - n_d,
+                   "orientation_differs_minor": _minor(rows, "position"),
+                   "descriptor_differs_minor": _minor(rows, "orientation"),
                    "nn_in_place_a": in_place_a,
                    "nn_distinctive_a": distinctive_a,
                    "nn_in_place_b": in_place_b,
@@ -381,7 +391,8 @@ _CSV_METRICS = ("pos_dist_px", "abs_ori_diff_deg", "ori_diff_deg",
 
 CSV_COLUMNS = (
     ["image", "keypoints_a", "keypoints_b", "colocated", "same_orientation",
-     "similar_descriptor", "recall", "precision", "ori_agreement",
+     "similar_descriptor", "orientation_differs_minor",
+     "descriptor_differs_minor", "recall", "precision", "ori_agreement",
      "desc_agreement", "nn_agreement_a", "nn_agreement_b"]
     + [f"{k}_{q}" for k in _CSV_METRICS
        for q in ("mean", "median", "p90", "max")]
@@ -391,7 +402,8 @@ CSV_COLUMNS = (
 def _csv_row(name, stats):
     c = stats["counts"]
     row = [name, c["a"], c["b"], c["colocated"], c["same_orientation"],
-           c["similar_descriptor"],
+           c["similar_descriptor"], c["orientation_differs_minor"],
+           c["descriptor_differs_minor"],
            _fmt(stats["recall"], 4), _fmt(stats["precision"], 4),
            _fmt(stats["ori_agreement"], 4), _fmt(stats["desc_agreement"], 4),
            _fmt(stats["nn_agreement_a"], 4), _fmt(stats["nn_agreement_b"], 4)]
@@ -443,6 +455,15 @@ def write_report(report_dir, run_a, run_b, set_name, images, total):
             "descriptor_differs": "pairs with the same orientation without "
                                   "a similar descriptor: a strong hint at a "
                                   "difference in the descriptor extraction",
+            "orientation_differs_minor": "those of orientation_differs "
+                                         "where another pair at the same "
+                                         "position (keypoint of run_a) has "
+                                         "the same orientation: a minor "
+                                         "problem",
+            "descriptor_differs_minor": "those of descriptor_differs where "
+                                        "another pair at the same position "
+                                        "has a similar descriptor: a minor "
+                                        "problem",
             "recall": "co-located / keypoints of run_b",
             "precision": "co-located / keypoints of run_a",
             "ori_agreement": "same orientation / co-located",
@@ -501,10 +522,18 @@ def _agreement_table(stats):
         f"| also descriptor (L2 <= {DESC_TOLERANCE_L2:g}) | "
         f"{c['similar_descriptor']} | {_fmt(stats['desc_agreement'])} of "
         f"same orientation | descriptor extraction |",
-        f"| orientation differs | {c['orientation_differs']} | | "
-        f"descriptor extraction cannot be judged |",
+        f"| orientation differs | "
+        f"{c['orientation_differs'] - c['orientation_differs_minor']} | | "
+        f"orientation computation differs; descriptor extraction cannot be "
+        f"judged |",
+        f"| orientation differs, another at the position agrees | "
+        f"{c['orientation_differs_minor']} | | minor: an orientation of "
+        f"only one run |",
         f"| same orientation, descriptor differs | "
-        f"{c['descriptor_differs']} | | suspect the descriptor extraction |",
+        f"{c['descriptor_differs'] - c['descriptor_differs_minor']} | | "
+        f"suspect the descriptor extraction |",
+        f"| same orientation, descriptor differs, another at the position "
+        f"agrees | {c['descriptor_differs_minor']} | | minor |",
     ]
 
 
@@ -568,11 +597,12 @@ def _markdown(report_dir, run_a, run_b, set_name, images, total):
     out.append("")
     out.append("| Image | a | b | co-located | recall | precision | "
                "same ori. | ori. agreement | similar desc. | "
-               "desc. agreement | median pixel dist. (px) | "
+               "desc. agreement | ori. differs (minor) | "
+               "desc. differs (minor) | median pixel dist. (px) | "
                "median \\|rot\\| (deg) | mean rot (deg) | "
                "median desc. dist. (L2), same ori. | "
                "nearest-desc. agreement a | nearest-desc. agreement b |")
-    out.append("| --- " + "| ---: " * 15 + "|")
+    out.append("| --- " + "| ---: " * 17 + "|")
     for im in images:
         s = im["stats"]
         c = s["counts"]
@@ -584,6 +614,10 @@ def _markdown(report_dir, run_a, run_b, set_name, images, total):
                    f"{_fmt(s['ori_agreement'])} | "
                    f"{c['similar_descriptor']} | "
                    f"{_fmt(s['desc_agreement'])} | "
+                   f"{c['orientation_differs']} "
+                   f"({c['orientation_differs_minor']}) | "
+                   f"{c['descriptor_differs']} "
+                   f"({c['descriptor_differs_minor']}) | "
                    f"{_fmt(m['pos_dist_px']['median'])} | "
                    f"{_fmt(m['abs_ori_diff_deg']['median'], 2)} | "
                    f"{_fmt(m['ori_diff_deg']['mean'], 2)} | "

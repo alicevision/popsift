@@ -41,6 +41,33 @@ LEVEL_LABELS = {"position": "orientation differs",
 LEVEL_COLORS = {"position": "#D55E00", "orientation": "#CC79A7",
                 "descriptor": "#009E73"}
 
+# The pairs of a level split by best_at_position: "minor" where another
+# keypoint at the same position agrees further. (class, level, minor, label),
+# lowest first. Minor pairs are drawn hollow and hatched in the colour of
+# their level.
+PAIR_CLASSES = (
+    ("orientation_differs", "position", False, "orientation differs"),
+    ("orientation_differs_minor", "position", True,
+     "orientation differs, another at the position agrees"),
+    ("descriptor_differs", "orientation", False,
+     "only the descriptor differs"),
+    ("descriptor_differs_minor", "orientation", True,
+     "only the descriptor differs, another at the position agrees"),
+    ("agree", "descriptor", False, "orientation and descriptor agree"),
+)
+
+
+def pair_class(row):
+    """The PAIR_CLASSES name of a row of colocated.csv."""
+    level = row["agreement"]
+    if level == "descriptor":
+        return "agree"
+    name = "orientation_differs" if level == "position" else \
+        "descriptor_differs"
+    best = LEVELS.index(row.get("best_at_position", level))
+    return name + "_minor" if best > LEVELS.index(level) else name
+
+
 # Glyph radius in multiples of the keypoint's sigma.
 GLYPH_SCALE = 3.0
 
@@ -203,13 +230,14 @@ def render_agreement(out_png, title, rows, counts, ori_tolerance=2.0,
     """Writes the three agreement levels of the co-located pairs.
 
     Left: every co-located pair by its rotation difference and descriptor
-    distance (L2), coloured by agreement level. The grey lines are the
+    distance (L2), coloured by agreement level, hollow where another keypoint
+    at the same position agrees further (a minor problem). The grey lines are the
     tolerances, and the three regions are what a tester can conclude: right
     of the orientation tolerance the orientation computation differs and the
     descriptor cannot be judged; left of it and above the descriptor
     tolerance the descriptor extraction is suspect; below it all agree.
     Right: the keypoints of a and b split into unpaired, and co-located by
-    agreement level. rows is match_stats.read_rows() output and counts the
+    agreement level, minor ones hatched. rows is match_stats.read_rows() output and counts the
     counts of match_stats.image_stats() or set_stats(), possibly merged over
     images. Values outside an axis are drawn at its ends.
     """
@@ -218,15 +246,17 @@ def render_agreement(out_png, title, rows, counts, ori_tolerance=2.0,
     pairs = rows["colocated"]
     rot = np.array([abs(float(r["ori_diff_deg"])) for r in pairs])
     desc = np.array([float(r["desc_dist"]) for r in pairs])
-    level = np.array([r["agreement"] for r in pairs])
+    cls = np.array([pair_class(r) for r in pairs])
     rot_lo, desc_lo = 0.01, 0.1
     desc_hi = 1.2 * max([10 * desc_tolerance, *desc])
-    for lv in LEVELS:
-        sel = level == lv
+    for name, lv, minor, label in PAIR_CLASSES:
+        sel = cls == name
         left.plot(np.clip(rot[sel], rot_lo, 180.0),
-                  np.clip(desc[sel], desc_lo, desc_hi), ".",
-                  markersize=3, alpha=0.6, color=LEVEL_COLORS[lv],
-                  label=f"{LEVEL_LABELS[lv]} ({int(sel.sum())})")
+                  np.clip(desc[sel], desc_lo, desc_hi),
+                  "o" if minor else ".", markersize=3.5 if minor else 3,
+                  alpha=0.7, color=LEVEL_COLORS[lv],
+                  markerfacecolor="none" if minor else LEVEL_COLORS[lv],
+                  markeredgewidth=0.7, label=f"{label} ({int(sel.sum())})")
     log_axis(left, "x", rot_lo, 180.0)
     log_axis(left, "y", desc_lo, desc_hi)
     left.axvline(ori_tolerance, color="grey", linewidth=0.8)
@@ -251,17 +281,24 @@ def render_agreement(out_png, title, rows, counts, ori_tolerance=2.0,
     left.legend(fontsize=8, loc="lower right", framealpha=1)
 
     c = counts
-    segments = [("unpaired", "#BBBBBB", c["only_a"], c["only_b"])] + \
-        [(LEVEL_LABELS[lv], LEVEL_COLORS[lv], n, n) for lv, n in
-         (("position", c["orientation_differs"]),
-          ("orientation", c["descriptor_differs"]),
-          ("descriptor", c["similar_descriptor"]))]
+    n = {"orientation_differs_minor": c["orientation_differs_minor"],
+         "orientation_differs": c["orientation_differs"]
+         - c["orientation_differs_minor"],
+         "descriptor_differs_minor": c["descriptor_differs_minor"],
+         "descriptor_differs": c["descriptor_differs"]
+         - c["descriptor_differs_minor"],
+         "agree": c["similar_descriptor"]}
+    segments = [("unpaired", "#BBBBBB", False, c["only_a"], c["only_b"])] + \
+        [(label, LEVEL_COLORS[lv], minor, n[name], n[name])
+         for name, lv, minor, label in PAIR_CLASSES]
     left_edge = np.zeros(2)
     # Numbers only on segments wide enough for them.
     min_labelled = 0.06 * max(c["a"], c["b"], 1)
-    for label, color, n_a, n_b in segments:
+    for label, color, minor, n_a, n_b in segments:
         widths = np.array([n_a, n_b], dtype=float)
-        right.barh([1, 0], widths, left=left_edge, color=color, label=label)
+        right.barh([1, 0], widths, left=left_edge, label=label,
+                   color="white" if minor else color, edgecolor=color,
+                   hatch="////" if minor else None, linewidth=0)
         for y, w, x in zip((1, 0), widths, left_edge):
             if w >= min_labelled:
                 right.text(x + w / 2, y, str(int(w)), ha="center",
@@ -271,7 +308,7 @@ def render_agreement(out_png, title, rows, counts, ori_tolerance=2.0,
     right.set_xlabel("keypoints")
     right.set_title("Keypoints by agreement level", fontsize=10)
     right.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.15),
-                 ncol=2, frameon=False)
+                 ncol=1, frameon=False)
     fig.suptitle(title, fontsize=11)
     fig.tight_layout()
     fig.savefig(out_png, dpi=100)
