@@ -1,4 +1,4 @@
-# Only needed for the plots and inspect_matches.py.
+# Only needed for the plots, inspect_matches.py and explorer.py.
 # The comparison scripts themselves use the Python standard library only.
 numpy
 matplotlib

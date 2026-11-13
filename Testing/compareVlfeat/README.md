@@ -77,3 +77,8 @@ to read, `summary.csv` and `summary.json` for scripts. With numpy and
 matplotlib installed, the report and every image folder also get the plots
 described in `Testing/analysis/README.md`. `ctest -V` shows the verdict of
 every image and the summary of every set.
+
+To look through the results interactively, open the work dir with
+`Testing/analysis/explorer.py`. `Testing/analysis/make_explorer_package.py`
+packs the reports, plots and images of the work dir into a zip file for
+testers without a build.
