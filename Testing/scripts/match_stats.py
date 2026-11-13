@@ -437,6 +437,8 @@ def write_report(report_dir, run_a, run_b, set_name, images, total):
         "run_a": run_a,
         "run_b": run_b,
         "set": set_name,
+        "tolerances": {"ori_tolerance_deg": ORI_TOLERANCE_DEG,
+                       "desc_tolerance_l2": DESC_TOLERANCE_L2},
         "definitions": {
             "colocated": f"a keypoint of run_a and one of run_b at most "
                          f"max({PAIR_RADIUS_MIN_PX:g} px, "
