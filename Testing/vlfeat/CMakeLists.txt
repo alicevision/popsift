@@ -10,6 +10,8 @@
 #   vlfeat_sift              target that downloads, patches and builds VLFeat
 #                            as part of the normal build.
 #   PopSift_VLFEAT_SIFT_BIN  path of the built 'sift' executable.
+#   vlfeat_sift_smoke        CTest test that runs 'sift' on a hand-made
+#                            image (with BUILD_TESTING).
 #
 # Included by Testing/CMakeLists.txt when BUILD_TESTING and
 # PopSift_TEST_WITH_VLFEAT are both ON. It can also be configured on its own,
@@ -91,3 +93,13 @@ ExternalProject_Add(vlfeat_sift
 
 set(PopSift_VLFEAT_SIFT_BIN "${_vlfeat_bin_dir}/sift${_vlfeat_exe_suffix}"
     CACHE INTERNAL "Path of the VLFeat sift CLI built by vlfeat_sift")
+
+if(BUILD_TESTING)
+  # Without the pgm fix, 'sift' rejects this file, so this also checks that
+  # the patch was applied.
+  add_test(NAME vlfeat_sift_smoke
+           COMMAND "${PopSift_VLFEAT_SIFT_BIN}" --verbose
+                   "--output=${CMAKE_CURRENT_BINARY_DIR}/box-12x12.sift"
+                   "${CMAKE_CURRENT_SOURCE_DIR}/../testImages/box-12x12.pgm")
+  set_tests_properties(vlfeat_sift_smoke PROPERTIES LABELS "cpu;vlfeat")
+endif()

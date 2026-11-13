@@ -216,6 +216,8 @@ if(PROJECT_IS_TOP_LEVEL)
 endif()
 
 if(BUILD_TESTING)
+  # Lets ctest run the tests that Testing defines, from the build directory.
+  enable_testing()
   add_subdirectory(Testing)
 elseif(PopSift_TEST_WITH_VLFEAT)
   message(STATUS "PopSift_TEST_WITH_VLFEAT is ON but BUILD_TESTING is OFF: "

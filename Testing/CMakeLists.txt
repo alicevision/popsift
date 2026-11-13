@@ -1,5 +1,5 @@
-# Tools for testing PopSift. Only added when BUILD_TESTING is ON.
-# See README.md in this folder.
+# Tools and CTest tests for testing PopSift. Only added when BUILD_TESTING
+# is ON. See README.md in this folder.
 
 add_subdirectory(compareSiftFiles)
 
@@ -66,3 +66,10 @@ ${_image_sets_json}
 }
 "
      CONDITION "${_tools_json_condition}")
+
+# --- CTest -------------------------------------------------------------------
+
+if(PopSift_TEST_WITH_VLFEAT)
+  # PopSift against VLFeat on every image of every set
+  add_subdirectory(compareVlfeat)
+endif()
