@@ -180,7 +180,7 @@ static sycl::event compute_orientations_sycl(
                         const float Dy = d_layer_data[offset + layer_pitch] - d_layer_data[offset - layer_pitch];
                         
                         const float grad = sycl::sqrt(Dx * Dx + Dy * Dy);
-                        const float theta = sycl::atan2(Dy, Dx);
+                        const float theta = popsift_atan2(Dy, Dx);
                         
                         const float weight = grad * sycl::exp(sq_dist * factor);
                         

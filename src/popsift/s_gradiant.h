@@ -12,6 +12,8 @@
 #include "common/grid.h"
 #include "sift_constants.h"
 
+#include <sycl/sycl.hpp>
+
 #include <cinttypes>
 #include <cstdio>
 #include <cmath>
@@ -19,6 +21,46 @@
 
 namespace popsift
 {
+#ifdef PopSift_TEST_WITH_VL_ATAN2
+/* VLFeat's vl_fast_atan2_f (vl/mathop.h), a polynomial approximation with
+ * an error of up to about 0.35 degrees.
+ * Meant for testing and found in TEST compile-time options.
+ */
+static inline
+float vl_fast_atan2_f( float y, float x )
+{
+    const float c3    = 0.1821f;
+    const float c1    = 0.9675f;
+    const float abs_y = sycl::fabs( y ) + 1.19209290E-07F; // VL_EPSILON_F
+    float angle;
+    float r;
+    if( x >= 0 ) {
+        r     = ( x - abs_y ) / ( x + abs_y );
+        angle = 0.785398163f;   // pi/4
+    } else {
+        r     = ( x + abs_y ) / ( abs_y - x );
+        angle = 2.356194490f;   // 3*pi/4
+    }
+    angle += ( c3 * r * r - c1 ) * r;
+    return ( y < 0 ) ? -angle : angle;
+}
+#endif
+
+/* The gradient angle used for orientation and descriptor computation.
+ * With the CMake option PopSift_TEST_WITH_VL_ATAN2 it is VLFeat's fast
+ * approximation, which allows a closer comparison with VLFeat; otherwise
+ * it is sycl::atan2.
+ */
+static inline
+float popsift_atan2( float y, float x )
+{
+#ifdef PopSift_TEST_WITH_VL_ATAN2
+    return vl_fast_atan2_f( y, x );
+#else
+    return sycl::atan2( y, x );
+#endif
+}
+
 /*
  * We are wasting time by computing gradiants on demand several
  * times. We could precompute gradiants for all pixels once, as
@@ -47,7 +89,7 @@ void get_gradiant( float&                        grad,
         float dx = layer.get(y  ,x+1) - layer.get(y  ,x-1);
         float dy = layer.get(y+1,x  ) - layer.get(y-1,x  );
         grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
-        theta    = atan2f(dy, dx);
+        theta    = popsift_atan2(dy, dx);
     }
 }
 
@@ -70,7 +112,7 @@ void get_gradiant32( float&               grad,
                    - layer.get( level, y-1, x   );
 
     grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
-    theta    = atan2f(dy, dx);
+    theta    = popsift_atan2(dy, dx);
 }
 
 static inline
@@ -91,7 +133,7 @@ void get_gradiant32( float&               grad,
     const float dy = yp_x - ym_x;
 
     grad     = hypotf( dx, dy ); // __fsqrt_rz(dx*dx + dy*dy);
-    theta    = atan2f(dy, dx);
+    theta    = popsift_atan2(dy, dx);
 
     debug_ostr << std::setprecision(3)
                << "[" << ym_x << "..." << yp_x << ", " << y_xm << "..." << y_xp << "]->"

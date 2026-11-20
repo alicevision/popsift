@@ -38,6 +38,10 @@ target_link_libraries(popsift
                       PUBLIC
 		      Threads::Threads)
 
+if(PopSift_TEST_WITH_VL_ATAN2)
+  target_compile_definitions(popsift PRIVATE PopSift_TEST_WITH_VL_ATAN2)
+endif()
+
 set_target_properties(popsift PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(popsift PROPERTIES DEBUG_POSTFIX "d")
 

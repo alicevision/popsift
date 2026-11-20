@@ -117,7 +117,7 @@ return q.submit([&](sycl::handler& cgh) {
                     const float dy = pix_y_pls_1 - pix_y_min_1;
                     
                     float mod = sycl::sqrt(dx * dx + dy * dy);
-                    float th = sycl::atan2(dy, dx);
+                    float th = popsift_atan2(dy, dx);
                     
                     mod /= 2.0f;
                     

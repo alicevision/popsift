@@ -207,6 +207,7 @@ option(PopSift_ERRCHK_AFTER_KERNEL "Synchronize after kernels" OFF)
 option(PopSift_USE_POSITION_INDEPENDENT_CODE "PIC" ON)
 option(PopSift_USE_GRID_FILTER "Grid filtering" ON)
 option(PopSift_USE_TEST_CMD "Testing" OFF)
+option(PopSift_TEST_WITH_VL_ATAN2 "Compute gradient angles with VLFeat's fast atan2 approximation (for comparison tests only)" OFF)
 option(BUILD_SHARED_LIBS "Shared libraries" ON)
 
 if(PopSift_USE_POSITION_INDEPENDENT_CODE AND NOT MSVC)

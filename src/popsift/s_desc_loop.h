@@ -85,7 +85,7 @@ static inline void ext_desc_loop_sub(
             const float dy = (pix_y_pls - pix_y_min) * 0.5f;
             
             float mod = sycl::sqrt(dx * dx + dy * dy);
-            float th = sycl::atan2(dy, dx);
+            float th = popsift_atan2(dy, dx);
             
             const sycl::vec<float, 2> dn = n + offsetpt;
             const float ww = sycl::exp(-sycl::ldexp(sycl::dot(dn, dn), -3));
