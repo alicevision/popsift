@@ -43,9 +43,10 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc )
         norm += ( src_desc[i] * src_desc[i] );
     }
 
-    // compute 1 / sqrt(sum)
-    // norm = frsqrtf( norm );
-    norm = 1.0f / std::sqrt( norm );
+    // compute 1 / sqrt(sum). A sum of squares cannot be negative, and it is
+    // only zero for an all-zero descriptor, which stays all-zero instead of
+    // scaling by inf.
+    norm = ( norm > 0.0f ) ? 1.0f / std::sqrt( norm ) : 0.0f;
 
     float desc[128];
 
@@ -63,8 +64,8 @@ void NormalizeL2::normalize( const float* src_desc, float* dst_desc )
         norm += ( desc[i] * desc[i] );
     }
 
-    // norm = frsqrtf( norm ); // inverse square root
-    norm = 1.0f / std::sqrt( norm );
+    // inverse square root, zero for an all-zero descriptor
+    norm = ( norm > 0.0f ) ? 1.0f / std::sqrt( norm ) : 0.0f;
 
     // scale for the desired output scale (0-1, 0-256 og 0-512)
     norm = scalbnf( norm, h_consts.norm_multi );
@@ -97,7 +98,9 @@ static sycl::event normalize_descriptors_sycl(
                 norm += (features[j] * features[j]);
             }
             
-            norm = 1.0f / sycl::sqrt(norm);
+            // A zero sum of squares means an all-zero descriptor, which
+            // stays all-zero instead of scaling by inf (0 * inf = NaN).
+            norm = (norm > 0.0f) ? 1.0f / sycl::sqrt(norm) : 0.0f;
             
             float temp[128];
             for(int j = 0; j < 128; j++) {
@@ -110,7 +113,7 @@ static sycl::event normalize_descriptors_sycl(
                 norm += (temp[j] * temp[j]);
             }
             
-            norm = 1.0f / sycl::sqrt(norm);
+            norm = (norm > 0.0f) ? 1.0f / sycl::sqrt(norm) : 0.0f;
             
             // Scale for output
             norm = sycl::ldexp(norm, norm_multi);  // scalbnf equivalent
