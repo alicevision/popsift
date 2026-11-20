@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Compare several PopSift parameter sets with each other, by hand.
 
-This runs every parameter set once per image, then compares every pair of
-sets (loop vs grid, loop vs igrid, ...), or every set against one --baseline,
+This collects every parameter set with collect_run.py into a result store
+(see Testing/scripts/README.md), then compares every pair of sets (loop vs grid, loop vs igrid, ...), or every set against one --baseline,
 and prints a table of the three agreement levels of the co-located
 keypoints (position and scale, also orientation, also descriptor) with
 position, rotation and descriptor differences (see match_stats.py). Each pair also
@@ -28,8 +28,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import collect_run  # noqa: E402
 import match_stats  # noqa: E402
 import popsift_compare as pc  # noqa: E402
+import result_store as rs  # noqa: E402
 
 
 def _split(text):
@@ -47,59 +49,61 @@ def _pairs_and_specs(parser, sets, baseline):
 
 
 class Collector:
-    """Runs and compares the sets image by image and collects the results."""
+    """Collects every set with collect_run.py, then compares the pairs
+    image by image and collects the results."""
 
-    def __init__(self, runner, specs, pairs):
-        self.runner = runner
+    def __init__(self, tools, specs, pairs, stores):
+        self.tools = tools
         self.specs = specs
         self.pairs = pairs
+        self.stores = stores
         # pair -> list of report entries, one per image
         self.results = {p: [] for p in pairs}
         self.counts = {s: [] for s in specs}
         self.failures = []
 
-    def image_set(self, tools, images, work_dir):
-        """Runs and compares every image of one image set or folder."""
-        name, folder = pc.resolve_images(tools, images)
-        files = pc.find_images(folder)
-        if not files:
-            raise pc.CompareError(f"no .pgm/.ppm images under {folder}")
-        expectations = pc.load_expectations(folder)
-        set_dir = os.path.join(work_dir, pc.safe_name(name.replace("/", "_")))
+    def image_set(self, images, work_dir):
+        """Collects and compares every image of one image set or folder."""
+        found = {}
+        for spec in self.specs:
+            collector = collect_run.Collector(self.tools, spec,
+                                              stores=self.stores,
+                                              replace=True)
+            for rel, r in collector.collect(images).items():
+                if r is None:
+                    self.failures.append(f"{images}: {rel}: {spec} failed")
+                elif r is pc.SKIP:
+                    self.failures.append(f"{images}: {rel}: {spec} skipped, "
+                                         "no usable GPU")
+                else:
+                    self.counts[spec].append(r)
+            found[spec] = rs.Store.open(collector.path)
+        imgset = pc.ImageSet(self.tools, images, work_dir)
+        files = imgset.files()
         for index, src in enumerate(files, 1):
-            rel = os.path.relpath(src, folder)
-            print(f"\n==================== [{index}/{len(files)}] {name}: "
-                  f"{rel} ====================", flush=True)
-            allow_empty = bool(expectations.get(
-                os.path.normpath(rel), {}).get("allow_empty"))
-            self.image(src, name, rel, set_dir, allow_empty)
+            rel = imgset.rel(src)
+            print(f"\n==================== [{index}/{len(files)}] "
+                  f"{imgset.name}: {rel} ====================", flush=True)
+            self.image(imgset, src, found)
 
-    def image(self, src, name, rel, set_dir, allow_empty):
-        """Runs every set on one image and compares the pairs."""
-        label = f"{name}: {rel}"
-        image_dir = os.path.join(set_dir,
-                                 pc.safe_name(os.path.splitext(rel)[0]))
-        os.makedirs(image_dir, exist_ok=True)
-        pgm = pc.prepare_input(src, image_dir)
-        runs = {s: self.runner.run(s, pgm, image_dir) for s in self.specs}
-        for s, r in runs.items():
-            if r is None:
-                self.failures.append(f"{label}: {s} failed")
-            elif r is pc.SKIP:
-                self.failures.append(f"{label}: {s} skipped, no usable GPU")
-            else:
-                self.counts[s].append(r.count)
-        runs = {s: r for s, r in runs.items() if r is not pc.SKIP}
+    def image(self, imgset, src, found):
+        """Compares the pairs on one image."""
+        rel = imgset.rel(src)
+        label = f"{imgset.name}: {rel}"
+        image_dir = imgset.image_dir(src)
+        pgm = collect_run.prepare_input(src, image_dir)
         for a, b in self.pairs:
-            if runs.get(a) is None or runs.get(b) is None:
+            if not all(pc.availability(found[s], imgset.name, rel)[0]
+                       for s in (a, b)):
                 continue
-            res = self.runner.compare(runs[a], runs[b], image_dir, -1.0,
-                                      allow_empty)
+            res = pc.compare_features(self.tools, found[a], found[b],
+                                      image_dir, rel, imgset.name, -1.0,
+                                      imgset.allow_empty(src))
             if res.stats is None:
                 self.failures.append(f"{label}: comparing {a} with {b} failed")
             else:
                 self.results[(a, b)].append(
-                    {"name": f"{name}/{rel}", "input": pgm,
+                    {"name": f"{imgset.name}/{rel}", "input": pgm,
                      "pair_dir": res.pair_dir, "stats": res.stats})
 
 
@@ -197,6 +201,9 @@ def main(argv=None):
     parser.add_argument("--work-dir",
                         help="where outputs go (default: "
                              "<build>/Testing/paramset-runs)")
+    parser.add_argument("--stores",
+                        help="where collect_run.py puts the result stores "
+                             "(default: stores_dir of the build)")
     parser.add_argument("--list", action="store_true",
                         help="list the parameter sets and image sets, and exit")
     args = parser.parse_args(argv)
@@ -210,14 +217,15 @@ def main(argv=None):
             parser.error("--sets is required (or use --list)")
         pairs, specs = _pairs_and_specs(parser, _split(args.sets),
                                         args.baseline)
-        runner = pc.Runner(tools)
-        runner.check(specs)
+        collect_run.check_binaries(tools, ["compare_sift_files"])
         work_dir = args.work_dir or os.path.join(
             os.path.abspath(args.build), "Testing", "paramset-runs")
 
-        collector = Collector(runner, specs, pairs)
-        for images in _split(args.images):
-            collector.image_set(tools, images, work_dir)
+        collector = Collector(tools, specs, pairs, args.stores)
+        for images in dict.fromkeys(
+                s for arg in _split(args.images)
+                for s in rs.expand_images(tools, arg)):
+            collector.image_set(images, work_dir)
 
         print("\n==================== Summary ====================")
         print(f"Outputs: {work_dir}")

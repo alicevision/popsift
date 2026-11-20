@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Explore the comparison of PopSift with VLFeat, image by image.
+"""Explore comparisons of SIFT runs, e.g. PopSift and VLFeat, image by image.
 
     explorer.py [<data dir>]
 
@@ -56,11 +56,6 @@ SELECTED = "#dbe9f7"
 MUTED = "#666666"
 
 
-def run_name(run):
-    """How a run is called for readers."""
-    return "VLFeat" if run == "vlfeat" else "PopSift"
-
-
 def fmt(x, digits=3, unit=""):
     return "-" if x is None else f"{x:.{digits}f}{unit}"
 
@@ -100,6 +95,10 @@ class Report:
         self.set = self.summary["set"]
         self.run_a = self.summary["run_a"]
         self.run_b = self.summary["run_b"]
+        runs = self.summary.get("runs") or {}
+        # How the runs are called for readers: their labels from run.json.
+        self.label_a = (runs.get("a") or {}).get("label") or self.run_a
+        self.label_b = (runs.get("b") or {}).get("label") or self.run_b
         tol = self.summary.get("tolerances", {})
         self.ori_tolerance = tol.get("ori_tolerance_deg", 2.0)
         self.desc_tolerance = tol.get("desc_tolerance_l2", 12.0)
@@ -107,9 +106,8 @@ class Report:
     def path(self, rel):
         return os.path.normpath(os.path.join(self.dir, rel))
 
-    def label(self, with_runs):
-        return f"{self.set} ({self.run_a} vs {self.run_b})" if with_runs \
-            else self.set
+    def runs(self):
+        return f"{self.label_a} vs {self.label_b}"
 
 
 def find_reports(data_dir):
@@ -144,7 +142,7 @@ class Explorer:
         self.pairs = None
 
         self.fig = plt.figure(figsize=(16, 10), facecolor=BACKGROUND)
-        self.fig.canvas.manager.set_window_title("PopSift vs VLFeat explorer")
+        self.fig.canvas.manager.set_window_title("PopSift comparison explorer")
         self.header = self.fig.text(0.01, 0.965, "", fontsize=15,
                                     weight="bold")
         self.subheader = self.fig.text(0.01, 0.94, "", fontsize=10,
@@ -239,7 +237,8 @@ class Explorer:
     def row_height(count):
         return min(0.08, 0.85 / max(count, 1))
 
-    def draw_list(self, ax, title, columns, rows, selected):
+    def draw_list(self, ax, title, columns, rows, selected, notes=None):
+        """A list of rows, each with an optional note in a second line."""
         ax.clear()
         self.panel_style(ax)
         h = self.row_height(len(rows))
@@ -250,8 +249,13 @@ class Explorer:
             y = 0.9 - (k + 0.5) * h
             if k == selected:
                 ax.axhspan(y - h / 2, y + h / 2, 0.01, 0.99, color=SELECTED)
-            ax.text(0.03, y, row, fontsize=min(8.5, 300 * h), va="center",
+            note = notes[k] if notes else None
+            ax.text(0.03, y + (0.2 * h if note else 0), row,
+                    fontsize=min(8.5, 300 * h), va="center",
                     family="monospace")
+            if note:
+                ax.text(0.05, y - 0.25 * h, note[:56],
+                        fontsize=min(7, 200 * h), va="center", color=MUTED)
 
     @staticmethod
     def panel_style(ax):
@@ -262,22 +266,23 @@ class Explorer:
 
     def draw(self):
         rep = self.report
-        self.header.set_text("PopSift vs VLFeat explorer")
+        self.header.set_text("PopSift comparison explorer")
         self.subheader.set_text(
-            f"PopSift parameter set: {rep.run_a}   ·   reference: "
-            f"{rep.run_b}   ·   {len(self.reports)} image set(s)   ·   "
-            "descriptor distances are L2, in byte units")
+            f"a: {rep.label_a}   ·   b (reference): {rep.label_b}   ·   "
+            f"{len(self.reports)} image set(s)   ·   descriptor distances "
+            "are L2, in byte units")
         self.draw_list(
             self.ax_sets, "Image sets",
             "set              images co-loc.   agree",
-            [f"{r.label(self.several_pairs)[:16]:<16} {len(r.images):>6} "
+            [f"{r.set[:16]:<16} {len(r.images):>6} "
              f"{colocated_pct(r.summary['set_stats']):>7} "
              f"{agree_pct(r.summary['set_stats']):>7}"
-             for r in self.reports], self.r)
+             for r in self.reports], self.r,
+            [r.runs() for r in self.reports] if self.several_pairs
+            else None)
         self.draw_list(
             self.ax_images, f"Images of {rep.set}",
-            f"image      {run_name(rep.run_a)[:6]:>6} "
-            f"{run_name(rep.run_b)[:6]:>6} co-loc.   agree",
+            "image           a      b co-loc.   agree",
             [f"{os.path.splitext(e['name'])[0][:10]:<10} "
              f"{e['counts']['a']:>6} {e['counts']['b']:>6} "
              f"{colocated_pct(e):>7} "
@@ -310,14 +315,13 @@ class Explorer:
 
     def tiles(self, ax, title, stats, top=0.95):
         rep = self.report
-        a, b = run_name(rep.run_a), run_name(rep.run_b)
         c = stats["counts"]
         m = stats["metrics"]
         minor = c["orientation_differs_minor"] + c["descriptor_differs_minor"]
         values = [
-            (f"keypoints {a}", f"{c['a']}"),
-            (f"keypoints {b}", f"{c['b']}"),
-            (f"co-located, share of {a}", share(c["colocated"], c["a"])),
+            ("keypoints of a", f"{c['a']}"),
+            ("keypoints of b", f"{c['b']}"),
+            ("co-located, share of a", share(c["colocated"], c["a"])),
             ("same orientation, of co-located",
              share(c["same_orientation"], c["colocated"])),
             ("similar descriptor, of same orient.",
@@ -337,7 +341,7 @@ class Explorer:
         ]
         ax.text(0.03, top, title, fontsize=12, weight="bold", va="top")
         ax.text(0.03, top - 0.07,
-                f"co-located: a {b} keypoint at most max(1 px, 0.5 sigma) "
+                f"co-located: a keypoint of b at most max(1 px, 0.5 sigma) "
                 f"away with a scale within a factor 1.5;\n"
                 f"   paired one to one, closest first\n"
                 f"same orientation: rotation difference at most "
@@ -346,8 +350,8 @@ class Explorer:
                 f"{rep.desc_tolerance:g}. Minor: the orientation or "
                 f"descriptor differs, but\n   another keypoint at the same "
                 f"position agrees further\n"
-                f"nearest descriptor in place: the most similar {b} "
-                f"descriptor belongs to a keypoint\n"
+                f"nearest descriptor in place: the most similar "
+                f"descriptor of b belongs to a keypoint\n"
                 f"   within the pairing radius; nearest-descriptor "
                 f"agreement: it is the co-located one",
                 fontsize=7.5, color=MUTED, va="top", linespacing=1.3)
@@ -464,12 +468,12 @@ class Explorer:
         ax.clear()
         ax.set_xticks([])
         ax.set_yticks([])
-        rep, e = self.report, self.entry
+        e = self.entry
         png = os.path.join(self.pair_dir, "unpaired.png")
         c = e["counts"]
         ax.set_title(f"Keypoints found by only one side: "
-                     f"{c['only_a']} only {run_name(rep.run_a)} (orange), "
-                     f"{c['only_b']} only {run_name(rep.run_b)} (blue)",
+                     f"{c['only_a']} only in a (orange), "
+                     f"{c['only_b']} only in b (blue)",
                      fontsize=9)
         if os.path.exists(png):
             ax.imshow(plt.imread(png))
