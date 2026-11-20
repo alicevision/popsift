@@ -14,6 +14,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -69,9 +70,31 @@ static void parseargs(int argc, char** argv, popsift::Config& config, string& in
             ("downsampling", value<float>()->notifier([&](float f) { config.setDownsampling(f); }), "Downscale width and height of input by 2^N")
             ("initial-blur", value<float>()->notifier([&](float f) {config.setInitialBlur(f); }), "Assume initial blur, subtract when blurring first time");
     }
+    /* The SYCL implementation has only VLFeat's Gauss filter computation and
+     * VLFeat's descriptor extraction. --gauss-mode and --desc-mode exist so
+     * that command lines written for the CUDA/HIP popsift-demo, such as the
+     * VLFeat comparison tests, work unchanged; any value other than vlfeat
+     * is an error instead of being ignored.
+     */
+    auto only_vlfeat = []( const char* option ) {
+        return [option]( const std::string& s ) {
+            std::string v( s );
+            for( auto& c : v ) c = std::tolower( static_cast<unsigned char>(c) );
+            if( v != "vlfeat" ) {
+                throw boost::program_options::error(
+                    std::string("--") + option + "=" + s
+                    + ": the SYCL implementation supports only vlfeat" );
+            }
+        };
+    };
+
     options_description modes("Modes");
     {
     modes.add_options()
+        ("gauss-mode", value<std::string>()->notifier(only_vlfeat("gauss-mode")),
+         "Choice of Gauss filter method. The SYCL implementation supports only vlfeat (the default).")
+        ("desc-mode", value<std::string>()->notifier(only_vlfeat("desc-mode")),
+         "Choice of descriptor extraction mode. The SYCL implementation supports only vlfeat (the default).")
         ("popsift-mode", bool_switch()->notifier([&](bool b) { if(b) config.setMode(popsift::Config::RefineInOctave); }),
         "During the initial upscale, shift pixels by 1. In extrema refinement, steps up to 0.6, do not reject points when reaching max iterations, "
         "first contrast threshold is .8 * peak thresh. Shift feature coords octave 0 back to original pos.")
