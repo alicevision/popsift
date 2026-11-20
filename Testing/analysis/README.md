@@ -111,7 +111,10 @@ whose difference exceeds a threshold, both glyphs joined by a white line.
 python3 Testing/analysis/explorer.py build/Testing/run
 ```
 
-One window for all reports of a run. On the left, the image sets and their
+One window for all reports of a work dir. The header names the runs a and b
+by their labels from `run.json` (see `Testing/scripts/README.md`); when the
+work dir holds reports of several pairs of runs, each set in the list names
+its pair. On the left, the image sets and their
 images with the share of co-located keypoints and the share of co-located
 pairs where orientation and descriptor agree; click to select, the arrow
 keys step through the images, page up and down through the sets. The tabs:
