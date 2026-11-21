@@ -16,11 +16,13 @@ import os
 import random
 import subprocess  # nosec B404
 import sys
+from collections.abc import Callable
 
-DESC_SIZE = 128
+DESC_SIZE: int = 128
 
 
-def feature(x, y, sigma, ori_deg, seed):
+def feature(x: float, y: float, sigma: float, ori_deg: float,
+            seed: int) -> list[float]:
     """Return a feature with a reproducible random descriptor."""
     rng = random.Random(seed) # nosec B311
     return [x, y, sigma, math.radians(ori_deg)] + \
@@ -28,28 +30,31 @@ def feature(x, y, sigma, ori_deg, seed):
 
 
 # Five features that are far apart, with different descriptors.
-BASE = [feature(20.0 + 30 * i, 15.0 + 7 * i, 2.0 + 0.5 * i, 40.0 * i, i)
-        for i in range(5)]
+BASE: list[list[float]] = [
+    feature(20.0 + 30 * i, 15.0 + 7 * i, 2.0 + 0.5 * i, 40.0 * i, i)
+    for i in range(5)
+]
 
 
 class Case:
     """One test case: its folder, the tool, and the count of failed checks."""
 
-    def __init__(self, tool, work_dir, name):
+    def __init__(self, tool: str, work_dir: str, name: str) -> None:
         """Create the folder of the case below work_dir."""
-        self.tool = tool
-        self.dir = os.path.join(work_dir, name)
+        self.tool: str = tool
+        self.dir: str = os.path.join(work_dir, name)
         os.makedirs(self.dir, exist_ok=True)
-        self.failures = 0
+        self.failures: int = 0
 
-    def write(self, name, features):
+    def write(self, name: str, features: list[list[float]]) -> str:
         """Write features into a file of the case and return its path."""
         path = os.path.join(self.dir, name)
         with open(path, "w", encoding="utf-8") as f:
             f.writelines(" ".join(f"{v:.6f}" for v in feat) + "\n" for feat in features)
         return path
 
-    def run(self, a, b, *options):
+    def run(self, a: list[list[float]], b: list[list[float]],
+            *options: str) -> tuple[int, str]:
         """Runs the tool on the features a and b. Returns the exit code and output."""
         pair_dir = os.path.join(self.dir, "pairs")
         os.makedirs(pair_dir, exist_ok=True)
@@ -66,28 +71,32 @@ class Case:
             print("   | " + line)
         return proc.returncode, output
 
-    def rows(self, name):
+    def rows(self, name: str) -> list[dict[str, str]]:
         """Return the rows of a pair file as dicts, none if empty."""
         path = os.path.join(self.dir, "pairs", name)
         if not os.path.exists(path):
             return []
         with open(path, newline="", encoding="utf-8") as f:
-            return list(csv.DictReader(f))
+            return [
+                {key: value or "" for key, value in row.items()}
+                for row in csv.DictReader(f)
+            ]
 
-    def check(self, ok, what):
+    def check(self, ok: bool, what: str) -> None:
         """Print PASS or FAIL for one check and count the failures."""
         print(f"{'PASS' if ok else 'FAIL'}: {what}")
         if not ok:
             self.failures += 1
 
-    def check_close(self, values, expected, tol, what):
+    def check_close(self, values: list[float], expected: float, tol: float,
+                    what: str) -> None:
         """Check that there are values and all are expected +- tol."""
         bad = [v for v in values if abs(v - expected) > tol]
-        self.check(values and not bad,
+        self.check(bool(values) and not bad,
                    f"{what} is {expected} (+-{tol}) for all {len(values)} "
                    f"pair(s)" + (f", got {bad[:5]}" if bad else ""))
 
-    def check_counts(self, colocated, only_a, only_b):
+    def check_counts(self, colocated: int, only_a: int, only_b: int) -> None:
         """Check the number of rows of the three pair files."""
         got = (len(self.rows("colocated.csv")), len(self.rows("only_a.csv")),
                len(self.rows("only_b.csv")))
@@ -95,17 +104,17 @@ class Case:
                    f"{colocated} co-located, {only_a} only in a, {only_b} only "
                    f"in b (got {got[0]}, {got[1]}, {got[2]})")
 
-    def agreement(self):
+    def agreement(self) -> dict[int, str]:
         """Return the agreement column of colocated.csv by index of a."""
         return {int(r["a_index"]): r["agreement"]
                 for r in self.rows("colocated.csv")}
 
-    def column(self, name, file="colocated.csv"):
+    def column(self, name: str, file: str = "colocated.csv") -> list[float]:
         """Return one column of a pair file as floats."""
         return [float(r[name]) for r in self.rows(file)]
 
 
-def case_identical(c):
+def case_identical(c: Case) -> None:
     """Check that identical inputs agree completely, at distance 0."""
     code, output = c.run(BASE, BASE)
     c.check(code == 0, f"exit code 0 (got {code})")
@@ -121,7 +130,7 @@ def case_identical(c):
             "average best-match descriptor distance 0 is printed")
 
 
-def case_shifted(c):
+def case_shifted(c: Case) -> None:
     """Check that a shift of 0.5 px in x shows in pos_dist and dx only."""
     b = [[f[0] + 0.5] + f[1:] for f in BASE]
     code, _ = c.run(BASE, b)
@@ -132,7 +141,7 @@ def case_shifted(c):
     c.check_close(c.column("desc_dist"), 0.0, 1e-6, "descriptor distance")
 
 
-def case_missing(c):
+def case_missing(c: Case) -> None:
     """Check that features missing in a or b end up in only_a or only_b."""
     code, _ = c.run(BASE, BASE[:3])
     c.check(code == 0, f"exit code 0 with features missing in b (got {code})")
@@ -144,7 +153,7 @@ def case_missing(c):
     c.check_counts(4, 0, 1)
 
 
-def case_empty(c):
+def case_empty(c: Case) -> None:
     """Check that empty inputs fail, unless both are and --allow-empty."""
     code, output = c.run([], [])
     c.check(code != 0 and "FAIL" in output,
@@ -159,7 +168,7 @@ def case_empty(c):
             f"an empty a fails even with --allow-empty (exit code {code})")
 
 
-def case_orientation_wrap(c):
+def case_orientation_wrap(c: Case) -> None:
     """Check that orientations are compared around the circle.  0.5 and 359.5 degrees are 1 degree apart, not 359. A negative angle is the same as the angle plus 360 degrees."""
     a = [BASE[0][:3] + [math.radians(0.5)] + BASE[0][4:],
          BASE[1][:3] + [math.radians(359.5)] + BASE[1][4:],
@@ -180,7 +189,7 @@ def case_orientation_wrap(c):
             f"orientations are written in [0, 360) degrees (got {oris})")
 
 
-def case_same_position(c):
+def case_same_position(c: Case) -> None:
     """Check that orientations at one position are paired by orientation.
 
     SIFT gives one keypoint several orientations. They are paired by
@@ -196,7 +205,7 @@ def case_same_position(c):
     c.check_close(c.column("desc_dist"), 0.0, 1e-6, "descriptor distance")
 
 
-def case_max_avg_dist(c):
+def case_max_avg_dist(c: Case) -> None:
     """Check --max-avg-dist and the sums in desc_bins.csv.
 
     Each descriptor of b differs by 6 in one component: L2 distance 6.
@@ -222,7 +231,7 @@ def case_max_avg_dist(c):
             f"fails with --max-avg-dist 5 (exit code {code})")
 
 
-def case_agreement(c):
+def case_agreement(c: Case) -> None:
     """Check the three agreement levels of co-located keypoints.
 
     0: identical. 1: rotated by 30 degrees, so the orientation differs
@@ -254,7 +263,7 @@ def case_agreement(c):
             f"wider tolerances raise pairs 1 and 2 to descriptor (got {got})")
 
 
-CASES = {
+CASES: dict[str, Callable[[Case], None]] = {
     "agreement": case_agreement,
     "identical": case_identical,
     "shifted": case_shifted,
@@ -266,7 +275,7 @@ CASES = {
 }
 
 
-def main():
+def main() -> int:
     """Run the case named on the command line; 0 if all checks pass."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--tool", required=True,
