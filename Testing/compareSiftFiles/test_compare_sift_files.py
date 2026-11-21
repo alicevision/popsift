@@ -46,8 +46,7 @@ class Case:
         """Write features into a file of the case and return its path."""
         path = os.path.join(self.dir, name)
         with open(path, "w", encoding="utf-8") as f:
-            for feat in features:
-                f.write(" ".join(f"{v:.6f}" for v in feat) + "\n")
+            f.writelines(" ".join(f"{v:.6f}" for v in feat) + "\n" for feat in features)
         return path
 
     def run(self, a, b, *options):
