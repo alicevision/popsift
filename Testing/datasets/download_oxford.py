@@ -55,7 +55,10 @@ def download(name: str, dest: str, url: str) -> None:
             if member.isfile():  # unpack flat, never outside dest
                 with open(os.path.join(dest, os.path.basename(member.name)),
                           "wb") as f:
-                    f.write(tar.extractfile(member).read())
+                    extracted = tar.extractfile(member)
+                    if extracted is None:
+                        sys.exit(f"{name}: cannot unpack {member.name}")
+                    f.write(extracted.read())
     print(f"{name}: unpacked into {dest}")
 
 
