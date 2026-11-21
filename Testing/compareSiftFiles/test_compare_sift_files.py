@@ -14,7 +14,7 @@ import csv
 import math
 import os
 import random
-import subprocess # nosec B404
+import subprocess  # nosec B404
 import sys
 
 DESC_SIZE = 128
