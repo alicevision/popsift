@@ -19,8 +19,8 @@ import sys
 import tarfile
 import urllib.request
 
-URL = ("https://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/{}.tar.gz")
-SHA256 = {
+URL: str = ("https://www.robots.ox.ac.uk/~vgg/research/affine/det_eval_files/{}.tar.gz")
+SHA256: dict[str, str] = {
     "bark": "f631c09a0f43fc1e092203f32f8f27e2e43e59b524918255d45474c50c91ea4f",
     "bikes": "3b95c49accadfd71e63c2fa0f7602abcbadd87d7f53ff54eb1efb15210d19e0c",
     "boat": "6e5721f37fbf9c3e974fd05935a42c1670f3e71aa3e5b218807ea046a068c603",
@@ -32,13 +32,13 @@ SHA256 = {
 }
 
 
-def has_images(folder):
+def has_images(folder: str) -> bool:
     """Tell whether a folder exists and holds .pgm or .ppm files."""
     return os.path.isdir(folder) and any(
         f.lower().endswith((".pgm", ".ppm")) for f in os.listdir(folder))
 
 
-def download(name, dest, url):
+def download(name: str, dest: str, url: str) -> None:
     """Download the archive of a set, check it and unpack it into dest."""
     print(f"{name}: downloading {url}", flush=True)
     try:
@@ -59,7 +59,7 @@ def download(name, dest, url):
     print(f"{name}: unpacked into {dest}")
 
 
-def main():
+def main() -> None:
     """Download the sets named on the command line, or all of them."""
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
