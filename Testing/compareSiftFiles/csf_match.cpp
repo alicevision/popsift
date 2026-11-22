@@ -4,6 +4,8 @@
 #include <fstream>
 #include <filesystem>
 #include <numeric>
+#include <ostream>
+#include <string_view>
 
 #include "csf_match.h"
 
