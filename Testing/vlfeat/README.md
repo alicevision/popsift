@@ -20,7 +20,7 @@ What it does, in the `vlfeat_sift` target:
 
 ## Inside PopSift
 
-Configured when `BUILD_TESTING` and `PopSift_TEST_WITH_VLFEAT` are both ON.
+Configured when `PopSift_BUILD_TESTING` and `PopSift_TEST_WITH_VLFEAT` are both ON.
 The normal build then also builds `sift`. To build only `sift`:
 
 ```sh
