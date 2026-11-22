@@ -265,7 +265,7 @@ bool writeDescBinsFile( const string&               dir,
             count[s]++;
             for( int i = 0; i < DescSize; i++ )
             {
-                const double d = l_a[p.b].desc[i] - l_b[p.a].desc[i];
+                const double d = l_b[p.b].desc[i] - l_a[p.a].desc[i];
                 sum[s][i]     += d;
                 sum_abs[s][i] += fabs( d );
             }
