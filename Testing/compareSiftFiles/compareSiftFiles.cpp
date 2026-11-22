@@ -42,12 +42,17 @@ static float distanceSumBrief( const Parameters& param, ostream* outfile, const 
 
 static float distanceSum( ostream* outfile, const vector<feat_t>& l_A, const vector<feat_t>& l_B );
 
-static bool writeFiles( const Parameters& param, const vector<NearestDesc>& nearest_A_B, const vector<feat_t>& l_A, const vector<feat_t>& l_B )
+static bool writeFiles( const Parameters& param,
+                        const vector<NearestDesc>& nearest_A_B,
+                        const vector<NearestDesc>& nearest_B_A,
+                        const vector<feat_t>& l_A,
+                        const vector<feat_t>& l_B )
 {
     if( param.pair_directory.empty() ) return true;
 
-    vector<NearestDesc> nearest_B_A;
-    nearestDescriptors( nearest_B_A, l_B, l_A );
+    /* writeFiles is never called if l_A or l_B is empty */
+    assert( !l_A.empty() );
+    assert( !l_B.empty() );
 
     PairParams pp;
     pp.radius_sigma      = param.pair_radius_sigma;
@@ -103,15 +108,6 @@ int main( int argc, char* argv[] )
     readFile( l_A, param.input[0] );
     readFile( l_B, param.input[1] );
 
-    // The most expensive part: every descriptor of the first file against
-    // every descriptor of the second, in parallel where available.
-    vector<NearestDesc> nearest_A_B;
-    nearestDescriptors( nearest_A_B, l_A, l_B );
-
-    bool written = writeFiles( param, nearest_A_B, l_A, l_B );
-    if( !written )
-        return EXIT_FAILURE;
-
     /* If both inputs are empty, report this as an error if not explicitly
      * permitted by a command line switch.
      * Always exit.
@@ -137,6 +133,26 @@ int main( int argc, char* argv[] )
              << ( l_A.empty() ? param.input[1] : param.input[0] ) << " does" << endl;
         return EXIT_FAILURE;
     }
+
+    if( l_A.size() > std::numeric_limits<int>::max() ||
+        l_B.size() > std::numeric_limits<int>::max() )
+    {
+        cerr << "FAIL: one of the files contains more than " << std::numeric_limits<int>::max()
+             << "descriptors." << std::endl
+             << "This tool does not support that and must be modified before continuing." << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    // The most expensive part: every descriptor of one first file against
+    // every descriptor of the other, in parallel where available.
+    vector<NearestDesc> nearest_A_B;
+    vector<NearestDesc> nearest_B_A;
+    nearestDescriptors( nearest_A_B, l_A, l_B );
+    nearestDescriptors( nearest_B_A, l_B, l_A );
+
+    bool written = writeFiles( param, nearest_A_B, nearest_B_A, l_A, l_B );
+    if( !written )
+        return EXIT_FAILURE;
 
     ostream* outfile  = openOutputFile( param.outfile_name );
 
@@ -174,7 +190,6 @@ static float distanceSumBrief( const Parameters& param, ostream* outfile, const 
 
     for( int i = 0; i < len; ++i ) // for loops over signed integer types are faster
     {
-        assert( !nearest_A_B[i].empty );
         l_A[i].printBestMatch( *outfile, print_distances, l_B[nearest_A_B[i].index],
                                nearest_A_B[i].dist, desc_stats );
         *outfile << endl;

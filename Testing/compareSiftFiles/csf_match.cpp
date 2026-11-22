@@ -120,19 +120,23 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
                          const std::vector<feat_t>& l_query,
                          const std::vector<feat_t>& l_other )
 {
+
     nearest.clear();
     nearest.resize( l_query.size() );
 
-    vector<int>         idx( l_query.size() );
+    // comparison should never reach this if one of the lists is empty
+    assert( !l_query.empty() );
+    assert( !l_other.empty() );
+
+    const int   otherlen = static_cast<int>( l_other.size() );
+    vector<int> idx( l_query.size() );
     iota( idx.begin(), idx.end(), 0 );
     for_each( PAR_UNSEQ idx.begin(), idx.end(), [&]( int iq ) {
         // Sums instead of distances, so that a candidate can be dropped as
         // soon as it is farther than the second nearest so far.
-        const int otherlen = static_cast<int>( l_other.size() );
+        size_t index  = 0;
         float  best   = INFINITY;
         float  second = INFINITY;
-        size_t index  = 0;
-        bool   empty = true;
         for( int io = 0; io < otherlen; ++io )
         {
             const float s = descDistanceSum( l_query[iq], l_other[io], second );
@@ -140,18 +144,17 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
             {
                 second = best;
                 best   = s;
-                index  = io;
-                empty  = false;
+                index  = static_cast<size_t>( io );
             }
             else if( s < second )
             {
                 second = s;
             }
         }
+        assert( best != INFINITY );
         nearest[iq] = NearestDesc{ index,
                                    descDistanceFromSum( best ),
-                                   descDistanceFromSum( second ),
-                                   empty };
+                                   descDistanceFromSum( second ) };
     } );
 }
 
