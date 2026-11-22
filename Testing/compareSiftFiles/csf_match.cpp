@@ -127,7 +127,7 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
     for_each( PAR_UNSEQ idx.begin(), idx.end(), [&]( int iq ) {
         // Sums instead of distances, so that a candidate can be dropped as
         // soon as it is farther than the second nearest so far.
-        constexpr int otherlen = static_cast<int>( l_other.size() );
+        const int otherlen = static_cast<int>( l_other.size() );
         float  best   = INFINITY;
         float  second = INFINITY;
         size_t index  = 0;
