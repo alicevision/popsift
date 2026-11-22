@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <numeric>
 #include <string>
+#include <cassert>
 
 #include "csf_feat.h"
 
@@ -52,7 +53,8 @@ float descDistanceSum( const feat_t& l, const feat_t& r, float bound )
 
 float descDistanceFromSum( float sum )
 {
-    return feat_t::_use_l2_distance ? sqrtf( sum ) : sum / DescSize;
+    assert( sum >= 0.f );
+    return feat_t::_use_l2_distance ? sqrtf( sum ) : sum;
 }
 
 int readFeats( vector<feat_t>& l_one, ifstream& f_one )

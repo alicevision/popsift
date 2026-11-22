@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cstdlib>
+#include <limits>
 
 #include <boost/program_options.hpp>
 
@@ -30,12 +31,11 @@ void readFile( vector<feat_t>& vec, const std::string& filename );
  */
 void writeSummary( ostream& file, const vector<float>& stats, int sz );
 
-/** Open a new stream or return the default stream. The default stream is
+/** Open a new stream or return the default stream. nullptr is
  *  returned if the name is empty or opening the stream fails.
  * @param name A string containing the name of the file to open or empty
- * @param default_stream The default stream to return
  */
-ostream* openOutputFile( const string& name, ostream* default_stream );
+static ostream* openOutputFile( const string& name );
 
 static float distanceSumBrief( const Parameters& param, ostream* outfile, const vector<feat_t>& l_A, const vector<feat_t>& l_B, const vector<NearestDesc>& nearest_A_B );
 
@@ -138,13 +138,13 @@ int main( int argc, char* argv[] )
         return EXIT_FAILURE;
     }
 
-    ostream* outfile  = openOutputFile( param.outfile_name, &cout );
+    ostream* outfile  = openOutputFile( param.outfile_name );
 
     const float sum_min_dist = ( param.briefinfo )
-                             ? distanceSumBrief( param, outfile, l_A, l_B, nearest_A_B )
-                             : distanceSum( outfile, l_A, l_B );
+                             ? distanceSumBrief( param, outfile?outfile:&cout, l_A, l_B, nearest_A_B )
+                             : distanceSum( outfile?outfile:&cout, l_A, l_B );
 
-    if( ! param.outfile_name.empty() ) delete outfile;
+    delete outfile;
 
     const float avg_min_dist = sum_min_dist / l_A.size();
     cerr << "Average best-match descriptor distance: " << avg_min_dist << endl;
@@ -161,16 +161,16 @@ int main( int argc, char* argv[] )
 
 static float distanceSumBrief( const Parameters& param, ostream* outfile, const vector<feat_t>& l_A, const vector<feat_t>& l_B, const vector<NearestDesc>& nearest_A_B )
 {
-    const int len = l_A.size();
+    const int len = static_cast<int>( std::min<size_t>( l_A.size(), std::numeric_limits<int>::max() ) );
 
-    ostream*      descfile = openOutputFile( param.descfile_name, nullptr );
+    ostream*      descfile = openOutputFile( param.descfile_name );
     vector<float> desc_stats( DescSize, 0.0f );
 
     ostream* print_distances = param.descfile_verbose ? descfile : nullptr;
 
     float sum_min_dist = 0.0f;
 
-    for( int i = 0; i < len; i++ )
+    for( int i = 0; i < len; ++i ) // for loops over signed integer types are faster
     {
         l_A[i].printBestMatch( *outfile, print_distances, l_B[nearest_A_B[i].index],
                                nearest_A_B[i].dist, desc_stats );
@@ -232,21 +232,20 @@ void readFile( vector<feat_t>& vec, const std::string& filename )
     cerr << "Read " << lines_read << " features from " << filename << endl;
 }
 
-ostream* openOutputFile( const string& outfile_name, ostream* default_stream )
+static ostream* openOutputFile( const string& outfile_name )
 {
-    ostream* outfile = default_stream;
-    if( outfile_name.empty() ) return outfile;
+    if( outfile_name.empty() ) return nullptr;
 
     ostream* o = new ofstream( outfile_name );
     if( o->good() )
     {
-        outfile = o;
+        return o;
     }
     else
     {
         delete o;
     }
 
-    return outfile;
+    return nullptr;
 }
 

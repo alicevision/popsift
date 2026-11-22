@@ -18,7 +18,7 @@
 
 constexpr int DescSize = 128;
 
-using desc_t = std::vector<float> 
+using desc_t = std::vector<float>;
 
 constexpr float RAD2DEG = 180.0f / 3.14159265358979323846f;
 

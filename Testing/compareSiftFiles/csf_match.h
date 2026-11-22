@@ -48,10 +48,6 @@ enum class Agreement
     Descriptor
 };
 
-/** The name of an agreement level in the CSV files.
- */
-const char* agreementName( Agreement level );
-
 /** One pair of co-located keypoints, indices into the two keypoint lists.
  */
 struct KeypointPair
@@ -138,6 +134,3 @@ bool writeDescBinsFile( const std::string&               dir,
                         const std::vector<feat_t>&       l_b,
                         const std::vector<KeypointPair>& pairs );
 
-/** Signed orientation difference b - a in degrees, wrapped to [-180,180).
- */
-float signedAngleDiffDegrees( float ori_a, float ori_b );

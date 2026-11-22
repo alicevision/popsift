@@ -22,7 +22,9 @@ struct Candidate
 
 }
 
-const char* agreementName( Agreement level )
+/** The name of an agreement level in the CSV files.
+ */
+static constexpr std::string_view agreementName( Agreement level )
 {
     switch( level )
     {
@@ -234,7 +236,7 @@ bool writePairFiles( const string&               dir,
                  fa.sigma > 0.0f ? fb.sigma / fa.sigma : 0.0f,
                  p.ori_diff,
                  p.desc_dist,
-                 agreementName( p.level ) );
+                 agreementName( p.level ).data() ); // data() is a hack
     }
     if( fclose( f ) != 0 ) return false;
 
@@ -260,7 +262,7 @@ bool writeDescBinsFile( const string&               dir,
             count[s]++;
             for( int i = 0; i < DescSize; i++ )
             {
-                const double d = l_b[p.b].desc[i] - l_a[p.a].desc[i];
+                const double d = l_a[p.b].desc[i] - l_b[p.a].desc[i];
                 sum[s][i]     += d;
                 sum_abs[s][i] += fabs( d );
             }
