@@ -119,7 +119,6 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
                          const std::vector<feat_t>& l_query,
                          const std::vector<feat_t>& l_other )
 {
-    // vector<NearestDesc> nearest( l_query.size() );
     nearest.clear();
     nearest.resize( l_query.size() );
 
@@ -128,10 +127,12 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
     for_each( PAR_UNSEQ idx.begin(), idx.end(), [&]( int iq ) {
         // Sums instead of distances, so that a candidate can be dropped as
         // soon as it is farther than the second nearest so far.
-        float best   = INFINITY;
-        float second = INFINITY;
-        int   index  = -1;
-        for( int io = 0; io < int(l_other.size()); io++ )
+        const int otherlen = static_cast<int>( l_other.size() );
+        float  best   = INFINITY;
+        float  second = INFINITY;
+        size_t index  = 0;
+        bool   empty = true;
+        for( int io = 0; io < otherlen; ++io )
         {
             const float s = descDistanceSum( l_query[iq], l_other[io], second );
             if( s < best )
@@ -139,6 +140,7 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
                 second = best;
                 best   = s;
                 index  = io;
+                empty  = false;
             }
             else if( s < second )
             {
@@ -147,7 +149,8 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
         }
         nearest[iq] = NearestDesc{ index,
                                    descDistanceFromSum( best ),
-                                   descDistanceFromSum( second ) };
+                                   descDistanceFromSum( second ),
+                                   empty };
     } );
 }
 
@@ -192,7 +195,7 @@ bool writeNearestFile( const string&               path,
     for( int iq = 0; iq < int(l_query.size()); iq++ )
     {
         const NearestDesc& n = nearest[iq];
-        if( n.index < 0 ) continue;
+        if( n.empty ) continue;
         const feat_t& fq = l_query[iq];
         const feat_t& fn = l_other[n.index];
         writeFeature( f, iq, fq );
@@ -262,7 +265,7 @@ bool writeDescBinsFile( const string&               dir,
             count[s]++;
             for( int i = 0; i < DescSize; i++ )
             {
-                const double d = l_a[p.b].desc[i] - l_b[p.a].desc[i];
+                const double d = l_b[p.b].desc[i] - l_a[p.a].desc[i];
                 sum[s][i]     += d;
                 sum_abs[s][i] += fabs( d );
             }
