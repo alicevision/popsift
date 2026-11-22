@@ -89,7 +89,6 @@ struct NearestDesc
     size_t index  = 0;           // index into the other descriptor set
     float  dist   = INFINITY;    // descriptor distance to it
     float  second = INFINITY;    // descriptor distance to the second nearest
-    bool   empty  = true;
 };
 
 /** For every feature of l_query, the feature of l_other with the most similar
