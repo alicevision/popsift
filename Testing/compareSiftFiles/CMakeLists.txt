@@ -1,6 +1,6 @@
 if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
   # I am top-level project, i.e. I am not being include by another project
-  cmake_minimum_required(VERSION 3.12)
+  cmake_minimum_required(VERSION 3.24) # same as PopSift
   project(PopSiftCompareDescriptors LANGUAGES CXX)
 
   include(GNUInstallDirs)
@@ -34,12 +34,16 @@ add_executable(popsift-compareSiftFiles
 target_include_directories(popsift-compareSiftFiles PUBLIC ${Boost_INCLUDE_DIRS})
 target_link_libraries(popsift-compareSiftFiles PUBLIC ${Boost_LIBRARIES})
 
-# C++17 for <execution>
-set_target_properties(popsift-compareSiftFiles PROPERTIES
-                      CXX_STANDARD 17
-                      CXX_STANDARD_REQUIRED ON)
-
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckParallelExecution.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckStdFormat.cmake)
+
+# C++17 for <execution>, C++20 for std::format if available
+set_target_properties(popsift-compareSiftFiles PROPERTIES
+                      CXX_STANDARD ${Csf_CXX_STANDARD}
+                      CXX_STANDARD_REQUIRED ON)
+if(NOT Csf_HAVE_STD_FORMAT)
+  target_link_libraries(popsift-compareSiftFiles PRIVATE fmt::fmt)
+endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/csf_config.h.in
                ${CMAKE_CURRENT_BINARY_DIR}/csf_config.h @ONLY)

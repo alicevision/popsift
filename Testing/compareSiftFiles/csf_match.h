@@ -107,7 +107,7 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest_out,
  * KeypointPair::a indexes l_query.
  * @return false if the file cannot be written
  */
-bool writeNearestFile( const std::string&               path,
+bool writeNearestFile( const std::filesystem::path&     path,
                        const std::vector<feat_t>&       l_query,
                        const std::vector<feat_t>&       l_other,
                        const std::vector<NearestDesc>&  nearest,
@@ -119,7 +119,7 @@ bool writeNearestFile( const std::string&               path,
  * keypoint in the other file, into dir. Sorted by the index in l_a.
  * @return false if a file cannot be written
  */
-bool writePairFiles( const std::string&               dir,
+bool writePairFiles( const std::filesystem::path&     dir,
                      const std::vector<feat_t>&       l_a,
                      const std::vector<feat_t>&       l_b,
                      const std::vector<KeypointPair>& pairs );
@@ -130,7 +130,7 @@ bool writePairFiles( const std::string&               dir,
  * and once over those with the same orientation ("same_orientation").
  * @return false if the file cannot be written
  */
-bool writeDescBinsFile( const std::string&               dir,
+bool writeDescBinsFile( const std::filesystem::path&     dir,
                         const std::vector<feat_t>&       l_a,
                         const std::vector<feat_t>&       l_b,
                         const std::vector<KeypointPair>& pairs );

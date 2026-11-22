@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <filesystem>
 
 #include <boost/program_options.hpp>
 
@@ -16,7 +17,7 @@ struct Parameters
     bool                     briefinfo;
     float                    max_avg_desc_dist; // CTest pass/fail gate; <0 disables the check
     bool                     allow_empty;       // an input without features is not an error
-    std::string              pair_directory;    // write colocated.csv, only_a.csv, only_b.csv, ... here
+    std::filesystem::path    pair_directory;    // write colocated.csv, only_a.csv, only_b.csv, ... here
     float                    pair_radius_sigma;
     float                    pair_radius_min;
     float                    pair_max_scale_ratio;
