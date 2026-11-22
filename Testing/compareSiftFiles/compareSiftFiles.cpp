@@ -235,7 +235,6 @@ static float distanceSumBrief( const Parameters& param, ostream* outfile, const 
 
     for( int i = 0; i < len; ++i ) // for loops over signed integer types are faster
     {
-        assert( !nearest_A_B[i].empty );
         l_A[i].printBestMatch( *outfile, print_distances, l_B[nearest_A_B[i].index],
                                nearest_A_B[i].dist, desc_stats );
         *outfile << endl;

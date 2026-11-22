@@ -121,6 +121,7 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
                          const feat_vector_t&      l_query,
                          const feat_vector_t&      l_other )
 {
+
     nearest.clear();
     nearest.resize( l_query.size() );
 
@@ -154,8 +155,7 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
         assert( best != INFINITY );
         nearest[iq] = NearestDesc{ index,
                                    descDistanceFromSum( best ),
-                                   descDistanceFromSum( second ),
-                                   empty };
+                                   descDistanceFromSum( second ) };
     } );
 }
 
