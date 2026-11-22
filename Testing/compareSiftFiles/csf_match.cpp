@@ -234,7 +234,7 @@ bool writePairFiles( const std::filesystem::path& base,
         used_a[p.a] = true;
         used_b[p.b] = true;
         writeFeature( f, p.a, fa );
-        fprintf( f, "," );
+        f << ",";
         writeFeature( f, p.b, fb );
         f << csf::format( ",{:.6g},{:.6g},{:.6g},{:.6g},{:.6g},{:.6g},{}\n",
                           fb.x - fa.x, fb.y - fa.y, p.pos_dist,
