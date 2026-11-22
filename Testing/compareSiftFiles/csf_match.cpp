@@ -121,7 +121,6 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
                          const feat_vector_t&      l_query,
                          const feat_vector_t&      l_other )
 {
-
     nearest.clear();
     nearest.resize( l_query.size() );
 
@@ -155,7 +154,8 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
         assert( best != INFINITY );
         nearest[iq] = NearestDesc{ index,
                                    descDistanceFromSum( best ),
-                                   descDistanceFromSum( second ) };
+                                   descDistanceFromSum( second ),
+                                   empty };
     } );
 }
 
@@ -202,6 +202,7 @@ bool writeNearestFile( const std::filesystem::path& path,
     for( int iq = 0; iq < int(l_query.size()); iq++ )
     {
         const NearestDesc& n = nearest[iq];
+        if( n.empty ) continue;
         const feat_t& fq = l_query[iq];
         const feat_t& fn = l_other[n.index];
         writeFeature( f, iq, fq );
