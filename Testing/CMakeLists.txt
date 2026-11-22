@@ -1,4 +1,4 @@
-# Tools for testing PopSift. Only added when BUILD_TESTING is ON.
+# Tools for testing PopSift. Only added when PopSift_BUILD_TESTING is ON.
 
 add_subdirectory(compareSiftFiles)
 

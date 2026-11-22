@@ -11,7 +11,7 @@
 #                            as part of the normal build.
 #   PopSift_VLFEAT_SIFT_BIN  path of the built 'sift' executable.
 #
-# Included by Testing/CMakeLists.txt when BUILD_TESTING and
+# Included by Testing/CMakeLists.txt when PopSift_BUILD_TESTING and
 # PopSift_TEST_WITH_VLFEAT are both ON. It can also be configured on its own,
 # without CUDA or HIP:
 #
