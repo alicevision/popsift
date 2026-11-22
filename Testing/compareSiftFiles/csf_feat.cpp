@@ -10,7 +10,7 @@
 
 using namespace std;
 
-const float M_PI2 = 2.0f * 3.14159265358979323846f;
+constexpr float M_PI2 = 2.0f * 3.14159265358979323846f;
 
 bool feat_t::_use_l2_distance = true;
 

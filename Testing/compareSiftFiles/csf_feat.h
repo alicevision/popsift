@@ -16,11 +16,11 @@
 #define PAR_UNSEQ
 #endif
 
-const int DescSize = 128;
+constexpr int DescSize = 128;
 
-typedef std::vector<float> desc_t;
+using desc_t = std::vector<float> 
 
-static const float RAD2DEG = 180.0f / 3.14159265358979323846f;
+constexpr float RAD2DEG = 180.0f / 3.14159265358979323846f;
 
 class feat_t
 {

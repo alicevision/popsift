@@ -1,6 +1,7 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <filesystem>
 #include <sstream>
 #include <cmath>
 #include <vector>
@@ -16,7 +17,7 @@
 
 using namespace std;
 
-typedef vector<float> desc_t;
+using desc_t = vector<float>;
 
 /** Read a file containing SIFT descriptors
  */
@@ -66,10 +67,10 @@ static bool writeFiles( const Parameters& param, const vector<NearestDesc>& near
             cerr << "Cannot write desc_bins.csv into " << param.pair_directory << endl;
             return false;
     }
-    const string base = param.pair_directory + "/";
-    if( ! writeNearestFile( base + "desc_nn_a.csv",
+    const std::filesystem::path base( param.pair_directory );
+    if( ! writeNearestFile( (base / "desc_nn_a.csv").string(),
                             l_A, l_B, nearest_A_B, pairs, true ) ||
-        ! writeNearestFile( base + "desc_nn_b.csv",
+        ! writeNearestFile( (base / "desc_nn_b.csv").string(),
                             l_B, l_A, nearest_B_A, pairs, false ) )
     {
             cerr << "Cannot write the descriptor nearest neighbours into " << param.pair_directory << endl;
@@ -188,12 +189,9 @@ static float distanceSumBrief( const Parameters& param, ostream* outfile, const 
 
 static float distanceSum( ostream* outfile, const vector<feat_t>& l_A, const vector<feat_t>& l_B )
 {
-    const int len = l_A.size();
-    float sum_min_dist = 0.0f;
-    for( int i = 0; i < len; i++ )
-    {
-        sum_min_dist += l_A[i].compareAll( *outfile, l_B );
-    }
+    auto sum_min_dist{0.0f};
+    for( const auto& feature : l_A )
+        sum_min_dist += feature.compareAll( *outfile, l_B );
     return sum_min_dist;
 }
 

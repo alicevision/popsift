@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <filesystem>
 #include <numeric>
 
 #include "csf_match.h"
@@ -209,9 +210,9 @@ bool writePairFiles( const string&               dir,
                      const vector<feat_t>&       l_b,
                      const vector<KeypointPair>& pairs )
 {
-    const string base = dir.empty() ? string() : dir + "/";
+    const std::filesystem::path base( dir );
 
-    FILE* f = fopen( ( base + "colocated.csv" ).c_str(), "w" );
+    FILE* f = fopen( (base / "colocated.csv").string().c_str(), "w" );
     if( !f ) return false;
     fprintf( f, "a_index,a_x,a_y,a_sigma,a_ori_deg,"
                 "b_index,b_x,b_y,b_sigma,b_ori_deg,"
@@ -237,8 +238,8 @@ bool writePairFiles( const string&               dir,
     }
     if( fclose( f ) != 0 ) return false;
 
-    return writeUnpaired( base + "only_a.csv", l_a, used_a )
-        && writeUnpaired( base + "only_b.csv", l_b, used_b );
+    return writeUnpaired( (base / "only_a.csv").string(), l_a, used_a )
+        && writeUnpaired( (base / "only_b.csv").string(), l_b, used_b );
 }
 
 bool writeDescBinsFile( const string&               dir,
@@ -266,8 +267,8 @@ bool writeDescBinsFile( const string&               dir,
         }
     }
 
-    const string base = dir.empty() ? string() : dir + "/";
-    FILE* f = fopen( ( base + "desc_bins.csv" ).c_str(), "w" );
+    const std::filesystem::path base( dir );
+    FILE* f = fopen( (base / "desc_bins.csv").string().c_str(), "w" );
     if( !f ) return false;
     fprintf( f, "subset,element,pairs,sum_diff,sum_abs_diff\n" );
     const char* names[2] = { "colocated", "same_orientation" };

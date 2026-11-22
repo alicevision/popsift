@@ -13,8 +13,8 @@ trees, ubc, wall) are published by the Visual Geometry Group, University of
 Oxford, for research use, and are not redistributed with PopSift.
 
 ```sh
-python3 Testing/datasets/download_oxford.py /data/popsift-testdata          # all eight
-python3 Testing/datasets/download_oxford.py /data/popsift-testdata boat graf
+python3 Testing/datasets/download_oxford.py ./data/popsift-testdata          # all eight
+python3 Testing/datasets/download_oxford.py ./data/popsift-testdata boat graf
 ```
 
 downloads them into `<dir>/oxford/<set>/` and checks each archive against
