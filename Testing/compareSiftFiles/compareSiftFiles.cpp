@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <sstream>
 #include <cmath>
+#include <cassert>
 #include <vector>
 #include <algorithm>
 #include <cstring>
@@ -160,6 +161,8 @@ int main( int argc, char* argv[] )
 
 static float distanceSumBrief( const Parameters& param, ostream* outfile, const vector<feat_t>& l_A, const vector<feat_t>& l_B, const vector<NearestDesc>& nearest_A_B )
 {
+    if( l_B.size() == 0 ) return INFINITY;
+
     const int len = static_cast<int>( std::min<size_t>( l_A.size(), std::numeric_limits<int>::max() ) );
 
     ostream*      descfile = openOutputFile( param.descfile_name );
@@ -171,6 +174,7 @@ static float distanceSumBrief( const Parameters& param, ostream* outfile, const 
 
     for( int i = 0; i < len; ++i ) // for loops over signed integer types are faster
     {
+        assert( !nearest_A_B[i].empty );
         l_A[i].printBestMatch( *outfile, print_distances, l_B[nearest_A_B[i].index],
                                nearest_A_B[i].dist, desc_stats );
         *outfile << endl;
