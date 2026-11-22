@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <cassert>
 #include <fstream>
 #include <filesystem>
 #include <numeric>
@@ -201,7 +202,6 @@ bool writeNearestFile( const std::filesystem::path& path,
     for( int iq = 0; iq < int(l_query.size()); iq++ )
     {
         const NearestDesc& n = nearest[iq];
-        if( n.empty ) continue;
         const feat_t& fq = l_query[iq];
         const feat_t& fn = l_other[n.index];
         writeFeature( f, iq, fq );
