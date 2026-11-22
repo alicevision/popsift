@@ -51,7 +51,8 @@ void parseargs( int argc, char** argv, Parameters& param )
             ;
 
         same_image.add_options()
-            ("pair-dir", value<std::string>(&param.pair_directory),
+            // ("pair-dir", value<std::string>(&param.pair_directory),
+            ("pair-dir", value<std::filesystem::path>(&param.pair_directory),
                           "Pair the keypoints of the two files by position and scale, "
                           "rate how far every pair agrees (position only, also "
                           "orientation, also descriptor), and write colocated.csv, "

@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <fstream>
 #include <filesystem>
 #include <numeric>
@@ -156,31 +155,32 @@ void nearestDescriptors( std::vector<NearestDesc>& nearest,
     } );
 }
 
-static void writeFeature( FILE* f, int index, const feat_t& ft )
+static void writeFeature( std::ostream& f, int index, const feat_t& ft )
 {
-    fprintf( f, "%d,%.6g,%.6g,%.6g,%.6g", index, ft.x, ft.y, ft.sigma, ft.ori * RAD2DEG );
+    f << csf::format( "{},{:.6g},{:.6g},{:.6g},{:.6g}", index, ft.x, ft.y, ft.sigma, ft.ori * RAD2DEG );
 }
 
-static bool writeUnpaired( const string& path, const vector<feat_t>& l, const vector<bool>& used )
+static bool writeUnpaired( const std::filesystem::path& path, const vector<feat_t>& l, const vector<bool>& used )
 {
-    FILE* f = fopen( path.c_str(), "w" );
+    std::ofstream f( path );
     if( !f ) return false;
-    fprintf( f, "index,x,y,sigma,ori_deg\n" );
+
+    f << "index,x,y,sigma,ori_deg\n";
     for( int i = 0; i < int(l.size()); i++ )
     {
         if( used[i] ) continue;
         writeFeature( f, i, l[i] );
-        fprintf( f, "\n" );
+        f << "\n";
     }
-    return fclose( f ) == 0;
+    return !f.fail();
 }
 
-bool writeNearestFile( const string&               path,
-                       const vector<feat_t>&       l_query,
-                       const vector<feat_t>&       l_other,
-                       const vector<NearestDesc>&  nearest,
-                       const vector<KeypointPair>& pairs,
-                       bool                        pairs_query_first )
+bool writeNearestFile( const std::filesystem::path& path,
+                       const vector<feat_t>&        l_query,
+                       const vector<feat_t>&        l_other,
+                       const vector<NearestDesc>&   nearest,
+                       const vector<KeypointPair>&  pairs,
+                       bool                         pairs_query_first )
 {
     vector<int> colocated( l_query.size(), -1 );
     for( const KeypointPair& p : pairs )
@@ -189,11 +189,12 @@ bool writeNearestFile( const string&               path,
         else                    colocated[p.b] = p.a;
     }
 
-    FILE* f = fopen( path.c_str(), "w" );
+    std::ofstream f( path );
     if( !f ) return false;
-    fprintf( f, "q_index,q_x,q_y,q_sigma,q_ori_deg,"
-                "n_index,n_x,n_y,n_sigma,n_ori_deg,"
-                "desc_dist,second_desc_dist,pos_dist,ori_diff_deg,colocated_index\n" );
+
+    f << "q_index,q_x,q_y,q_sigma,q_ori_deg,"
+         "n_index,n_x,n_y,n_sigma,n_ori_deg,"
+         "desc_dist,second_desc_dist,pos_dist,ori_diff_deg,colocated_index\n";
     for( int iq = 0; iq < int(l_query.size()); iq++ )
     {
         const NearestDesc& n = nearest[iq];
@@ -201,29 +202,28 @@ bool writeNearestFile( const string&               path,
         const feat_t& fq = l_query[iq];
         const feat_t& fn = l_other[n.index];
         writeFeature( f, iq, fq );
-        fprintf( f, "," );
+        f << ",";
         writeFeature( f, n.index, fn );
-        fprintf( f, ",%.6g,%.6g,%.6g,%.6g,%d\n",
-                 n.dist, n.second,
-                 fq.l2PixDist(fn), // sqrtf( (fn.x-fq.x)*(fn.x-fq.x) + (fn.y-fq.y)*(fn.y-fq.y) ),
-                 fq.signedAngleDiffDegrees(fn),
-                 colocated[iq] );
+        f << csf::format( ",{:.6g},{:.6g},{:.6g},{:.6g},{}\n",
+                          n.dist, n.second,
+                          fq.l2PixDist(fn), // sqrtf( (fn.x-fq.x)*(fn.x-fq.x) + (fn.y-fq.y)*(fn.y-fq.y) ),
+                          fq.signedAngleDiffDegrees(fn),
+                          colocated[iq] );
     }
-    return fclose( f ) == 0;
+    return !f.fail();
 }
 
-bool writePairFiles( const string&               dir,
-                     const vector<feat_t>&       l_a,
-                     const vector<feat_t>&       l_b,
-                     const vector<KeypointPair>& pairs )
+bool writePairFiles( const std::filesystem::path& base,
+                     const vector<feat_t>&        l_a,
+                     const vector<feat_t>&        l_b,
+                     const vector<KeypointPair>&  pairs )
 {
-    const std::filesystem::path base( dir );
-
-    FILE* f = fopen( (base / "colocated.csv").string().c_str(), "w" );
+    std::ofstream f( base / "colocated.csv" );
     if( !f ) return false;
-    fprintf( f, "a_index,a_x,a_y,a_sigma,a_ori_deg,"
-                "b_index,b_x,b_y,b_sigma,b_ori_deg,"
-                "dx,dy,pos_dist,scale_ratio,ori_diff_deg,desc_dist,agreement\n" );
+
+    f << "a_index,a_x,a_y,a_sigma,a_ori_deg,"
+         "b_index,b_x,b_y,b_sigma,b_ori_deg,"
+         "dx,dy,pos_dist,scale_ratio,ori_diff_deg,desc_dist,agreement\n";
 
     vector<bool> used_a( l_a.size(), false );
     vector<bool> used_b( l_b.size(), false );
@@ -236,24 +236,24 @@ bool writePairFiles( const string&               dir,
         writeFeature( f, p.a, fa );
         fprintf( f, "," );
         writeFeature( f, p.b, fb );
-        fprintf( f, ",%.6g,%.6g,%.6g,%.6g,%.6g,%.6g,%s\n",
-                 fb.x - fa.x, fb.y - fa.y, p.pos_dist,
-                 fa.sigma > 0.0f ? fb.sigma / fa.sigma : 0.0f,
-                 p.ori_diff,
-                 p.desc_dist,
-                 agreementName( p.level ).data() ); // data() is a hack
+        f << csf::format( ",{:.6g},{:.6g},{:.6g},{:.6g},{:.6g},{:.6g},{}\n",
+                          fb.x - fa.x, fb.y - fa.y, p.pos_dist,
+                          fa.sigma > 0.0f ? fb.sigma / fa.sigma : 0.0f,
+                          p.ori_diff,
+                          p.desc_dist,
+                          agreementName( p.level ) ); // data() is a hack
     }
-    if( fclose( f ) != 0 ) return false;
+    if( f.fail() ) return false;
 
-    return writeUnpaired( (base / "only_a.csv").string(), l_a, used_a )
-        && writeUnpaired( (base / "only_b.csv").string(), l_b, used_b );
+    return writeUnpaired( base / "only_a.csv", l_a, used_a )
+        && writeUnpaired( base / "only_b.csv", l_b, used_b );
 }
 
-bool writeDescBinsFile( const string&               dir,
-                        const vector<feat_t>&       l_a,
-                        const vector<feat_t>&       l_b,
-                        const vector<KeypointPair>& pairs )
-{
+bool writeDescBinsFile( const std::filesystem::path& base,
+                        const vector<feat_t>&        l_a,
+                        const vector<feat_t>&        l_b,
+                        const vector<KeypointPair>&  pairs )
+ {
     // [subset][element]: subset 0 is all co-located pairs, 1 those with the
     // same orientation
     long   count[2]             = { 0, 0 };
@@ -274,17 +274,19 @@ bool writeDescBinsFile( const string&               dir,
         }
     }
 
-    const std::filesystem::path base( dir );
-    FILE* f = fopen( (base / "desc_bins.csv").string().c_str(), "w" );
+    std::ofstream f( base / "desc_bins.csv" );
     if( !f ) return false;
-    fprintf( f, "subset,element,pairs,sum_diff,sum_abs_diff\n" );
-    const char* names[2] = { "colocated", "same_orientation" };
+
+    f << "subset,element,pairs,sum_diff,sum_abs_diff\n";
+    constexpr std::string_view names[2] = { "colocated", "same_orientation" };
+
     for( int s = 0; s < 2; s++ )
     {
         for( int i = 0; i < DescSize; i++ )
         {
-            fprintf( f, "%s,%d,%ld,%.9g,%.9g\n", names[s], i, count[s], sum[s][i], sum_abs[s][i] );
+            f << csf::format( "{},{},{},{:.9g},{:.9g}\n", names[s], i, count[s], sum[s][i], sum_abs[s][i] );
         }
     }
-    return fclose( f ) == 0;
+    return !f.fail();
 }
+
