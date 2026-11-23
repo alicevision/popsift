@@ -11,7 +11,7 @@
 #                 .ppm files, named by its path relative to it, e.g.
 #                 oxford/boat for <dir>/oxford/boat/.
 #
-# Included by Testing/CMakeLists.txt when BUILD_TESTING is ON. Afterwards
+# Included by Testing/CMakeLists.txt when PopSift_BUILD_TESTING is ON. Afterwards
 # these variables describe the sets:
 #   PopSift_TEST_IMAGE_SETS              names, e.g. handcrafted;oxford/boat
 #   PopSift_TEST_IMAGE_SET_<id>_DIR      the folder of the set
