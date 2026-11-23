@@ -2,7 +2,7 @@
 
 Require at least Python 3.8 and nothing beyond its standard library.
 They read the binaries, parameter sets and image sets from
-`popsift-testing-config.json`, which CMake writes into the build directory when `BUILD_TESTING` is ON. The `vlfeat` run needs
+`popsift-testing-config.json`, which CMake writes into the build directory when `PopSift_BUILD_TESTING` is ON. The `vlfeat` run needs
 `PopSift_TEST_WITH_VLFEAT` ON as well.
 
 ## Runs and parameter sets

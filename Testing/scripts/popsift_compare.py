@@ -78,7 +78,7 @@ def load_tools(path):
     except OSError as e:
         raise CompareError(f"cannot read {path}: {e.strerror}. "
                            "It is written when CMake configures with "
-                           "-DBUILD_TESTING=ON.")
+                           "-DPopSift_BUILD_TESTING=ON.")
     for key in ("popsift_demo", "compare_sift_files", "vlfeat_sift",
                 "paramsets", "image_sets"):
         if key not in tools:
@@ -91,7 +91,7 @@ def find_tools_file(build_dir):
     path = os.path.join(build_dir, TOOLS_FILE)
     if not os.path.exists(path):
         raise CompareError(f"no {TOOLS_FILE} in {build_dir}. Configure that "
-                           "build with -DBUILD_TESTING=ON first.")
+                           "build with -DPopSift_BUILD_TESTING=ON first.")
     return path
 
 

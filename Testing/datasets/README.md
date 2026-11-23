@@ -1,7 +1,7 @@
 # Test image sets
 
 The comparison scripts in `Testing/scripts` run on image sets that configure
-finds on disk when `BUILD_TESTING` is ON. Configure never downloads anything,
+finds on disk when `PopSift_BUILD_TESTING` is ON. Configure never downloads anything,
 and prints the sets it found:
 
 ```text

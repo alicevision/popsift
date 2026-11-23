@@ -2,18 +2,18 @@
 
 The tools in this folder compare the keypoints and descriptors that PopSift
 finds with those of VLFeat, or of one PopSift parameter set with another.
-They are built when `BUILD_TESTING` is ON and are run by hand.
+They are built when `PopSift_BUILD_TESTING` is ON and are run by hand.
 
 ## Configure options
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `BUILD_TESTING` | OFF | Builds `popsift-compareSiftFiles` and `popsift-gpu-probe`, finds the test image sets and writes `popsift-testing-config.json` into the build directory. |
-| `PopSift_TEST_WITH_VLFEAT` | OFF | Also downloads, patches and builds VLFeat's `sift` CLI as the reference (needs `BUILD_TESTING`). |
+| `PopSift_BUILD_TESTING` | OFF | Builds `popsift-compareSiftFiles` and `popsift-gpu-probe`, finds the test image sets and writes `popsift-testing-config.json` into the build directory. |
+| `PopSift_TEST_WITH_VLFEAT` | OFF | Also downloads, patches and builds VLFeat's `sift` CLI as the reference (needs `PopSift_BUILD_TESTING`). |
 | `PopSift_TESTDATA_DIR` | `$POPSIFT_TESTDATA_DIR` | Folder of your own test images. Every folder below it that holds .pgm or .ppm files becomes an image set. |
 
 ```sh
-cmake -S . -B build -DBUILD_TESTING=ON -DPopSift_TEST_WITH_VLFEAT=ON \
+cmake -S . -B build -DPopSift_BUILD_TESTING=ON -DPopSift_TEST_WITH_VLFEAT=ON \
       -DPopSift_TESTDATA_DIR=/data/popsift-testdata
 cmake --build build
 python3 Testing/scripts/popsift_compare.py --tools build/popsift-testing-config.json \
