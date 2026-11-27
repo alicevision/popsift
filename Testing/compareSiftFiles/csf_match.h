@@ -52,7 +52,7 @@ enum class Agreement
      */
     Orientation,
 
-    /** All values including descriptor are simular.
+    /** All values including descriptor are similar.
      */
     Descriptor
 };
