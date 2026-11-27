@@ -1,0 +1,25 @@
+[project]
+name = "popsift-testing-tools"
+version = "0.1.0"
+description = "Development and testing tools for the PopSift project."
+readme = "README.md"
+license = "MPL-2.0"
+license-files = ["COPYING.md"]
+requires-python = ">=3.12"
+dependencies = []
+keywords = ["SIFT", "computer vision", "feature detection", "CUDA", "HIP"]
+
+[project.urls]
+Homepage = "https://github.com/alicevision/popsift"
+Documentation = "https://popsift.readthedocs.io/"
+Repository = "https://github.com/alicevision/popsift"
+Issues = "https://github.com/alicevision/popsift/issues"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.6",
+    "ty>=0.0.107",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

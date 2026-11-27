@@ -1,0 +1,8 @@
+{
+  "images": {
+    "box-12x12-symm.pgm": {
+      "allow_empty": true,
+      "note": "The ring is perfectly symmetric. At the original resolution its DoG extremum falls between four pixels of identical value, so no pixel is a strict extremum and neither PopSift nor VLFeat detects a keypoint. box-12x12.pgm breaks the symmetry and yields keypoints at (5.5, 5.5)."
+    }
+  }
+}

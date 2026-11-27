@@ -1,0 +1,26 @@
+#pragma once
+
+#define CSF_IS_DEFINED(F)   F() == 1
+#define CSF_IS_UNDEFINED(F) F() == 0
+
+#define CSF_HAVE_PAR_EXECUTION()      @Csf_HAVE_PAR_EXECUTION@
+
+#define CSF_HAVE_STD_FORMAT()         @Csf_HAVE_STD_FORMAT@
+
+/* csf::format is std::format, or fmt::format for C++17 compilers (see
+ * cmake/CheckStdFormat.cmake). Both check the format string at compile time.
+ * Use only format specs that both libraries interpret identically.
+ */
+#if CSF_IS_DEFINED(CSF_HAVE_STD_FORMAT)
+#include <format>
+namespace csf {
+    using std::format;
+    using std::format_to;
+}
+#else
+#include <fmt/format.h>
+namespace csf {
+    using fmt::format;
+    using fmt::format_to;
+}
+#endif
