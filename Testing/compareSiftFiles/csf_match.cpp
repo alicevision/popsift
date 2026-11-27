@@ -37,8 +37,8 @@ static constexpr std::string_view agreementName( Agreement level )
     return "?";
 }
 
-vector<KeypointPair> matchKeypointsByPosition( const vector<feat_t>& l_a,
-                                               const vector<feat_t>& l_b,
+vector<KeypointPair> matchKeypointsByPosition( const feat_vector_t&  l_a,
+                                               const feat_vector_t&  l_b,
                                                const PairParams&     param )
 {
     // Indices of l_b sorted by x, so that the candidates of a feature are
@@ -101,8 +101,8 @@ vector<KeypointPair> matchKeypointsByPosition( const vector<feat_t>& l_a,
 }
 
 void classifyAgreement( vector<KeypointPair>& pairs,
-                        const vector<feat_t>& l_a,
-                        const vector<feat_t>& l_b,
+                        const feat_vector_t&  l_a,
+                        const feat_vector_t&  l_b,
                         const PairParams&     param )
 {
     for( KeypointPair& p : pairs )
@@ -118,8 +118,8 @@ void classifyAgreement( vector<KeypointPair>& pairs,
 }
 
 void nearestDescriptors( std::vector<NearestDesc>& nearest,
-                         const std::vector<feat_t>& l_query,
-                         const std::vector<feat_t>& l_other )
+                         const feat_vector_t&      l_query,
+                         const feat_vector_t&      l_other )
 {
 
     nearest.clear();
@@ -164,7 +164,7 @@ static void writeFeature( std::ostream& f, int index, const feat_t& ft )
     f << csf::format( "{},{:.6g},{:.6g},{:.6g},{:.6g}", index, ft.x, ft.y, ft.sigma, ft.ori * RAD2DEG );
 }
 
-static bool writeUnpaired( const std::filesystem::path& path, const vector<feat_t>& l, const vector<bool>& used )
+static bool writeUnpaired( const std::filesystem::path& path, const feat_vector_t& l, const vector<bool>& used )
 {
     std::ofstream f( path );
     if( !f ) return false;
@@ -180,8 +180,8 @@ static bool writeUnpaired( const std::filesystem::path& path, const vector<feat_
 }
 
 bool writeNearestFile( const std::filesystem::path& path,
-                       const vector<feat_t>&        l_query,
-                       const vector<feat_t>&        l_other,
+                       const feat_vector_t&         l_query,
+                       const feat_vector_t&         l_other,
                        const vector<NearestDesc>&   nearest,
                        const vector<KeypointPair>&  pairs,
                        bool                         pairs_query_first )
@@ -217,8 +217,8 @@ bool writeNearestFile( const std::filesystem::path& path,
 }
 
 bool writePairFiles( const std::filesystem::path& base,
-                     const vector<feat_t>&        l_a,
-                     const vector<feat_t>&        l_b,
+                     const feat_vector_t&         l_a,
+                     const feat_vector_t&         l_b,
                      const vector<KeypointPair>&  pairs )
 {
     std::ofstream f( base / "colocated.csv" );
@@ -253,8 +253,8 @@ bool writePairFiles( const std::filesystem::path& base,
 }
 
 bool writeDescBinsFile( const std::filesystem::path& base,
-                        const vector<feat_t>&        l_a,
-                        const vector<feat_t>&        l_b,
+                        const feat_vector_t&         l_a,
+                        const feat_vector_t&         l_b,
                         const vector<KeypointPair>&  pairs )
  {
     // [subset][element]: subset 0 is all co-located pairs, 1 those with the

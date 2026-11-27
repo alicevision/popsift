@@ -57,7 +57,7 @@ float descDistanceFromSum( float sum )
     return feat_t::_use_l2_distance ? sqrtf( sum ) : sum;
 }
 
-int readFeats( vector<feat_t>& l_one, ifstream& f_one )
+int readFeats( feat_vector_t& l_one, ifstream& f_one )
 {
     string line;
     int    line_no = 0;
@@ -76,7 +76,7 @@ int readFeats( vector<feat_t>& l_one, ifstream& f_one )
     return malformed ? -1 : int( l_one.size() );
 }
 
-bool addFeat( vector<feat_t>& features, const string& line )
+bool addFeat( feat_vector_t& features, const string& line )
 {
     vector<float> values; // 4 or 5 values followed by DescSize desc values
     values.reserve( 5+DescSize );
@@ -103,7 +103,7 @@ bool addFeat( vector<feat_t>& features, const string& line )
 }
 
 feat_t::feat_t( int num, const vector<float>& input )
-    : desc(DescSize)
+    : desc{0}
 {
     auto it = input.begin();
     auto to = desc.begin();
@@ -143,7 +143,7 @@ void feat_t::print( ostream& ostr ) const
     }
 }
 
-float feat_t::compareAll( ostream& ostr, const vector<feat_t>& l_B ) const
+float feat_t::compareAll( ostream& ostr, const feat_vector_t& l_B ) const
 {
     vector<float> distances( l_B.size() );
     transform( PAR_UNSEQ l_B.begin(), l_B.end(), distances.begin(),
@@ -165,7 +165,7 @@ float feat_t::compareAll( ostream& ostr, const vector<feat_t>& l_B ) const
     return m == distances.end() ? 0.0f : *m;
 }
 
-void feat_t::printBestMatch( ostream& ostr, ostream* dstr, const feat_t& r, float d, vector<float>& desc_stats ) const
+void feat_t::printBestMatch( ostream& ostr, ostream* dstr, const feat_t& r, float d, desc_t& desc_stats ) const
 {
     ostr << "desc dist " << d
          << " MIN"

@@ -31,9 +31,9 @@ void parseargs( int argc, char** argv, Parameters& param )
             ("help,h", "Print usage")
             ("verbose,v", value<bool>( &longinfo )->default_value(false),
                           "verbose, longer output")
-            ("output,o",  value<std::string>(&param.outfile_name),
+            ("output,o",  value<std::filesystem::path>(&param.outfile_name),
                           "print essential diff info to <file> (default is cout)")
-            ("desc,d",    value<std::string>(&param.descfile_name),
+            ("desc,d",    value<std::filesystem::path>(&param.descfile_name),
                           "print descriptor distance per cell to <file>")
             ("dv",        value<bool>(&param.descfile_verbose)->default_value(false),
                           "prints every comparison into descfile, instead of summary only")
