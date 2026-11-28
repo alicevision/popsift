@@ -5,14 +5,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <stdio.h>
-#include <iso646.h>
-
-#include "sift_constants.h"
-#include "s_gradiant.h"
-#include "s_desc_iloop.h"
 #include "common/assist.h"
 #include "common/vec_macros.h"
+#include "s_desc_iloop.h"
+#include "s_gradiant.h"
+#include "sift_constants.h"
+
+#include <cstdio>
 
 using namespace popsift;
 
@@ -20,7 +19,7 @@ __device__ static inline
 void ext_desc_iloop_sub( const float         ang,
                         const Extremum*     ext,
                         float* __restrict__ features,
-                        cudaTextureObject_t layer_tex,
+                        LayeredReadTex      layer_tex,
                         const int           width,
                         const int           height )
 {
@@ -115,13 +114,15 @@ void ext_desc_iloop_sub( const float         ang,
     dpt[0] += dpt[8];
 
     /* reduction here */
+    // Reduction over the 32 threads of one descriptor tile; the shuffle width is
+    // that tile width, not the hardware warp size (see s_desc_loop.cu).
     for (int i = 0; i < 8; i++) {
-        dpt[i] += __shfl_down( dpt[i], 16 );
-        dpt[i] += __shfl_down( dpt[i], 8 );
-        dpt[i] += __shfl_down( dpt[i], 4 );
-        dpt[i] += __shfl_down( dpt[i], 2 );
-        dpt[i] += __shfl_down( dpt[i], 1 );
-        dpt[i]  = __shfl     ( dpt[i], 0 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 16, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 8, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 4, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 2, 32 );
+        dpt[i] += popsift::shuffle_down( dpt[i], 1, 32 );
+        dpt[i]  = popsift::shuffle     ( dpt[i], 0, 32 );
     }
 
     if( threadIdx.x < 8 ) {
@@ -129,11 +130,7 @@ void ext_desc_iloop_sub( const float         ang,
     }
 }
 
-__global__
-void ext_desc_iloop( const int           octave,
-                     cudaTextureObject_t layer_tex,
-                     const int           w,
-                     const int           h )
+__global__ void ext_desc_iloop(int octave, LayeredReadTex layer_tex, int w, int h)
 {
     const int   o_offset =  dct.ori_ps[octave] + blockIdx.x;
     Descriptor* desc     = &dbuf.desc           [o_offset];

@@ -7,8 +7,9 @@
  */
 #pragma once
 
+#include "assist.h"
+
 #include <cuda_runtime.h>
-#include <iso646.h>
 
 namespace popsift {
 namespace BitonicSort {
@@ -56,16 +57,20 @@ private:
     __device__ inline
     int shiftit( const int my_index, const int shift, const int direction, const bool increasing )
     {
+        // This is a 32-lane bitonic step: the caller launches a 32-thread block
+        // and sort64 holds 2 elements per thread. The shuffle width is that
+        // network width, not the hardware warp size, so a 64-lane wavefront does
+        // not exchange elements across the two halves of the sorting network.
         const T    my_val      = _array[my_index];
-        const T    other_val   = __shfl_xor( my_val, 1 << shift );
+        const T    other_val   = popsift::shuffle_xor( my_val, 1 << shift, 32 );
         const bool reverse     = ( threadIdx.x & ( 1 << direction ) );
         const bool id_less     = ( ( threadIdx.x & ( 1 << shift ) ) == 0 );
         const bool my_more     = id_less ? ( my_val > other_val )
                                          : ( my_val < other_val );
-        const bool must_swap   = not ( my_more ^ reverse ^ increasing );
+        const bool must_swap   = ! ( my_more ^ reverse ^ increasing );
 
-        return ( must_swap ? __shfl_xor( my_index, 1 << shift )
-                           : my_index );
+        int lane = must_swap ? ( 1 << shift ) : 0;
+        return popsift::shuffle_xor( my_index, lane, 32 );
     }
 
     __device__ inline

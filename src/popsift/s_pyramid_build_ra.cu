@@ -5,10 +5,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+#include "common/assist.h"
+#include "gauss_filter.h"
 #include "s_pyramid_build_ra.h"
 #include "sift_constants.h"
-#include "gauss_filter.h"
-#include "common/assist.h"
 
 namespace popsift {
 namespace gauss {
@@ -19,21 +19,15 @@ void horiz( cudaTextureObject_t src_linear_tex,
             cudaSurfaceObject_t dst_data,
             int                 dst_w,
             int                 dst_h,
-            int                 octave,
             float               shift )
 {
-    // Create level-0 for any octave from the input image.
-    // Since we are computing the direct-downscaling gauss filter tables
-    // and the first entry in that table is identical to the "normal"
-    // table, we do not need a special case.
-
     const int    write_x = blockIdx.x * blockDim.x + threadIdx.x;
     const int    write_y = blockIdx.y;
 
     if( write_x >= dst_w ) return;
 
-    const int    span    =  d_gauss.dd.span[octave];
-    const float* filter  = &d_gauss.dd.filter[octave*GAUSS_ALIGN];
+    const int    span    =  d_gauss.dd.span[0];
+    const float* filter  = &d_gauss.dd.filter[0];
     const float  read_x  = ( blockIdx.x * blockDim.x + threadIdx.x + shift ) / dst_w;
     const float  read_y  = ( blockIdx.y + shift ) / dst_h;
 

@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <cstdint>
+
 template<class T>
 __device__ __host__
 inline T clamp( T val, uint32_t maxval )

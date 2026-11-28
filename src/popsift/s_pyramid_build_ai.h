@@ -5,32 +5,23 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+#include "common/assist.h"
 #include "common/plane_2d.h"
 
 namespace popsift {
 namespace gauss {
 namespace absoluteSourceInterpolated {
 
-__global__
-void horiz( cudaTextureObject_t src_linear_tex,
-            cudaSurfaceObject_t dst_data,
-            const int           dst_level );
+__global__ void horiz(LayeredReadTex src_linear_tex, cudaSurfaceObject_t dst_data, int dst_level);
 
-__global__
-void vert( cudaTextureObject_t src_linear_tex,
-           cudaSurfaceObject_t dst_data,
-           const int           dst_level );
+__global__ void vert(LayeredReadTex src_linear_tex, cudaSurfaceObject_t dst_data, int dst_level);
 
-__global__
-void vert_abs0( cudaTextureObject_t src_linear_tex,
-           cudaSurfaceObject_t dst_data,
-           const int           dst_level );
+__global__ void vert_abs0(LayeredReadTex src_linear_tex, cudaSurfaceObject_t dst_data, int dst_level);
 
-__global__
-void vert_all_abs0( cudaTextureObject_t src_linear_tex,
-                    cudaSurfaceObject_t dst_data,
-                    const int           start_level,
-                    const int           max_level );
+__global__ void vert_all_abs0(LayeredReadTex src_linear_tex,
+                              cudaSurfaceObject_t dst_data,
+                              int start_level,
+                              int max_level);
 
 } // namespace absoluteSourceInterpolated
 } // namespace gauss

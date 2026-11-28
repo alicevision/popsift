@@ -1,0 +1,204 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+    # Skip jobs when only documentation files are changed
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
+  # Allows manual triggering from GitHub UI or CLI
+  workflow_dispatch:
+  # Weekly build every Monday at 8:10 UTC
+  schedule:
+    - cron: "10 8 * * 1"
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["alicevision/popsift-deps:cuda11.8.0-ubuntu20.04", "alicevision/popsift-deps:cuda12.1.0-ubuntu22.04"]
+
+    container:
+      image: ${{ matrix.container }}
+
+    env:
+      DEPS_INSTALL_DIR: /opt/
+      CTEST_OUTPUT_ON_FAILURE: 1
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Make scripts executable
+        run: chmod +x ./.github/scripts/*.sh
+
+      - name: Build Release Configuration
+        uses: ./.github/actions/build-config
+        with:
+          build-type: 'Release'
+          platform: 'linux'
+          deps-install-dir: ${{ env.DEPS_INSTALL_DIR }}
+
+      - name: Build Debug Configuration
+        # Skip Debug build for CUDA 11.8 because of a strange seg fault at compilation time
+        if: ${{ !contains(matrix.container, 'cuda11.8.0') }}
+        uses: ./.github/actions/build-config
+        with:
+          build-type: 'Debug'
+          platform: 'linux'
+          deps-install-dir: ${{ env.DEPS_INSTALL_DIR }}
+
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        cuda_version: ["12.5.1", "12.9.0"]
+
+    env:
+      VCPKG_SRC_DIR: ${{ github.workspace }}\vcpkg
+      VCPKG_INSTALLED_DIR: ${{ github.workspace }}\vcpkg\vcpkg_installed
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Cache CUDA installation
+      - name: Cache CUDA installation
+        id: cache-cuda
+        uses: actions/cache@v3
+        with:
+          path: |
+            C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA
+            C:\Program Files\NVIDIA Corporation\Installer2
+          key: cuda-${{ matrix.cuda_version }}-${{ runner.os }}
+          restore-keys: |
+            cuda-${{ matrix.cuda_version }}-
+
+      - name: Install CUDA
+        if: steps.cache-cuda.outputs.cache-hit != 'true'
+        uses: Jimver/cuda-toolkit@v0.2.24
+        with:
+          cuda: ${{ matrix.cuda_version }}
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "visual_studio_integration"]'
+          use-github-cache: true
+          use-local-cache: true
+
+      # Add CUDA to PATH if restored from cache
+      - name: Add CUDA to PATH (cached)
+        if: steps.cache-cuda.outputs.cache-hit == 'true'
+        shell: powershell
+        run: |
+          # Extract major.minor from matrix.cuda_version (e.g., "12.5.1" -> "12.5")
+          $cudaVersion = "${{ matrix.cuda_version }}"
+          $cudaMajorMinor = ($cudaVersion -split '\.')[0..1] -join '.'
+          $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v$cudaMajorMinor"
+          $cudaVersionEnv = $cudaVersion.Replace('.', '_')
+          echo "$cudaPath\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "CUDA_PATH=$cudaPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "CUDA_TOOLKIT_ROOT_DIR=$cudaPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "CUDA_BIN_PATH=$cudaPath\bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "CUDA_PATH_V$cudaVersionEnv=$cudaPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      # debug info about the env variables
+      - name: (debug) Print CUDA env variables
+        shell: pwsh
+        run: |
+          $cudaVersionEnv = "${{ matrix.cuda_version }}".Replace('.', '_')
+          Write-Host "CUDA_PATH: $env:CUDA_PATH"
+          Write-Host "CUDA_TOOLKIT_ROOT_DIR: $env:CUDA_TOOLKIT_ROOT_DIR"
+          Write-Host "CUDA_BIN_PATH: $env:CUDA_BIN_PATH"
+          Write-Host "CUDA_PATH_V${cudaVersionEnv}: $env:CUDA_PATH_V$cudaVersionEnv"
+          Write-Host "PATH: $env:PATH"
+
+      # # debug info about nvcc
+      # - name: (debug) Check nvcc in PATH (PowerShell)
+      #   shell: pwsh
+      #   run: |
+      #     $nvcc = Get-Command nvcc.exe -ErrorAction SilentlyContinue
+      #     if ($null -eq $nvcc) {
+      #       Write-Host "nvcc.exe not found in PATH"
+      #       exit 1
+      #     } else {
+      #       Write-Host "nvcc.exe found at $($nvcc.Source)"
+      #       nvcc --version
+      #     }
+
+      # # debug info about nvcc
+      # - name: (debug) List CUDA cache contents
+      #   if: steps.cache-cuda.outputs.cache-hit == 'true'
+      #   shell: pwsh
+      #   run: |
+      #     Write-Host "Listing CUDA directory:"
+      #     Get-ChildItem -Path "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+      #     Write-Host "Listing Installer2 directory:"
+      #     Get-ChildItem -Path "C:\Program Files\NVIDIA Corporation\Installer2" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+
+      # Cache vcpkg installation and dependencies
+      - name: Cache vcpkg
+        id: cache-vcpkg
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.VCPKG_SRC_DIR }}
+            ${{ env.VCPKG_INSTALLED_DIR}}
+          key: vcpkg-${{ hashFiles('**/vcpkg.json', '.github/workflows/continuous-integration.yml') }}-${{ runner.os }}
+          restore-keys: |
+            vcpkg-
+
+      - name: Set up vcpkg
+        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: '${{ env.VCPKG_SRC_DIR }}'
+          vcpkgGitCommitId: 'f7423ee180c4b7f40d43402c2feb3859161ef625'
+          vcpkgJsonGlob: 'vcpkg.json'
+
+      # # debug info about cache
+      # - name: (debug) List vcpkg cache contents
+      #   run: |
+      #     if (Test-Path "$env:VCPKG_SRC_DIR") {
+      #       Write-Host "Directory $env:VCPKG_SRC_DIR exists:"
+      #       dir "$env:VCPKG_SRC_DIR"
+      #     } else {
+      #       Write-Host "Directory $env:VCPKG_SRC_DIR does not exist."
+      #     }
+      #     if (Test-Path "$env:VCPKG_INSTALLED_DIR") {
+      #       Write-Host "Directory $env:VCPKG_INSTALLED_DIR exists:"
+      #       dir "$env:VCPKG_INSTALLED_DIR"
+      #     } else {
+      #       Write-Host "Directory $env:VCPKG_INSTALLED_DIR does not exist."
+      #     }
+      #   shell: pwsh
+
+      # debug info about the packages
+      - name: (debug) List vcpkg installed (Debug)
+        run: |
+          $env:VCPKG_ROOT = "$env:VCPKG_SRC_DIR"
+          $env:VCPKG_DEFAULT_TRIPLET = "x64-windows"
+          & "$env:VCPKG_SRC_DIR\vcpkg.exe" list
+        shell: pwsh
+
+      - name: Build Release Configuration
+        uses: ./.github/actions/build-config
+        with:
+          build-type: 'Release'
+          platform: 'windows'
+          vcpkg-root: '${{ env.VCPKG_SRC_DIR }}'
+          workspace-dir: '${{ github.workspace }}'
+
+      - name: Build Debug Configuration
+        uses: ./.github/actions/build-config
+        with:
+          build-type: 'Debug'
+          platform: 'windows'
+          vcpkg-root: '${{ env.VCPKG_SRC_DIR }}'
+          workspace-dir: '${{ github.workspace }}'

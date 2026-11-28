@@ -1,0 +1,314 @@
+#include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <filesystem>
+#include <sstream>
+#include <cmath>
+#include <cassert>
+#include <vector>
+#include <algorithm>
+#include <cstring>
+#include <cstdlib>
+#include <limits>
+
+#include <boost/program_options.hpp>
+
+#include "csf_feat.h"
+#include "csf_match.h"
+#include "csf_options.h"
+
+using namespace std;
+
+/** Reads a descriptor file with readFeats() and prints the count to cerr.
+ * Terminates the process with exit code -1 if the file cannot be opened, and
+ * with EXIT_FAILURE if it contains malformed lines.
+ * @param[in,out] vec      features are appended
+ * @param[in]     filename descriptor file
+ */
+void readFile( feat_vector_t& vec, const std::string& filename );
+
+/** Writes the average descriptor differences stats[i]/sz.
+ * Meant for SIFT descriptors, where each blocks of 8 subsequent descriptors
+ * value represents the gradient histogram of one of the 4x4 regions around
+ * a keypoint. Precision 3.
+ * @param[in,out] file  output stream
+ * @param[in]     stats sums of differences per descriptor element
+ * @param[in]     sz    number of samples summed in stats
+ * @pre sz > 0
+ */
+void writeSummary( ostream& file, const desc_t& stats, std::size_t sz );
+
+/** Opens a file for writing, truncating it.
+ * @param[in] name file name, or empty
+ * @return a new stream that the caller must delete, or nullptr if name is
+ *         empty or the file cannot be opened
+ */
+static ostream* openOutputFile( const std::filesystem::path& name );
+
+/** For every feature in l_A, this prints the best match found in l_B
+ * using feat_t::printBestMatch() to outfile.
+ * Also writes the differences to every feature in l_B if
+ * param.descfile_name is given, either as a summary with writeSummary() or
+ * the complete difference line if param.descfile_verbose is true.
+ * @param[in]     param       uses descfile_name and descfile_verbose
+ * @param[in,out] outfile     output stream, not null
+ * @param[in]     l_A         first feature list
+ * @param[in]     l_B         second feature list, not empty
+ * @param[in]     nearest_A_B nearestDescriptors( ..., l_A, l_B )
+ * @return the sum of nearest_A_B[i].dist
+ */
+static float distanceSumBrief( const Parameters& param, ostream* outfile, const feat_vector_t& l_A, const feat_vector_t& l_B, const vector<NearestDesc>& nearest_A_B );
+
+/** Prints feat_t::compareAll() of every feature of l_A to outfile, |l_A|*(|l_B|+1) lines.
+ * @param[in,out] outfile output stream, not null
+ * @param[in]     l_A     first feature list
+ * @param[in]     l_B     second feature list
+ * @return the sum of the compareAll() results
+ */
+static float distanceSum( ostream* outfile, const feat_vector_t& l_A, const feat_vector_t& l_B );
+
+/** If param.pair_directory is set, pairs l_A and l_B by position, classifies
+ * them, writes colocated.csv, only_a.csv, only_b.csv, desc_bins.csv,
+ * desc_nn_a.csv and desc_nn_b.csv there, and prints the pair counts to cerr.
+ * @param[in] param       options; uses pair_directory, the pair_* and
+ *                        tolerance values, and input for the messages
+ * @param[in] nearest_A_B nearestDescriptors( ..., l_A, l_B )
+ * @param[in] nearest_B_A nearestDescriptors( ..., l_B, l_A )
+ * @param[in] l_A         first non-empty feature list
+ * @param[in] l_B         second non-empty feature list
+ * @return true if pair_directory is empty or all files were written; false
+ *         after an error message on cerr otherwise
+ */
+static bool writeFiles( const Parameters& param,
+                        const vector<NearestDesc>& nearest_A_B,
+                        const vector<NearestDesc>& nearest_B_A,
+                        const feat_vector_t&       l_A,
+                        const feat_vector_t&       l_B )
+{
+    if( param.pair_directory.empty() ) return true;
+
+    /* writeFiles is never called if l_A or l_B is empty */
+    assert( !l_A.empty() );
+    assert( !l_B.empty() );
+
+    PairParams pp;
+    pp.radius_sigma      = param.pair_radius_sigma;
+    pp.radius_min        = param.pair_radius_min;
+    pp.max_scale_ratio   = param.pair_max_scale_ratio;
+    pp.ori_tolerance_deg = param.ori_tolerance_deg;
+    pp.desc_tolerance    = param.desc_tolerance;
+    vector<KeypointPair> pairs = matchKeypointsByPosition( l_A, l_B, pp );
+    classifyAgreement( pairs, l_A, l_B, pp );
+
+    if( ! writePairFiles( param.pair_directory, l_A, l_B, pairs ) )
+    {
+            cerr << "Cannot write the pair files into " << param.pair_directory << endl;
+            return false;
+    }
+    if( ! writeDescBinsFile( param.pair_directory, l_A, l_B, pairs ) )
+    {
+            cerr << "Cannot write desc_bins.csv into " << param.pair_directory << endl;
+            return false;
+    }
+    if( ! writeNearestFile( param.pair_directory / "desc_nn_a.csv",
+                            l_A, l_B, nearest_A_B, pairs, true ) ||
+        ! writeNearestFile( param.pair_directory / "desc_nn_b.csv",
+                            l_B, l_A, nearest_B_A, pairs, false ) )
+    {
+            cerr << "Cannot write the descriptor nearest neighbours into " << param.pair_directory << endl;
+            return false;
+    }
+
+    const auto at_least = [&]( Agreement level ) {
+        return count_if( pairs.begin(), pairs.end(),
+                         [level]( const KeypointPair& p ) { return p.level >= level; } );
+    };
+    cerr << "Co-located " << pairs.size() << " of " << l_A.size() << " keypoints in "
+         << param.input[0] << " and " << l_B.size() << " in " << param.input[1] << endl
+         << "  same orientation (<= " << pp.ori_tolerance_deg << " deg): "
+         << at_least( Agreement::Orientation ) << endl
+         << "  also similar descriptor (<= " << pp.desc_tolerance << "): "
+         << at_least( Agreement::Descriptor ) << endl;
+
+    return true;
+}
+
+/** Compares two descriptor files; see usage().
+ * @return EXIT_SUCCESS, or EXIT_FAILURE if: neither file has features and
+ *         --allow-empty is not given; exactly one file has none; a file has
+ *         more than std::numeric_limits<int>::max() features; a pair file
+ *         cannot be written; or the average best-match descriptor distance
+ *         exceeds --max-avg-dist. Exits earlier from parseargs() and
+ *         readFile().
+ */
+int main( int argc, char* argv[] )
+{
+    Parameters param;
+
+    parseargs( argc, argv, param );
+
+    feat_vector_t l_A;
+    feat_vector_t l_B;
+
+    readFile( l_A, param.input[0] );
+    readFile( l_B, param.input[1] );
+
+    /* If both inputs are empty, report this as an error if not explicitly
+     * permitted by a command line switch.
+     * Always exit.
+     */
+    if( l_A.empty() && l_B.empty() )
+    {
+        if( !param.allow_empty )
+        {
+            cerr << "FAIL: neither input contains features "
+                    "(use --allow-empty if that is expected)" << endl;
+            return EXIT_FAILURE;
+        }
+        cerr << "Average best-match descriptor distance: 0" << endl;
+        return EXIT_SUCCESS;
+    }
+
+    /* If only one input is empty, it is always an error.
+     */
+    if( l_A.empty() || l_B.empty() )
+    {
+        cerr << "FAIL: " << ( l_A.empty() ? param.input[0] : param.input[1] )
+             << " contains no features, but "
+             << ( l_A.empty() ? param.input[1] : param.input[0] ) << " does" << endl;
+        return EXIT_FAILURE;
+    }
+
+    if( l_A.size() > std::numeric_limits<int>::max() ||
+        l_B.size() > std::numeric_limits<int>::max() )
+    {
+        cerr << "FAIL: one of the files contains more than " << std::numeric_limits<int>::max()
+             << "descriptors." << std::endl
+             << "This tool does not support that and must be modified before continuing." << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    // The most expensive part: every descriptor of one first file against
+    // every descriptor of the other, in parallel where available.
+    vector<NearestDesc> nearest_A_B;
+    vector<NearestDesc> nearest_B_A;
+    nearestDescriptors( nearest_A_B, l_A, l_B );
+    nearestDescriptors( nearest_B_A, l_B, l_A );
+
+    bool written = writeFiles( param, nearest_A_B, nearest_B_A, l_A, l_B );
+    if( !written )
+        return EXIT_FAILURE;
+
+    ostream* outfile  = openOutputFile( param.outfile_name );
+
+    const float sum_min_dist = ( param.briefinfo )
+                             ? distanceSumBrief( param, outfile?outfile:&cout, l_A, l_B, nearest_A_B )
+                             : distanceSum( outfile?outfile:&cout, l_A, l_B );
+
+    delete outfile;
+
+    const float avg_min_dist = sum_min_dist / static_cast<float>(l_A.size());
+    cerr << "Average best-match descriptor distance: " << avg_min_dist << endl;
+
+    if( param.max_avg_desc_dist >= 0.0f && avg_min_dist > param.max_avg_desc_dist )
+    {
+        cerr << "FAIL: average best-match descriptor distance " << avg_min_dist
+             << " exceeds threshold " << param.max_avg_desc_dist << endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+static float distanceSumBrief( const Parameters& param, ostream* outfile, const feat_vector_t& l_A, const feat_vector_t& l_B, const vector<NearestDesc>& nearest_A_B )
+{
+    if( l_B.size() == 0 ) return INFINITY;
+
+    const int len = static_cast<int>( std::min<size_t>( l_A.size(), std::numeric_limits<int>::max() ) );
+
+    ostream*      descfile = openOutputFile( param.descfile_name );
+    desc_t        desc_stats = { 0 };
+
+    ostream* print_distances = param.descfile_verbose ? descfile : nullptr;
+
+    float sum_min_dist = 0.0f;
+
+    for( int i = 0; i < len; ++i ) // for loops over signed integer types are faster
+    {
+        l_A[i].printBestMatch( *outfile, print_distances, l_B[nearest_A_B[i].index],
+                               nearest_A_B[i].dist, desc_stats );
+        *outfile << endl;
+        sum_min_dist += nearest_A_B[i].dist;
+    }
+
+    if( descfile )
+    {
+        writeSummary( *descfile, desc_stats, l_A.size() );
+        delete descfile;
+    }
+
+    return sum_min_dist;
+}
+
+static float distanceSum( ostream* outfile, const feat_vector_t& l_A, const feat_vector_t& l_B )
+{
+    auto sum_min_dist{0.0f};
+    for( const auto& feature : l_A )
+        sum_min_dist += feature.compareAll( *outfile, l_B );
+    return sum_min_dist;
+}
+
+void writeSummary( ostream& descfile, const desc_t& desc_stats, std::size_t sz )
+{
+    descfile << "========== Summary Stats ==========" << endl
+             << "Average values:" << endl
+             << setprecision(3);
+    for( int i=0; i<DescSize ; i++ )
+    {
+        if( i%32==0  ) descfile << "X=0 | ";
+        if( i%32==8  ) descfile << "X=1 |  ";
+        if( i%32==16 ) descfile << "X=2 |   ";
+        if( i%32==24 ) descfile << "X=3 |    ";
+        float d = desc_stats[i] / static_cast<float>(sz);
+        descfile << setw(8) << d << " ";
+        if( i%8==7 ) descfile << endl;
+    }
+    descfile << endl;
+}
+
+void readFile( feat_vector_t& vec, const std::string& filename )
+{
+    ifstream infile( filename );
+
+    if( ! infile.good() )
+    {
+        cerr << "File " << filename << " could not be opened." << endl;
+        exit( -1 );
+    }
+
+    int lines_read = readFeats( vec, infile );
+    if( lines_read < 0 )
+    {
+        cerr << "File " << filename << " contains lines that are not features." << endl;
+        exit( EXIT_FAILURE );
+    }
+    cerr << "Read " << lines_read << " features from " << filename << endl;
+}
+
+static ostream* openOutputFile( const std::filesystem::path& outfile_name )
+{
+    if( outfile_name.empty() ) return nullptr;
+
+    ostream* o = new ofstream( outfile_name );
+    if( o->good() )
+    {
+        return o;
+    }
+    else
+    {
+        delete o;
+    }
+
+    return nullptr;
+}
+

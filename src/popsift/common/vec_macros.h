@@ -7,7 +7,7 @@
  */
 #pragma once
 
-#include <math.h>
+#include <cmath>
 
 __device__ static inline
 float2 operator+( float2 l, const float2& r )
