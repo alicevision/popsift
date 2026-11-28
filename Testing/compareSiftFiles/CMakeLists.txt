@@ -16,7 +16,7 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
   # Prefer Boost's own cmake config.
   cmake_policy(SET CMP0167 NEW)
 endif()
-find_package(Boost 1.71.0 REQUIRED COMPONENTS filesystem program_options)
+find_package(Boost 1.71.0 REQUIRED COMPONENTS program_options)
 if(WIN32)
   add_definitions("-DBOOST_ALL_NO_LIB")
 endif(WIN32)

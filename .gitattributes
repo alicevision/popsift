@@ -1,0 +1,2 @@
+# Patches are applied with git apply and must keep their LF line endings.
+Testing/**/*.patch -text

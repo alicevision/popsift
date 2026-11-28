@@ -36,7 +36,7 @@ void readFile( feat_vector_t& vec, const std::string& filename );
  * @param[in]     sz    number of samples summed in stats
  * @pre sz > 0
  */
-void writeSummary( ostream& file, const desc_t& stats, int sz );
+void writeSummary( ostream& file, const desc_t& stats, std::size_t sz );
 
 /** Opens a file for writing, truncating it.
  * @param[in] name file name, or empty
@@ -207,7 +207,7 @@ int main( int argc, char* argv[] )
 
     delete outfile;
 
-    const float avg_min_dist = sum_min_dist / l_A.size();
+    const float avg_min_dist = sum_min_dist / static_cast<float>(l_A.size());
     cerr << "Average best-match descriptor distance: " << avg_min_dist << endl;
 
     if( param.max_avg_desc_dist >= 0.0f && avg_min_dist > param.max_avg_desc_dist )
@@ -258,7 +258,7 @@ static float distanceSum( ostream* outfile, const feat_vector_t& l_A, const feat
     return sum_min_dist;
 }
 
-void writeSummary( ostream& descfile, const desc_t& desc_stats, int sz )
+void writeSummary( ostream& descfile, const desc_t& desc_stats, std::size_t sz )
 {
     descfile << "========== Summary Stats ==========" << endl
              << "Average values:" << endl
@@ -269,7 +269,7 @@ void writeSummary( ostream& descfile, const desc_t& desc_stats, int sz )
         if( i%32==8  ) descfile << "X=1 |  ";
         if( i%32==16 ) descfile << "X=2 |   ";
         if( i%32==24 ) descfile << "X=3 |    ";
-        float d = desc_stats[i] / sz;
+        float d = desc_stats[i] / static_cast<float>(sz);
         descfile << setw(8) << d << " ";
         if( i%8==7 ) descfile << endl;
     }
