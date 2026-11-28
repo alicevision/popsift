@@ -40,6 +40,6 @@ prints the available parameter sets and image sets.
 | [`datasets`](datasets/README.md) | how image sets are found, and a download script for the Oxford sets |
 | [`testImages`](testImages) | small hand-made images, the set `handcrafted` |
 | [`scripts`](scripts/README.md) | the comparison scripts and their reports |
-| [`analysis`](analysis/README.md) | plots and an interactive inspector of co-located keypoints, with numpy and matplotlib |
+| [`analysis`](analysis/README.md) | plots, an interactive inspector of co-located keypoints and an explorer of whole runs, with numpy and matplotlib; packs a run for testers |
 | [`gpuProbe`](gpuProbe) | `popsift-gpu-probe`, which tells the scripts whether a GPU is usable |
 | `paramsets.json` | named parameter sets for `popsift-demo` |
